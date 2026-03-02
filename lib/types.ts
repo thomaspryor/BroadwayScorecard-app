@@ -6,8 +6,9 @@
  * there, update MobileShow and mapMobileShow() here.
  */
 
-// Expected schema version from mobile-shows.json
+// Expected schema versions
 export const EXPECTED_SCHEMA_VERSION = 1;
+export const EXPECTED_DETAIL_SCHEMA_VERSION = 1;
 
 /** Raw abbreviated show data from mobile-shows.json */
 export interface MobileShow {
@@ -88,6 +89,103 @@ export interface Show {
   creativeTeam: { name: string; role: string }[];
   ticketLinks: { platform: string; url: string }[];
   officialUrl: string | null;
+}
+
+// ===========================================
+// PER-SHOW DETAIL (from /data/shows/{id}.json)
+// ===========================================
+
+/** Raw abbreviated per-show detail from CDN */
+export interface MobileShowDetail {
+  _v: number;
+  id: string;
+  bd?: { positive: number; mixed: number; negative: number };
+  rv?: {
+    cn: string | null;  // criticName
+    o: string;          // outlet display name
+    s: number;          // score 0-100
+    b: string;          // bucket (Positive/Mixed/Negative)
+    t: number;          // tier (1/2/3)
+    u?: string;         // url
+    d?: string;         // publishDate
+    q?: string;         // pullQuote
+    dg?: string;        // designation
+  }[];
+  au?: {
+    score: number;
+    designation: string | null;
+    sources?: {
+      ss?: { s: number; c: number };
+      mz?: { s: number; c: number; sr?: number | null };
+      rd?: { s: number; c: number; tp?: number; sent?: string | null };
+    };
+  };
+  hi?: string;   // hero image path
+  ta?: string;   // theater address
+  pd?: string;   // previews start date
+  ca?: { n: string; r: string }[];  // cast
+}
+
+/** Expanded per-show detail for components */
+export interface ShowDetail {
+  id: string;
+  breakdown: { positive: number; mixed: number; negative: number } | null;
+  reviews: {
+    criticName: string | null;
+    outlet: string;
+    score: number;
+    bucket: string;
+    tier: number;
+    url: string | null;
+    publishDate: string | null;
+    pullQuote: string | null;
+    designation: string | null;
+  }[];
+  audience: {
+    score: number;
+    designation: string | null;
+    sources: {
+      showScore: { score: number; count: number } | null;
+      mezzanine: { score: number; count: number; starRating: number | null } | null;
+      reddit: { score: number; count: number; totalPosts: number; sentiment: string | null } | null;
+    };
+  } | null;
+  heroImage: string | null;
+  theaterAddress: string | null;
+  previewsStartDate: string | null;
+  cast: { name: string; role: string }[];
+}
+
+/** Convert abbreviated detail to expanded form */
+export function mapShowDetail(raw: MobileShowDetail): ShowDetail {
+  return {
+    id: raw.id,
+    breakdown: raw.bd ?? null,
+    reviews: (raw.rv ?? []).map(r => ({
+      criticName: r.cn ?? null,
+      outlet: r.o,
+      score: r.s,
+      bucket: r.b,
+      tier: r.t,
+      url: r.u ?? null,
+      publishDate: r.d ?? null,
+      pullQuote: r.q ?? null,
+      designation: r.dg ?? null,
+    })),
+    audience: raw.au ? {
+      score: raw.au.score,
+      designation: raw.au.designation ?? null,
+      sources: {
+        showScore: raw.au.sources?.ss ? { score: raw.au.sources.ss.s, count: raw.au.sources.ss.c } : null,
+        mezzanine: raw.au.sources?.mz ? { score: raw.au.sources.mz.s, count: raw.au.sources.mz.c, starRating: raw.au.sources.mz.sr ?? null } : null,
+        reddit: raw.au.sources?.rd ? { score: raw.au.sources.rd.s, count: raw.au.sources.rd.c, totalPosts: raw.au.sources.rd.tp ?? 0, sentiment: raw.au.sources.rd.sent ?? null } : null,
+      },
+    } : null,
+    heroImage: raw.hi ?? null,
+    theaterAddress: raw.ta ?? null,
+    previewsStartDate: raw.pd ?? null,
+    cast: (raw.ca ?? []).map(c => ({ name: c.n, role: c.r })),
+  };
 }
 
 /**
