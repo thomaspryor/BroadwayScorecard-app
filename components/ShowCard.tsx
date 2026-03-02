@@ -25,23 +25,30 @@ interface ShowCardProps {
   hideStatus?: boolean;
 }
 
-function getRunDuration(openingDate: string | null, status: string): string | null {
+const MARKET_LABELS: Record<string, string> = {
+  'broadway': 'on Broadway',
+  'off-broadway': 'Off-Broadway',
+  'west-end': 'in the West End',
+};
+
+function getRunDuration(openingDate: string | null, status: string, category: string): string | null {
   if (!openingDate || status !== 'open') return null;
   const open = new Date(openingDate);
   if (isNaN(open.getTime())) return null;
 
+  const suffix = MARKET_LABELS[category] ?? 'on Broadway';
   const now = new Date();
   const totalMonths = Math.max(1, Math.round((now.getTime() - open.getTime()) / (30.44 * 24 * 60 * 60 * 1000)));
   if (totalMonths >= 24) {
     const years = Math.floor(totalMonths / 12);
-    return `${years} years on Broadway`;
+    return `${years} years ${suffix}`;
   }
   if (totalMonths >= 12) {
     const years = Math.floor(totalMonths / 12);
     const rem = totalMonths % 12;
-    return rem > 0 ? `${years} year${years > 1 ? 's' : ''}, ${rem} mo on Broadway` : `${years} year on Broadway`;
+    return rem > 0 ? `${years} year${years > 1 ? 's' : ''}, ${rem} mo ${suffix}` : `${years} year ${suffix}`;
   }
-  return `${totalMonths} mo on Broadway`;
+  return `${totalMonths} mo ${suffix}`;
 }
 
 function getClosingInfo(closingDate: string | null, status: string): string | null {
@@ -65,8 +72,8 @@ export const ShowCard = memo(function ShowCard({ show, scoreMode = 'critics', hi
   const router = useRouter();
   const imageUrl = getImageUrl(show.images.poster ?? show.images.thumbnail);
   const runInfo = useMemo(
-    () => getRunDuration(show.openingDate, show.status),
-    [show.openingDate, show.status]
+    () => getRunDuration(show.openingDate, show.status, show.category),
+    [show.openingDate, show.status, show.category]
   );
   const closingInfo = useMemo(
     () => getClosingInfo(show.closingDate, show.status),

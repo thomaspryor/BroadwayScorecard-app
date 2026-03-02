@@ -14,7 +14,7 @@ import { fetchShowDetail } from '@/lib/api';
 import { getImageUrl } from '@/lib/images';
 import { getScoreTier, getScoreColor } from '@/lib/score-utils';
 import { Show, ShowDetail, MobileShowDetail, mapShowDetail } from '@/lib/types';
-import { ScoreBadge, StatusBadge, FormatPill } from '@/components/show-cards';
+import { ScoreBadge, StatusBadge, FormatPill, ProductionPill, CategoryBadge } from '@/components/show-cards';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
 
 export default function ShowDetailScreen() {
@@ -108,13 +108,10 @@ export default function ShowDetailScreen() {
                 <Text style={styles.address}>{detail.theaterAddress}</Text>
               )}
               <View style={styles.pills}>
-                <StatusBadge status={show.status} />
                 <FormatPill type={show.type} />
-                {show.isRevival && (
-                  <View style={styles.revivalPill}>
-                    <Text style={styles.revivalText}>REVIVAL</Text>
-                  </View>
-                )}
+                <ProductionPill isRevival={show.isRevival} />
+                <StatusBadge status={show.status} />
+                <CategoryBadge category={show.category} />
               </View>
             </View>
             <ScoreBadge score={show.compositeScore} size="large" showLabel />
@@ -514,17 +511,6 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: Spacing.xs,
     marginTop: Spacing.sm,
-  },
-  revivalPill: {
-    backgroundColor: Colors.score.amber + '20',
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 2,
-    borderRadius: 9999,
-  },
-  revivalText: {
-    color: Colors.score.amber,
-    fontSize: FontSize.xs,
-    fontWeight: '600',
   },
   scoreCards: {
     flexDirection: 'row',
