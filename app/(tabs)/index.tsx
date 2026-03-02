@@ -124,10 +124,10 @@ export default function HomeScreen() {
             {/* Brand header + market picker */}
             <View style={styles.header}>
               <View style={styles.headerRow}>
-                <View>
-                  <Text style={styles.brandText}>Broadway</Text>
+                <Text style={styles.brandText}>
+                  Broadway{' '}
                   <Text style={styles.brandAccent}>Scorecard</Text>
-                </View>
+                </Text>
                 <MarketPicker market={market} onChange={setMarket} />
               </View>
               <Text style={styles.subtitle}>
@@ -209,14 +209,11 @@ const styles = StyleSheet.create({
   },
   brandText: {
     color: Colors.text.primary,
-    fontSize: FontSize.title,
+    fontSize: FontSize.xxl,
     fontWeight: '700',
   },
   brandAccent: {
     color: Colors.brand,
-    fontSize: FontSize.title,
-    fontWeight: '700',
-    marginTop: -4,
   },
   subtitle: {
     color: Colors.text.secondary,
