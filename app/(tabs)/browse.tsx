@@ -97,7 +97,9 @@ export default function BrowseScreen() {
     [shows, market, includeOB]
   );
 
-  const renderItem = useCallback(({ item }: { item: Show }) => <ShowCard show={item} scoreMode={scoreMode} />, [scoreMode]);
+  const renderItem = useCallback(({ item }: { item: Show }) => (
+    <ShowCard show={item} scoreMode={scoreMode} hideStatus={statusFilter === 'open'} />
+  ), [scoreMode, statusFilter]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);

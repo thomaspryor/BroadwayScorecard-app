@@ -87,7 +87,7 @@ export default function HomeScreen() {
     [marketShows]
   );
 
-  const renderItem = useCallback(({ item }: { item: Show }) => <ShowCard show={item} />, []);
+  const renderItem = useCallback(({ item }: { item: Show }) => <ShowCard show={item} hideStatus />, []);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);

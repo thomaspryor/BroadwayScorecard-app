@@ -7,6 +7,7 @@
 import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import Svg, { Path } from 'react-native-svg';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -62,10 +63,16 @@ function GoldShimmer({ size }: { size: number }) {
 }
 
 function Crown() {
+  // Thin 3-point crown matching the website — very subtle, sits just above the badge
   return (
-    <Text style={{ fontSize: 8, lineHeight: 10, textAlign: 'center', color: '#DAA520', marginBottom: -1 }}>
-      {'\u265B'}
-    </Text>
+    <View style={{ alignItems: 'center', marginBottom: -1 }}>
+      <Svg width={14} height={6} viewBox="0 0 14 6">
+        <Path
+          d="M0,6 L1,2 L3.5,4 L7,0 L10.5,4 L13,2 L14,6 Z"
+          fill="#C8960E"
+        />
+      </Svg>
+    </View>
   );
 }
 

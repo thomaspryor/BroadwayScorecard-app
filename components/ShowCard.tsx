@@ -19,6 +19,7 @@ import type { ScoreMode } from '@/components/ScoreToggle';
 interface ShowCardProps {
   show: Show;
   scoreMode?: ScoreMode;
+  hideStatus?: boolean;
 }
 
 function getRunDuration(openingDate: string | null, closingDate: string | null, status: string): string | null {
@@ -49,9 +50,9 @@ function getRunDuration(openingDate: string | null, closingDate: string | null, 
   return null;
 }
 
-export const ShowCard = memo(function ShowCard({ show, scoreMode = 'critics' }: ShowCardProps) {
+export const ShowCard = memo(function ShowCard({ show, scoreMode = 'critics', hideStatus = false }: ShowCardProps) {
   const router = useRouter();
-  const thumbnailUrl = getImageUrl(show.images.thumbnail);
+  const imageUrl = getImageUrl(show.images.poster ?? show.images.thumbnail);
   const runInfo = useMemo(
     () => getRunDuration(show.openingDate, show.closingDate, show.status),
     [show.openingDate, show.closingDate, show.status]
@@ -62,17 +63,17 @@ export const ShowCard = memo(function ShowCard({ show, scoreMode = 'critics' }: 
       style={({ pressed }) => [styles.container, pressed && styles.pressed]}
       onPress={() => router.push(`/show/${show.slug}`)}
     >
-      {/* Thumbnail */}
-      <View style={styles.thumbnailContainer}>
-        {thumbnailUrl ? (
+      {/* Poster image */}
+      <View style={styles.imageContainer}>
+        {imageUrl ? (
           <Image
-            source={{ uri: thumbnailUrl }}
-            style={styles.thumbnail}
+            source={{ uri: imageUrl }}
+            style={styles.posterImage}
             contentFit="cover"
             transition={200}
           />
         ) : (
-          <View style={[styles.thumbnail, styles.placeholderThumb]}>
+          <View style={[styles.posterImage, styles.placeholderThumb]}>
             <Text style={styles.placeholderText}>
               {show.title.charAt(0)}
             </Text>
@@ -89,7 +90,7 @@ export const ShowCard = memo(function ShowCard({ show, scoreMode = 'critics' }: 
           {show.venue}
         </Text>
         <View style={styles.pills}>
-          <StatusBadge status={show.status} />
+          {!hideStatus && <StatusBadge status={show.status} />}
           <FormatPill type={show.type} />
         </View>
         {runInfo && (
@@ -137,12 +138,12 @@ const styles = StyleSheet.create({
   pressed: {
     opacity: 0.7,
   },
-  thumbnailContainer: {
+  imageContainer: {
     marginRight: Spacing.md,
   },
-  thumbnail: {
-    width: 56,
-    height: 56,
+  posterImage: {
+    width: 64,
+    height: 80,
     borderRadius: BorderRadius.sm,
   },
   placeholderThumb: {
