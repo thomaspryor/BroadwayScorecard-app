@@ -17,6 +17,7 @@ import { Show, ShowDetail, MobileShowDetail, mapShowDetail } from '@/lib/types';
 import { ScoreBadge, StatusBadge, FormatPill, ProductionPill, CategoryBadge } from '@/components/show-cards';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
 import { trackTicketTap, trackBuyButtonTap } from '@/lib/analytics';
+import Svg, { Path } from 'react-native-svg';
 
 export default function ShowDetailScreen() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
@@ -84,7 +85,10 @@ export default function ShowDetailScreen() {
 
   const posterUrl = getImageUrl(show.images.poster) || getImageUrl(show.images.thumbnail);
   const heroUrl = detail?.heroImage ? getImageUrl(detail.heroImage) : null;
-  const headerImage = posterUrl || heroUrl;
+  // Hero images are high-res (designed for full-width). Poster images are small (card-sized).
+  // Use hero for full-width cover; fall back to poster in a contained (non-stretched) format.
+  const hasHero = !!heroUrl;
+  const headerImage = heroUrl || posterUrl;
 
   // Primary ticket link: prefer TodayTix, then first available
   const primaryTicketLink = useMemo(() => {
@@ -99,14 +103,25 @@ export default function ShowDetailScreen() {
       <Stack.Screen options={{ title: show.title }} />
       <View style={styles.container}>
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
-        {/* Hero / Poster */}
+        {/* Hero (full-width cover) or Poster (contained, centered) */}
         {headerImage && (
-          <Image
-            source={{ uri: headerImage }}
-            style={styles.poster}
-            contentFit="cover"
-            transition={300}
-          />
+          hasHero ? (
+            <Image
+              source={{ uri: headerImage }}
+              style={styles.heroImage}
+              contentFit="cover"
+              transition={300}
+            />
+          ) : (
+            <View style={styles.posterContainer}>
+              <Image
+                source={{ uri: headerImage }}
+                style={styles.posterImage}
+                contentFit="contain"
+                transition={300}
+              />
+            </View>
+          )
         )}
 
         {/* Title + Score section */}
@@ -221,12 +236,17 @@ export default function ShowDetailScreen() {
                 </Text>
               </View>
             </View>
-            {/* Horizontal source cards */}
+            {/* Horizontal source cards with logos (matching website) */}
             {detail.audience.sources && (
               <View style={styles.audienceSourceCards}>
                 {detail.audience.sources.showScore && (
                   <View style={styles.audienceSourceCard}>
-                    <Text style={styles.audienceSourceLabel}>SHOW SCORE</Text>
+                    <View style={styles.audienceSourceHeader}>
+                      <Svg width={14} height={14} viewBox="0 0 24 24" fill="#facc15">
+                        <Path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                      </Svg>
+                      <Text style={styles.audienceSourceLabel}>SHOW SCORE</Text>
+                    </View>
                     <Text style={styles.audienceSourceValue}>
                       {detail.audience.sources.showScore.score}%
                     </Text>
@@ -237,7 +257,12 @@ export default function ShowDetailScreen() {
                 )}
                 {detail.audience.sources.mezzanine && (
                   <View style={styles.audienceSourceCard}>
-                    <Text style={styles.audienceSourceLabel}>MEZZANINE</Text>
+                    <View style={styles.audienceSourceHeader}>
+                      <Svg width={14} height={14} viewBox="0 0 24 24" fill="#c084fc">
+                        <Path d="M20 2H4c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM8 20H4v-4h4v4zm0-6H4v-4h4v4zm6 6h-4v-4h4v4zm0-6h-4v-4h4v4zm6 6h-4v-4h4v4zm0-6h-4v-4h4v4z" />
+                      </Svg>
+                      <Text style={styles.audienceSourceLabel}>MEZZANINE</Text>
+                    </View>
                     <Text style={styles.audienceSourceValue}>
                       {detail.audience.sources.mezzanine.starRating != null
                         ? `${detail.audience.sources.mezzanine.starRating}/5`
@@ -250,7 +275,12 @@ export default function ShowDetailScreen() {
                 )}
                 {detail.audience.sources.reddit && (
                   <View style={styles.audienceSourceCard}>
-                    <Text style={styles.audienceSourceLabel}>REDDIT</Text>
+                    <View style={styles.audienceSourceHeader}>
+                      <Svg width={14} height={14} viewBox="0 0 24 24" fill="#fb923c">
+                        <Path d="M12 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0zm5.01 4.744c.688 0 1.25.561 1.25 1.249a1.25 1.25 0 0 1-2.498.056l-2.597-.547-.8 3.747c1.824.07 3.48.632 4.674 1.488.308-.309.73-.491 1.207-.491.968 0 1.754.786 1.754 1.754 0 .716-.435 1.333-1.01 1.614a3.111 3.111 0 0 1 .042.52c0 2.694-3.13 4.87-7.004 4.87-3.874 0-7.004-2.176-7.004-4.87 0-.183.015-.366.043-.534A1.748 1.748 0 0 1 4.028 12c0-.968.786-1.754 1.754-1.754.463 0 .898.196 1.207.49 1.207-.883 2.878-1.43 4.744-1.487l.885-4.182a.342.342 0 0 1 .14-.197.35.35 0 0 1 .238-.042l2.906.617a1.214 1.214 0 0 1 1.108-.701zM9.25 12C8.561 12 8 12.562 8 13.25c0 .687.561 1.248 1.25 1.248.687 0 1.248-.561 1.248-1.249 0-.688-.561-1.249-1.249-1.249zm5.5 0c-.687 0-1.248.561-1.248 1.25 0 .687.561 1.248 1.249 1.248.688 0 1.249-.561 1.249-1.249 0-.687-.562-1.249-1.25-1.249zm-5.466 3.99a.327.327 0 0 0-.231.094.33.33 0 0 0 0 .463c.842.842 2.484.913 2.961.913.477 0 2.105-.056 2.961-.913a.361.361 0 0 0 .029-.463.33.33 0 0 0-.464 0c-.547.533-1.684.73-2.512.73-.828 0-1.979-.196-2.512-.73a.326.326 0 0 0-.232-.095z" />
+                      </Svg>
+                      <Text style={styles.audienceSourceLabel}>REDDIT</Text>
+                    </View>
                     <Text style={styles.audienceSourceValue}>
                       {detail.audience.sources.reddit.score}%
                     </Text>
@@ -559,9 +589,21 @@ const styles = StyleSheet.create({
     color: Colors.text.muted,
     fontSize: FontSize.lg,
   },
-  poster: {
+  heroImage: {
     width: '100%',
     height: 280,
+  },
+  posterContainer: {
+    backgroundColor: Colors.surface.raised,
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 300,
+    paddingVertical: Spacing.lg,
+  },
+  posterImage: {
+    width: 180,
+    height: 270,
+    borderRadius: BorderRadius.md,
   },
   titleSection: {
     padding: Spacing.lg,
@@ -786,12 +828,17 @@ const styles = StyleSheet.create({
     padding: Spacing.md,
     alignItems: 'center',
   },
+  audienceSourceHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginBottom: 4,
+  },
   audienceSourceLabel: {
     color: Colors.text.muted,
     fontSize: 9,
     fontWeight: '700',
     letterSpacing: 0.5,
-    marginBottom: 4,
   },
   audienceSourceValue: {
     color: Colors.text.primary,
