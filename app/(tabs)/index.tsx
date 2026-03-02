@@ -1,6 +1,6 @@
 /**
- * Home tab — market picker, score toggle, featured rows, currently playing shows.
- * Defaults to NYC market (broadway + off-broadway), critics mode.
+ * Home tab — market picker, featured rows, currently playing shows.
+ * Defaults to NYC market (Broadway only — no off-broadway). Critics mode only.
  */
 
 import React, { useMemo, useCallback, useState } from 'react';
@@ -9,42 +9,28 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useShows } from '@/lib/data-context';
 import { ShowCard } from '@/components/ShowCard';
 import { FeaturedCarousel } from '@/components/FeaturedCarousel';
-import { MarketPicker, Market, filterByMarket } from '@/components/MarketPicker';
-import { ScoreToggle, ScoreMode } from '@/components/ScoreToggle';
+import { MarketPicker, Market, filterByMarketCategory } from '@/components/MarketPicker';
 import { Show } from '@/lib/types';
 import { Colors, Spacing, FontSize } from '@/constants/theme';
-
-/** A themed featured row definition */
-interface FeaturedRow {
-  title: string;
-  filter: (s: Show) => boolean;
-  sort?: (a: Show, b: Show) => number;
-  limit?: number;
-}
 
 export default function HomeScreen() {
   const { shows, isLoading, error, isStale, refresh } = useShows();
   const insets = useSafeAreaInsets();
   const [market, setMarket] = useState<Market>('nyc');
-  const [scoreMode, setScoreMode] = useState<ScoreMode>('critics');
   const [refreshing, setRefreshing] = useState(false);
 
+  // Home: Broadway-only for NYC (no off-broadway), all west-end for London
   const marketShows = useMemo(
-    () => shows.filter(s => filterByMarket(s.category, market)),
+    () => shows.filter(s => filterByMarketCategory(s.category, market, false)),
     [shows, market]
   );
 
+  // Main list: open shows only (no previews), sorted by newest opening date
   const openShows = useMemo(() => {
-    const filtered = marketShows.filter(s => s.status === 'open' || s.status === 'previews');
-    if (scoreMode === 'audience') {
-      return filtered.sort((a, b) => {
-        const aGrade = a.audienceGrade?.grade ?? 'Z';
-        const bGrade = b.audienceGrade?.grade ?? 'Z';
-        return aGrade.localeCompare(bGrade);
-      });
-    }
-    return filtered.sort((a, b) => (b.compositeScore ?? 0) - (a.compositeScore ?? 0));
-  }, [marketShows, scoreMode]);
+    return marketShows
+      .filter(s => s.status === 'open')
+      .sort((a, b) => (b.openingDate ?? '').localeCompare(a.openingDate ?? ''));
+  }, [marketShows]);
 
   // Themed featured rows
   const featuredRows = useMemo((): { title: string; shows: Show[] }[] => {
@@ -94,7 +80,7 @@ export default function HomeScreen() {
     [marketShows]
   );
 
-  const renderItem = useCallback(({ item }: { item: Show }) => <ShowCard show={item} scoreMode={scoreMode} />, [scoreMode]);
+  const renderItem = useCallback(({ item }: { item: Show }) => <ShowCard show={item} />, []);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -147,11 +133,6 @@ export default function HomeScreen() {
                   </Text>
                 </View>
               )}
-            </View>
-
-            {/* Score toggle */}
-            <View style={styles.toggleRow}>
-              <ScoreToggle mode={scoreMode} onChange={setScoreMode} />
             </View>
 
             {/* Featured rows */}
@@ -245,10 +226,6 @@ const styles = StyleSheet.create({
   staleText: {
     color: Colors.score.amber,
     fontSize: FontSize.sm,
-  },
-  toggleRow: {
-    paddingHorizontal: Spacing.lg,
-    marginBottom: Spacing.md,
   },
   sectionTitle: {
     color: Colors.text.primary,

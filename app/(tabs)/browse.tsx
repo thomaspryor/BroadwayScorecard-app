@@ -8,7 +8,7 @@ import { View, Text, FlatList, StyleSheet, ActivityIndicator, ScrollView, Pressa
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useShows } from '@/lib/data-context';
 import { ShowCard } from '@/components/ShowCard';
-import { MarketPicker, Market, filterByMarket } from '@/components/MarketPicker';
+import { MarketPicker, Market, filterByMarketCategory } from '@/components/MarketPicker';
 import { ScoreToggle, ScoreMode } from '@/components/ScoreToggle';
 import { Show } from '@/lib/types';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
@@ -53,12 +53,13 @@ export default function BrowseScreen() {
   const insets = useSafeAreaInsets();
   const [market, setMarket] = useState<Market>('nyc');
   const [scoreMode, setScoreMode] = useState<ScoreMode>('critics');
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('open');
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
   const [sortBy, setSortBy] = useState<SortOption>('score');
+  const [includeOB, setIncludeOB] = useState(false);
 
   const filteredShows = useMemo(() => {
-    let result = shows.filter(s => filterByMarket(s.category, market));
+    let result = shows.filter(s => filterByMarketCategory(s.category, market, includeOB));
 
     if (statusFilter !== 'all') {
       result = result.filter(s => s.status === statusFilter);
@@ -88,11 +89,11 @@ export default function BrowseScreen() {
     }
 
     return result;
-  }, [shows, market, statusFilter, typeFilter, sortBy, scoreMode]);
+  }, [shows, market, includeOB, statusFilter, typeFilter, sortBy, scoreMode]);
 
   const totalForMarket = useMemo(
-    () => shows.filter(s => filterByMarket(s.category, market)).length,
-    [shows, market]
+    () => shows.filter(s => filterByMarketCategory(s.category, market, includeOB)).length,
+    [shows, market, includeOB]
   );
 
   const renderItem = useCallback(({ item }: { item: Show }) => <ShowCard show={item} scoreMode={scoreMode} />, [scoreMode]);
@@ -127,24 +128,22 @@ export default function BrowseScreen() {
               {filteredShows.length} of {totalForMarket} shows
             </Text>
 
-            {/* Score toggle */}
-            <View style={styles.toggleRow}>
+            {/* Status filter + Score toggle */}
+            <View style={styles.statusRow}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterGroup}>
+                {STATUS_OPTIONS.map(opt => (
+                  <FilterPill
+                    key={opt.key}
+                    label={opt.label}
+                    active={statusFilter === opt.key}
+                    onPress={() => setStatusFilter(opt.key)}
+                  />
+                ))}
+              </ScrollView>
               <ScoreToggle mode={scoreMode} onChange={setScoreMode} />
             </View>
 
-            {/* Status filter */}
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterRow}>
-              {STATUS_OPTIONS.map(opt => (
-                <FilterPill
-                  key={opt.key}
-                  label={opt.label}
-                  active={statusFilter === opt.key}
-                  onPress={() => setStatusFilter(opt.key)}
-                />
-              ))}
-            </ScrollView>
-
-            {/* Type + Sort */}
+            {/* Type + Sort + OB toggle */}
             <View style={styles.filterRowInline}>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterGroup}>
                 {TYPE_OPTIONS.map(opt => (
@@ -155,9 +154,7 @@ export default function BrowseScreen() {
                     onPress={() => setTypeFilter(opt.key)}
                   />
                 ))}
-              </ScrollView>
-              <View style={styles.sortDivider} />
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterGroup}>
+                <View style={styles.sortDivider} />
                 {SORT_OPTIONS.map(opt => (
                   <FilterPill
                     key={opt.key}
@@ -166,6 +163,16 @@ export default function BrowseScreen() {
                     onPress={() => setSortBy(opt.key)}
                   />
                 ))}
+                {market === 'nyc' && (
+                  <>
+                    <View style={styles.sortDivider} />
+                    <FilterPill
+                      label="Off-Bway"
+                      active={includeOB}
+                      onPress={() => setIncludeOB(!includeOB)}
+                    />
+                  </>
+                )}
               </ScrollView>
             </View>
           </View>
@@ -223,11 +230,10 @@ const styles = StyleSheet.create({
     marginTop: Spacing.xs,
     paddingHorizontal: Spacing.lg,
   },
-  toggleRow: {
-    paddingHorizontal: Spacing.lg,
-    marginTop: Spacing.md,
-  },
-  filterRow: {
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     marginTop: Spacing.md,
     paddingHorizontal: Spacing.lg,
   },

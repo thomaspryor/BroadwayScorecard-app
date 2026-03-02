@@ -37,10 +37,18 @@ export function MarketPicker({ market, onChange }: MarketPickerProps) {
   );
 }
 
-/** Filter shows by market selection */
+/** Filter shows by market selection (includes off-broadway for NYC) */
 export function filterByMarket(category: string, market: Market): boolean {
   if (market === 'nyc') {
     return category === 'broadway' || category === 'off-broadway';
+  }
+  return category === 'west-end';
+}
+
+/** Filter by market with off-broadway control. Home uses includeOB=false. Browse can toggle. */
+export function filterByMarketCategory(category: string, market: Market, includeOB: boolean): boolean {
+  if (market === 'nyc') {
+    return category === 'broadway' || (includeOB && category === 'off-broadway');
   }
   return category === 'west-end';
 }

@@ -15,6 +15,8 @@ import { Colors } from '@/constants/theme';
 export interface ScoreTier {
   label: string;
   color: string;
+  textColor: string;
+  shadowColor: string;
   glow: boolean;
   range: string;
 }
@@ -23,30 +25,40 @@ const SCORE_TIERS = {
   mustSee: {
     label: 'Critical Gold',
     color: '#FFD700',
+    textColor: '#1a1a1a',
+    shadowColor: '#DAA520',
     glow: true,
     range: '83-100',
   },
   recommended: {
     label: 'Recommended',
     color: '#22c55e',
+    textColor: '#ffffff',
+    shadowColor: '#22c55e',
     glow: false,
     range: '75-82',
   },
   worthSeeing: {
     label: 'Worth Seeing',
     color: '#14b8a6',
+    textColor: '#ffffff',
+    shadowColor: '#14b8a6',
     glow: false,
     range: '65-74',
   },
   skippable: {
     label: 'Skippable',
     color: '#d97706',
+    textColor: '#1a1a1a',
+    shadowColor: '#d97706',
     glow: false,
     range: '55-64',
   },
   stayAway: {
     label: 'Stay Away',
     color: '#ef4444',
+    textColor: '#ffffff',
+    shadowColor: '#ef4444',
     glow: false,
     range: '<55',
   },
