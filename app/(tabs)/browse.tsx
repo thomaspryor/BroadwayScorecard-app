@@ -11,6 +11,7 @@ import { ShowCard } from '@/components/ShowCard';
 import { MarketPicker, Market, filterByMarketCategory } from '@/components/MarketPicker';
 import { ScoreToggle, ScoreMode } from '@/components/ScoreToggle';
 import { Show } from '@/lib/types';
+import { StaleBanner } from '@/components/StaleBanner';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
 
 type StatusFilter = 'all' | 'open' | 'previews' | 'closed';
@@ -122,7 +123,9 @@ export default function BrowseScreen() {
         keyExtractor={item => item.id}
         renderItem={renderItem}
         ListHeaderComponent={
-          <View style={styles.header}>
+          <View>
+            <StaleBanner />
+            <View style={styles.header}>
             <View style={styles.headerRow}>
               <Text style={styles.title}>Browse Shows</Text>
               <MarketPicker market={market} onChange={setMarket} />
@@ -179,6 +182,7 @@ export default function BrowseScreen() {
                 )}
               </ScrollView>
             </View>
+          </View>
           </View>
         }
         contentContainerStyle={styles.list}

@@ -11,10 +11,11 @@ import { ShowCard } from '@/components/ShowCard';
 import { FeaturedCarousel } from '@/components/FeaturedCarousel';
 import { MarketPicker, Market, filterByMarketCategory } from '@/components/MarketPicker';
 import { Show } from '@/lib/types';
+import { StaleBanner } from '@/components/StaleBanner';
 import { Colors, Spacing, FontSize } from '@/constants/theme';
 
 export default function HomeScreen() {
-  const { shows, isLoading, error, isStale, refresh } = useShows();
+  const { shows, isLoading, error, refresh } = useShows();
   const insets = useSafeAreaInsets();
   const [market, setMarket] = useState<Market>('nyc');
   const [refreshing, setRefreshing] = useState(false);
@@ -133,13 +134,7 @@ export default function HomeScreen() {
               <Text style={styles.subtitle}>
                 {scoredCount} shows scored by critics
               </Text>
-              {isStale && (
-                <View style={styles.staleBanner}>
-                  <Text style={styles.staleText}>
-                    Showing cached data. Pull to refresh.
-                  </Text>
-                </View>
-              )}
+              <StaleBanner />
             </View>
 
             {/* Featured rows */}
@@ -219,17 +214,6 @@ const styles = StyleSheet.create({
     color: Colors.text.secondary,
     fontSize: FontSize.md,
     marginTop: Spacing.sm,
-  },
-  staleBanner: {
-    backgroundColor: Colors.score.amber + '20',
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderRadius: 8,
-    marginTop: Spacing.md,
-  },
-  staleText: {
-    color: Colors.score.amber,
-    fontSize: FontSize.sm,
   },
   sectionTitle: {
     color: Colors.text.primary,
