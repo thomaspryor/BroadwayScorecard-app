@@ -171,8 +171,8 @@ const styles = StyleSheet.create({
     marginRight: Spacing.md,
   },
   showImage: {
-    width: 80,
-    height: 80,
+    width: 72,
+    height: 96,
     borderRadius: BorderRadius.sm,
   },
   placeholderThumb: {
