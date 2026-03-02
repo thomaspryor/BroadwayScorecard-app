@@ -1,10 +1,10 @@
 /**
  * Critics / Audience score mode toggle.
- * Matches the website's ScoreToggle component.
+ * Matches the website's ScoreToggle: uppercase, rounded-lg, shadow on active.
  */
 
 import React from 'react';
-import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { View, Text, Pressable, StyleSheet, Platform } from 'react-native';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
 
 export type ScoreMode = 'critics' | 'audience';
@@ -15,8 +15,8 @@ interface ScoreToggleProps {
 }
 
 const OPTIONS: { key: ScoreMode; label: string }[] = [
-  { key: 'critics', label: 'Critics' },
-  { key: 'audience', label: 'Audience' },
+  { key: 'critics', label: 'CRITICS' },
+  { key: 'audience', label: 'AUDIENCE' },
 ];
 
 export function ScoreToggle({ mode, onChange }: ScoreToggleProps) {
@@ -40,25 +40,37 @@ export function ScoreToggle({ mode, onChange }: ScoreToggleProps) {
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
-    backgroundColor: Colors.surface.raised,
-    borderRadius: BorderRadius.pill,
-    padding: 3,
+    backgroundColor: Colors.surface.overlay,
+    borderRadius: BorderRadius.sm,
+    padding: 2,
     alignSelf: 'flex-start',
     borderWidth: 1,
-    borderColor: Colors.border.subtle,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   option: {
     paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.xs,
-    borderRadius: BorderRadius.pill,
+    paddingVertical: 6,
+    borderRadius: 6,
   },
   optionActive: {
     backgroundColor: Colors.brand,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.2,
+        shadowRadius: 2,
+      },
+      android: {
+        elevation: 2,
+      },
+    }),
   },
   label: {
     color: Colors.text.muted,
-    fontSize: FontSize.sm,
-    fontWeight: '600',
+    fontSize: FontSize.xs,
+    fontWeight: '700',
+    letterSpacing: 0.8,
   },
   labelActive: {
     color: Colors.text.inverse,

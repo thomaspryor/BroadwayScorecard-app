@@ -19,7 +19,7 @@ interface FeaturedCarouselProps {
 function FeaturedCard({ show, cardWidth }: { show: Show; cardWidth: number }) {
   const router = useRouter();
   const posterUrl = getImageUrl(show.images.poster) || getImageUrl(show.images.thumbnail);
-  const cardHeight = cardWidth * 1.35;
+  const cardHeight = cardWidth * 1.5;
 
   return (
     <Pressable
@@ -63,8 +63,8 @@ export function FeaturedCarousel({ shows }: FeaturedCarouselProps) {
   const { width } = useWindowDimensions();
   if (shows.length === 0) return null;
 
-  // Responsive: show more cards on wider screens
-  const cardWidth = width >= 768 ? width * 0.25 : width * 0.42;
+  // Responsive: show more cards on wider screens (website uses ~112px on mobile)
+  const cardWidth = width >= 768 ? width * 0.2 : width * 0.3;
 
   return (
     <View style={styles.container}>

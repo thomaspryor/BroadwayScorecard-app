@@ -26,9 +26,9 @@ interface ScoreBadgeProps {
 }
 
 const SIZES = {
-  small: { box: 36, font: FontSize.sm, labelFont: 0, radius: BorderRadius.sm },
-  medium: { box: 48, font: FontSize.xl, labelFont: FontSize.xs, radius: BorderRadius.md },
-  large: { box: 64, font: FontSize.xxl, labelFont: FontSize.sm, radius: BorderRadius.lg },
+  small: { box: 40, font: FontSize.sm, labelFont: 0, radius: BorderRadius.sm },
+  medium: { box: 56, font: FontSize.xl, labelFont: FontSize.xs, radius: BorderRadius.md },
+  large: { box: 64, font: FontSize.xxl, labelFont: FontSize.sm, radius: BorderRadius.md },
 } as const;
 
 const GOLD_GRADIENT: [string, string, string, string, string] = [
@@ -131,26 +131,25 @@ export function ScoreBadge({ score, size = 'medium', showLabel = false, animated
 
       {/* Badge */}
       {isGold ? (
-        <View style={[styles.goldWrapper, { borderRadius: dim.radius + 2 }, shadowStyle]}>
-          <LinearGradient
-            colors={GOLD_GRADIENT}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={[
-              styles.badge,
-              {
-                width: dim.box,
-                height: dim.box,
-                borderRadius: dim.radius,
-              },
-            ]}
-          >
-            <Text style={[styles.score, { fontSize: dim.font, color: tier.textColor }]}>
-              {rounded}
-            </Text>
-            {animated && <GoldShimmer size={dim.box} />}
-          </LinearGradient>
-        </View>
+        <LinearGradient
+          colors={GOLD_GRADIENT}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[
+            styles.badge,
+            {
+              width: dim.box,
+              height: dim.box,
+              borderRadius: dim.radius,
+            },
+            shadowStyle,
+          ]}
+        >
+          <Text style={[styles.score, { fontSize: dim.font, color: tier.textColor }]}>
+            {rounded}
+          </Text>
+          {animated && <GoldShimmer size={dim.box} />}
+        </LinearGradient>
       ) : (
         <View
           style={[
@@ -180,11 +179,6 @@ const styles = StyleSheet.create({
   badge: {
     alignItems: 'center',
     justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  goldWrapper: {
-    borderWidth: 2,
-    borderColor: '#C8960E',
     overflow: 'hidden',
   },
   score: {
