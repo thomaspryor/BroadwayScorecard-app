@@ -1,10 +1,10 @@
 /**
  * Featured carousel — horizontal scrolling poster cards.
- * Shows top 10 currently-open shows by compositeScore.
+ * Responsive sizing via useWindowDimensions.
  */
 
 import React from 'react';
-import { View, Text, FlatList, StyleSheet, Pressable, Dimensions } from 'react-native';
+import { View, Text, FlatList, StyleSheet, Pressable, useWindowDimensions } from 'react-native';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { Show } from '@/lib/types';
@@ -12,20 +12,22 @@ import { getImageUrl } from '@/lib/images';
 import { ScoreBadge } from '@/components/show-cards';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
 
-const CARD_WIDTH = Dimensions.get('window').width * 0.42;
-const CARD_HEIGHT = CARD_WIDTH * 1.35;
-
 interface FeaturedCarouselProps {
   shows: Show[];
 }
 
-function FeaturedCard({ show }: { show: Show }) {
+function FeaturedCard({ show, cardWidth }: { show: Show; cardWidth: number }) {
   const router = useRouter();
   const posterUrl = getImageUrl(show.images.poster) || getImageUrl(show.images.thumbnail);
+  const cardHeight = cardWidth * 1.35;
 
   return (
     <Pressable
-      style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
+      style={({ pressed }) => [
+        styles.card,
+        { width: cardWidth, height: cardHeight },
+        pressed && styles.cardPressed,
+      ]}
       onPress={() => router.push(`/show/${show.slug}`)}
     >
       {posterUrl ? (
@@ -57,19 +59,22 @@ function FeaturedCard({ show }: { show: Show }) {
 }
 
 export function FeaturedCarousel({ shows }: FeaturedCarouselProps) {
+  const { width } = useWindowDimensions();
   if (shows.length === 0) return null;
+
+  // Responsive: show more cards on wider screens
+  const cardWidth = width >= 768 ? width * 0.25 : width * 0.42;
 
   return (
     <View style={styles.container}>
-      <Text style={styles.sectionTitle}>Top Shows</Text>
       <FlatList
         horizontal
         data={shows}
         keyExtractor={item => item.id}
-        renderItem={({ item }) => <FeaturedCard show={item} />}
+        renderItem={({ item }) => <FeaturedCard show={item} cardWidth={cardWidth} />}
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.list}
-        snapToInterval={CARD_WIDTH + Spacing.md}
+        snapToInterval={cardWidth + Spacing.md}
         decelerationRate="fast"
       />
     </View>
@@ -78,21 +83,12 @@ export function FeaturedCarousel({ shows }: FeaturedCarouselProps) {
 
 const styles = StyleSheet.create({
   container: {
-    marginBottom: Spacing.lg,
-  },
-  sectionTitle: {
-    color: Colors.text.primary,
-    fontSize: FontSize.xl,
-    fontWeight: '700',
-    paddingHorizontal: Spacing.lg,
-    marginBottom: Spacing.md,
+    marginBottom: Spacing.sm,
   },
   list: {
     paddingHorizontal: Spacing.lg,
   },
   card: {
-    width: CARD_WIDTH,
-    height: CARD_HEIGHT,
     borderRadius: BorderRadius.md,
     overflow: 'hidden',
     marginRight: Spacing.md,

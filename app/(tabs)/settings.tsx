@@ -1,5 +1,5 @@
 /**
- * Settings / More tab — app info, data refresh, links.
+ * Settings / More tab — app info, data refresh, links to web features.
  */
 
 import React from 'react';
@@ -8,6 +8,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as WebBrowser from 'expo-web-browser';
 import { useShows } from '@/lib/data-context';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
+
+const WEB = 'https://broadwayscorecard.com';
 
 function SettingsRow({ label, value, onPress }: { label: string; value?: string; onPress?: () => void }) {
   return (
@@ -44,6 +46,8 @@ export default function SettingsScreen() {
       })
     : 'Never';
 
+  const open = (path: string) => WebBrowser.openBrowserAsync(`${WEB}${path}`);
+
   return (
     <ScrollView
       style={[styles.container, { paddingTop: insets.top }]}
@@ -59,21 +63,24 @@ export default function SettingsScreen() {
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>LINKS</Text>
-        <SettingsRow
-          label="Visit Website"
-          onPress={() => WebBrowser.openBrowserAsync('https://broadwayscorecard.com')}
-        />
-        <SettingsRow
-          label="How Scoring Works"
-          onPress={() => WebBrowser.openBrowserAsync('https://broadwayscorecard.com/methodology')}
-        />
+        <Text style={styles.sectionTitle}>EXPLORE</Text>
+        <SettingsRow label="Best-Of Lists" onPress={() => open('/best/best-musicals')} />
+        <SettingsRow label="Tony Predictions" onPress={() => open('/tony-awards/predictions')} />
+        <SettingsRow label="Box Office" onPress={() => open('/box-office')} />
+        <SettingsRow label="Lottery & Rush Tickets" onPress={() => open('/lotteries')} />
+        <SettingsRow label="Audience Buzz" onPress={() => open('/audience-buzz')} />
+        <SettingsRow label="Best Value Tickets" onPress={() => open('/best-value')} />
+        <SettingsRow label="Critics Index" onPress={() => open('/critics')} />
+        <SettingsRow label="Theater Guide" onPress={() => open('/guides/cheap-broadway-tickets')} />
       </View>
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>ABOUT</Text>
+        <SettingsRow label="Visit Website" onPress={() => open('/')} />
+        <SettingsRow label="How Scoring Works" onPress={() => open('/methodology')} />
+        <SettingsRow label="About" onPress={() => open('/about')} />
+        <SettingsRow label="Send Feedback" onPress={() => open('/feedback')} />
         <SettingsRow label="Version" value="1.0.0" />
-        <SettingsRow label="Broadway Scorecard" value="broadwayscorecard.com" />
       </View>
     </ScrollView>
   );

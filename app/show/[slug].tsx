@@ -5,25 +5,53 @@
  */
 
 import React, { useMemo, useEffect, useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, Pressable, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Pressable, ActivityIndicator, Share } from 'react-native';
 import { Image } from 'expo-image';
-import { useLocalSearchParams, Stack } from 'expo-router';
+import { useLocalSearchParams, Stack, useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { useShows } from '@/lib/data-context';
 import { fetchShowDetail } from '@/lib/api';
 import { getImageUrl } from '@/lib/images';
 import { getScoreTier, getScoreColor } from '@/lib/score-utils';
-import { ShowDetail, MobileShowDetail, mapShowDetail } from '@/lib/types';
+import { Show, ShowDetail, MobileShowDetail, mapShowDetail } from '@/lib/types';
 import { ScoreBadge, StatusBadge, FormatPill } from '@/components/show-cards';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
 
 export default function ShowDetailScreen() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
   const { shows } = useShows();
+  const router = useRouter();
   const [detail, setDetail] = useState<ShowDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(true);
 
   const show = useMemo(() => shows.find(s => s.slug === slug), [shows, slug]);
+
+  // Related shows: same type, similar score, currently open
+  const relatedShows = useMemo(() => {
+    if (!show) return [];
+    return shows
+      .filter(s =>
+        s.id !== show.id &&
+        s.type === show.type &&
+        s.category === show.category &&
+        (s.status === 'open' || s.status === 'previews') &&
+        s.compositeScore != null
+      )
+      .sort((a, b) => {
+        const aDiff = Math.abs((a.compositeScore ?? 0) - (show.compositeScore ?? 0));
+        const bDiff = Math.abs((b.compositeScore ?? 0) - (show.compositeScore ?? 0));
+        return aDiff - bDiff;
+      })
+      .slice(0, 6);
+  }, [show, shows]);
+
+  const handleShare = async () => {
+    if (!show) return;
+    const scoreText = show.compositeScore ? ` (Score: ${Math.round(show.compositeScore)})` : '';
+    await Share.share({
+      message: `Check out ${show.title}${scoreText} on Broadway Scorecard!\nhttps://broadwayscorecard.com/show/${show.slug}`,
+    });
+  };
 
   useEffect(() => {
     if (!show) return;
@@ -254,17 +282,45 @@ export default function ShowDetailScreen() {
           </View>
         )}
 
-        {/* Footer link */}
-        <Pressable
-          style={({ pressed }) => [styles.webLink, pressed && styles.pressed]}
-          onPress={() =>
-            WebBrowser.openBrowserAsync(
-              `https://broadwayscorecard.com/show/${show.slug}`
-            )
-          }
-        >
-          <Text style={styles.webLinkText}>View on broadwayscorecard.com</Text>
-        </Pressable>
+        {/* Related Shows */}
+        {relatedShows.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Other Shows to See</Text>
+            {relatedShows.map(related => (
+              <Pressable
+                key={related.id}
+                style={({ pressed }) => [styles.relatedShowRow, pressed && styles.pressed]}
+                onPress={() => router.push(`/show/${related.slug}`)}
+              >
+                <View style={styles.relatedShowInfo}>
+                  <Text style={styles.relatedShowTitle} numberOfLines={1}>{related.title}</Text>
+                  <Text style={styles.relatedShowVenue} numberOfLines={1}>{related.venue}</Text>
+                </View>
+                <ScoreBadge score={related.compositeScore} size="small" />
+              </Pressable>
+            ))}
+          </View>
+        )}
+
+        {/* Action buttons */}
+        <View style={styles.actionButtons}>
+          <Pressable
+            style={({ pressed }) => [styles.shareButton, pressed && styles.pressed]}
+            onPress={handleShare}
+          >
+            <Text style={styles.shareButtonText}>Share This Show</Text>
+          </Pressable>
+          <Pressable
+            style={({ pressed }) => [styles.webLink, pressed && styles.pressed]}
+            onPress={() =>
+              WebBrowser.openBrowserAsync(
+                `https://broadwayscorecard.com/show/${show.slug}`
+              )
+            }
+          >
+            <Text style={styles.webLinkText}>View on broadwayscorecard.com</Text>
+          </Pressable>
+        </View>
       </ScrollView>
     </>
   );
@@ -719,9 +775,50 @@ const styles = StyleSheet.create({
     fontSize: FontSize.md,
     fontWeight: '600',
   },
-  webLink: {
+  // Related shows
+  relatedShowRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: Spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border.subtle,
+  },
+  relatedShowInfo: {
+    flex: 1,
+    marginRight: Spacing.md,
+  },
+  relatedShowTitle: {
+    color: Colors.text.primary,
+    fontSize: FontSize.md,
+    fontWeight: '600',
+  },
+  relatedShowVenue: {
+    color: Colors.text.secondary,
+    fontSize: FontSize.sm,
+    marginTop: 2,
+  },
+
+  // Action buttons
+  actionButtons: {
     marginTop: Spacing.xl,
-    marginHorizontal: Spacing.lg,
+    paddingHorizontal: Spacing.lg,
+    gap: Spacing.md,
+    paddingBottom: Spacing.lg,
+  },
+  shareButton: {
+    paddingVertical: Spacing.md,
+    alignItems: 'center',
+    backgroundColor: Colors.surface.raised,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: Colors.border.default,
+  },
+  shareButtonText: {
+    color: Colors.text.primary,
+    fontSize: FontSize.md,
+    fontWeight: '600',
+  },
+  webLink: {
     paddingVertical: Spacing.md,
     alignItems: 'center',
     borderWidth: 1,

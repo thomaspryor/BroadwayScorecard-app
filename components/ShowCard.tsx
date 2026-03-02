@@ -2,7 +2,7 @@
  * ShowCard — main list row for show browsing.
  * Layout: [Thumbnail] [Title + Venue + Pills] [Score + Label]
  *
- * Shows tier label below score badge, audience grade in pills.
+ * Supports critics and audience score modes.
  * Tapping navigates to the show detail page.
  */
 
@@ -14,12 +14,14 @@ import { Show } from '@/lib/types';
 import { getImageUrl } from '@/lib/images';
 import { ScoreBadge, StatusBadge, FormatPill, AudienceChip } from '@/components/show-cards';
 import { Colors, Spacing, BorderRadius, FontSize } from '@/constants/theme';
+import type { ScoreMode } from '@/components/ScoreToggle';
 
 interface ShowCardProps {
   show: Show;
+  scoreMode?: ScoreMode;
 }
 
-export const ShowCard = memo(function ShowCard({ show }: ShowCardProps) {
+export const ShowCard = memo(function ShowCard({ show, scoreMode = 'critics' }: ShowCardProps) {
   const router = useRouter();
   const thumbnailUrl = getImageUrl(show.images.thumbnail);
 
@@ -57,7 +59,7 @@ export const ShowCard = memo(function ShowCard({ show }: ShowCardProps) {
         <View style={styles.pills}>
           <StatusBadge status={show.status} />
           <FormatPill type={show.type} />
-          {show.audienceGrade && (
+          {scoreMode === 'critics' && show.audienceGrade && (
             <AudienceChip
               grade={show.audienceGrade.grade}
               color={show.audienceGrade.color}
@@ -66,8 +68,19 @@ export const ShowCard = memo(function ShowCard({ show }: ShowCardProps) {
         </View>
       </View>
 
-      {/* Score with tier label */}
-      <ScoreBadge score={show.compositeScore} size="medium" showLabel />
+      {/* Score — switch based on mode */}
+      {scoreMode === 'audience' && show.audienceGrade ? (
+        <View style={styles.audienceScoreWrapper}>
+          <View style={[styles.audienceGradeBadge, { backgroundColor: show.audienceGrade.color }]}>
+            <Text style={styles.audienceGradeText}>{show.audienceGrade.grade}</Text>
+          </View>
+          <Text style={[styles.audienceGradeLabel, { color: show.audienceGrade.color }]} numberOfLines={1}>
+            {show.audienceGrade.label}
+          </Text>
+        </View>
+      ) : (
+        <ScoreBadge score={show.compositeScore} size="medium" showLabel />
+      )}
     </Pressable>
   );
 });
@@ -123,5 +136,26 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: Spacing.xs,
     marginTop: 2,
+  },
+  audienceScoreWrapper: {
+    alignItems: 'center',
+  },
+  audienceGradeBadge: {
+    width: 48,
+    height: 48,
+    borderRadius: BorderRadius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  audienceGradeText: {
+    color: '#ffffff',
+    fontSize: FontSize.xl,
+    fontWeight: '700',
+  },
+  audienceGradeLabel: {
+    fontSize: FontSize.xs,
+    fontWeight: '600',
+    marginTop: 3,
+    textAlign: 'center',
   },
 });

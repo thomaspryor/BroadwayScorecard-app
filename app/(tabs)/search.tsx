@@ -1,30 +1,39 @@
 /**
- * Search tab — fuzzy search on show titles, venues, creative team.
- * Sprint 2 will add Fuse.js integration.
- * For now, simple case-insensitive substring matching.
+ * Search tab — Fuse.js fuzzy search on show titles, venues, creative team.
  */
 
 import React, { useState, useMemo } from 'react';
 import { View, Text, TextInput, FlatList, StyleSheet } from 'react-native';
+import Fuse, { IFuseOptions } from 'fuse.js';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useShows } from '@/lib/data-context';
 import { ShowCard } from '@/components/ShowCard';
+import { Show } from '@/lib/types';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
+
+const FUSE_OPTIONS: IFuseOptions<Show> = {
+  keys: [
+    { name: 'title', weight: 2 },
+    { name: 'venue', weight: 1 },
+    { name: 'creativeTeam.name', weight: 0.7 },
+  ],
+  threshold: 0.35,
+  includeScore: true,
+  minMatchCharLength: 2,
+};
 
 export default function SearchScreen() {
   const { shows } = useShows();
   const insets = useSafeAreaInsets();
   const [query, setQuery] = useState('');
 
+  const fuse = useMemo(() => new Fuse(shows, FUSE_OPTIONS), [shows]);
+
   const results = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return [];
-    return shows.filter(s =>
-      s.title.toLowerCase().includes(q) ||
-      s.venue.toLowerCase().includes(q) ||
-      s.creativeTeam.some(m => m.name.toLowerCase().includes(q))
-    );
-  }, [shows, query]);
+    const q = query.trim();
+    if (q.length < 2) return [];
+    return fuse.search(q, { limit: 50 }).map(r => r.item);
+  }, [fuse, query]);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -38,12 +47,12 @@ export default function SearchScreen() {
           onChangeText={setQuery}
           autoCorrect={false}
           clearButtonMode="while-editing"
+          returnKeyType="search"
         />
       </View>
 
-      {query.trim().length === 0 ? (
+      {query.trim().length < 2 ? (
         <View style={styles.emptyState}>
-          <Text style={styles.emptyIcon}>🔍</Text>
           <Text style={styles.emptyText}>
             Search for shows by title, theater, or creative team
           </Text>
@@ -99,10 +108,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: Spacing.xl,
-  },
-  emptyIcon: {
-    fontSize: 48,
-    marginBottom: Spacing.md,
   },
   emptyText: {
     color: Colors.text.muted,
