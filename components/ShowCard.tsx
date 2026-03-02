@@ -180,7 +180,7 @@ const styles = StyleSheet.create({
   },
   scoreColumn: {
     alignItems: 'center',
-    gap: 3,
+    gap: 6,
   },
   audienceGradeBadge: {
     width: 48,

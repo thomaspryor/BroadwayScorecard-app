@@ -61,18 +61,10 @@ function GoldShimmer({ size }: { size: number }) {
   );
 }
 
-function Crown({ size }: { size: number }) {
-  const crownSize = Math.max(10, Math.round(size * 0.18));
+function Crown() {
   return (
-    <Text
-      style={{
-        fontSize: crownSize,
-        lineHeight: crownSize + 1,
-        textAlign: 'center',
-        marginBottom: -1,
-      }}
-    >
-      {'\u{1F451}'}
+    <Text style={{ fontSize: 8, lineHeight: 10, textAlign: 'center', color: '#DAA520', marginBottom: -1 }}>
+      {'\u265B'}
     </Text>
   );
 }
@@ -128,7 +120,7 @@ export function ScoreBadge({ score, size = 'medium', showLabel = false, animated
       )}
 
       {/* Crown for gold 83+ */}
-      {showCrown && <Crown size={dim.box} />}
+      {showCrown && <Crown />}
 
       {/* Badge */}
       {isGold ? (
