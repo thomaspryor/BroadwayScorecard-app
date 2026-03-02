@@ -1,13 +1,14 @@
 /**
- * Home tab — shows currently playing shows sorted by score.
- * Header with branding + FlatList of open shows.
+ * Home tab — featured carousel + currently playing shows sorted by score.
+ * Header with branding, top 10 open musicals carousel, then full list.
  */
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useCallback } from 'react';
 import { View, Text, FlatList, StyleSheet, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useShows } from '@/lib/data-context';
 import { ShowCard } from '@/components/ShowCard';
+import { FeaturedCarousel } from '@/components/FeaturedCarousel';
 import { Show } from '@/lib/types';
 import { Colors, Spacing, FontSize } from '@/constants/theme';
 
@@ -21,7 +22,17 @@ export default function HomeScreen() {
       .sort((a, b) => (b.compositeScore ?? 0) - (a.compositeScore ?? 0));
   }, [shows]);
 
+  // Top 10 currently-open musicals by score for the featured carousel
+  const featuredShows = useMemo(() => {
+    return shows
+      .filter(s => (s.status === 'open' || s.status === 'previews') && s.compositeScore != null)
+      .sort((a, b) => (b.compositeScore ?? 0) - (a.compositeScore ?? 0))
+      .slice(0, 10);
+  }, [shows]);
+
   const scoredCount = useMemo(() => shows.filter(s => s.compositeScore != null).length, [shows]);
+
+  const renderItem = useCallback(({ item }: { item: Show }) => <ShowCard show={item} />, []);
 
   if (isLoading && shows.length === 0) {
     return (
@@ -46,21 +57,30 @@ export default function HomeScreen() {
       <FlatList
         data={openShows}
         keyExtractor={item => item.id}
-        renderItem={({ item }) => <ShowCard show={item} />}
+        renderItem={renderItem}
         ListHeaderComponent={
-          <View style={styles.header}>
-            <Text style={styles.brandText}>Broadway</Text>
-            <Text style={styles.brandAccent}>Scorecard</Text>
-            <Text style={styles.subtitle}>
-              {scoredCount} shows scored by critics
-            </Text>
-            {isStale && (
-              <View style={styles.staleBanner}>
-                <Text style={styles.staleText}>
-                  Showing cached data. Pull to refresh.
-                </Text>
-              </View>
-            )}
+          <View>
+            {/* Brand header */}
+            <View style={styles.header}>
+              <Text style={styles.brandText}>Broadway</Text>
+              <Text style={styles.brandAccent}>Scorecard</Text>
+              <Text style={styles.subtitle}>
+                {scoredCount} shows scored by critics
+              </Text>
+              {isStale && (
+                <View style={styles.staleBanner}>
+                  <Text style={styles.staleText}>
+                    Showing cached data. Pull to refresh.
+                  </Text>
+                </View>
+              )}
+            </View>
+
+            {/* Featured carousel */}
+            <FeaturedCarousel shows={featuredShows} />
+
+            {/* Section title for the list */}
+            <Text style={styles.sectionTitle}>Now Playing</Text>
           </View>
         }
         contentContainerStyle={styles.list}
@@ -130,6 +150,13 @@ const styles = StyleSheet.create({
   staleText: {
     color: Colors.score.amber,
     fontSize: FontSize.sm,
+  },
+  sectionTitle: {
+    color: Colors.text.primary,
+    fontSize: FontSize.xl,
+    fontWeight: '700',
+    paddingHorizontal: Spacing.lg,
+    marginBottom: Spacing.sm,
   },
   list: {
     paddingBottom: Spacing.xxl,
