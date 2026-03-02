@@ -1,12 +1,12 @@
 /**
  * ShowCard — main list row for show browsing.
- * Layout: [Thumbnail] [Title + Venue + Pills] [Score + Label]
+ * Layout: [Thumbnail] [Title + Venue + Pills + Meta] [Score + Audience]
  *
  * Supports critics and audience score modes.
  * Tapping navigates to the show detail page.
  */
 
-import React, { memo } from 'react';
+import React, { memo, useMemo } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
@@ -21,9 +21,41 @@ interface ShowCardProps {
   scoreMode?: ScoreMode;
 }
 
+function getRunDuration(openingDate: string | null, closingDate: string | null, status: string): string | null {
+  if (!openingDate) return null;
+  const open = new Date(openingDate);
+  if (isNaN(open.getTime())) return null;
+
+  if (status === 'closed' && closingDate) {
+    const close = new Date(closingDate);
+    if (!isNaN(close.getTime())) {
+      const fmt = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+      return `${fmt(open)} – ${fmt(close)}`;
+    }
+  }
+
+  // Open show: "X months on Broadway"
+  if (status === 'open') {
+    const now = new Date();
+    const months = Math.max(1, Math.round((now.getTime() - open.getTime()) / (30.44 * 24 * 60 * 60 * 1000)));
+    if (months >= 12) {
+      const years = Math.floor(months / 12);
+      const rem = months % 12;
+      return rem > 0 ? `${years}y ${rem}mo on Broadway` : `${years}y on Broadway`;
+    }
+    return `${months} mo on Broadway`;
+  }
+
+  return null;
+}
+
 export const ShowCard = memo(function ShowCard({ show, scoreMode = 'critics' }: ShowCardProps) {
   const router = useRouter();
   const thumbnailUrl = getImageUrl(show.images.thumbnail);
+  const runInfo = useMemo(
+    () => getRunDuration(show.openingDate, show.closingDate, show.status),
+    [show.openingDate, show.closingDate, show.status]
+  );
 
   return (
     <Pressable
@@ -59,18 +91,15 @@ export const ShowCard = memo(function ShowCard({ show, scoreMode = 'critics' }: 
         <View style={styles.pills}>
           <StatusBadge status={show.status} />
           <FormatPill type={show.type} />
-          {scoreMode === 'critics' && show.audienceGrade && (
-            <AudienceChip
-              grade={show.audienceGrade.grade}
-              color={show.audienceGrade.color}
-            />
-          )}
         </View>
+        {runInfo && (
+          <Text style={styles.metaText} numberOfLines={1}>{runInfo}</Text>
+        )}
       </View>
 
-      {/* Score — switch based on mode */}
+      {/* Score column — critic badge + audience grade below */}
       {scoreMode === 'audience' && show.audienceGrade ? (
-        <View style={styles.audienceScoreWrapper}>
+        <View style={styles.scoreColumn}>
           <View style={[styles.audienceGradeBadge, { backgroundColor: show.audienceGrade.color }]}>
             <Text style={styles.audienceGradeText}>{show.audienceGrade.grade}</Text>
           </View>
@@ -79,7 +108,15 @@ export const ShowCard = memo(function ShowCard({ show, scoreMode = 'critics' }: 
           </Text>
         </View>
       ) : (
-        <ScoreBadge score={show.compositeScore} size="medium" showLabel />
+        <View style={styles.scoreColumn}>
+          <ScoreBadge score={show.compositeScore} size="medium" showLabel />
+          {show.audienceGrade && (
+            <AudienceChip
+              grade={show.audienceGrade.grade}
+              color={show.audienceGrade.color}
+            />
+          )}
+        </View>
       )}
     </Pressable>
   );
@@ -137,8 +174,13 @@ const styles = StyleSheet.create({
     gap: Spacing.xs,
     marginTop: 2,
   },
-  audienceScoreWrapper: {
+  metaText: {
+    color: Colors.text.muted,
+    fontSize: FontSize.xs,
+  },
+  scoreColumn: {
     alignItems: 'center',
+    gap: 3,
   },
   audienceGradeBadge: {
     width: 48,
@@ -155,7 +197,6 @@ const styles = StyleSheet.create({
   audienceGradeLabel: {
     fontSize: FontSize.xs,
     fontWeight: '600',
-    marginTop: 3,
     textAlign: 'center',
   },
 });

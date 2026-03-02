@@ -36,13 +36,14 @@ const SORT_OPTIONS: { key: SortOption; label: string }[] = [
   { key: 'date', label: 'Newest' },
 ];
 
-function FilterPill({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
+function FilterPill({ label, active, onPress, color }: { label: string; active: boolean; onPress: () => void; color?: string }) {
+  const activeColor = color ?? Colors.brand;
   return (
     <Pressable
-      style={[styles.pill, active && styles.pillActive]}
+      style={[styles.pill, active && [styles.pillActive, { backgroundColor: activeColor + '20', borderColor: activeColor }]]}
       onPress={onPress}
     >
-      <Text style={[styles.pillText, active && styles.pillTextActive]}>{label}</Text>
+      <Text style={[styles.pillText, active && [styles.pillTextActive, { color: activeColor }]]}>{label}</Text>
     </Pressable>
   );
 }
@@ -170,6 +171,7 @@ export default function BrowseScreen() {
                       label="Off-Bway"
                       active={includeOB}
                       onPress={() => setIncludeOB(!includeOB)}
+                      color="#14b8a6"
                     />
                   </>
                 )}

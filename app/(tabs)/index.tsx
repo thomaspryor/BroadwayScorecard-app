@@ -35,12 +35,20 @@ export default function HomeScreen() {
   // Themed featured rows
   const featuredRows = useMemo((): { title: string; shows: Show[] }[] => {
     const rows: { title: string; shows: Show[] }[] = [];
+    const now = new Date();
     const isOpen = (s: Show) => s.status === 'open' || s.status === 'previews';
     const byScore = (a: Show, b: Show) => (b.compositeScore ?? 0) - (a.compositeScore ?? 0);
 
     // Top Shows (overall)
     const top = marketShows.filter(s => isOpen(s) && s.compositeScore != null).sort(byScore).slice(0, 10);
     if (top.length > 0) rows.push({ title: 'Top Shows', shows: top });
+
+    // Top Recent Shows (opened in last 12 months)
+    const twelveMonthsAgo = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const recent = marketShows.filter(s =>
+      isOpen(s) && s.compositeScore != null && s.openingDate && s.openingDate >= twelveMonthsAgo
+    ).sort(byScore).slice(0, 10);
+    if (recent.length >= 3) rows.push({ title: 'Top Recent Shows', shows: recent });
 
     // Best Musicals
     const musicals = marketShows.filter(s => isOpen(s) && s.type === 'musical' && s.compositeScore != null).sort(byScore).slice(0, 10);
@@ -51,7 +59,6 @@ export default function HomeScreen() {
     if (plays.length >= 3) rows.push({ title: 'Best Plays', shows: plays });
 
     // Closing Soon (has closingDate in the next 3 months)
-    const now = new Date();
     const threeMonths = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000);
     const closing = marketShows.filter(s => {
       if (!s.closingDate || s.status === 'closed') return false;

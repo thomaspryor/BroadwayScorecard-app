@@ -62,14 +62,14 @@ function GoldShimmer({ size }: { size: number }) {
 }
 
 function Crown({ size }: { size: number }) {
-  const crownSize = Math.round(size * 0.35);
+  const crownSize = Math.max(10, Math.round(size * 0.18));
   return (
     <Text
       style={{
         fontSize: crownSize,
-        lineHeight: crownSize + 2,
+        lineHeight: crownSize + 1,
         textAlign: 'center',
-        marginBottom: -2,
+        marginBottom: -1,
       }}
     >
       {'\u{1F451}'}
@@ -132,14 +132,13 @@ export function ScoreBadge({ score, size = 'medium', showLabel = false, animated
 
       {/* Badge */}
       {isGold ? (
-        <View style={[{ borderRadius: dim.radius }, shadowStyle]}>
+        <View style={[styles.goldWrapper, { borderRadius: dim.radius + 2 }, shadowStyle]}>
           <LinearGradient
             colors={GOLD_GRADIENT}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={[
               styles.badge,
-              styles.goldBadge,
               {
                 width: dim.box,
                 height: dim.box,
@@ -184,9 +183,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     overflow: 'hidden',
   },
-  goldBadge: {
+  goldWrapper: {
     borderWidth: 2,
     borderColor: '#C8960E',
+    overflow: 'hidden',
   },
   score: {
     fontWeight: '700',

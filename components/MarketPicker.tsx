@@ -1,10 +1,10 @@
 /**
- * Market picker — NYC / London toggle, matching the website's market switcher.
- * NYC = broadway + off-broadway, London = west-end.
+ * Market picker — dropdown selector for NYC / London.
+ * White-styled to differentiate from the brown score toggle.
  */
 
-import React from 'react';
-import { View, Text, Pressable, StyleSheet } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, Pressable, StyleSheet, Modal } from 'react-native';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
 
 export type Market = 'nyc' | 'london';
@@ -20,20 +20,43 @@ const OPTIONS: { key: Market; label: string }[] = [
 ];
 
 export function MarketPicker({ market, onChange }: MarketPickerProps) {
+  const [open, setOpen] = useState(false);
+  const currentLabel = OPTIONS.find(o => o.key === market)?.label ?? 'NYC';
+
   return (
-    <View style={styles.container}>
-      {OPTIONS.map(opt => (
-        <Pressable
-          key={opt.key}
-          style={[styles.option, market === opt.key && styles.optionActive]}
-          onPress={() => onChange(opt.key)}
-        >
-          <Text style={[styles.label, market === opt.key && styles.labelActive]}>
-            {opt.label}
-          </Text>
+    <>
+      <Pressable
+        style={({ pressed }) => [styles.trigger, pressed && styles.triggerPressed]}
+        onPress={() => setOpen(true)}
+      >
+        <Text style={styles.triggerText}>{currentLabel}</Text>
+        <Text style={styles.chevron}>{'\u25BE'}</Text>
+      </Pressable>
+
+      <Modal
+        visible={open}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setOpen(false)}
+      >
+        <Pressable style={styles.overlay} onPress={() => setOpen(false)}>
+          <View style={styles.dropdown}>
+            {OPTIONS.map(opt => (
+              <Pressable
+                key={opt.key}
+                style={[styles.dropdownItem, market === opt.key && styles.dropdownItemActive]}
+                onPress={() => { onChange(opt.key); setOpen(false); }}
+              >
+                <Text style={[styles.dropdownText, market === opt.key && styles.dropdownTextActive]}>
+                  {opt.label}
+                </Text>
+                {market === opt.key && <Text style={styles.checkmark}>{'\u2713'}</Text>}
+              </Pressable>
+            ))}
+          </View>
         </Pressable>
-      ))}
-    </View>
+      </Modal>
+    </>
   );
 }
 
@@ -45,38 +68,73 @@ export function filterByMarket(category: string, market: Market): boolean {
   return category === 'west-end';
 }
 
-/** Filter by market with off-broadway control. Home uses includeOB=false. Browse can toggle. */
+/** Filter by market with off-broadway control.
+ * includeOB=false → Broadway only. includeOB=true → Off-Broadway only. */
 export function filterByMarketCategory(category: string, market: Market, includeOB: boolean): boolean {
   if (market === 'nyc') {
-    return category === 'broadway' || (includeOB && category === 'off-broadway');
+    return includeOB ? category === 'off-broadway' : category === 'broadway';
   }
   return category === 'west-end';
 }
 
 const styles = StyleSheet.create({
-  container: {
+  trigger: {
     flexDirection: 'row',
-    backgroundColor: Colors.surface.raised,
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.12)',
     borderRadius: BorderRadius.pill,
-    padding: 3,
-    alignSelf: 'flex-start',
-    borderWidth: 1,
-    borderColor: Colors.border.subtle,
-  },
-  option: {
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.pill,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.25)',
+    gap: 6,
   },
-  optionActive: {
-    backgroundColor: Colors.brand,
+  triggerPressed: {
+    opacity: 0.7,
   },
-  label: {
-    color: Colors.text.muted,
+  triggerText: {
+    color: '#ffffff',
     fontSize: FontSize.sm,
     fontWeight: '600',
   },
-  labelActive: {
-    color: Colors.text.inverse,
+  chevron: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: FontSize.xs,
+  },
+  overlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  dropdown: {
+    backgroundColor: Colors.surface.elevated,
+    borderRadius: BorderRadius.md,
+    minWidth: 180,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: Colors.border.default,
+  },
+  dropdownItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
+  },
+  dropdownItemActive: {
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  dropdownText: {
+    color: Colors.text.primary,
+    fontSize: FontSize.md,
+  },
+  dropdownTextActive: {
+    fontWeight: '600',
+  },
+  checkmark: {
+    color: Colors.brand,
+    fontSize: FontSize.md,
+    fontWeight: '700',
   },
 });
