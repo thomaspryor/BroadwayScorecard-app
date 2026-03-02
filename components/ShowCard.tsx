@@ -1,7 +1,8 @@
 /**
  * ShowCard — main list row for show browsing.
- * Layout: [Thumbnail] [Title + Venue + Pills] [ScoreBadge]
+ * Layout: [Thumbnail] [Title + Venue + Pills] [Score + Label]
  *
+ * Shows tier label below score badge, audience grade in pills.
  * Tapping navigates to the show detail page.
  */
 
@@ -65,10 +66,8 @@ export const ShowCard = memo(function ShowCard({ show }: ShowCardProps) {
         </View>
       </View>
 
-      {/* Score */}
-      <View style={styles.scoreContainer}>
-        <ScoreBadge score={show.compositeScore} size="medium" />
-      </View>
+      {/* Score with tier label */}
+      <ScoreBadge score={show.compositeScore} size="medium" showLabel />
     </Pressable>
   );
 });
@@ -124,8 +123,5 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: Spacing.xs,
     marginTop: 2,
-  },
-  scoreContainer: {
-    marginLeft: Spacing.md,
   },
 });

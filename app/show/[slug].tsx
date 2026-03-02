@@ -64,32 +64,55 @@ export default function ShowDetailScreen() {
                 )}
               </View>
             </View>
-            <ScoreBadge score={show.compositeScore} size="large" />
+            <ScoreBadge score={show.compositeScore} size="large" showLabel />
           </View>
 
-          {/* Score details */}
-          {show.criticScore && (
-            <View style={styles.scoreDetails}>
-              <Text style={[styles.tierLabel, { color: tier?.color ?? Colors.text.muted }]}>
-                {show.criticScore.label}
-              </Text>
-              <Text style={styles.reviewCount}>
-                Based on {show.criticScore.reviewCount} critic reviews
-                {show.criticScore.tier1Count > 0 && ` (${show.criticScore.tier1Count} top-tier)`}
-              </Text>
-            </View>
-          )}
+          {/* Score cards — Critic + Audience side by side */}
+          <View style={styles.scoreCards}>
+            {/* Critic score card */}
+            {show.criticScore && (
+              <View style={[styles.scoreCard, { borderColor: (tier?.color ?? Colors.text.muted) + '40' }]}>
+                <Text style={styles.scoreCardTitle}>Critics</Text>
+                <Text style={[styles.scoreCardScore, { color: tier?.color ?? Colors.text.muted }]}>
+                  {show.criticScore.score}
+                </Text>
+                <Text style={[styles.scoreCardLabel, { color: tier?.color ?? Colors.text.muted }]}>
+                  {show.criticScore.label}
+                </Text>
+                <Text style={styles.scoreCardDetail}>
+                  {show.criticScore.reviewCount} reviews
+                </Text>
+              </View>
+            )}
 
-          {/* Audience grade */}
-          {show.audienceGrade && (
-            <View style={styles.audienceSection}>
-              <AudienceChip
-                grade={show.audienceGrade.grade}
-                color={show.audienceGrade.color}
-              />
-              <Text style={styles.audienceLabel}>{show.audienceGrade.label}</Text>
-            </View>
-          )}
+            {/* Audience score card */}
+            {show.audienceGrade && (
+              <View style={[styles.scoreCard, { borderColor: show.audienceGrade.color + '40' }]}>
+                <Text style={styles.scoreCardTitle}>Audience</Text>
+                <Text style={[styles.scoreCardScore, { color: show.audienceGrade.color }]}>
+                  {show.audienceGrade.grade}
+                </Text>
+                <Text style={[styles.scoreCardLabel, { color: show.audienceGrade.color }]}>
+                  {show.audienceGrade.label}
+                </Text>
+              </View>
+            )}
+          </View>
+
+          {/* Full reviews link — prominent */}
+          <Pressable
+            style={({ pressed }) => [styles.fullReviewsButton, pressed && styles.pressed]}
+            onPress={() =>
+              WebBrowser.openBrowserAsync(
+                `https://broadwayscorecard.com/show/${show.slug}`
+              )
+            }
+          >
+            <Text style={styles.fullReviewsText}>See All Critic Reviews</Text>
+            <Text style={styles.fullReviewsSubtext}>
+              Score breakdown, individual reviews & more
+            </Text>
+          </Pressable>
         </View>
 
         {/* Show info */}
@@ -244,30 +267,58 @@ const styles = StyleSheet.create({
     fontSize: FontSize.xs,
     fontWeight: '600',
   },
-  scoreDetails: {
+  scoreCards: {
+    flexDirection: 'row',
+    gap: Spacing.md,
     marginTop: Spacing.lg,
-    paddingTop: Spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: Colors.border.subtle,
   },
-  tierLabel: {
-    fontSize: FontSize.lg,
+  scoreCard: {
+    flex: 1,
+    backgroundColor: Colors.surface.raised,
+    borderRadius: BorderRadius.md,
+    padding: Spacing.lg,
+    alignItems: 'center',
+    borderWidth: 1,
+  },
+  scoreCardTitle: {
+    color: Colors.text.muted,
+    fontSize: FontSize.xs,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+    marginBottom: Spacing.xs,
+  },
+  scoreCardScore: {
+    fontSize: FontSize.title,
     fontWeight: '700',
   },
-  reviewCount: {
-    color: Colors.text.secondary,
+  scoreCardLabel: {
     fontSize: FontSize.sm,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  scoreCardDetail: {
+    color: Colors.text.muted,
+    fontSize: FontSize.xs,
     marginTop: 4,
   },
-  audienceSection: {
-    flexDirection: 'row',
+  fullReviewsButton: {
+    backgroundColor: Colors.brand,
+    borderRadius: BorderRadius.md,
+    paddingVertical: Spacing.lg,
     alignItems: 'center',
-    gap: Spacing.sm,
-    marginTop: Spacing.md,
+    marginTop: Spacing.lg,
   },
-  audienceLabel: {
-    color: Colors.text.secondary,
+  fullReviewsText: {
+    color: Colors.text.inverse,
+    fontSize: FontSize.md,
+    fontWeight: '700',
+  },
+  fullReviewsSubtext: {
+    color: Colors.text.inverse,
     fontSize: FontSize.sm,
+    opacity: 0.8,
+    marginTop: 2,
   },
   infoSection: {
     marginHorizontal: Spacing.lg,

@@ -1,8 +1,6 @@
 /**
- * Browse tab — all shows with filter pills and sort controls.
- *
- * Filters: Status (All/Now Playing/Previews/Closed), Type (All/Musicals/Plays)
- * Sort: Score (default), Name A-Z, Opening Date
+ * Browse tab — all shows with market picker, filter pills, and sort controls.
+ * Defaults to NYC market (broadway + off-broadway).
  */
 
 import React, { useMemo, useState, useCallback } from 'react';
@@ -10,6 +8,7 @@ import { View, Text, FlatList, StyleSheet, ActivityIndicator, ScrollView, Pressa
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useShows } from '@/lib/data-context';
 import { ShowCard } from '@/components/ShowCard';
+import { MarketPicker, Market, filterByMarket } from '@/components/MarketPicker';
 import { Show } from '@/lib/types';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
 
@@ -50,24 +49,21 @@ function FilterPill({ label, active, onPress }: { label: string; active: boolean
 export default function BrowseScreen() {
   const { shows, isLoading } = useShows();
   const insets = useSafeAreaInsets();
+  const [market, setMarket] = useState<Market>('nyc');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
   const [sortBy, setSortBy] = useState<SortOption>('score');
 
   const filteredShows = useMemo(() => {
-    let result = [...shows];
+    let result = shows.filter(s => filterByMarket(s.category, market));
 
-    // Status filter
     if (statusFilter !== 'all') {
       result = result.filter(s => s.status === statusFilter);
     }
-
-    // Type filter
     if (typeFilter !== 'all') {
       result = result.filter(s => s.type === typeFilter);
     }
 
-    // Sort
     switch (sortBy) {
       case 'score':
         result.sort((a, b) => (b.compositeScore ?? -1) - (a.compositeScore ?? -1));
@@ -76,16 +72,17 @@ export default function BrowseScreen() {
         result.sort((a, b) => a.title.localeCompare(b.title));
         break;
       case 'date':
-        result.sort((a, b) => {
-          const da = a.openingDate ?? '';
-          const db = b.openingDate ?? '';
-          return db.localeCompare(da);
-        });
+        result.sort((a, b) => (b.openingDate ?? '').localeCompare(a.openingDate ?? ''));
         break;
     }
 
     return result;
-  }, [shows, statusFilter, typeFilter, sortBy]);
+  }, [shows, market, statusFilter, typeFilter, sortBy]);
+
+  const totalForMarket = useMemo(
+    () => shows.filter(s => filterByMarket(s.category, market)).length,
+    [shows, market]
+  );
 
   const renderItem = useCallback(({ item }: { item: Show }) => <ShowCard show={item} />, []);
 
@@ -105,9 +102,12 @@ export default function BrowseScreen() {
         renderItem={renderItem}
         ListHeaderComponent={
           <View style={styles.header}>
-            <Text style={styles.title}>Browse Shows</Text>
+            <View style={styles.headerRow}>
+              <Text style={styles.title}>Browse Shows</Text>
+              <MarketPicker market={market} onChange={setMarket} />
+            </View>
             <Text style={styles.count}>
-              {filteredShows.length} of {shows.length} shows
+              {filteredShows.length} of {totalForMarket} shows
             </Text>
 
             {/* Status filter */}
@@ -122,7 +122,7 @@ export default function BrowseScreen() {
               ))}
             </ScrollView>
 
-            {/* Type + Sort row */}
+            {/* Type + Sort */}
             <View style={styles.filterRowInline}>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterGroup}>
                 {TYPE_OPTIONS.map(opt => (
@@ -170,11 +170,16 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.xl,
     paddingBottom: Spacing.md,
   },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.lg,
+  },
   title: {
     color: Colors.text.primary,
     fontSize: FontSize.xxl,
     fontWeight: '700',
-    paddingHorizontal: Spacing.lg,
   },
   count: {
     color: Colors.text.secondary,

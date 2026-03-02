@@ -1,36 +1,47 @@
 /**
- * Home tab — featured carousel + currently playing shows sorted by score.
- * Header with branding, top 10 open musicals carousel, then full list.
+ * Home tab — market picker, featured carousel, currently playing shows.
+ * Defaults to NYC (broadway + off-broadway). Matches website behavior.
  */
 
-import React, { useMemo, useCallback } from 'react';
+import React, { useMemo, useCallback, useState } from 'react';
 import { View, Text, FlatList, StyleSheet, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useShows } from '@/lib/data-context';
 import { ShowCard } from '@/components/ShowCard';
 import { FeaturedCarousel } from '@/components/FeaturedCarousel';
+import { MarketPicker, Market, filterByMarket } from '@/components/MarketPicker';
 import { Show } from '@/lib/types';
 import { Colors, Spacing, FontSize } from '@/constants/theme';
 
 export default function HomeScreen() {
   const { shows, isLoading, error, isStale } = useShows();
   const insets = useSafeAreaInsets();
+  const [market, setMarket] = useState<Market>('nyc');
 
   const openShows = useMemo(() => {
     return shows
-      .filter(s => s.status === 'open' || s.status === 'previews')
+      .filter(s =>
+        (s.status === 'open' || s.status === 'previews') &&
+        filterByMarket(s.category, market)
+      )
       .sort((a, b) => (b.compositeScore ?? 0) - (a.compositeScore ?? 0));
-  }, [shows]);
+  }, [shows, market]);
 
-  // Top 10 currently-open musicals by score for the featured carousel
   const featuredShows = useMemo(() => {
     return shows
-      .filter(s => (s.status === 'open' || s.status === 'previews') && s.compositeScore != null)
+      .filter(s =>
+        (s.status === 'open' || s.status === 'previews') &&
+        s.compositeScore != null &&
+        filterByMarket(s.category, market)
+      )
       .sort((a, b) => (b.compositeScore ?? 0) - (a.compositeScore ?? 0))
       .slice(0, 10);
-  }, [shows]);
+  }, [shows, market]);
 
-  const scoredCount = useMemo(() => shows.filter(s => s.compositeScore != null).length, [shows]);
+  const scoredCount = useMemo(() =>
+    shows.filter(s => s.compositeScore != null && filterByMarket(s.category, market)).length,
+    [shows, market]
+  );
 
   const renderItem = useCallback(({ item }: { item: Show }) => <ShowCard show={item} />, []);
 
@@ -60,10 +71,15 @@ export default function HomeScreen() {
         renderItem={renderItem}
         ListHeaderComponent={
           <View>
-            {/* Brand header */}
+            {/* Brand header + market picker */}
             <View style={styles.header}>
-              <Text style={styles.brandText}>Broadway</Text>
-              <Text style={styles.brandAccent}>Scorecard</Text>
+              <View style={styles.headerRow}>
+                <View>
+                  <Text style={styles.brandText}>Broadway</Text>
+                  <Text style={styles.brandAccent}>Scorecard</Text>
+                </View>
+                <MarketPicker market={market} onChange={setMarket} />
+              </View>
               <Text style={styles.subtitle}>
                 {scoredCount} shows scored by critics
               </Text>
@@ -79,7 +95,7 @@ export default function HomeScreen() {
             {/* Featured carousel */}
             <FeaturedCarousel shows={featuredShows} />
 
-            {/* Section title for the list */}
+            {/* Section title */}
             <Text style={styles.sectionTitle}>Now Playing</Text>
           </View>
         }
@@ -123,6 +139,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
     paddingTop: Spacing.xl,
     paddingBottom: Spacing.lg,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
   },
   brandText: {
     color: Colors.text.primary,
