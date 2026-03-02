@@ -24,36 +24,37 @@ function FeaturedCard({ show, cardWidth }: { show: Show; cardWidth: number }) {
   return (
     <Pressable
       style={({ pressed }) => [
-        styles.card,
-        { width: cardWidth, height: cardHeight },
+        { width: cardWidth },
+        styles.cardWrapper,
         pressed && styles.cardPressed,
       ]}
       onPress={() => router.push(`/show/${show.slug}`)}
     >
-      {posterUrl ? (
-        <Image
-          source={{ uri: posterUrl }}
-          style={styles.poster}
-          contentFit="cover"
-          transition={200}
-        />
-      ) : (
-        <View style={[styles.poster, styles.placeholderPoster]}>
-          <Text style={styles.placeholderText}>{show.title.charAt(0)}</Text>
+      {/* Image container with score badge overlapping bottom-right */}
+      <View style={[styles.imageContainer, { height: cardHeight }]}>
+        {posterUrl ? (
+          <Image
+            source={{ uri: posterUrl }}
+            style={styles.poster}
+            contentFit="cover"
+            transition={200}
+          />
+        ) : (
+          <View style={[styles.poster, styles.placeholderPoster]}>
+            <Text style={styles.placeholderText}>{show.title.charAt(0)}</Text>
+          </View>
+        )}
+
+        {/* Score badge — bottom-right, overlapping the image edge */}
+        <View style={styles.scoreOverlay}>
+          <ScoreBadge score={show.compositeScore} size="small" />
         </View>
-      )}
-
-      {/* Score overlay */}
-      <View style={styles.scoreOverlay}>
-        <ScoreBadge score={show.compositeScore} size="small" />
       </View>
 
-      {/* Title overlay */}
-      <View style={styles.titleOverlay}>
-        <Text style={styles.cardTitle} numberOfLines={2}>
-          {show.title}
-        </Text>
-      </View>
+      {/* Title below image */}
+      <Text style={styles.cardTitle} numberOfLines={2}>
+        {show.title}
+      </Text>
     </Pressable>
   );
 }
@@ -88,14 +89,16 @@ const styles = StyleSheet.create({
   list: {
     paddingHorizontal: Spacing.lg,
   },
-  card: {
-    borderRadius: BorderRadius.md,
-    overflow: 'hidden',
+  cardWrapper: {
     marginRight: Spacing.md,
-    backgroundColor: Colors.surface.raised,
   },
   cardPressed: {
     opacity: 0.85,
+  },
+  imageContainer: {
+    borderRadius: BorderRadius.md,
+    overflow: 'hidden',
+    backgroundColor: Colors.surface.raised,
   },
   poster: {
     width: '100%',
@@ -113,21 +116,13 @@ const styles = StyleSheet.create({
   },
   scoreOverlay: {
     position: 'absolute',
-    top: Spacing.sm,
+    bottom: Spacing.sm,
     right: Spacing.sm,
-  },
-  titleOverlay: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: Spacing.sm,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
   },
   cardTitle: {
     color: Colors.text.primary,
     fontSize: FontSize.sm,
     fontWeight: '600',
+    marginTop: Spacing.xs,
   },
 });
