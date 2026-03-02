@@ -16,6 +16,7 @@ import { getScoreTier, getScoreColor } from '@/lib/score-utils';
 import { Show, ShowDetail, MobileShowDetail, mapShowDetail } from '@/lib/types';
 import { ScoreBadge, StatusBadge, FormatPill, ProductionPill, CategoryBadge } from '@/components/show-cards';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
+import { trackTicketTap, trackBuyButtonTap } from '@/lib/analytics';
 
 export default function ShowDetailScreen() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
@@ -23,6 +24,8 @@ export default function ShowDetailScreen() {
   const router = useRouter();
   const [detail, setDetail] = useState<ShowDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(true);
+  const [showAllReviews, setShowAllReviews] = useState(false);
+  const [showAllCast, setShowAllCast] = useState(false);
 
   const show = useMemo(() => shows.find(s => s.slug === slug), [shows, slug]);
 
@@ -81,13 +84,21 @@ export default function ShowDetailScreen() {
 
   const posterUrl = getImageUrl(show.images.poster) || getImageUrl(show.images.thumbnail);
   const heroUrl = detail?.heroImage ? getImageUrl(detail.heroImage) : null;
-  const headerImage = heroUrl || posterUrl;
+  const headerImage = posterUrl || heroUrl;
+
+  // Primary ticket link: prefer TodayTix, then first available
+  const primaryTicketLink = useMemo(() => {
+    if (show.ticketLinks.length === 0) return null;
+    const todayTix = show.ticketLinks.find(l => l.platform.toLowerCase().includes('todaytix'));
+    return todayTix || show.ticketLinks[0];
+  }, [show.ticketLinks]);
   const tier = getScoreTier(show.compositeScore);
 
   return (
     <>
       <Stack.Screen options={{ title: show.title }} />
-      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <View style={styles.container}>
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
         {/* Hero / Poster */}
         {headerImage && (
           <Image
@@ -158,15 +169,25 @@ export default function ShowDetailScreen() {
           )}
         </View>
 
-        {/* Critic Reviews List */}
+        {/* Critic Reviews List — collapsed by default */}
         {detail?.reviews && detail.reviews.length > 0 && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>
               Critic Reviews ({detail.reviews.length})
             </Text>
-            {detail.reviews.map((review, i) => (
+            {(showAllReviews ? detail.reviews : detail.reviews.slice(0, 3)).map((review, i) => (
               <ReviewRow key={i} review={review} />
             ))}
+            {!showAllReviews && detail.reviews.length > 3 && (
+              <Pressable
+                style={({ pressed }) => [styles.showAllButton, pressed && styles.pressed]}
+                onPress={() => setShowAllReviews(true)}
+              >
+                <Text style={styles.showAllText}>
+                  Show all {detail.reviews.length} reviews
+                </Text>
+              </Pressable>
+            )}
           </View>
         )}
 
@@ -178,34 +199,68 @@ export default function ShowDetailScreen() {
           </View>
         )}
 
-        {/* Audience Sources */}
-        {detail?.audience && detail.audience.sources && (
+        {/* Audience Scorecard — grade badge header + horizontal source cards */}
+        {detail?.audience && show.audienceGrade && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Audience Sources</Text>
-            <View style={styles.audienceSourcesCard}>
-              {detail.audience.sources.showScore && (
-                <AudienceSourceRow
-                  name="ShowScore"
-                  score={detail.audience.sources.showScore.score}
-                  count={detail.audience.sources.showScore.count}
-                />
-              )}
-              {detail.audience.sources.mezzanine && (
-                <AudienceSourceRow
-                  name="Mezzanine"
-                  score={detail.audience.sources.mezzanine.score}
-                  count={detail.audience.sources.mezzanine.count}
-                />
-              )}
-              {detail.audience.sources.reddit && (
-                <AudienceSourceRow
-                  name="Reddit"
-                  score={detail.audience.sources.reddit.score}
-                  count={detail.audience.sources.reddit.count}
-                  extra={`${detail.audience.sources.reddit.totalPosts} posts`}
-                />
-              )}
+            <Text style={styles.sectionTitle}>Audience Scorecard</Text>
+            {/* Grade badge header card */}
+            <View style={[styles.audienceHeader, { borderColor: show.audienceGrade.color + '40' }]}>
+              <View style={[styles.audienceGradeBadge, { backgroundColor: show.audienceGrade.color }]}>
+                <Text style={styles.audienceGradeText}>{show.audienceGrade.grade}</Text>
+              </View>
+              <View style={styles.audienceGradeInfo}>
+                <Text style={[styles.audienceGradeLabel, { color: show.audienceGrade.color }]}>
+                  {show.audienceGrade.label}
+                </Text>
+                <Text style={styles.audienceGradeSubtext}>
+                  Based on {
+                    (detail.audience.sources.showScore?.count ?? 0) +
+                    (detail.audience.sources.mezzanine?.count ?? 0) +
+                    (detail.audience.sources.reddit?.count ?? 0)
+                  } audience reviews
+                </Text>
+              </View>
             </View>
+            {/* Horizontal source cards */}
+            {detail.audience.sources && (
+              <View style={styles.audienceSourceCards}>
+                {detail.audience.sources.showScore && (
+                  <View style={styles.audienceSourceCard}>
+                    <Text style={styles.audienceSourceLabel}>SHOW SCORE</Text>
+                    <Text style={styles.audienceSourceValue}>
+                      {detail.audience.sources.showScore.score}%
+                    </Text>
+                    <Text style={styles.audienceSourceMeta}>
+                      {detail.audience.sources.showScore.count} reviews
+                    </Text>
+                  </View>
+                )}
+                {detail.audience.sources.mezzanine && (
+                  <View style={styles.audienceSourceCard}>
+                    <Text style={styles.audienceSourceLabel}>MEZZANINE</Text>
+                    <Text style={styles.audienceSourceValue}>
+                      {detail.audience.sources.mezzanine.starRating != null
+                        ? `${detail.audience.sources.mezzanine.starRating}/5`
+                        : `${detail.audience.sources.mezzanine.score}%`}
+                    </Text>
+                    <Text style={styles.audienceSourceMeta}>
+                      {detail.audience.sources.mezzanine.count} reviews
+                    </Text>
+                  </View>
+                )}
+                {detail.audience.sources.reddit && (
+                  <View style={styles.audienceSourceCard}>
+                    <Text style={styles.audienceSourceLabel}>REDDIT</Text>
+                    <Text style={styles.audienceSourceValue}>
+                      {detail.audience.sources.reddit.score}%
+                    </Text>
+                    <Text style={styles.audienceSourceMeta}>
+                      {detail.audience.sources.reddit.totalPosts} posts
+                    </Text>
+                  </View>
+                )}
+              </View>
+            )}
           </View>
         )}
 
@@ -237,16 +292,28 @@ export default function ShowDetailScreen() {
           </View>
         )}
 
-        {/* Cast */}
+        {/* Cast — show first 6, expandable */}
         {detail?.cast && detail.cast.length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Cast</Text>
-            {detail.cast.map((member, i) => (
+            <Text style={styles.sectionTitle}>
+              Cast ({detail.cast.length})
+            </Text>
+            {(showAllCast ? detail.cast : detail.cast.slice(0, 6)).map((member, i) => (
               <View key={i} style={styles.creditRow}>
                 <Text style={styles.creditRole}>{member.role}</Text>
                 <Text style={styles.creditName}>{member.name}</Text>
               </View>
             ))}
+            {!showAllCast && detail.cast.length > 6 && (
+              <Pressable
+                style={({ pressed }) => [styles.showAllButton, pressed && styles.pressed]}
+                onPress={() => setShowAllCast(true)}
+              >
+                <Text style={styles.showAllText}>
+                  Show all {detail.cast.length} cast members
+                </Text>
+              </Pressable>
+            )}
           </View>
         )}
 
@@ -263,39 +330,60 @@ export default function ShowDetailScreen() {
           </View>
         )}
 
-        {/* Ticket Links */}
-        {show.ticketLinks.length > 0 && (
+        {/* All ticket links (inline, secondary to sticky CTA) */}
+        {show.ticketLinks.length > 1 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Tickets</Text>
+            <Text style={styles.sectionTitle}>All Ticket Sources</Text>
             {show.ticketLinks.map((link, i) => (
               <Pressable
                 key={i}
-                style={({ pressed }) => [styles.ticketButton, pressed && styles.pressed]}
-                onPress={() => WebBrowser.openBrowserAsync(link.url)}
+                style={({ pressed }) => [styles.ticketRowButton, pressed && styles.pressed]}
+                onPress={() => {
+                  trackTicketTap(show.id, show.title, link.platform, link.url);
+                  WebBrowser.openBrowserAsync(link.url);
+                }}
               >
-                <Text style={styles.ticketText}>Buy on {link.platform}</Text>
+                <Text style={styles.ticketRowText}>{link.platform}</Text>
+                <Text style={styles.ticketRowArrow}>→</Text>
               </Pressable>
             ))}
           </View>
         )}
 
-        {/* Related Shows */}
+        {/* Related Shows — with poster thumbnails */}
         {relatedShows.length > 0 && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Other Shows to See</Text>
-            {relatedShows.map(related => (
-              <Pressable
-                key={related.id}
-                style={({ pressed }) => [styles.relatedShowRow, pressed && styles.pressed]}
-                onPress={() => router.push(`/show/${related.slug}`)}
-              >
-                <View style={styles.relatedShowInfo}>
-                  <Text style={styles.relatedShowTitle} numberOfLines={1}>{related.title}</Text>
-                  <Text style={styles.relatedShowVenue} numberOfLines={1}>{related.venue}</Text>
-                </View>
-                <ScoreBadge score={related.compositeScore} size="small" />
-              </Pressable>
-            ))}
+            {relatedShows.map(related => {
+              const relatedPoster = getImageUrl(related.images.poster) || getImageUrl(related.images.thumbnail);
+              return (
+                <Pressable
+                  key={related.id}
+                  style={({ pressed }) => [styles.relatedShowRow, pressed && styles.pressed]}
+                  onPress={() => router.push(`/show/${related.slug}`)}
+                >
+                  {relatedPoster ? (
+                    <Image
+                      source={{ uri: relatedPoster }}
+                      style={styles.relatedShowImage}
+                      contentFit="cover"
+                      transition={200}
+                    />
+                  ) : (
+                    <View style={[styles.relatedShowImage, styles.relatedShowPlaceholder]}>
+                      <Text style={styles.relatedShowPlaceholderText}>
+                        {related.title.charAt(0)}
+                      </Text>
+                    </View>
+                  )}
+                  <View style={styles.relatedShowInfo}>
+                    <Text style={styles.relatedShowTitle} numberOfLines={1}>{related.title}</Text>
+                    <Text style={styles.relatedShowVenue} numberOfLines={1}>{related.venue}</Text>
+                  </View>
+                  <ScoreBadge score={related.compositeScore} size="small" />
+                </Pressable>
+              );
+            })}
           </View>
         )}
 
@@ -319,6 +407,23 @@ export default function ShowDetailScreen() {
           </Pressable>
         </View>
       </ScrollView>
+
+      {/* Sticky Buy Tickets button */}
+      {primaryTicketLink && (
+        <View style={styles.stickyButtonContainer}>
+          <Pressable
+            style={({ pressed }) => [styles.stickyBuyButton, pressed && styles.stickyBuyButtonPressed]}
+            onPress={() => {
+              trackBuyButtonTap(show.id, show.title, primaryTicketLink.platform, primaryTicketLink.url);
+              WebBrowser.openBrowserAsync(primaryTicketLink.url);
+            }}
+          >
+            <Text style={styles.stickyBuyText}>Buy Tickets</Text>
+            <Text style={styles.stickyBuySubtext}>on {primaryTicketLink.platform}</Text>
+          </Pressable>
+        </View>
+      )}
+      </View>
     </>
   );
 }
@@ -408,30 +513,6 @@ function ReviewRow({ review }: { review: ShowDetail['reviews'][0] }) {
   );
 }
 
-function AudienceSourceRow({
-  name,
-  score,
-  count,
-  extra,
-}: {
-  name: string;
-  score: number;
-  count: number;
-  extra?: string;
-}) {
-  return (
-    <View style={styles.audienceSourceRow}>
-      <Text style={styles.audienceSourceName}>{name}</Text>
-      <View style={styles.audienceSourceRight}>
-        <Text style={styles.audienceSourceScore}>{score}</Text>
-        <Text style={styles.audienceSourceCount}>
-          {count} reviews{extra ? ` / ${extra}` : ''}
-        </Text>
-      </View>
-    </View>
-  );
-}
-
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
     <View style={styles.infoRow}>
@@ -462,8 +543,11 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.surface.default,
   },
+  scrollView: {
+    flex: 1,
+  },
   content: {
-    paddingBottom: 48,
+    paddingBottom: 100, // room for sticky button
   },
   center: {
     flex: 1,
@@ -656,38 +740,68 @@ const styles = StyleSheet.create({
     fontSize: FontSize.sm,
   },
 
-  // Audience sources
-  audienceSourcesCard: {
+  // Audience scorecard
+  audienceHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: Colors.surface.raised,
     borderRadius: BorderRadius.md,
-    overflow: 'hidden',
+    padding: Spacing.lg,
+    borderWidth: 1,
+    gap: Spacing.md,
   },
-  audienceSourceRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  audienceGradeBadge: {
+    width: 56,
+    height: 56,
+    borderRadius: BorderRadius.md,
     alignItems: 'center',
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border.subtle,
+    justifyContent: 'center',
   },
-  audienceSourceName: {
-    color: Colors.text.primary,
-    fontSize: FontSize.md,
-    fontWeight: '500',
+  audienceGradeText: {
+    color: '#ffffff',
+    fontSize: FontSize.xxl,
+    fontWeight: '700',
   },
-  audienceSourceRight: {
-    alignItems: 'flex-end',
+  audienceGradeInfo: {
+    flex: 1,
   },
-  audienceSourceScore: {
-    color: Colors.text.primary,
+  audienceGradeLabel: {
     fontSize: FontSize.lg,
     fontWeight: '700',
   },
-  audienceSourceCount: {
+  audienceGradeSubtext: {
     color: Colors.text.muted,
-    fontSize: FontSize.xs,
-    marginTop: 1,
+    fontSize: FontSize.sm,
+    marginTop: 2,
+  },
+  audienceSourceCards: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+    marginTop: Spacing.sm,
+  },
+  audienceSourceCard: {
+    flex: 1,
+    backgroundColor: Colors.surface.raised,
+    borderRadius: BorderRadius.md,
+    padding: Spacing.md,
+    alignItems: 'center',
+  },
+  audienceSourceLabel: {
+    color: Colors.text.muted,
+    fontSize: 9,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+  audienceSourceValue: {
+    color: Colors.text.primary,
+    fontSize: FontSize.xl,
+    fontWeight: '700',
+  },
+  audienceSourceMeta: {
+    color: Colors.text.muted,
+    fontSize: 9,
+    marginTop: 2,
   },
 
   // Info section
@@ -746,19 +860,37 @@ const styles = StyleSheet.create({
     fontSize: FontSize.sm,
     flex: 1,
   },
-  ticketButton: {
-    backgroundColor: Colors.brand,
-    paddingVertical: Spacing.md,
-    borderRadius: BorderRadius.md,
+  ticketRowButton: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: Spacing.sm,
+    paddingVertical: Spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border.subtle,
+  },
+  ticketRowText: {
+    color: Colors.text.primary,
+    fontSize: FontSize.md,
+    fontWeight: '500',
+  },
+  ticketRowArrow: {
+    color: Colors.text.muted,
+    fontSize: FontSize.md,
   },
   pressed: {
     opacity: 0.7,
   },
-  ticketText: {
-    color: Colors.text.inverse,
-    fontSize: FontSize.md,
+  // Show all button (reviews, cast)
+  showAllButton: {
+    paddingVertical: Spacing.md,
+    alignItems: 'center',
+    marginTop: Spacing.sm,
+    backgroundColor: Colors.surface.raised,
+    borderRadius: BorderRadius.md,
+  },
+  showAllText: {
+    color: Colors.brand,
+    fontSize: FontSize.sm,
     fontWeight: '600',
   },
   // Related shows
@@ -782,6 +914,58 @@ const styles = StyleSheet.create({
     color: Colors.text.secondary,
     fontSize: FontSize.sm,
     marginTop: 2,
+  },
+  relatedShowImage: {
+    width: 40,
+    height: 53,
+    borderRadius: BorderRadius.sm,
+    marginRight: Spacing.md,
+  },
+  relatedShowPlaceholder: {
+    backgroundColor: Colors.surface.overlay,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  relatedShowPlaceholderText: {
+    color: Colors.text.muted,
+    fontSize: FontSize.sm,
+    fontWeight: '600',
+  },
+
+  // Sticky buy button
+  stickyButtonContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
+    paddingBottom: Spacing.xl,
+    backgroundColor: Colors.surface.default,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border.subtle,
+  },
+  stickyBuyButton: {
+    backgroundColor: Colors.brand,
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.md,
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: Spacing.sm,
+  },
+  stickyBuyButtonPressed: {
+    opacity: 0.85,
+  },
+  stickyBuyText: {
+    color: Colors.text.inverse,
+    fontSize: FontSize.lg,
+    fontWeight: '700',
+  },
+  stickyBuySubtext: {
+    color: Colors.text.inverse,
+    fontSize: FontSize.sm,
+    opacity: 0.8,
   },
 
   // Action buttons
