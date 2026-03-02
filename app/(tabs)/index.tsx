@@ -1,98 +1,137 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+/**
+ * Home tab — shows currently playing shows sorted by score.
+ * Header with branding + FlatList of open shows.
+ */
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+import React, { useMemo } from 'react';
+import { View, Text, FlatList, StyleSheet, ActivityIndicator } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useShows } from '@/lib/data-context';
+import { ShowCard } from '@/components/ShowCard';
+import { Show } from '@/lib/types';
+import { Colors, Spacing, FontSize } from '@/constants/theme';
 
 export default function HomeScreen() {
-  return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+  const { shows, isLoading, error, isStale } = useShows();
+  const insets = useSafeAreaInsets();
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+  const openShows = useMemo(() => {
+    return shows
+      .filter(s => s.status === 'open' || s.status === 'previews')
+      .sort((a, b) => (b.compositeScore ?? 0) - (a.compositeScore ?? 0));
+  }, [shows]);
+
+  const scoredCount = useMemo(() => shows.filter(s => s.compositeScore != null).length, [shows]);
+
+  if (isLoading && shows.length === 0) {
+    return (
+      <View style={[styles.center, { paddingTop: insets.top }]}>
+        <ActivityIndicator size="large" color={Colors.brand} />
+        <Text style={styles.loadingText}>Loading shows...</Text>
+      </View>
+    );
+  }
+
+  if (error && shows.length === 0) {
+    return (
+      <View style={[styles.center, { paddingTop: insets.top }]}>
+        <Text style={styles.errorText}>{error}</Text>
+        <Text style={styles.hintText}>Check your internet connection and try again.</Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={[styles.container, { paddingTop: insets.top }]}>
+      <FlatList
+        data={openShows}
+        keyExtractor={item => item.id}
+        renderItem={({ item }) => <ShowCard show={item} />}
+        ListHeaderComponent={
+          <View style={styles.header}>
+            <Text style={styles.brandText}>Broadway</Text>
+            <Text style={styles.brandAccent}>Scorecard</Text>
+            <Text style={styles.subtitle}>
+              {scoredCount} shows scored by critics
+            </Text>
+            {isStale && (
+              <View style={styles.staleBanner}>
+                <Text style={styles.staleText}>
+                  Showing cached data. Pull to refresh.
+                </Text>
+              </View>
+            )}
+          </View>
+        }
+        contentContainerStyle={styles.list}
+        showsVerticalScrollIndicator={false}
+      />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
+  container: {
+    flex: 1,
+    backgroundColor: Colors.surface.default,
+  },
+  center: {
+    flex: 1,
+    backgroundColor: Colors.surface.default,
     alignItems: 'center',
-    gap: 8,
+    justifyContent: 'center',
+    padding: Spacing.xl,
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  loadingText: {
+    color: Colors.text.secondary,
+    fontSize: FontSize.md,
+    marginTop: Spacing.md,
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  errorText: {
+    color: Colors.score.red,
+    fontSize: FontSize.lg,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  hintText: {
+    color: Colors.text.muted,
+    fontSize: FontSize.md,
+    marginTop: Spacing.sm,
+    textAlign: 'center',
+  },
+  header: {
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.xl,
+    paddingBottom: Spacing.lg,
+  },
+  brandText: {
+    color: Colors.text.primary,
+    fontSize: FontSize.title,
+    fontWeight: '700',
+  },
+  brandAccent: {
+    color: Colors.brand,
+    fontSize: FontSize.title,
+    fontWeight: '700',
+    marginTop: -4,
+  },
+  subtitle: {
+    color: Colors.text.secondary,
+    fontSize: FontSize.md,
+    marginTop: Spacing.sm,
+  },
+  staleBanner: {
+    backgroundColor: Colors.score.amber + '20',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: 8,
+    marginTop: Spacing.md,
+  },
+  staleText: {
+    color: Colors.score.amber,
+    fontSize: FontSize.sm,
+  },
+  list: {
+    paddingBottom: Spacing.xxl,
   },
 });
