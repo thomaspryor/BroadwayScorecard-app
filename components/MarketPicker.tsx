@@ -3,8 +3,8 @@
  * White-styled to differentiate from the brown score toggle.
  */
 
-import React, { useState } from 'react';
-import { View, Text, Pressable, StyleSheet, Modal } from 'react-native';
+import React, { useState, useRef, useCallback } from 'react';
+import { View, Text, Pressable, StyleSheet, Modal, findNodeHandle, UIManager, Platform } from 'react-native';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
 
 export type Market = 'nyc' | 'london';
@@ -21,26 +21,37 @@ const OPTIONS: { key: Market; label: string }[] = [
 
 export function MarketPicker({ market, onChange }: MarketPickerProps) {
   const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState({ top: 0, right: 0 });
+  const triggerRef = useRef<View>(null);
   const currentLabel = OPTIONS.find(o => o.key === market)?.label ?? 'NYC';
+
+  const handleOpen = useCallback(() => {
+    triggerRef.current?.measureInWindow((x, y, width, height) => {
+      setPos({ top: y + height + 4, right: 16 });
+      setOpen(true);
+    });
+  }, []);
 
   return (
     <>
-      <Pressable
-        style={({ pressed }) => [styles.trigger, pressed && styles.triggerPressed]}
-        onPress={() => setOpen(true)}
-      >
-        <Text style={styles.triggerText}>{currentLabel}</Text>
-        <Text style={styles.chevron}>{'\u25BE'}</Text>
-      </Pressable>
+      <View ref={triggerRef} collapsable={false}>
+        <Pressable
+          style={({ pressed }) => [styles.trigger, pressed && styles.triggerPressed]}
+          onPress={handleOpen}
+        >
+          <Text style={styles.triggerText}>{currentLabel}</Text>
+          <Text style={styles.chevron}>{'\u25BE'}</Text>
+        </Pressable>
+      </View>
 
       <Modal
         visible={open}
         transparent
-        animationType="fade"
+        animationType="none"
         onRequestClose={() => setOpen(false)}
       >
         <Pressable style={styles.overlay} onPress={() => setOpen(false)}>
-          <View style={styles.dropdown}>
+          <View style={[styles.dropdown, { position: 'absolute', top: pos.top, right: pos.right }]}>
             {OPTIONS.map(opt => (
               <Pressable
                 key={opt.key}
@@ -103,9 +114,7 @@ const styles = StyleSheet.create({
   },
   overlay: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(0,0,0,0.3)',
   },
   dropdown: {
     backgroundColor: Colors.surface.elevated,
