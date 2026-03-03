@@ -3,7 +3,11 @@
  *
  * Broadway Scorecard has no REST API — data is a static JSON file
  * generated at build time and served from the web CDN.
+ *
+ * Show detail responses are cached to AsyncStorage for offline use.
  */
+
+import { setCachedDetail, getCachedDetail } from './cache';
 
 const CDN_BASE = 'https://broadwayscorecard.com/data';
 const SHOWS_URL = `${CDN_BASE}/mobile-shows.json`;
@@ -27,20 +31,29 @@ export async function fetchMobileShows(): Promise<string> {
 
 /**
  * Fetch per-show detail data from the CDN.
- * Returns parsed JSON (small files, ~5KB each).
+ * Caches responses for offline use.
+ * Falls back to cache on network failure.
  * Returns null on 404 (show detail not generated yet).
  */
 export async function fetchShowDetail(showId: string): Promise<object | null> {
-  const url = `${CDN_BASE}/shows/${encodeURIComponent(showId)}.json`;
-  const response = await fetch(url, {
-    headers: { 'Cache-Control': 'no-cache' },
-  });
+  try {
+    const url = `${CDN_BASE}/shows/${encodeURIComponent(showId)}.json`;
+    const response = await fetch(url, {
+      headers: { 'Cache-Control': 'no-cache' },
+    });
 
-  if (response.status === 404) return null;
+    if (response.status === 404) return null;
 
-  if (!response.ok) {
-    throw new Error(`Failed to fetch show detail (HTTP ${response.status})`);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch show detail (HTTP ${response.status})`);
+    }
+
+    const data = await response.json();
+    // Cache for offline use (fire and forget)
+    setCachedDetail(showId, data).catch(() => {});
+    return data;
+  } catch {
+    // Network failure — try cache
+    return getCachedDetail(showId);
   }
-
-  return response.json();
 }

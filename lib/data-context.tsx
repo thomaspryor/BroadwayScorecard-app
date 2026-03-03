@@ -11,6 +11,7 @@
 
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
+import * as Network from 'expo-network';
 import { MobileDataResponse, Show, mapMobileShow, EXPECTED_SCHEMA_VERSION } from './types';
 import { fetchMobileShows } from './api';
 import { getCachedData, setCachedData, isCacheStale, getLastFetched } from './cache';
@@ -21,6 +22,7 @@ interface DataState {
   error: string | null;
   lastUpdated: Date | null;
   isStale: boolean;
+  isOffline: boolean;
   refresh: () => Promise<void>;
 }
 
@@ -30,6 +32,7 @@ const DataContext = createContext<DataState>({
   error: null,
   lastUpdated: null,
   isStale: false,
+  isOffline: false,
   refresh: async () => {},
 });
 
@@ -61,11 +64,17 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [isStale, setIsStale] = useState(false);
+  const [isOffline, setIsOffline] = useState(false);
   const hasData = useRef(false);
   const appState = useRef(AppState.currentState);
 
   const loadData = useCallback(async (forceRefresh = false) => {
     try {
+      // Check network state
+      const networkState = await Network.getNetworkStateAsync();
+      const online = networkState.isConnected && networkState.isInternetReachable !== false;
+      setIsOffline(!online);
+
       // Try cache first for instant display
       if (!forceRefresh) {
         const cached = await getCachedData();
@@ -77,10 +86,23 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
           const stale = await isCacheStale();
           setIsStale(stale);
           setLastUpdated(await getLastFetched());
-          // If cache is fresh, we're done
-          if (!stale) return;
+          // If cache is fresh or we're offline, stop here
+          if (!stale || !online) return;
           // Otherwise, continue to fetch fresh data in the background
         }
+      }
+
+      // Skip fetch if offline
+      if (!online) {
+        if (!hasData.current) {
+          const seed = loadSeedData();
+          if (seed.length > 0) {
+            setShows(seed);
+            hasData.current = true;
+            setIsStale(true);
+          }
+        }
+        return;
       }
 
       // Fetch fresh data from CDN
@@ -91,6 +113,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       await setCachedData(json);
       setLastUpdated(new Date());
       setIsStale(false);
+      setIsOffline(false);
       setError(null);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to load shows';
@@ -141,6 +164,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         error,
         lastUpdated,
         isStale,
+        isOffline,
         refresh: () => loadData(true),
       }}
     >

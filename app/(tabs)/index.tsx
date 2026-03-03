@@ -8,6 +8,7 @@ import { View, Text, FlatList, StyleSheet, ActivityIndicator, RefreshControl } f
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useShows } from '@/lib/data-context';
 import { ShowCard } from '@/components/ShowCard';
+import { AnimatedListItem } from '@/components/AnimatedListItem';
 import { FeaturedCarousel } from '@/components/FeaturedCarousel';
 import { MarketPicker, Market, filterByMarketCategory } from '@/components/MarketPicker';
 import { Show } from '@/lib/types';
@@ -88,7 +89,11 @@ export default function HomeScreen() {
     [marketShows]
   );
 
-  const renderItem = useCallback(({ item }: { item: Show }) => <ShowCard show={item} hideStatus />, []);
+  const renderItem = useCallback(({ item, index }: { item: Show; index: number }) => (
+    <AnimatedListItem index={index}>
+      <ShowCard show={item} hideStatus />
+    </AnimatedListItem>
+  ), []);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);

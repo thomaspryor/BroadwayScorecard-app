@@ -8,6 +8,7 @@ import Fuse, { IFuseOptions } from 'fuse.js';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useShows } from '@/lib/data-context';
 import { ShowCard } from '@/components/ShowCard';
+import { AnimatedListItem } from '@/components/AnimatedListItem';
 import { Show } from '@/lib/types';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
 
@@ -67,7 +68,11 @@ export default function SearchScreen() {
         <FlatList
           data={results}
           keyExtractor={item => item.id}
-          renderItem={({ item }) => <ShowCard show={item} />}
+          renderItem={({ item, index }) => (
+            <AnimatedListItem index={index}>
+              <ShowCard show={item} />
+            </AnimatedListItem>
+          )}
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
           keyboardDismissMode="on-drag"

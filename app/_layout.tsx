@@ -31,7 +31,12 @@ export default function RootLayout() {
   return (
     <ThemeProvider value={BroadwayDark}>
       <DataProvider>
-        <Stack>
+        <Stack
+          screenOptions={{
+            animation: 'slide_from_right',
+            animationDuration: 250,
+          }}
+        >
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen
             name="show/[slug]"
@@ -42,6 +47,7 @@ export default function RootLayout() {
               headerTintColor: Colors.brand,
               headerTitleStyle: { color: Colors.text.primary },
               title: '',
+              animation: 'slide_from_right',
             }}
           />
         </Stack>

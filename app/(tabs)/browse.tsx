@@ -8,6 +8,7 @@ import { View, Text, FlatList, StyleSheet, ActivityIndicator, ScrollView, Pressa
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useShows } from '@/lib/data-context';
 import { ShowCard } from '@/components/ShowCard';
+import { AnimatedListItem } from '@/components/AnimatedListItem';
 import { MarketPicker, Market, filterByMarketCategory } from '@/components/MarketPicker';
 import { ScoreToggle, ScoreMode } from '@/components/ScoreToggle';
 import { Show } from '@/lib/types';
@@ -98,8 +99,10 @@ export default function BrowseScreen() {
     [shows, market, includeOB]
   );
 
-  const renderItem = useCallback(({ item }: { item: Show }) => (
-    <ShowCard show={item} scoreMode={scoreMode} hideStatus={statusFilter === 'open'} />
+  const renderItem = useCallback(({ item, index }: { item: Show; index: number }) => (
+    <AnimatedListItem index={index}>
+      <ShowCard show={item} scoreMode={scoreMode} hideStatus={statusFilter === 'open'} />
+    </AnimatedListItem>
   ), [scoreMode, statusFilter]);
 
   const onRefresh = useCallback(async () => {
