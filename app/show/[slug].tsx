@@ -195,14 +195,14 @@ export default function ShowDetailScreen() {
               </Pressable>
             ))}
           </View>
-        </View>
 
-        {/* Score Breakdown Bar */}
-        {detail?.breakdown && hasEnoughReviews && (
-          <View style={styles.breakdownSection}>
-            <BreakdownBar breakdown={detail.breakdown} />
-          </View>
-        )}
+          {/* Score Breakdown Bar — inside header card */}
+          {detail?.breakdown && hasEnoughReviews && (
+            <View style={styles.breakdownSection}>
+              <BreakdownBar breakdown={detail.breakdown} />
+            </View>
+          )}
+        </View>
 
         {/* Critic Reviews List — collapsed by default */}
         {detail?.reviews && detail.reviews.length > 0 && (
@@ -739,7 +739,10 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   breakdownSection: {
-    paddingHorizontal: Spacing.lg,
+    marginTop: Spacing.lg,
+    paddingTop: Spacing.lg,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border.subtle,
   },
   title: {
     color: Colors.text.primary,
@@ -760,10 +763,6 @@ const styles = StyleSheet.create({
 
   // Breakdown bar
   breakdownContainer: {
-    marginTop: Spacing.lg,
-    backgroundColor: Colors.surface.raised,
-    borderRadius: BorderRadius.md,
-    padding: Spacing.lg,
   },
   breakdownBar: {
     flexDirection: 'row',
