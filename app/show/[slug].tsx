@@ -101,49 +101,99 @@ export default function ShowDetailScreen() {
       <Stack.Screen options={{ title: show.title }} />
       <View style={styles.container}>
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
-        {/* Header: Poster card + Info (matching website layout) */}
+        {/* Header card — matches website: poster + info, score below */}
         <View style={styles.headerCard}>
-          {/* Poster */}
-          {posterUrl ? (
-            <Image
-              source={{ uri: posterUrl }}
-              style={styles.posterCard}
-              contentFit="cover"
-              transition={200}
-            />
-          ) : (
-            <View style={[styles.posterCard, styles.posterPlaceholder]}>
-              <Text style={styles.posterPlaceholderText}>{show.title.charAt(0)}</Text>
-            </View>
-          )}
-
-          {/* Info alongside poster */}
-          <View style={styles.headerInfo}>
-            <View style={styles.pills}>
-              <FormatPill type={show.type} />
-              <ProductionPill isRevival={show.isRevival} />
-              <StatusBadge status={show.status} />
-              <CategoryBadge category={show.category} />
-            </View>
-            <Text style={styles.title}>{show.title}</Text>
-            <Text style={styles.venue}>{show.venue}</Text>
-            {detail?.theaterAddress && (
-              <Text style={styles.address}>{detail.theaterAddress}</Text>
+          {/* Top row: Poster + Title/Meta */}
+          <View style={styles.headerTopRow}>
+            {posterUrl ? (
+              <Image
+                source={{ uri: posterUrl }}
+                style={styles.posterCard}
+                contentFit="cover"
+                transition={200}
+              />
+            ) : (
+              <View style={[styles.posterCard, styles.posterPlaceholder]}>
+                <Text style={styles.posterPlaceholderText}>{show.title.charAt(0)}</Text>
+              </View>
             )}
-            {/* Score + review count */}
-            <View style={styles.headerScoreRow}>
-              <ScoreBadge score={displayScore} size="large" showLabel animated />
-              {hasEnoughReviews && show.criticScore && (
-                <Text style={styles.reviewCountText}>
-                  {show.criticScore.reviewCount} critic reviews
-                </Text>
-              )}
-              {!hasEnoughReviews && show.criticScore && (
-                <Text style={styles.reviewCountText}>
-                  {show.criticScore.reviewCount} review{show.criticScore.reviewCount !== 1 ? 's' : ''} — not enough to score
+
+            <View style={styles.headerInfo}>
+              <View style={styles.pills}>
+                <FormatPill type={show.type} />
+                <ProductionPill isRevival={show.isRevival} />
+                <StatusBadge status={show.status} />
+                <CategoryBadge category={show.category} />
+              </View>
+              <Text style={styles.title} numberOfLines={2}>{show.title}</Text>
+              <Text style={styles.meta} numberOfLines={2}>
+                {show.venue}
+                {show.runtime ? ` · ${show.runtime}` : ''}
+              </Text>
+              {show.openingDate && (
+                <Text style={styles.meta} numberOfLines={1}>
+                  {show.status === 'closed' ? 'Opened' : show.status === 'previews' ? 'Opens' : 'Opened'}{' '}
+                  {formatDate(show.openingDate)}
+                  {show.closingDate && show.status === 'closed' ? ` · Closed ${formatDate(show.closingDate)}` : ''}
+                  {show.closingDate && show.status !== 'closed' ? ` · Closes ${formatDate(show.closingDate)}` : ''}
                 </Text>
               )}
             </View>
+          </View>
+
+          {/* Score row: badge + sentiment + review count */}
+          <View style={styles.scoreRow}>
+            <ScoreBadge score={displayScore} size="large" animated />
+            <View style={styles.scoreMeta}>
+              {hasEnoughReviews && show.criticScore ? (
+                <>
+                  <Text style={[styles.sentimentLabel, { color: getScoreColor(displayScore) }]}>
+                    {show.criticScore.label}
+                  </Text>
+                  <Text style={styles.reviewCountText}>
+                    Based on {show.criticScore.reviewCount} critic reviews
+                  </Text>
+                </>
+              ) : show.criticScore ? (
+                <Text style={styles.reviewCountText}>
+                  {show.criticScore.reviewCount} review{show.criticScore.reviewCount !== 1 ? 's' : ''} — awaiting more reviews
+                </Text>
+              ) : (
+                <Text style={styles.reviewCountText}>Awaiting reviews</Text>
+              )}
+              {/* Audience grade chip — matching website */}
+              {show.audienceGrade && (
+                <View style={[styles.audienceChip, { backgroundColor: show.audienceGrade.color + '26' }]}>
+                  <Text style={[styles.audienceChipText, { color: show.audienceGrade.color }]}>
+                    Audience: {show.audienceGrade.grade} · {show.audienceGrade.label}
+                  </Text>
+                </View>
+              )}
+            </View>
+          </View>
+
+          {/* Link buttons: Official Site, Ticket platforms */}
+          <View style={styles.linkButtons}>
+            {show.officialUrl && (
+              <Pressable
+                style={({ pressed }) => [styles.linkButton, pressed && styles.pressed]}
+                onPress={() => WebBrowser.openBrowserAsync(show.officialUrl!)}
+              >
+                <Text style={styles.linkButtonText}>Official Site</Text>
+              </Pressable>
+            )}
+            {show.status !== 'closed' && show.ticketLinks.map((link, i) => (
+              <Pressable
+                key={i}
+                style={({ pressed }) => [styles.linkButton, pressed && styles.pressed]}
+                onPress={() => {
+                  trackTicketTap(show.id, show.title, link.platform, link.url);
+                  WebBrowser.openBrowserAsync(link.url);
+                }}
+              >
+                <Text style={styles.linkButtonText}>{link.platform}</Text>
+              </Pressable>
+            ))}
           </View>
         </View>
 
@@ -210,7 +260,13 @@ export default function ShowDetailScreen() {
             {detail.audience.sources && (
               <View style={styles.audienceSourceCards}>
                 {detail.audience.sources.showScore && (
-                  <View style={styles.audienceSourceCard}>
+                  <Pressable
+                    style={styles.audienceSourceCard}
+                    onPress={() => {
+                      const ssSlug = show.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+                      WebBrowser.openBrowserAsync(`https://show-score.com/show/${ssSlug}`);
+                    }}
+                  >
                     <View style={styles.audienceSourceHeader}>
                       <Svg width={14} height={14} viewBox="0 0 24 24" fill="#facc15">
                         <Path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
@@ -221,9 +277,9 @@ export default function ShowDetailScreen() {
                       {detail.audience.sources.showScore.score}%
                     </Text>
                     <Text style={styles.audienceSourceMeta}>
-                      {detail.audience.sources.showScore.count} reviews
+                      {detail.audience.sources.showScore.count} reviews →
                     </Text>
-                  </View>
+                  </Pressable>
                 )}
                 {detail.audience.sources.mezzanine && (
                   <View style={styles.audienceSourceCard}>
@@ -264,23 +320,14 @@ export default function ShowDetailScreen() {
           </View>
         )}
 
-        {/* Show info */}
+        {/* Quick facts */}
         <View style={styles.infoSection}>
-          {show.openingDate && (
-            <InfoRow label="Opening" value={formatDate(show.openingDate)} />
-          )}
-          {detail?.previewsStartDate && (
-            <InfoRow label="Previews" value={formatDate(detail.previewsStartDate)} />
-          )}
-          {show.closingDate && (
-            <InfoRow label="Closing" value={formatDate(show.closingDate)} />
-          )}
           {show.runtime && <InfoRow label="Runtime" value={show.runtime} />}
           {show.ageRecommendation && (
             <InfoRow label="Ages" value={show.ageRecommendation} />
           )}
-          {show.category !== 'broadway' && (
-            <InfoRow label="Category" value={show.category.replace('-', ' ').toUpperCase()} />
+          {detail?.theaterAddress && (
+            <InfoRow label="Theater" value={`${show.venue} · ${detail.theaterAddress}`} />
           )}
         </View>
 
@@ -330,25 +377,6 @@ export default function ShowDetailScreen() {
           </View>
         )}
 
-        {/* All ticket links (inline, secondary to sticky CTA) */}
-        {show.ticketLinks.length > 1 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>All Ticket Sources</Text>
-            {show.ticketLinks.map((link, i) => (
-              <Pressable
-                key={i}
-                style={({ pressed }) => [styles.ticketRowButton, pressed && styles.pressed]}
-                onPress={() => {
-                  trackTicketTap(show.id, show.title, link.platform, link.url);
-                  WebBrowser.openBrowserAsync(link.url);
-                }}
-              >
-                <Text style={styles.ticketRowText}>{link.platform}</Text>
-                <Text style={styles.ticketRowArrow}>→</Text>
-              </Pressable>
-            ))}
-          </View>
-        )}
 
         {/* Related Shows — with poster thumbnails */}
         {relatedShows.length > 0 && (
@@ -488,38 +516,93 @@ function ReviewRow({ review }: { review: ShowDetail['reviews'][0] }) {
     } catch { return null; }
   })() : null;
 
+  // Outlet logo from Google Favicons (same as website)
+  const outletDomain = getOutletDomain(review.outlet);
+  const logoUrl = outletDomain ? `https://www.google.com/s2/favicons?domain=${outletDomain}&sz=64` : null;
+
   return (
-    <Pressable
-      style={({ pressed }) => [styles.reviewRow, pressed && review.url ? styles.pressed : null]}
-      onPress={review.url ? () => WebBrowser.openBrowserAsync(review.url!) : undefined}
-      disabled={!review.url}
-    >
-      {/* Score badge */}
-      <View style={[styles.reviewScore, { backgroundColor: scoreColor }]}>
-        <Text style={styles.reviewScoreText}>{review.score}</Text>
+    <View style={styles.reviewRow}>
+      {/* Top row: score + logo + outlet + date */}
+      <View style={styles.reviewTopRow}>
+        <View style={[styles.reviewScore, { backgroundColor: scoreColor }]}>
+          <Text style={styles.reviewScoreText}>{review.score}</Text>
+        </View>
+        {logoUrl && (
+          <Image source={{ uri: logoUrl }} style={styles.outletLogo} contentFit="cover" />
+        )}
+        <Text style={styles.reviewOutlet} numberOfLines={1}>{review.outlet}</Text>
+        {formattedDate && (
+          <Text style={styles.reviewDate}>{formattedDate}</Text>
+        )}
       </View>
 
-      {/* Review info — outlet prominent, matching website */}
-      <View style={styles.reviewInfo}>
-        <View style={styles.reviewHeader}>
-          <Text style={styles.reviewOutlet} numberOfLines={1}>
-            {review.outlet}
-          </Text>
-          {formattedDate && (
-            <Text style={styles.reviewDate}>{formattedDate}</Text>
-          )}
-        </View>
+      {/* Content indented past score badge */}
+      <View style={styles.reviewContent}>
         {review.pullQuote && (
           <Text style={styles.reviewQuote} numberOfLines={2}>
             &ldquo;{review.pullQuote}&rdquo;
           </Text>
         )}
-        <Text style={styles.reviewCritic} numberOfLines={1}>
-          By {review.criticName || `${review.outlet} Staff`}
-        </Text>
+        <View style={styles.reviewFooter}>
+          <Text style={styles.reviewCritic} numberOfLines={1}>
+            By {review.criticName || `${review.outlet} Staff`}
+          </Text>
+          {review.url && (
+            <Pressable onPress={() => WebBrowser.openBrowserAsync(review.url!)}>
+              <Text style={styles.fullReviewLink}>Full Review →</Text>
+            </Pressable>
+          )}
+        </View>
       </View>
-    </Pressable>
+    </View>
   );
+}
+
+/** Map outlet display names to domains for Google Favicons */
+function getOutletDomain(outlet: string): string | null {
+  const OUTLET_DOMAINS: Record<string, string> = {
+    'The New York Times': 'nytimes.com',
+    'Vulture': 'vulture.com',
+    'Variety': 'variety.com',
+    'The Hollywood Reporter': 'hollywoodreporter.com',
+    'Entertainment Weekly': 'ew.com',
+    'TheaterMania': 'theatermania.com',
+    'New York Post': 'nypost.com',
+    'The Wall Street Journal': 'wsj.com',
+    'The Washington Post': 'washingtonpost.com',
+    'Time Out New York': 'timeout.com',
+    'Time Out London': 'timeout.com',
+    'BroadwayWorld': 'broadwayworld.com',
+    'Deadline': 'deadline.com',
+    'The Guardian': 'theguardian.com',
+    'The Telegraph': 'telegraph.co.uk',
+    'Associated Press': 'apnews.com',
+    'NBC New York': 'nbcnewyork.com',
+    'amNewYork': 'amny.com',
+    'New York Magazine': 'nymag.com',
+    'The Daily Beast': 'thedailybeast.com',
+    'USA Today': 'usatoday.com',
+    'Chicago Tribune': 'chicagotribune.com',
+    'Playbill': 'playbill.com',
+    'Broadway News': 'broadwaynews.com',
+    'New York Theater': 'newyorktheater.me',
+    'WhatsOnStage': 'whatsonstage.com',
+    'The Stage': 'thestage.co.uk',
+    'Evening Standard': 'standard.co.uk',
+    'Financial Times': 'ft.com',
+    'The Independent': 'independent.co.uk',
+    'The Observer': 'observer.com',
+    'The Wrap': 'thewrap.com',
+    'Vogue': 'vogue.com',
+    'The New Yorker': 'newyorker.com',
+    'Rolling Stone': 'rollingstone.com',
+    'Forbes': 'forbes.com',
+    'NPR': 'npr.org',
+    'Newsday': 'newsday.com',
+    'Daily News': 'nydailynews.com',
+    'CurtainUp': 'curtainup.com',
+  };
+  return OUTLET_DOMAINS[outlet] ?? null;
 }
 
 function InfoRow({ label, value }: { label: string; value: string }) {
@@ -569,41 +652,91 @@ const styles = StyleSheet.create({
     fontSize: FontSize.lg,
   },
   headerCard: {
-    flexDirection: 'row',
+    backgroundColor: Colors.surface.raised,
+    margin: Spacing.lg,
     padding: Spacing.lg,
-    gap: Spacing.lg,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+    borderColor: Colors.border.subtle,
+  },
+  headerTopRow: {
+    flexDirection: 'row',
     alignItems: 'flex-start',
+    gap: Spacing.md,
   },
   posterCard: {
-    width: 112,
-    height: 168,
-    borderRadius: BorderRadius.md,
-    backgroundColor: Colors.surface.raised,
+    width: 100,
+    height: 150,
+    borderRadius: BorderRadius.sm,
+    backgroundColor: Colors.surface.overlay,
   },
   posterPlaceholder: {
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.surface.overlay,
   },
   posterPlaceholderText: {
     color: Colors.text.muted,
-    fontSize: FontSize.title,
+    fontSize: FontSize.xxl,
     fontWeight: '600',
   },
   headerInfo: {
     flex: 1,
-    gap: 4,
+    gap: 3,
   },
-  headerScoreRow: {
+  scoreRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: Spacing.md,
-    marginTop: Spacing.sm,
+    marginTop: Spacing.lg,
+    paddingTop: Spacing.lg,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border.subtle,
+  },
+  scoreMeta: {
+    flex: 1,
+    paddingTop: 2,
+  },
+  sentimentLabel: {
+    fontSize: FontSize.lg,
+    fontWeight: '700',
   },
   reviewCountText: {
     color: Colors.text.muted,
     fontSize: FontSize.xs,
-    flex: 1,
+    marginTop: 3,
+  },
+  audienceChip: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 4,
+    borderRadius: BorderRadius.pill,
+    marginTop: Spacing.sm,
+  },
+  audienceChipText: {
+    fontSize: FontSize.xs,
+    fontWeight: '600',
+  },
+  linkButtons: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.sm,
+    marginTop: Spacing.lg,
+    paddingTop: Spacing.lg,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border.subtle,
+  },
+  linkButton: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: Colors.border.default,
+    backgroundColor: Colors.surface.overlay,
+  },
+  linkButtonText: {
+    color: Colors.text.primary,
+    fontSize: FontSize.sm,
+    fontWeight: '500',
   },
   breakdownSection: {
     paddingHorizontal: Spacing.lg,
@@ -613,13 +746,8 @@ const styles = StyleSheet.create({
     fontSize: FontSize.xxl,
     fontWeight: '700',
   },
-  venue: {
+  meta: {
     color: Colors.text.secondary,
-    fontSize: FontSize.md,
-    marginTop: 4,
-  },
-  address: {
-    color: Colors.text.muted,
     fontSize: FontSize.sm,
     marginTop: 2,
   },
@@ -627,7 +755,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: Spacing.xs,
-    marginTop: Spacing.sm,
+    marginBottom: 4,
   },
 
   // Breakdown bar
@@ -669,32 +797,31 @@ const styles = StyleSheet.create({
 
   // Review rows
   reviewRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
     paddingVertical: Spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border.subtle,
   },
+  reviewTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
   reviewScore: {
-    width: 40,
-    height: 40,
+    width: 36,
+    height: 36,
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: Spacing.md,
   },
   reviewScoreText: {
     color: '#ffffff',
     fontSize: FontSize.sm,
     fontWeight: '700',
   },
-  reviewInfo: {
-    flex: 1,
-  },
-  reviewHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
+  outletLogo: {
+    width: 20,
+    height: 20,
+    borderRadius: 4,
   },
   reviewOutlet: {
     color: Colors.text.primary,
@@ -706,16 +833,29 @@ const styles = StyleSheet.create({
     color: Colors.text.muted,
     fontSize: FontSize.xs,
   },
+  reviewContent: {
+    marginLeft: 48, // align with text past score badge (36 + 12 gap)
+    marginTop: 4,
+  },
   reviewQuote: {
     color: Colors.text.secondary,
     fontSize: FontSize.sm,
-    marginTop: 4,
     lineHeight: 18,
+  },
+  reviewFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 4,
   },
   reviewCritic: {
     color: Colors.text.muted,
     fontSize: FontSize.sm,
-    marginTop: 3,
+  },
+  fullReviewLink: {
+    color: Colors.brand,
+    fontSize: FontSize.sm,
+    fontWeight: '500',
   },
 
   // Detail loading
@@ -855,23 +995,6 @@ const styles = StyleSheet.create({
     color: Colors.text.primary,
     fontSize: FontSize.sm,
     flex: 1,
-  },
-  ticketRowButton: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: Spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border.subtle,
-  },
-  ticketRowText: {
-    color: Colors.text.primary,
-    fontSize: FontSize.md,
-    fontWeight: '500',
-  },
-  ticketRowArrow: {
-    color: Colors.text.muted,
-    fontSize: FontSize.md,
   },
   pressed: {
     opacity: 0.7,
