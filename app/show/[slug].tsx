@@ -12,7 +12,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { useShows } from '@/lib/data-context';
 import { fetchShowDetail } from '@/lib/api';
 import { getImageUrl } from '@/lib/images';
-import { getScoreTier, getScoreColor } from '@/lib/score-utils';
+import { getScoreColor } from '@/lib/score-utils';
 import { Show, ShowDetail, MobileShowDetail, mapShowDetail } from '@/lib/types';
 import { ScoreBadge, StatusBadge, FormatPill, ProductionPill, CategoryBadge } from '@/components/show-cards';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
@@ -84,11 +84,6 @@ export default function ShowDetailScreen() {
   }
 
   const posterUrl = getImageUrl(show.images.poster) || getImageUrl(show.images.thumbnail);
-  const heroUrl = detail?.heroImage ? getImageUrl(detail.heroImage) : null;
-  // Hero images are high-res (designed for full-width). Poster images are small (card-sized).
-  // Use hero for full-width cover; fall back to poster in a contained (non-stretched) format.
-  const hasHero = !!heroUrl;
-  const headerImage = heroUrl || posterUrl;
 
   // Primary ticket link: prefer TodayTix, then first available
   const primaryTicketLink = useMemo(() => {
@@ -96,93 +91,68 @@ export default function ShowDetailScreen() {
     const todayTix = show.ticketLinks.find(l => l.platform.toLowerCase().includes('todaytix'));
     return todayTix || show.ticketLinks[0];
   }, [show.ticketLinks]);
-  const tier = getScoreTier(show.compositeScore);
+
+  // Minimum 3 reviews to show a score (1-2 reviews is not a meaningful composite)
+  const hasEnoughReviews = (show.criticScore?.reviewCount ?? 0) >= 3;
+  const displayScore = hasEnoughReviews ? show.compositeScore : null;
 
   return (
     <>
       <Stack.Screen options={{ title: show.title }} />
       <View style={styles.container}>
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
-        {/* Hero (full-width cover) or Poster (contained, centered) */}
-        {headerImage && (
-          hasHero ? (
+        {/* Header: Poster card + Info (matching website layout) */}
+        <View style={styles.headerCard}>
+          {/* Poster */}
+          {posterUrl ? (
             <Image
-              source={{ uri: headerImage }}
-              style={styles.heroImage}
+              source={{ uri: posterUrl }}
+              style={styles.posterCard}
               contentFit="cover"
-              transition={300}
+              transition={200}
             />
           ) : (
-            <View style={styles.posterContainer}>
-              <Image
-                source={{ uri: headerImage }}
-                style={styles.posterImage}
-                contentFit="contain"
-                transition={300}
-              />
+            <View style={[styles.posterCard, styles.posterPlaceholder]}>
+              <Text style={styles.posterPlaceholderText}>{show.title.charAt(0)}</Text>
             </View>
-          )
-        )}
-
-        {/* Title + Score section */}
-        <View style={styles.titleSection}>
-          <View style={styles.titleRow}>
-            <View style={styles.titleInfo}>
-              <Text style={styles.title}>{show.title}</Text>
-              <Text style={styles.venue}>{show.venue}</Text>
-              {detail?.theaterAddress && (
-                <Text style={styles.address}>{detail.theaterAddress}</Text>
-              )}
-              <View style={styles.pills}>
-                <FormatPill type={show.type} />
-                <ProductionPill isRevival={show.isRevival} />
-                <StatusBadge status={show.status} />
-                <CategoryBadge category={show.category} />
-              </View>
-            </View>
-            <ScoreBadge score={show.compositeScore} size="large" showLabel />
-          </View>
-
-          {/* Score cards — Critic + Audience side by side */}
-          <View style={styles.scoreCards}>
-            {show.criticScore && (
-              <View style={[styles.scoreCard, { borderColor: (tier?.color ?? Colors.text.muted) + '40' }]}>
-                <Text style={styles.scoreCardTitle}>Critics</Text>
-                <Text style={[styles.scoreCardScore, { color: tier?.color ?? Colors.text.muted }]}>
-                  {show.criticScore.score}
-                </Text>
-                <Text style={[styles.scoreCardLabel, { color: tier?.color ?? Colors.text.muted }]}>
-                  {show.criticScore.label}
-                </Text>
-                <Text style={styles.scoreCardDetail}>
-                  {show.criticScore.reviewCount} reviews
-                </Text>
-              </View>
-            )}
-
-            {show.audienceGrade && (
-              <View style={[styles.scoreCard, { borderColor: show.audienceGrade.color + '40' }]}>
-                <Text style={styles.scoreCardTitle}>Audience</Text>
-                <Text style={[styles.scoreCardScore, { color: show.audienceGrade.color }]}>
-                  {show.audienceGrade.grade}
-                </Text>
-                <Text style={[styles.scoreCardLabel, { color: show.audienceGrade.color }]}>
-                  {show.audienceGrade.label}
-                </Text>
-                {detail?.audience && (
-                  <Text style={styles.scoreCardDetail}>
-                    Score: {detail.audience.score}
-                  </Text>
-                )}
-              </View>
-            )}
-          </View>
-
-          {/* Score Breakdown Bar */}
-          {detail?.breakdown && (
-            <BreakdownBar breakdown={detail.breakdown} />
           )}
+
+          {/* Info alongside poster */}
+          <View style={styles.headerInfo}>
+            <View style={styles.pills}>
+              <FormatPill type={show.type} />
+              <ProductionPill isRevival={show.isRevival} />
+              <StatusBadge status={show.status} />
+              <CategoryBadge category={show.category} />
+            </View>
+            <Text style={styles.title}>{show.title}</Text>
+            <Text style={styles.venue}>{show.venue}</Text>
+            {detail?.theaterAddress && (
+              <Text style={styles.address}>{detail.theaterAddress}</Text>
+            )}
+            {/* Score + review count */}
+            <View style={styles.headerScoreRow}>
+              <ScoreBadge score={displayScore} size="large" showLabel animated />
+              {hasEnoughReviews && show.criticScore && (
+                <Text style={styles.reviewCountText}>
+                  {show.criticScore.reviewCount} critic reviews
+                </Text>
+              )}
+              {!hasEnoughReviews && show.criticScore && (
+                <Text style={styles.reviewCountText}>
+                  {show.criticScore.reviewCount} review{show.criticScore.reviewCount !== 1 ? 's' : ''} — not enough to score
+                </Text>
+              )}
+            </View>
+          </View>
         </View>
+
+        {/* Score Breakdown Bar */}
+        {detail?.breakdown && hasEnoughReviews && (
+          <View style={styles.breakdownSection}>
+            <BreakdownBar breakdown={detail.breakdown} />
+          </View>
+        )}
 
         {/* Critic Reviews List — collapsed by default */}
         {detail?.reviews && detail.reviews.length > 0 && (
@@ -509,7 +479,14 @@ function BreakdownBar({ breakdown }: { breakdown: { positive: number; mixed: num
 
 function ReviewRow({ review }: { review: ShowDetail['reviews'][0] }) {
   const scoreColor = getScoreColor(review.score);
-  const tierLabel = review.tier === 1 ? 'T1' : review.tier === 2 ? 'T2' : 'T3';
+
+  const formattedDate = review.publishDate ? (() => {
+    try {
+      return new Date(review.publishDate + 'T12:00:00').toLocaleDateString('en-US', {
+        month: 'short', day: 'numeric', year: 'numeric',
+      });
+    } catch { return null; }
+  })() : null;
 
   return (
     <Pressable
@@ -517,27 +494,29 @@ function ReviewRow({ review }: { review: ShowDetail['reviews'][0] }) {
       onPress={review.url ? () => WebBrowser.openBrowserAsync(review.url!) : undefined}
       disabled={!review.url}
     >
-      {/* Score circle */}
+      {/* Score badge */}
       <View style={[styles.reviewScore, { backgroundColor: scoreColor }]}>
         <Text style={styles.reviewScoreText}>{review.score}</Text>
       </View>
 
-      {/* Review info */}
+      {/* Review info — outlet prominent, matching website */}
       <View style={styles.reviewInfo}>
         <View style={styles.reviewHeader}>
-          <Text style={styles.reviewCritic} numberOfLines={1}>
-            {review.criticName || 'Staff'}
+          <Text style={styles.reviewOutlet} numberOfLines={1}>
+            {review.outlet}
           </Text>
-          <Text style={styles.reviewTier}>{tierLabel}</Text>
+          {formattedDate && (
+            <Text style={styles.reviewDate}>{formattedDate}</Text>
+          )}
         </View>
-        <Text style={styles.reviewOutlet} numberOfLines={1}>
-          {review.outlet}
-        </Text>
         {review.pullQuote && (
           <Text style={styles.reviewQuote} numberOfLines={2}>
-            "{review.pullQuote}"
+            &ldquo;{review.pullQuote}&rdquo;
           </Text>
         )}
+        <Text style={styles.reviewCritic} numberOfLines={1}>
+          By {review.criticName || `${review.outlet} Staff`}
+        </Text>
       </View>
     </Pressable>
   );
@@ -589,33 +568,45 @@ const styles = StyleSheet.create({
     color: Colors.text.muted,
     fontSize: FontSize.lg,
   },
-  heroImage: {
-    width: '100%',
-    height: 280,
-  },
-  posterContainer: {
-    backgroundColor: Colors.surface.raised,
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: 300,
-    paddingVertical: Spacing.lg,
-  },
-  posterImage: {
-    width: 180,
-    height: 270,
-    borderRadius: BorderRadius.md,
-  },
-  titleSection: {
-    padding: Spacing.lg,
-  },
-  titleRow: {
+  headerCard: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    padding: Spacing.lg,
+    gap: Spacing.lg,
     alignItems: 'flex-start',
   },
-  titleInfo: {
+  posterCard: {
+    width: 112,
+    height: 168,
+    borderRadius: BorderRadius.md,
+    backgroundColor: Colors.surface.raised,
+  },
+  posterPlaceholder: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.surface.overlay,
+  },
+  posterPlaceholderText: {
+    color: Colors.text.muted,
+    fontSize: FontSize.title,
+    fontWeight: '600',
+  },
+  headerInfo: {
     flex: 1,
-    marginRight: Spacing.md,
+    gap: 4,
+  },
+  headerScoreRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+    marginTop: Spacing.sm,
+  },
+  reviewCountText: {
+    color: Colors.text.muted,
+    fontSize: FontSize.xs,
+    flex: 1,
+  },
+  breakdownSection: {
+    paddingHorizontal: Spacing.lg,
   },
   title: {
     color: Colors.text.primary,
@@ -637,41 +628,6 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: Spacing.xs,
     marginTop: Spacing.sm,
-  },
-  scoreCards: {
-    flexDirection: 'row',
-    gap: Spacing.md,
-    marginTop: Spacing.lg,
-  },
-  scoreCard: {
-    flex: 1,
-    backgroundColor: Colors.surface.raised,
-    borderRadius: BorderRadius.md,
-    padding: Spacing.lg,
-    alignItems: 'center',
-    borderWidth: 1,
-  },
-  scoreCardTitle: {
-    color: Colors.text.muted,
-    fontSize: FontSize.xs,
-    fontWeight: '600',
-    letterSpacing: 0.5,
-    textTransform: 'uppercase',
-    marginBottom: Spacing.xs,
-  },
-  scoreCardScore: {
-    fontSize: FontSize.title,
-    fontWeight: '700',
-  },
-  scoreCardLabel: {
-    fontSize: FontSize.sm,
-    fontWeight: '600',
-    marginTop: 2,
-  },
-  scoreCardDetail: {
-    color: Colors.text.muted,
-    fontSize: FontSize.xs,
-    marginTop: 4,
   },
 
   // Breakdown bar
@@ -740,33 +696,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.sm,
   },
-  reviewCritic: {
+  reviewOutlet: {
     color: Colors.text.primary,
     fontSize: FontSize.md,
     fontWeight: '600',
     flex: 1,
   },
-  reviewTier: {
+  reviewDate: {
     color: Colors.text.muted,
     fontSize: FontSize.xs,
-    fontWeight: '500',
-    backgroundColor: Colors.surface.overlay,
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  reviewOutlet: {
-    color: Colors.text.secondary,
-    fontSize: FontSize.sm,
-    marginTop: 1,
   },
   reviewQuote: {
-    color: Colors.text.muted,
+    color: Colors.text.secondary,
     fontSize: FontSize.sm,
-    fontStyle: 'italic',
     marginTop: 4,
     lineHeight: 18,
+  },
+  reviewCritic: {
+    color: Colors.text.muted,
+    fontSize: FontSize.sm,
+    marginTop: 3,
   },
 
   // Detail loading
