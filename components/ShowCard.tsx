@@ -16,6 +16,7 @@ import { useRouter } from 'expo-router';
 import { Show } from '@/lib/types';
 import { getImageUrl } from '@/lib/images';
 import { ScoreBadge, StatusBadge, FormatPill, ProductionPill, CategoryBadge, AudienceChip } from '@/components/show-cards';
+import { getContrastTextColor } from '@/lib/score-utils';
 import { Colors, Spacing, BorderRadius, FontSize } from '@/constants/theme';
 import type { ScoreMode } from '@/components/ScoreToggle';
 
@@ -136,7 +137,7 @@ export const ShowCard = memo(function ShowCard({ show, scoreMode = 'critics', hi
       {scoreMode === 'audience' && show.audienceGrade ? (
         <View style={styles.scoreColumn}>
           <View style={[styles.audienceGradeBadge, { backgroundColor: show.audienceGrade.color }]}>
-            <Text style={styles.audienceGradeText}>{show.audienceGrade.grade}</Text>
+            <Text style={[styles.audienceGradeText, { color: getContrastTextColor(show.audienceGrade.color) }]}>{show.audienceGrade.grade}</Text>
           </View>
           <Text style={[styles.audienceGradeLabel, { color: show.audienceGrade.color }]} numberOfLines={1}>
             {show.audienceGrade.label}
@@ -228,7 +229,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   audienceGradeText: {
-    color: '#ffffff',
     fontSize: FontSize.xl,
     fontWeight: '700',
   },

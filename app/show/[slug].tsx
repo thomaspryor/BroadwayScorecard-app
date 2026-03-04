@@ -13,7 +13,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { useShows } from '@/lib/data-context';
 import { fetchShowDetail } from '@/lib/api';
 import { getImageUrl } from '@/lib/images';
-import { getScoreColor, getScoreTier } from '@/lib/score-utils';
+import { getScoreColor, getScoreTier, getContrastTextColor } from '@/lib/score-utils';
 import { Show, ShowDetail, MobileShowDetail, mapShowDetail } from '@/lib/types';
 import { ScoreBadge, StatusBadge, FormatPill, ProductionPill, CategoryBadge } from '@/components/show-cards';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
@@ -243,7 +243,7 @@ export default function ShowDetailScreen() {
             {/* Grade badge header card */}
             <View style={[styles.audienceHeader, { borderColor: show.audienceGrade.color + '40' }]}>
               <View style={[styles.audienceGradeBadge, { backgroundColor: show.audienceGrade.color }]}>
-                <Text style={styles.audienceGradeText}>{show.audienceGrade.grade}</Text>
+                <Text style={[styles.audienceGradeText, { color: getContrastTextColor(show.audienceGrade.color) }]}>{show.audienceGrade.grade}</Text>
               </View>
               <View style={styles.audienceGradeInfo}>
                 <Text style={[styles.audienceGradeLabel, { color: show.audienceGrade.color }]}>
@@ -890,7 +890,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   audienceGradeText: {
-    color: '#ffffff',
     fontSize: FontSize.xxl,
     fontWeight: '700',
   },

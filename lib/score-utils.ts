@@ -79,6 +79,22 @@ export function getScoreColor(score: number | null | undefined): string {
   return tier?.color ?? Colors.score.none;
 }
 
+/**
+ * Returns '#1a1a1a' or '#ffffff' for best contrast on a given hex background.
+ * Uses relative luminance (WCAG formula).
+ */
+export function getContrastTextColor(hex: string): string {
+  const c = hex.replace('#', '');
+  const r = parseInt(c.substring(0, 2), 16) / 255;
+  const g = parseInt(c.substring(2, 4), 16) / 255;
+  const b = parseInt(c.substring(4, 6), 16) / 255;
+  const luminance =
+    0.2126 * (r <= 0.03928 ? r / 12.92 : ((r + 0.055) / 1.055) ** 2.4) +
+    0.7152 * (g <= 0.03928 ? g / 12.92 : ((g + 0.055) / 1.055) ** 2.4) +
+    0.0722 * (b <= 0.03928 ? b / 12.92 : ((b + 0.055) / 1.055) ** 2.4);
+  return luminance > 0.35 ? '#1a1a1a' : '#ffffff';
+}
+
 // ===========================================
 // STATUS DISPLAY
 // ===========================================
