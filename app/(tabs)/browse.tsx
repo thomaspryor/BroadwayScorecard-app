@@ -42,7 +42,7 @@ const SORT_OPTIONS: { key: SortOption; label: string }[] = [
 function FilterPill({ label, active, onPress, color }: { label: string; active: boolean; onPress: () => void; color?: string }) {
   const activeColor = color ?? Colors.brand;
   const handlePress = () => {
-    if (Platform.OS === 'ios') {
+    if (!active && Platform.OS === 'ios') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
     onPress();

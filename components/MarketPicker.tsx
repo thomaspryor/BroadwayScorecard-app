@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useRef, useCallback } from 'react';
-import { View, Text, Pressable, StyleSheet, Modal, findNodeHandle, UIManager, Platform } from 'react-native';
+import { View, Text, Pressable, StyleSheet, Modal, Platform } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
 
@@ -64,7 +64,7 @@ export function MarketPicker({ market, onChange }: MarketPickerProps) {
                   onChange(opt.key);
                   setOpen(false);
                 }}
-                accessibilityRole="menuitem"
+                accessibilityRole="button"
                 accessibilityState={{ selected: market === opt.key }}
               >
                 <Text style={[styles.dropdownText, market === opt.key && styles.dropdownTextActive]}>

@@ -8,18 +8,16 @@ import {
   View,
   Text,
   StyleSheet,
-  Dimensions,
   FlatList,
   Pressable,
   Platform,
   NativeScrollEvent,
   NativeSyntheticEvent,
+  useWindowDimensions,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
-
-const { width } = Dimensions.get('window');
 
 const ONBOARDING_KEY = '@broadwayScorecard:onboardingSeen';
 
@@ -69,6 +67,7 @@ interface OnboardingProps {
 export function Onboarding({ onDone }: OnboardingProps) {
   const [currentPage, setCurrentPage] = useState(0);
   const listRef = useRef<FlatList>(null);
+  const { width } = useWindowDimensions();
 
   const handleScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const page = Math.round(e.nativeEvent.contentOffset.x / width);
@@ -93,7 +92,7 @@ export function Onboarding({ onDone }: OnboardingProps) {
   };
 
   const renderPage = ({ item }: { item: OnboardingPage }) => (
-    <View style={styles.page}>
+    <View style={[styles.page, { width }]}>
       <Text style={styles.emoji}>{item.emoji}</Text>
       <Text style={styles.title}>{item.title}</Text>
       <Text style={styles.subtitle}>{item.subtitle}</Text>
@@ -152,7 +151,6 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface.default,
   },
   page: {
-    width,
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',

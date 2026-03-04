@@ -42,10 +42,10 @@ export default function RootLayout() {
 
   if (showOnboarding) {
     return (
-      <>
+      <ErrorBoundary>
         <Onboarding onDone={() => setShowOnboarding(false)} />
         <StatusBar style="light" />
-      </>
+      </ErrorBoundary>
     );
   }
 

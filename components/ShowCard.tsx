@@ -72,7 +72,7 @@ export const ShowCard = memo(function ShowCard({ show, scoreMode = 'critics', hi
   const router = useRouter();
   const imageUrl = getImageUrl(show.images.poster ?? show.images.thumbnail);
   const scoreText = show.compositeScore ? `Score ${Math.round(show.compositeScore)}` : 'No score';
-  const accessLabel = `${show.title}, ${show.venue}, ${show.type}, ${scoreText}`;
+  const accessLabel = `${show.title}, ${show.venue ?? 'Unknown venue'}, ${show.type}, ${scoreText}`;
   const runInfo = useMemo(
     () => getRunDuration(show.openingDate, show.status, show.category),
     [show.openingDate, show.status, show.category]

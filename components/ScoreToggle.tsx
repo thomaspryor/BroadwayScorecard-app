@@ -28,8 +28,10 @@ export function ScoreToggle({ mode, onChange }: ScoreToggleProps) {
           key={opt.key}
           style={[styles.option, mode === opt.key && styles.optionActive]}
           onPress={() => {
-            if (Platform.OS === 'ios') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            onChange(opt.key);
+            if (opt.key !== mode) {
+              if (Platform.OS === 'ios') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              onChange(opt.key);
+            }
           }}
           accessibilityRole="button"
           accessibilityState={{ selected: mode === opt.key }}

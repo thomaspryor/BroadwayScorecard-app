@@ -46,7 +46,12 @@ export default function SettingsScreen() {
         text: 'Clear',
         style: 'destructive',
         onPress: async () => {
+          // Preserve onboarding flag when clearing cache
+          const onboardingSeen = await AsyncStorage.getItem('@broadwayScorecard:onboardingSeen');
           await AsyncStorage.clear();
+          if (onboardingSeen) {
+            await AsyncStorage.setItem('@broadwayScorecard:onboardingSeen', onboardingSeen);
+          }
           Alert.alert('Done', 'Cache cleared. Pull down to refresh.');
         },
       },

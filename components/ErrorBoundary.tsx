@@ -14,15 +14,18 @@ interface Props {
 
 interface State {
   hasError: boolean;
+  retryCount: number;
 }
+
+const MAX_RETRIES = 2;
 
 export class ErrorBoundary extends Component<Props, State> {
   constructor(props: Props) {
     super(props);
-    this.state = { hasError: false };
+    this.state = { hasError: false, retryCount: 0 };
   }
 
-  static getDerivedStateFromError(): State {
+  static getDerivedStateFromError(_error: Error): Partial<State> {
     return { hasError: true };
   }
 
@@ -30,21 +33,33 @@ export class ErrorBoundary extends Component<Props, State> {
     console.error('ErrorBoundary caught:', error, info.componentStack);
   }
 
+  handleRetry = () => {
+    this.setState(prev => ({
+      hasError: false,
+      retryCount: prev.retryCount + 1,
+    }));
+  };
+
   render() {
     if (this.state.hasError) {
+      const canRetry = this.state.retryCount < MAX_RETRIES;
       return (
         <View style={styles.container}>
           <Text style={styles.emoji}>:(</Text>
           <Text style={styles.title}>Something went wrong</Text>
           <Text style={styles.message}>
-            {this.props.fallbackMessage || 'An unexpected error occurred.'}
+            {canRetry
+              ? (this.props.fallbackMessage || 'An unexpected error occurred.')
+              : 'This keeps happening. Please close and reopen the app.'}
           </Text>
-          <Pressable
-            style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
-            onPress={() => this.setState({ hasError: false })}
-          >
-            <Text style={styles.buttonText}>Try Again</Text>
-          </Pressable>
+          {canRetry && (
+            <Pressable
+              style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
+              onPress={this.handleRetry}
+            >
+              <Text style={styles.buttonText}>Try Again</Text>
+            </Pressable>
+          )}
         </View>
       );
     }
