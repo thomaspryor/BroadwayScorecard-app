@@ -58,6 +58,12 @@
       "typedRoutes": true,
       "reactCompiler": true
     },
+    "updates": {
+      "url": "https://u.expo.dev/8948052e-aa32-4767-9eeb-9f33288f8e6d"
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "extra": {
       "router": {
         "origin": "https://broadwayscorecard.com"
