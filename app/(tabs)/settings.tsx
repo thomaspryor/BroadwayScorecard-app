@@ -6,6 +6,8 @@ import React from 'react';
 import { View, Text, StyleSheet, Pressable, ScrollView, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as WebBrowser from 'expo-web-browser';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import Constants from 'expo-constants';
 import { useShows } from '@/lib/data-context';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
 
@@ -37,6 +39,22 @@ export default function SettingsScreen() {
     }
   };
 
+  const handleClearCache = () => {
+    Alert.alert('Clear Cache', 'This will remove all cached data. The app will re-download show data on next launch.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Clear',
+        style: 'destructive',
+        onPress: async () => {
+          await AsyncStorage.clear();
+          Alert.alert('Done', 'Cache cleared. Pull down to refresh.');
+        },
+      },
+    ]);
+  };
+
+  const appVersion = Constants.expoConfig?.version ?? '1.0.0';
+
   const lastUpdatedText = lastUpdated
     ? lastUpdated.toLocaleDateString('en-US', {
         month: 'short',
@@ -60,6 +78,7 @@ export default function SettingsScreen() {
         <SettingsRow label="Shows loaded" value={`${shows.length}`} />
         <SettingsRow label="Last updated" value={lastUpdatedText} />
         <SettingsRow label="Refresh data" onPress={handleRefresh} />
+        <SettingsRow label="Clear cache" onPress={handleClearCache} />
       </View>
 
       <View style={styles.section}>
@@ -80,7 +99,8 @@ export default function SettingsScreen() {
         <SettingsRow label="How Scoring Works" onPress={() => open('/methodology')} />
         <SettingsRow label="About" onPress={() => open('/about')} />
         <SettingsRow label="Send Feedback" onPress={() => open('/feedback')} />
-        <SettingsRow label="Version" value="1.0.0" />
+        <SettingsRow label="Privacy Policy" onPress={() => open('/privacy')} />
+        <SettingsRow label="Version" value={appVersion} />
       </View>
     </ScrollView>
   );

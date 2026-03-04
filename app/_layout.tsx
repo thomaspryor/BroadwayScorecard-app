@@ -8,6 +8,7 @@ import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
 
 import { DataProvider } from '@/lib/data-context';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { Colors } from '@/constants/theme';
 
 // Custom dark theme matching our design tokens
@@ -29,6 +30,7 @@ export const unstable_settings = {
 
 export default function RootLayout() {
   return (
+    <ErrorBoundary>
     <ThemeProvider value={BroadwayDark}>
       <DataProvider>
         <Stack
@@ -54,5 +56,6 @@ export default function RootLayout() {
         <StatusBar style="light" />
       </DataProvider>
     </ThemeProvider>
+    </ErrorBoundary>
   );
 }
