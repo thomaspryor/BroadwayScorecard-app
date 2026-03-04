@@ -1,7 +1,8 @@
 /**
- * Root layout — forces dark theme and wraps app in DataProvider.
+ * Root layout — forces dark theme, onboarding gate, and wraps app in DataProvider.
  */
 
+import React, { useEffect, useState } from 'react';
 import { DarkTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -9,6 +10,7 @@ import 'react-native-reanimated';
 
 import { DataProvider } from '@/lib/data-context';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { Onboarding, hasSeenOnboarding } from '@/components/Onboarding';
 import { Colors } from '@/constants/theme';
 
 // Custom dark theme matching our design tokens
@@ -29,6 +31,24 @@ export const unstable_settings = {
 };
 
 export default function RootLayout() {
+  const [showOnboarding, setShowOnboarding] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    hasSeenOnboarding().then(seen => setShowOnboarding(!seen));
+  }, []);
+
+  // Wait for onboarding check before rendering
+  if (showOnboarding === null) return null;
+
+  if (showOnboarding) {
+    return (
+      <>
+        <Onboarding onDone={() => setShowOnboarding(false)} />
+        <StatusBar style="light" />
+      </>
+    );
+  }
+
   return (
     <ErrorBoundary>
     <ThemeProvider value={BroadwayDark}>
