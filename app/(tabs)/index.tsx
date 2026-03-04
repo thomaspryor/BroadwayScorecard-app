@@ -89,6 +89,9 @@ export default function HomeScreen() {
     [marketShows]
   );
 
+  const isWestEnd = market === 'london';
+  const accentColor = isWestEnd ? Colors.brandWestEnd : Colors.brand;
+
   const renderItem = useCallback(({ item, index }: { item: Show; index: number }) => (
     <AnimatedListItem index={index}>
       <ShowCard show={item} hideStatus />
@@ -131,8 +134,8 @@ export default function HomeScreen() {
             <View style={styles.header}>
               <View style={styles.headerRow}>
                 <Text style={styles.brandText}>
-                  Broadway{' '}
-                  <Text style={styles.brandAccent}>Scorecard</Text>
+                  {isWestEnd ? 'WestEnd' : 'Broadway'}{' '}
+                  <Text style={[styles.brandAccent, { color: accentColor }]}>Scorecard</Text>
                 </Text>
                 <MarketPicker market={market} onChange={setMarket} />
               </View>

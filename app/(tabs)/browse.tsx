@@ -60,6 +60,7 @@ export default function BrowseScreen() {
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
   const [sortBy, setSortBy] = useState<SortOption>('score');
   const [includeOB, setIncludeOB] = useState(false);
+  const isWestEnd = market === 'london';
 
   const filteredShows = useMemo(() => {
     let result = shows.filter(s => filterByMarketCategory(s.category, market, includeOB));
@@ -130,7 +131,7 @@ export default function BrowseScreen() {
             <StaleBanner />
             <View style={styles.header}>
             <View style={styles.headerRow}>
-              <Text style={styles.title}>Browse Shows</Text>
+              <Text style={styles.title}>{isWestEnd ? 'West End Shows' : 'Browse Shows'}</Text>
               <MarketPicker market={market} onChange={setMarket} />
             </View>
             <Text style={styles.count}>

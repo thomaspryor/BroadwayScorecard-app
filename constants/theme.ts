@@ -18,6 +18,8 @@ export const Colors = {
   },
   brand: '#d4a574',
   brandHover: '#c4956a',
+  brandWestEnd: '#f472b6',        // pink-400 — West End page branding
+  brandWestEndHover: '#ec4899',   // pink-500
   score: {
     gold: '#FFD700',
     green: '#22c55e',
