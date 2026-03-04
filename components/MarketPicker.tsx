@@ -5,6 +5,7 @@
 
 import React, { useState, useRef, useCallback } from 'react';
 import { View, Text, Pressable, StyleSheet, Modal, findNodeHandle, UIManager, Platform } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
 
 export type Market = 'nyc' | 'london';
@@ -38,6 +39,8 @@ export function MarketPicker({ market, onChange }: MarketPickerProps) {
         <Pressable
           style={({ pressed }) => [styles.trigger, pressed && styles.triggerPressed]}
           onPress={handleOpen}
+          accessibilityRole="button"
+          accessibilityLabel={`Market: ${currentLabel}. Tap to change.`}
         >
           <Text style={styles.triggerText}>{currentLabel}</Text>
           <Text style={styles.chevron}>{'\u25BE'}</Text>
@@ -56,7 +59,13 @@ export function MarketPicker({ market, onChange }: MarketPickerProps) {
               <Pressable
                 key={opt.key}
                 style={[styles.dropdownItem, market === opt.key && styles.dropdownItemActive]}
-                onPress={() => { onChange(opt.key); setOpen(false); }}
+                onPress={() => {
+                  if (Platform.OS === 'ios') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  onChange(opt.key);
+                  setOpen(false);
+                }}
+                accessibilityRole="menuitem"
+                accessibilityState={{ selected: market === opt.key }}
               >
                 <Text style={[styles.dropdownText, market === opt.key && styles.dropdownTextActive]}>
                   {opt.label}

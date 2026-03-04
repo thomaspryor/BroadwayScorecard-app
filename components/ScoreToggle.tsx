@@ -5,6 +5,7 @@
 
 import React from 'react';
 import { View, Text, Pressable, StyleSheet, Platform } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
 
 export type ScoreMode = 'critics' | 'audience';
@@ -26,7 +27,13 @@ export function ScoreToggle({ mode, onChange }: ScoreToggleProps) {
         <Pressable
           key={opt.key}
           style={[styles.option, mode === opt.key && styles.optionActive]}
-          onPress={() => onChange(opt.key)}
+          onPress={() => {
+            if (Platform.OS === 'ios') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            onChange(opt.key);
+          }}
+          accessibilityRole="button"
+          accessibilityState={{ selected: mode === opt.key }}
+          accessibilityLabel={`${opt.label} scores`}
         >
           <Text style={[styles.label, mode === opt.key && styles.labelActive]}>
             {opt.label}

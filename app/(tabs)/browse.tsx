@@ -4,7 +4,8 @@
  */
 
 import React, { useMemo, useState, useCallback } from 'react';
-import { View, Text, FlatList, StyleSheet, ActivityIndicator, ScrollView, Pressable, RefreshControl } from 'react-native';
+import { View, Text, FlatList, StyleSheet, ActivityIndicator, ScrollView, Pressable, RefreshControl, Platform } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useShows } from '@/lib/data-context';
 import { ShowCard } from '@/components/ShowCard';
@@ -40,10 +41,19 @@ const SORT_OPTIONS: { key: SortOption; label: string }[] = [
 
 function FilterPill({ label, active, onPress, color }: { label: string; active: boolean; onPress: () => void; color?: string }) {
   const activeColor = color ?? Colors.brand;
+  const handlePress = () => {
+    if (Platform.OS === 'ios') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+    onPress();
+  };
   return (
     <Pressable
       style={[styles.pill, active && [styles.pillActive, { backgroundColor: activeColor + '20', borderColor: activeColor }]]}
-      onPress={onPress}
+      onPress={handlePress}
+      accessibilityRole="button"
+      accessibilityState={{ selected: active }}
+      accessibilityLabel={label}
     >
       <Text style={[styles.pillText, active && [styles.pillTextActive, { color: activeColor }]]}>{label}</Text>
     </Pressable>

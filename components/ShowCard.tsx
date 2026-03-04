@@ -71,6 +71,8 @@ function getClosingInfo(closingDate: string | null, status: string): string | nu
 export const ShowCard = memo(function ShowCard({ show, scoreMode = 'critics', hideStatus = false }: ShowCardProps) {
   const router = useRouter();
   const imageUrl = getImageUrl(show.images.poster ?? show.images.thumbnail);
+  const scoreText = show.compositeScore ? `Score ${Math.round(show.compositeScore)}` : 'No score';
+  const accessLabel = `${show.title}, ${show.venue}, ${show.type}, ${scoreText}`;
   const runInfo = useMemo(
     () => getRunDuration(show.openingDate, show.status, show.category),
     [show.openingDate, show.status, show.category]
@@ -84,6 +86,8 @@ export const ShowCard = memo(function ShowCard({ show, scoreMode = 'critics', hi
     <Pressable
       style={({ pressed }) => [styles.container, pressed && styles.pressed]}
       onPress={() => router.push(`/show/${show.slug}`)}
+      accessibilityLabel={accessLabel}
+      accessibilityRole="button"
     >
       {/* Square image */}
       <View style={styles.imageContainer}>
@@ -93,6 +97,7 @@ export const ShowCard = memo(function ShowCard({ show, scoreMode = 'critics', hi
             style={styles.showImage}
             contentFit="cover"
             transition={200}
+            accessibilityLabel={`${show.title} poster`}
           />
         ) : (
           <View style={[styles.showImage, styles.placeholderThumb]}>

@@ -82,7 +82,7 @@ export function ScoreBadge({ score, size = 'medium', showLabel = false, animated
 
   if (!tier || score == null) {
     return (
-      <View style={styles.wrapper}>
+      <View style={styles.wrapper} accessibilityLabel="No score available" accessibilityRole="text">
         <View
           style={[
             styles.badge,
@@ -114,8 +114,10 @@ export function ScoreBadge({ score, size = 'medium', showLabel = false, animated
     elevation: isGold ? 8 : 3,
   };
 
+  const accessLabel = `Score ${rounded}, ${tier.label}`;
+
   return (
-    <View style={styles.wrapper}>
+    <View style={styles.wrapper} accessibilityLabel={accessLabel} accessibilityRole="text">
       {/* Tier label ABOVE badge */}
       {showLabel && dim.labelFont > 0 && (
         <Text

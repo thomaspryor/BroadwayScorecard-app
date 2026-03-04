@@ -5,7 +5,8 @@
  */
 
 import React, { useMemo, useEffect, useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, Pressable, ActivityIndicator, Share } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Pressable, ActivityIndicator, Share, Platform } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, Stack, useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
@@ -51,6 +52,7 @@ export default function ShowDetailScreen() {
 
   const handleShare = async () => {
     if (!show) return;
+    if (Platform.OS === 'ios') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     const scoreText = show.compositeScore ? ` (Score: ${Math.round(show.compositeScore)})` : '';
     await Share.share({
       message: `Check out ${show.title}${scoreText} on Broadway Scorecard!\nhttps://broadwayscorecard.com/show/${show.slug}`,
