@@ -34,7 +34,9 @@ export default function RootLayout() {
   const [showOnboarding, setShowOnboarding] = useState<boolean | null>(null);
 
   useEffect(() => {
-    hasSeenOnboarding().then(seen => setShowOnboarding(!seen));
+    hasSeenOnboarding()
+      .then(seen => setShowOnboarding(!seen))
+      .catch(() => setShowOnboarding(false));
   }, []);
 
   // Wait for onboarding check before rendering

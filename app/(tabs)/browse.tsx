@@ -61,7 +61,7 @@ function FilterPill({ label, active, onPress, color }: { label: string; active: 
 }
 
 export default function BrowseScreen() {
-  const { shows, isLoading, refresh } = useShows();
+  const { shows, isLoading, refresh, error } = useShows();
   const [refreshing, setRefreshing] = useState(false);
   const insets = useSafeAreaInsets();
   const [market, setMarket] = useState<Market>('nyc');
@@ -126,6 +126,15 @@ export default function BrowseScreen() {
     return (
       <View style={[styles.center, { paddingTop: insets.top }]}>
         <ActivityIndicator size="large" color={Colors.brand} />
+      </View>
+    );
+  }
+
+  if (error && shows.length === 0) {
+    return (
+      <View style={[styles.center, { paddingTop: insets.top }]}>
+        <Text style={styles.errorText}>{error}</Text>
+        <Text style={styles.hintText}>Check your internet connection and try again.</Text>
       </View>
     );
   }
@@ -304,6 +313,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   emptyText: {
+    color: Colors.text.muted,
+    fontSize: FontSize.md,
+    textAlign: 'center',
+  },
+  errorText: {
+    color: Colors.text.primary,
+    fontSize: FontSize.lg,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginBottom: Spacing.sm,
+  },
+  hintText: {
     color: Colors.text.muted,
     fontSize: FontSize.md,
     textAlign: 'center',

@@ -11,6 +11,7 @@ type AnalyticsEvent = {
 };
 
 // In-memory event queue (can be flushed to a real service later)
+const MAX_QUEUE_SIZE = 500;
 const eventQueue: AnalyticsEvent[] = [];
 
 export function trackEvent(event: string, properties: Record<string, string | number | boolean | null> = {}) {
@@ -19,6 +20,9 @@ export function trackEvent(event: string, properties: Record<string, string | nu
     properties,
     timestamp: new Date().toISOString(),
   };
+  if (eventQueue.length >= MAX_QUEUE_SIZE) {
+    eventQueue.splice(0, 100); // drop oldest 100 events
+  }
   eventQueue.push(entry);
 
   // Log in dev for debugging

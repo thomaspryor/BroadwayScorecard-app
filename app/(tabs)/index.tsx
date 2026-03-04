@@ -157,6 +157,13 @@ export default function HomeScreen() {
             <Text style={styles.sectionTitle}>Now Playing</Text>
           </View>
         }
+        ListEmptyComponent={
+          !isLoading ? (
+            <View style={{ padding: Spacing.xxl, alignItems: 'center' as const }}>
+              <Text style={styles.hintText}>No open shows found in this market.</Text>
+            </View>
+          ) : null
+        }
         contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}
         refreshControl={

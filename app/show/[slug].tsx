@@ -8,6 +8,7 @@ import React, { useMemo, useEffect, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, Pressable, ActivityIndicator, Share, Platform } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, Stack, useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { useShows } from '@/lib/data-context';
@@ -24,6 +25,7 @@ export default function ShowDetailScreen() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
   const { shows } = useShows();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [detail, setDetail] = useState<ShowDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(true);
   const [showAllReviews, setShowAllReviews] = useState(false);
@@ -440,7 +442,7 @@ export default function ShowDetailScreen() {
 
       {/* Sticky Buy Tickets button */}
       {primaryTicketLink && (
-        <View style={styles.stickyButtonContainer}>
+        <View style={[styles.stickyButtonContainer, { paddingBottom: Math.max(insets.bottom, Spacing.md) }]}>
           <Pressable
             style={({ pressed }) => [styles.stickyBuyButton, pressed && styles.stickyBuyButtonPressed]}
             onPress={() => {
@@ -1058,8 +1060,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
-    paddingBottom: Spacing.xl,
+    paddingTop: Spacing.md,
     backgroundColor: Colors.surface.default,
     borderTopWidth: 1,
     borderTopColor: Colors.border.subtle,
