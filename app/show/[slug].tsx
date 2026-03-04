@@ -13,7 +13,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { useShows } from '@/lib/data-context';
 import { fetchShowDetail } from '@/lib/api';
 import { getImageUrl } from '@/lib/images';
-import { getScoreColor } from '@/lib/score-utils';
+import { getScoreColor, getScoreTier } from '@/lib/score-utils';
 import { Show, ShowDetail, MobileShowDetail, mapShowDetail } from '@/lib/types';
 import { ScoreBadge, StatusBadge, FormatPill, ProductionPill, CategoryBadge } from '@/components/show-cards';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
@@ -509,6 +509,7 @@ function BreakdownBar({ breakdown }: { breakdown: { positive: number; mixed: num
 
 function ReviewRow({ review }: { review: ShowDetail['reviews'][0] }) {
   const scoreColor = getScoreColor(review.score);
+  const scoreTextColor = getScoreTier(review.score)?.textColor ?? '#ffffff';
 
   const formattedDate = review.publishDate ? (() => {
     try {
@@ -527,7 +528,7 @@ function ReviewRow({ review }: { review: ShowDetail['reviews'][0] }) {
       {/* Top row: score + logo + outlet + date */}
       <View style={styles.reviewTopRow}>
         <View style={[styles.reviewScore, { backgroundColor: scoreColor }]}>
-          <Text style={styles.reviewScoreText}>{review.score}</Text>
+          <Text style={[styles.reviewScoreText, { color: scoreTextColor }]}>{review.score}</Text>
         </View>
         {logoUrl && (
           <Image source={{ uri: logoUrl }} style={styles.outletLogo} contentFit="cover" />
@@ -815,7 +816,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   reviewScoreText: {
-    color: '#ffffff',
     fontSize: FontSize.sm,
     fontWeight: '700',
   },
