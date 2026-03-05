@@ -972,20 +972,23 @@ const styles = StyleSheet.create({
   },
   infoRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border.subtle,
+    gap: Spacing.md,
   },
   infoLabel: {
     color: Colors.text.muted,
     fontSize: FontSize.md,
+    flexShrink: 0,
   },
   infoValue: {
     color: Colors.text.primary,
     fontSize: FontSize.md,
     fontWeight: '500',
+    flex: 1,
+    textAlign: 'right',
   },
   section: {
     paddingHorizontal: Spacing.lg,

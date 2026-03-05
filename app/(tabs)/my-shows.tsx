@@ -13,10 +13,12 @@ import {
   Pressable,
   StyleSheet,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import Svg, { Path } from 'react-native-svg';
 import { useAuth } from '@/lib/auth-context';
 import { useUserReviews } from '@/hooks/useUserReviews';
@@ -60,6 +62,16 @@ export default function MyShowsScreen() {
     }
   }, [isAuthenticated, user, getAllReviews, getWatchlist]);
 
+  // Re-fetch when tab gains focus (picks up changes from show pages)
+  useFocusEffect(
+    useCallback(() => {
+      if (isAuthenticated && user) {
+        getAllReviews();
+        getWatchlist();
+      }
+    }, [isAuthenticated, user, getAllReviews, getWatchlist]),
+  );
+
   const loading = authLoading || reviewsLoading || watchlistLoading;
 
   // Stats
@@ -88,9 +100,26 @@ export default function MyShowsScreen() {
     }
   }, [reviews, diarySort]);
 
-  // Sorted watchlist
+  // Split watchlist into upcoming (planned_date >= today) and rest
+  const today = new Date().toISOString().split('T')[0];
+  const { upcomingWatchlist, regularWatchlist } = useMemo(() => {
+    const upcoming: typeof watchlist = [];
+    const regular: typeof watchlist = [];
+    for (const w of watchlist) {
+      if (w.planned_date && w.planned_date >= today) {
+        upcoming.push(w);
+      } else {
+        regular.push(w);
+      }
+    }
+    // Sort upcoming by date ascending (soonest first)
+    upcoming.sort((a, b) => (a.planned_date || '').localeCompare(b.planned_date || ''));
+    return { upcomingWatchlist: upcoming, regularWatchlist: regular };
+  }, [watchlist, today]);
+
+  // Sorted watchlist (regular items only)
   const sortedWatchlist = useMemo(() => {
-    const sorted = [...watchlist];
+    const sorted = [...regularWatchlist];
     switch (watchlistSort) {
       case 'added-desc':
         return sorted.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
@@ -109,7 +138,7 @@ export default function MyShowsScreen() {
       default:
         return sorted;
     }
-  }, [watchlist, watchlistSort, showMap]);
+  }, [regularWatchlist, watchlistSort, showMap]);
 
   const handleRemoveFromWatchlist = useCallback(async (showId: string) => {
     await removeFromWatchlist(showId);
@@ -211,16 +240,19 @@ export default function MyShowsScreen() {
     );
   };
 
-  // ─── Render watchlist item ─────────────────────────────
+  // ─── Render watchlist item (with swipe-to-delete) ─────
   const renderWatchlistItem = ({ item }: { item: WatchlistEntry }) => {
+    return <SwipeableWatchlistItem item={item} showMap={showMap} onRemove={handleRemoveFromWatchlist} router={router} />;
+  };
+
+  // ─── Render upcoming item ───────────────────────────────
+  const renderUpcomingItem = ({ item }: { item: WatchlistEntry }) => {
     const show = showMap[item.show_id];
     const title = show?.title || item.show_id;
     const posterUrl = show?.images ? (getImageUrl(show.images.poster) || getImageUrl(show.images.thumbnail)) : null;
-    const isClosingSoon = show?.closingDate && (() => {
-      const closing = new Date(show.closingDate!);
-      const fourWeeks = 28 * 24 * 60 * 60 * 1000;
-      return closing.getTime() - Date.now() < fourWeeks && closing > new Date();
-    })();
+    const daysUntil = item.planned_date
+      ? Math.ceil((new Date(item.planned_date + 'T00:00:00').getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+      : null;
 
     return (
       <Pressable
@@ -237,28 +269,22 @@ export default function MyShowsScreen() {
         <View style={styles.cardInfo}>
           <Text style={styles.cardTitle} numberOfLines={1}>{title}</Text>
           {show?.venue && <Text style={styles.cardVenue} numberOfLines={1}>{show.venue}</Text>}
-          {isClosingSoon && (
-            <View style={styles.closingSoonBadge}>
-              <Text style={styles.closingSoonText}>Closing Soon</Text>
+          {item.planned_date && (
+            <View style={styles.upcomingDateRow}>
+              <Svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#fcd34d" strokeWidth={2}>
+                <Path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </Svg>
+              <Text style={styles.upcomingDateText}>
+                {new Date(item.planned_date + 'T00:00:00').toLocaleDateString('en-US', {
+                  weekday: 'short', month: 'short', day: 'numeric',
+                })}
+                {daysUntil !== null && daysUntil >= 0 && (
+                  daysUntil === 0 ? ' · Today!' : daysUntil === 1 ? ' · Tomorrow' : ` · ${daysUntil} days`
+                )}
+              </Text>
             </View>
           )}
-          {item.planned_date && (
-            <Text style={styles.cardDate}>
-              Planned: {new Date(item.planned_date + 'T00:00:00').toLocaleDateString('en-US', {
-                month: 'short', day: 'numeric',
-              })}
-            </Text>
-          )}
         </View>
-        <Pressable
-          style={styles.removeButton}
-          onPress={() => handleRemoveFromWatchlist(item.show_id)}
-          hitSlop={8}
-        >
-          <Svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={Colors.text.muted} strokeWidth={2}>
-            <Path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-          </Svg>
-        </Pressable>
       </Pressable>
     );
   };
@@ -330,7 +356,7 @@ export default function MyShowsScreen() {
 
       {/* Watchlist list */}
       {activeTab === 'watchlist' && (
-        sortedWatchlist.length === 0 ? (
+        watchlist.length === 0 ? (
           <EmptyState
             title="Your watchlist is empty"
             description="Add shows you want to see!"
@@ -339,16 +365,106 @@ export default function MyShowsScreen() {
           />
         ) : (
           <FlatList
-            data={sortedWatchlist}
-            renderItem={renderWatchlistItem}
-            keyExtractor={item => item.id}
+            data={[
+              ...(upcomingWatchlist.length > 0 ? [{ __type: 'header' as const, label: 'Upcoming' }] : []),
+              ...upcomingWatchlist.map(w => ({ __type: 'upcoming' as const, ...w })),
+              ...(sortedWatchlist.length > 0 ? [{ __type: 'header' as const, label: 'Watchlist' }] : []),
+              ...sortedWatchlist.map(w => ({ __type: 'watchlist' as const, ...w })),
+            ]}
+            renderItem={({ item }) => {
+              if (item.__type === 'header') {
+                return (
+                  <View style={styles.sectionHeader}>
+                    <Text style={styles.sectionHeaderText}>{item.label}</Text>
+                  </View>
+                );
+              }
+              if (item.__type === 'upcoming') {
+                return renderUpcomingItem({ item: item as unknown as WatchlistEntry });
+              }
+              return renderWatchlistItem({ item: item as unknown as WatchlistEntry });
+            }}
+            keyExtractor={(item, i) => ('id' in item ? item.id : `header-${i}`)}
             contentContainerStyle={styles.listContent}
             windowSize={5}
-            removeClippedSubviews
+            removeClippedSubviews={false}
           />
         )
       )}
     </View>
+  );
+}
+
+function SwipeableWatchlistItem({
+  item,
+  showMap,
+  onRemove,
+  router,
+}: {
+  item: WatchlistEntry;
+  showMap: Record<string, Show>;
+  onRemove: (showId: string) => Promise<void>;
+  router: ReturnType<typeof useRouter>;
+}) {
+  const show = showMap[item.show_id];
+  const title = show?.title || item.show_id;
+  const posterUrl = show?.images ? (getImageUrl(show.images.poster) || getImageUrl(show.images.thumbnail)) : null;
+  const isClosingSoon = show?.closingDate && (() => {
+    const closing = new Date(show.closingDate!);
+    const fourWeeks = 28 * 24 * 60 * 60 * 1000;
+    return closing.getTime() - Date.now() < fourWeeks && closing > new Date();
+  })();
+
+  const handleLongPress = useCallback(() => {
+    Alert.alert(
+      'Remove from Watchlist',
+      `Remove ${title}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Remove', style: 'destructive', onPress: () => onRemove(item.show_id) },
+      ],
+    );
+  }, [title, item.show_id, onRemove]);
+
+  return (
+    <Pressable
+      style={({ pressed }) => [styles.card, pressed && styles.pressed]}
+      onPress={() => show && router.push(`/show/${show.slug}`)}
+      onLongPress={handleLongPress}
+    >
+      {posterUrl ? (
+        <Image source={{ uri: posterUrl }} style={styles.cardPoster} contentFit="cover" transition={200} />
+      ) : (
+        <View style={[styles.cardPoster, styles.cardPosterPlaceholder]}>
+          <Text style={styles.placeholderText}>{title.charAt(0)}</Text>
+        </View>
+      )}
+      <View style={styles.cardInfo}>
+        <Text style={styles.cardTitle} numberOfLines={1}>{title}</Text>
+        {show?.venue && <Text style={styles.cardVenue} numberOfLines={1}>{show.venue}</Text>}
+        {isClosingSoon && (
+          <View style={styles.closingSoonBadge}>
+            <Text style={styles.closingSoonText}>Closing Soon</Text>
+          </View>
+        )}
+        {item.planned_date && (
+          <Text style={styles.cardDate}>
+            Planned: {new Date(item.planned_date + 'T00:00:00').toLocaleDateString('en-US', {
+              month: 'short', day: 'numeric',
+            })}
+          </Text>
+        )}
+      </View>
+      <Pressable
+        style={styles.removeButton}
+        onPress={() => onRemove(item.show_id)}
+        hitSlop={8}
+      >
+        <Svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={Colors.text.muted} strokeWidth={2}>
+          <Path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+        </Svg>
+      </Pressable>
+    </Pressable>
   );
 }
 
@@ -513,6 +629,28 @@ const styles = StyleSheet.create({
   },
   removeButton: {
     padding: Spacing.sm,
+  },
+  sectionHeader: {
+    paddingTop: Spacing.lg,
+    paddingBottom: Spacing.xs,
+  },
+  sectionHeaderText: {
+    color: Colors.text.muted,
+    fontSize: FontSize.xs,
+    fontWeight: '700',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+  },
+  upcomingDateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 2,
+  },
+  upcomingDateText: {
+    color: '#fcd34d',
+    fontSize: FontSize.xs,
+    fontWeight: '600',
   },
   // CTA
   ctaContainer: {

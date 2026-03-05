@@ -160,7 +160,6 @@ export default function ShowPageRating({
         showToast('Please sign in to save ratings.', 'error');
         return;
       }
-      const isFirstSave = !editingReview && !latestReview && !lastSavedId.current;
       setSaving(true);
       try {
         const idToPass = editingReview?.id || lastSavedId.current || undefined;
@@ -190,15 +189,10 @@ export default function ShowPageRating({
         }
 
         await getReviewsForShow(showId);
-        const userFilledDetails = !!(data.reviewText || data.dateSeen);
-        if (isFirstSave && !userFilledDetails) {
-          // Keep panel open for adding notes/date
-        } else {
-          setShowPanel(false);
-          setEditingReview(null);
-          setCurrentRating(null);
-          lastSavedId.current = null;
-        }
+        setShowPanel(false);
+        setEditingReview(null);
+        setCurrentRating(null);
+        lastSavedId.current = null;
       } catch (e) {
         const detail = e instanceof Error ? e.message : 'Unknown error';
         showToast(`Save failed: ${detail}`, 'error');
@@ -269,24 +263,28 @@ export default function ShowPageRating({
 
           {/* Stars */}
           {latestReview && !showPanel ? (
-            <View style={styles.existingRow}>
+            <View>
               <StarRating rating={latestReview.rating} onRatingChange={handleRatingChange} size="lg" readOnly />
-              <Pressable onPress={() => handleEdit(latestReview)} hitSlop={8}>
-                <Svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={Colors.text.muted} strokeWidth={2}>
-                  <Path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                </Svg>
-              </Pressable>
-              <Pressable
-                onPress={() => {
-                  setEditingReview(null);
-                  setCurrentRating(null);
-                  lastSavedId.current = null;
-                  setShowPanel(false);
-                  handleRatingChange(latestReview.rating);
-                }}
-              >
-                <Text style={styles.newViewingText}>+ New Viewing</Text>
-              </Pressable>
+              <View style={styles.editActions}>
+                <Pressable style={styles.editButton} onPress={() => handleEdit(latestReview)} hitSlop={8}>
+                  <Svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke={Colors.text.muted} strokeWidth={2}>
+                    <Path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                  </Svg>
+                  <Text style={styles.editButtonText}>Edit</Text>
+                </Pressable>
+                <Pressable
+                  style={styles.editButton}
+                  onPress={() => {
+                    setEditingReview(null);
+                    setCurrentRating(null);
+                    lastSavedId.current = null;
+                    setShowPanel(false);
+                    handleRatingChange(latestReview.rating);
+                  }}
+                >
+                  <Text style={styles.newViewingText}>+ New Viewing</Text>
+                </Pressable>
+              </View>
             </View>
           ) : (
             <StarRating rating={currentRating} onRatingChange={handleRatingChange} size="lg" />
@@ -381,10 +379,20 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '500',
   },
-  existingRow: {
+  editActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.sm,
+    gap: Spacing.md,
+    marginTop: Spacing.sm,
+  },
+  editButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  editButtonText: {
+    color: Colors.text.muted,
+    fontSize: FontSize.xs,
   },
   newViewingText: {
     color: Colors.text.muted,
