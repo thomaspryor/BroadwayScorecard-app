@@ -14,7 +14,8 @@ import { useShows } from '@/lib/data-context';
 import { useAuth } from '@/lib/auth-context';
 import { clearUserCache } from '@/lib/user-cache';
 import { featureFlags } from '@/lib/feature-flags';
-import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
+import { Colors, Spacing, FontSize } from '@/constants/theme';
+import { trackDataRefreshed, trackCacheCleared } from '@/lib/analytics';
 
 const WEB = 'https://broadwayscorecard.com';
 
@@ -41,6 +42,7 @@ export default function SettingsScreen() {
   const { user, profile, isAuthenticated, signOut, showSignIn } = auth;
 
   const handleRefresh = async () => {
+    trackDataRefreshed('manual', 'settings');
     try {
       await refresh();
       Alert.alert('Updated', 'Show data has been refreshed.');
@@ -56,6 +58,7 @@ export default function SettingsScreen() {
         text: 'Clear',
         style: 'destructive',
         onPress: async () => {
+          trackCacheCleared();
           // Preserve onboarding flag + auth SecureStore keys when clearing cache
           const onboardingSeen = await AsyncStorage.getItem('@broadwayScorecard:onboardingSeen');
           // Clear user cache if signed in

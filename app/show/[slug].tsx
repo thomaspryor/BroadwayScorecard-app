@@ -18,7 +18,7 @@ import { getScoreColor, getScoreTier, getContrastTextColor } from '@/lib/score-u
 import { Show, ShowDetail, MobileShowDetail, mapShowDetail } from '@/lib/types';
 import { ScoreBadge, StatusBadge, FormatPill, ProductionPill, CategoryBadge } from '@/components/show-cards';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
-import { trackTicketTap, trackBuyButtonTap } from '@/lib/analytics';
+import { trackTicketTap, trackBuyButtonTap, trackShowDetailViewed, trackShowShared, trackFullReviewTapped } from '@/lib/analytics';
 import Svg, { Path } from 'react-native-svg';
 import ShowPageRating from '@/components/user/ShowPageRating';
 
@@ -56,6 +56,7 @@ export default function ShowDetailScreen() {
   const handleShare = async () => {
     if (!show) return;
     if (Platform.OS === 'ios') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    trackShowShared(show.id, show.title);
     const scoreText = show.compositeScore ? ` (Score: ${Math.round(show.compositeScore)})` : '';
     await Share.share({
       message: `Check out ${show.title}${scoreText} on Broadway Scorecard!\nhttps://broadwayscorecard.com/show/${show.slug}`,
@@ -78,6 +79,13 @@ export default function ShowDetailScreen() {
       }
     })();
     return () => { cancelled = true; };
+  }, [show]);
+
+  // Track show detail view (once per show load)
+  useEffect(() => {
+    if (show) {
+      trackShowDetailViewed(show.id, show.title, show.category, show.compositeScore ?? null);
+    }
   }, [show]);
 
   if (!show) {
@@ -223,7 +231,7 @@ export default function ShowDetailScreen() {
               Critic Reviews ({detail.reviews.length})
             </Text>
             {(showAllReviews ? detail.reviews : detail.reviews.slice(0, 3)).map((review, i) => (
-              <ReviewRow key={i} review={review} />
+              <ReviewRow key={i} review={review} showId={show.id} />
             ))}
             {!showAllReviews && detail.reviews.length > 3 && (
               <Pressable
@@ -517,7 +525,7 @@ function BreakdownBar({ breakdown }: { breakdown: { positive: number; mixed: num
   );
 }
 
-function ReviewRow({ review }: { review: ShowDetail['reviews'][0] }) {
+function ReviewRow({ review, showId }: { review: ShowDetail['reviews'][0]; showId: string }) {
   const scoreColor = getScoreColor(review.score);
   const scoreTextColor = getScoreTier(review.score)?.textColor ?? '#ffffff';
 
@@ -561,7 +569,10 @@ function ReviewRow({ review }: { review: ShowDetail['reviews'][0] }) {
             By {review.criticName || `${review.outlet} Staff`}
           </Text>
           {review.url && (
-            <Pressable onPress={() => WebBrowser.openBrowserAsync(review.url!)}>
+            <Pressable onPress={() => {
+              trackFullReviewTapped(showId, review.outlet, review.criticName || null);
+              WebBrowser.openBrowserAsync(review.url!);
+            }}>
               <Text style={styles.fullReviewLink}>Full Review →</Text>
             </Pressable>
           )}

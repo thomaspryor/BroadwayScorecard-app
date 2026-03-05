@@ -14,6 +14,7 @@ import { MarketPicker, Market, filterByMarketCategory } from '@/components/Marke
 import { Show } from '@/lib/types';
 import { StaleBanner } from '@/components/StaleBanner';
 import { Colors, Spacing, FontSize } from '@/constants/theme';
+import { trackMarketChanged, trackDataRefreshed } from '@/lib/analytics';
 
 export default function HomeScreen() {
   const { shows, isLoading, error, refresh } = useShows();
@@ -98,8 +99,14 @@ export default function HomeScreen() {
     </AnimatedListItem>
   ), []);
 
+  const handleMarketChange = useCallback((m: Market) => {
+    setMarket(m);
+    trackMarketChanged(m, 'home');
+  }, []);
+
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
+    trackDataRefreshed('pull_to_refresh', 'home');
     try { await refresh(); } catch {}
     setRefreshing(false);
   }, [refresh]);
@@ -141,7 +148,7 @@ export default function HomeScreen() {
                   {isWestEnd ? 'WestEnd' : 'Broadway'}{' '}
                   <Text style={[styles.brandAccent, { color: accentColor }]}>Scorecard</Text>
                 </Text>
-                <MarketPicker market={market} onChange={setMarket} />
+                <MarketPicker market={market} onChange={handleMarketChange} />
               </View>
               <Text style={styles.subtitle}>
                 {scoredCount} shows scored by critics

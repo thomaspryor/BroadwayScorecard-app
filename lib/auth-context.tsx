@@ -14,6 +14,7 @@ import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import { getSupabaseClient } from './supabase';
 import type { UserProfile } from './user-types';
 import SignInSheet from '@/components/SignInSheet';
+import { trackSignInStarted, trackSignInCompleted, trackSignOut as trackSignOutEvent, identifyUser, resetAnalyticsUser } from '@/lib/analytics';
 
 // Google OAuth — web client ID for server auth, iOS client ID for native SDK
 const GOOGLE_WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || '';
@@ -76,9 +77,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         loadProfile(session.user.id);
         setSheetOpen(false);
         setSignInLoading(false);
+        identifyUser(session.user.id);
+        trackSignInCompleted(session.user.app_metadata?.provider || 'unknown');
       } else if (event === 'SIGNED_OUT') {
         setUser(null);
         setProfile(null);
+        trackSignOutEvent();
+        resetAnalyticsUser();
       }
     });
 
@@ -142,6 +147,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     try {
       setSignInLoading(true);
+      trackSignInStarted('apple');
       const credential = await AppleAuthentication.signInAsync({
         requestedScopes: [
           AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
@@ -177,6 +183,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     try {
       setSignInLoading(true);
+      trackSignInStarted('google');
 
       await GoogleSignin.hasPlayServices();
       const response = await GoogleSignin.signIn();
