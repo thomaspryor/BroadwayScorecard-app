@@ -1,9 +1,9 @@
 /**
- * First-launch onboarding — 3 swipeable pages with key features.
+ * First-launch onboarding — 3 swipeable feature pages + optional sign-in page.
  * Uses AsyncStorage to track if user has seen it.
  */
 
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -17,33 +17,46 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
+import { useAuth } from '@/lib/auth-context';
+import { featureFlags } from '@/lib/feature-flags';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
 
 const ONBOARDING_KEY = '@broadwayScorecard:onboardingSeen';
 
 interface OnboardingPage {
+  id: string;
   emoji: string;
   title: string;
   subtitle: string;
 }
 
-const PAGES: OnboardingPage[] = [
+const BASE_PAGES: OnboardingPage[] = [
   {
+    id: 'scores',
     emoji: '\u2B50',
     title: 'Critic Scores for Every Show',
     subtitle: 'Aggregated reviews from 400+ outlets, weighted by critic tier. One score, instant clarity.',
   },
   {
+    id: 'markets',
     emoji: '\uD83C\uDFAD',
     title: 'Broadway, Off-Broadway & West End',
     subtitle: 'Browse musicals and plays across New York and London. Filter by status, type, and sort by score.',
   },
   {
+    id: 'offline',
     emoji: '\uD83D\uDCF1',
     title: 'Works Offline',
-    subtitle: 'Show data is cached on your device. Check scores anytime — no signal required.',
+    subtitle: 'Show data is cached on your device. Check scores anytime \u2014 no signal required.',
   },
 ];
+
+const SIGN_IN_PAGE: OnboardingPage = {
+  id: 'signin',
+  emoji: '\u2728',
+  title: 'Track Your Broadway Journey',
+  subtitle: 'Rate shows, keep a diary, and build your watchlist \u2014 synced across all your devices.',
+};
 
 export async function hasSeenOnboarding(): Promise<boolean> {
   try {
@@ -68,6 +81,20 @@ export function Onboarding({ onDone }: OnboardingProps) {
   const [currentPage, setCurrentPage] = useState(0);
   const listRef = useRef<FlatList>(null);
   const { width } = useWindowDimensions();
+  const { showSignIn, isAuthenticated } = useAuth();
+  const signInTriggered = useRef(false);
+
+  const pages = useMemo(
+    () => (featureFlags.userAccounts ? [...BASE_PAGES, SIGN_IN_PAGE] : BASE_PAGES),
+    [],
+  );
+
+  // Auto-dismiss onboarding after successful sign-in
+  useEffect(() => {
+    if (isAuthenticated && signInTriggered.current) {
+      handleDone();
+    }
+  }, [isAuthenticated]);
 
   const handleScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const page = Math.round(e.nativeEvent.contentOffset.x / width);
@@ -78,7 +105,7 @@ export function Onboarding({ onDone }: OnboardingProps) {
 
   const handleNext = () => {
     if (Platform.OS === 'ios') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    if (currentPage < PAGES.length - 1) {
+    if (currentPage < pages.length - 1) {
       listRef.current?.scrollToIndex({ index: currentPage + 1, animated: true });
     } else {
       handleDone();
@@ -91,6 +118,12 @@ export function Onboarding({ onDone }: OnboardingProps) {
     onDone();
   };
 
+  const handleSignIn = () => {
+    if (Platform.OS === 'ios') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    signInTriggered.current = true;
+    showSignIn('generic');
+  };
+
   const renderPage = ({ item }: { item: OnboardingPage }) => (
     <View style={[styles.page, { width }]}>
       <Text style={styles.emoji}>{item.emoji}</Text>
@@ -99,15 +132,16 @@ export function Onboarding({ onDone }: OnboardingProps) {
     </View>
   );
 
-  const isLast = currentPage === PAGES.length - 1;
+  const isLast = currentPage === pages.length - 1;
+  const isSignInPage = featureFlags.userAccounts && currentPage === pages.length - 1;
 
   return (
     <View style={styles.container}>
       <FlatList
         ref={listRef}
-        data={PAGES}
+        data={pages}
         renderItem={renderPage}
-        keyExtractor={(_, i) => String(i)}
+        keyExtractor={item => item.id}
         horizontal
         pagingEnabled
         showsHorizontalScrollIndicator={false}
@@ -118,29 +152,43 @@ export function Onboarding({ onDone }: OnboardingProps) {
 
       {/* Dots */}
       <View style={styles.dots}>
-        {PAGES.map((_, i) => (
+        {pages.map((page, i) => (
           <View
-            key={i}
+            key={page.id}
             style={[styles.dot, i === currentPage && styles.dotActive]}
           />
         ))}
       </View>
 
-      {/* Buttons */}
-      <View style={[styles.buttons, isLast && styles.buttonsCentered]}>
-        {!isLast && (
-          <Pressable onPress={handleDone} style={styles.skipButton}>
-            <Text style={styles.skipText}>Skip</Text>
+      {/* Buttons — sign-in page has custom layout */}
+      {isSignInPage ? (
+        <View style={styles.signInButtons}>
+          <Pressable
+            onPress={handleSignIn}
+            style={({ pressed }) => [styles.nextButton, pressed && styles.nextButtonPressed]}
+          >
+            <Text style={styles.nextText}>Sign In</Text>
           </Pressable>
-        )}
-        <Pressable
-          onPress={handleNext}
-          style={({ pressed }) => [styles.nextButton, pressed && styles.nextButtonPressed]}
-        >
-          <Text style={styles.nextText}>{isLast ? 'Get Started' : 'Next'}</Text>
-        </Pressable>
-        {!isLast && <View style={styles.skipButton} />}
-      </View>
+          <Pressable onPress={handleDone} style={styles.justBrowsingButton}>
+            <Text style={styles.justBrowsingText}>Just Browsing</Text>
+          </Pressable>
+        </View>
+      ) : (
+        <View style={[styles.buttons, isLast && styles.buttonsCentered]}>
+          {!isLast && (
+            <Pressable onPress={handleDone} style={styles.skipButton}>
+              <Text style={styles.skipText}>Skip</Text>
+            </Pressable>
+          )}
+          <Pressable
+            onPress={handleNext}
+            style={({ pressed }) => [styles.nextButton, pressed && styles.nextButtonPressed]}
+          >
+            <Text style={styles.nextText}>{isLast ? 'Get Started' : 'Next'}</Text>
+          </Pressable>
+          {!isLast && <View style={styles.skipButton} />}
+        </View>
+      )}
     </View>
   );
 }
@@ -219,5 +267,19 @@ const styles = StyleSheet.create({
     color: Colors.text.inverse,
     fontSize: FontSize.md,
     fontWeight: '600',
+  },
+  // Sign-in page buttons
+  signInButtons: {
+    alignItems: 'center',
+    gap: Spacing.md,
+    paddingHorizontal: Spacing.xl,
+    paddingBottom: Spacing.xxl,
+  },
+  justBrowsingButton: {
+    paddingVertical: Spacing.sm,
+  },
+  justBrowsingText: {
+    color: Colors.text.muted,
+    fontSize: FontSize.md,
   },
 });

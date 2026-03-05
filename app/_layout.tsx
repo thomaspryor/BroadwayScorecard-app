@@ -51,10 +51,19 @@ export default function RootLayout() {
   if (showOnboarding === null) return null;
 
   if (showOnboarding) {
-    return (
-      <ErrorBoundary>
+    const onboardingContent = (
+      <>
         <Onboarding onDone={() => setShowOnboarding(false)} />
         <StatusBar style="light" />
+      </>
+    );
+    return (
+      <ErrorBoundary>
+        {featureFlags.userAccounts ? (
+          <AuthProvider>{onboardingContent}</AuthProvider>
+        ) : (
+          onboardingContent
+        )}
       </ErrorBoundary>
     );
   }
