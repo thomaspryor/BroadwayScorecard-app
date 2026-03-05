@@ -81,12 +81,13 @@ export default function ShowDetailScreen() {
     return () => { cancelled = true; };
   }, [show]);
 
-  // Track show detail view (once per show load)
+  // Track show detail view (once per show load — keyed on id, not object ref)
   useEffect(() => {
     if (show) {
       trackShowDetailViewed(show.id, show.title, show.category, show.compositeScore ?? null);
     }
-  }, [show]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [show?.id]);
 
   // Primary ticket link: prefer TodayTix, then first available
   const primaryTicketLink = useMemo(() => {

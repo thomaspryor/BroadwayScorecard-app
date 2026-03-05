@@ -36,11 +36,12 @@ export const unstable_settings = {
   anchor: '(tabs)',
 };
 
-// Initialize PostHog client at module scope (async — resolves before provider renders)
+// Initialize PostHog client (guarded against double-init in strict mode)
 const POSTHOG_API_KEY = process.env.EXPO_PUBLIC_POSTHOG_API_KEY || '';
+let phInitialized = false;
 
 function initPostHog(): PostHog | null {
-  if (!POSTHOG_API_KEY) return null;
+  if (!POSTHOG_API_KEY || phInitialized) return null;
   try {
     const client = new PostHog(POSTHOG_API_KEY, {
       host: 'https://us.i.posthog.com',
@@ -48,6 +49,7 @@ function initPostHog(): PostHog | null {
       captureAppLifecycleEvents: true,
     });
     setPostHogInstance(client);
+    phInitialized = true;
     return client;
   } catch (e) {
     if (__DEV__) console.warn('[PostHog] Init failed:', e);
