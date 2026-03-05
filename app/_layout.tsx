@@ -18,6 +18,7 @@ import Toast from '@/components/Toast';
 import { featureFlags, loadFeatureFlagOverrides } from '@/lib/feature-flags';
 import { setPostHogInstance } from '@/lib/analytics';
 import { Colors } from '@/constants/theme';
+import { registerForPushNotifications, setupNotificationHandler, configureNotificationChannels } from '@/lib/notifications';
 
 // Custom dark theme matching our design tokens
 const BroadwayDark = {
@@ -87,6 +88,16 @@ export default function RootLayout() {
       } catch {} // Native module not available in dev client
     }
   }, []);
+
+  // Register push notifications + set up tap handler
+  // Runs once; actual permission prompt only fires after onboarding is dismissed
+  useEffect(() => {
+    if (showOnboarding !== false) return; // Wait until onboarding is done
+    configureNotificationChannels();
+    registerForPushNotifications();
+    const cleanup = setupNotificationHandler();
+    return () => { cleanup?.(); };
+  }, [showOnboarding]);
 
   // Wait for onboarding check + PostHog before rendering
   if (showOnboarding === null || !phReady) return null;
