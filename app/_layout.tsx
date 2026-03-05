@@ -6,7 +6,6 @@ import React, { useEffect, useState } from 'react';
 import { DarkTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import * as Updates from 'expo-updates';
 import 'react-native-reanimated';
 
 import PostHog, { PostHogProvider } from 'posthog-react-native';
@@ -76,11 +75,14 @@ export default function RootLayout() {
 
     // Check for OTA updates in background (non-blocking)
     if (!__DEV__) {
-      Updates.checkForUpdateAsync()
-        .then(({ isAvailable }) => {
-          if (isAvailable) return Updates.fetchUpdateAsync();
-        })
-        .catch(() => {}); // Silent fail — network errors are fine
+      try {
+        const Updates = require('expo-updates');
+        Updates.checkForUpdateAsync()
+          .then(({ isAvailable }: { isAvailable: boolean }) => {
+            if (isAvailable) return Updates.fetchUpdateAsync();
+          })
+          .catch(() => {}); // Silent fail — network errors are fine
+      } catch {} // Native module not available in dev client
     }
   }, []);
 
