@@ -3,7 +3,7 @@
  * Responsive sizing via useWindowDimensions.
  */
 
-import React from 'react';
+import React, { memo } from 'react';
 import { View, Text, FlatList, StyleSheet, Pressable, useWindowDimensions } from 'react-native';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
@@ -16,7 +16,7 @@ interface FeaturedCarouselProps {
   shows: Show[];
 }
 
-function FeaturedCard({ show, cardWidth }: { show: Show; cardWidth: number }) {
+const FeaturedCard = memo(function FeaturedCard({ show, cardWidth }: { show: Show; cardWidth: number }) {
   const router = useRouter();
   const posterUrl = getImageUrl(show.images.poster) || getImageUrl(show.images.thumbnail);
   const cardHeight = cardWidth * 1.5;
@@ -57,7 +57,7 @@ function FeaturedCard({ show, cardWidth }: { show: Show; cardWidth: number }) {
       </Text>
     </Pressable>
   );
-}
+});
 
 export function FeaturedCarousel({ shows }: FeaturedCarouselProps) {
   const { width } = useWindowDimensions();

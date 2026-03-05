@@ -76,6 +76,9 @@ export default function SearchScreen() {
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
           keyboardDismissMode="on-drag"
+          windowSize={5}
+          maxToRenderPerBatch={8}
+          removeClippedSubviews
         />
       )}
     </View>

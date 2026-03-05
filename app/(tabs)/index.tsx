@@ -128,6 +128,10 @@ export default function HomeScreen() {
         data={openShows}
         keyExtractor={item => item.id}
         renderItem={renderItem}
+        windowSize={5}
+        maxToRenderPerBatch={8}
+        initialNumToRender={10}
+        removeClippedSubviews
         ListHeaderComponent={
           <View>
             {/* Brand header + market picker */}

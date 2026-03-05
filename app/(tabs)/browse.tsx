@@ -210,6 +210,10 @@ export default function BrowseScreen() {
         }
         contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}
+        windowSize={5}
+        maxToRenderPerBatch={8}
+        initialNumToRender={10}
+        removeClippedSubviews
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
