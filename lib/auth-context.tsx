@@ -8,7 +8,7 @@
  */
 
 import React, { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
-import { Platform } from 'react-native';
+import { Alert, Platform } from 'react-native';
 import { getSupabaseClient } from './supabase';
 import type { UserProfile } from './user-types';
 import SignInSheet from '@/components/SignInSheet';
@@ -157,7 +157,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // ─── Apple Sign In (native) ──────────────────────────────
   const signInWithApple = useCallback(async () => {
     const client = getSupabaseClient();
-    if (!client) return;
+    if (!client) {
+      Alert.alert('Sign-In Unavailable', 'Unable to connect to the server. Please try again later.');
+      return;
+    }
 
     try {
       setSignInLoading(true);
@@ -188,13 +191,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
       console.error('[Auth] Apple sign-in failed:', e);
+      Alert.alert('Sign-In Failed', e instanceof Error ? e.message : 'Apple sign-in failed. Please try again.');
     }
   }, []);
 
   // ─── Google Sign In (native SDK) ─────────────────────────
   const signInWithGoogle = useCallback(async () => {
     const client = getSupabaseClient();
-    if (!client) return;
+    if (!client) {
+      Alert.alert('Sign-In Unavailable', 'Unable to connect to the server. Please try again later.');
+      return;
+    }
 
     try {
       setSignInLoading(true);
@@ -222,6 +229,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
       console.error('[Auth] Google sign-in failed:', e);
+      Alert.alert('Sign-In Failed', e instanceof Error ? e.message : 'Google sign-in failed. Please try again.');
     }
   }, []);
 
