@@ -1,0 +1,19 @@
+{
+  "app_name": "Broadway Scorecard",
+  "subtitle": "Critic Scores & Show Reviews",
+  "description": "Broadway Scorecard brings every professional theater review together in one place. Browse critic scores and audience grades for Broadway, Off-Broadway, and West End shows.\n\nFEATURES\n\n- Comprehensive Scores: Critic scores and audience grades for every show, drawn from hundreds of professional reviews and audience sources.\n\n- Every Review: Read summaries from every major critic and outlet — The New York Times, Vulture, Variety, The Guardian, and many more.\n\n- Three Markets: Browse shows across Broadway, Off-Broadway, and the West End. Filter by musicals, plays, open shows, and more.\n\n- Show Details: Cast, creative team, venue, running dates, ticket links, and complete review breakdowns for every production.\n\n- Smart Search: Find any show instantly with fuzzy search across all markets.\n\n- Score Toggle: Switch between critic scores and audience grades to see how professional reviewers and theatergoers compare.\n\n- Always Current: Scores and reviews update automatically as new reviews are published.\n\n- Dark Mode: Designed for a beautiful dark-themed experience.",
+  "keywords": "broadway,theater,theatre,reviews,scores,musicals,plays,off-broadway,west end,critic,ratings,audience",
+  "primary_category": "Entertainment",
+  "secondary_category": "Reference",
+  "privacy_url": "https://broadwayscorecard.com/privacy",
+  "support_url": "https://broadwayscorecard.com",
+  "marketing_url": "https://broadwayscorecard.com",
+  "copyright": "2025 Broadway Scorecard",
+  "age_rating": "4+",
+  "price": "Free",
+  "privacy_nutrition_labels": {
+    "data_not_collected": true,
+    "note": "Broadway Scorecard does not collect any personal data in v1.0.0. The app fetches publicly available show data from our CDN. No analytics, tracking, or user accounts in this version."
+  },
+  "app_review_notes": "Broadway Scorecard is a theater review aggregator. It displays critic scores and audience grades for Broadway, Off-Broadway, and West End shows. All data comes from publicly available professional reviews. No login or account is required to use the app. The app fetches show data from our CDN at broadwayscorecard.com/data/."
+}
