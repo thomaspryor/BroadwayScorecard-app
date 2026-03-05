@@ -34,20 +34,14 @@ const BASE_PAGES: OnboardingPage[] = [
   {
     id: 'scores',
     emoji: '\u2B50',
-    title: 'Critic Scores for Every Show',
-    subtitle: 'Aggregated reviews from 400+ outlets, weighted by critic tier. One score, instant clarity.',
+    title: 'Critic Scores & Audience Grades',
+    subtitle: 'Every review from every site, scored and ranked. Critic scores, audience grades, and the full breakdown \u2014 all in one place.',
   },
   {
     id: 'markets',
     emoji: '\uD83C\uDFAD',
     title: 'Broadway, Off-Broadway & West End',
     subtitle: 'Browse musicals and plays across New York and London. Filter by status, type, and sort by score.',
-  },
-  {
-    id: 'offline',
-    emoji: '\uD83D\uDCF1',
-    title: 'Works Offline',
-    subtitle: 'Show data is cached on your device. Check scores anytime \u2014 no signal required.',
   },
 ];
 
