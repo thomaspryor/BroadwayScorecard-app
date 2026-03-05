@@ -1,5 +1,5 @@
 /**
- * Root layout — forces dark theme, onboarding gate, and wraps app in DataProvider.
+ * Root layout — forces dark theme, onboarding gate, PostHog analytics, and wraps app in DataProvider.
  */
 
 import React, { useEffect, useState } from 'react';
@@ -9,6 +9,7 @@ import { StatusBar } from 'expo-status-bar';
 import * as Updates from 'expo-updates';
 import 'react-native-reanimated';
 
+import PostHog, { PostHogProvider } from 'posthog-react-native';
 import { DataProvider } from '@/lib/data-context';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { Onboarding, hasSeenOnboarding } from '@/components/Onboarding';
@@ -16,6 +17,7 @@ import { AuthProvider } from '@/lib/auth-context';
 import { ToastProvider } from '@/lib/toast-context';
 import Toast from '@/components/Toast';
 import { featureFlags, loadFeatureFlagOverrides } from '@/lib/feature-flags';
+import { setPostHogInstance } from '@/lib/analytics';
 import { Colors } from '@/constants/theme';
 
 // Custom dark theme matching our design tokens
@@ -35,11 +37,36 @@ export const unstable_settings = {
   anchor: '(tabs)',
 };
 
+// Initialize PostHog client at module scope (async — resolves before provider renders)
+const POSTHOG_API_KEY = process.env.EXPO_PUBLIC_POSTHOG_API_KEY || '';
+
+function initPostHog(): PostHog | null {
+  if (!POSTHOG_API_KEY) return null;
+  try {
+    const client = new PostHog(POSTHOG_API_KEY, {
+      host: 'https://us.i.posthog.com',
+      enableSessionReplay: false,
+      captureAppLifecycleEvents: true,
+    });
+    setPostHogInstance(client);
+    return client;
+  } catch (e) {
+    if (__DEV__) console.warn('[PostHog] Init failed:', e);
+    return null;
+  }
+}
+
 export default function RootLayout() {
   const [showOnboarding, setShowOnboarding] = useState<boolean | null>(null);
+  const [phClient, setPhClient] = useState<PostHog | null>(null);
+  const [phReady, setPhReady] = useState(!POSTHOG_API_KEY); // skip wait if no key
 
   useEffect(() => {
-    // Load feature flag overrides + onboarding check in parallel
+    // Init PostHog synchronously (constructor), load flags + onboarding async
+    const client = initPostHog();
+    if (client) setPhClient(client);
+    setPhReady(true);
+
     Promise.all([
       loadFeatureFlagOverrides(),
       hasSeenOnboarding(),
@@ -57,8 +84,20 @@ export default function RootLayout() {
     }
   }, []);
 
-  // Wait for onboarding check before rendering
-  if (showOnboarding === null) return null;
+  // Wait for onboarding check + PostHog before rendering
+  if (showOnboarding === null || !phReady) return null;
+
+  // Wrap content with PostHogProvider if client available
+  const wrapWithPostHog = (children: React.ReactNode) => {
+    if (phClient) {
+      return (
+        <PostHogProvider client={phClient} autocapture={{ captureScreens: false }}>
+          {children}
+        </PostHogProvider>
+      );
+    }
+    return <>{children}</>;
+  };
 
   if (showOnboarding) {
     const onboardingContent = (
@@ -69,10 +108,12 @@ export default function RootLayout() {
     );
     return (
       <ErrorBoundary>
-        {featureFlags.userAccounts ? (
-          <AuthProvider>{onboardingContent}</AuthProvider>
-        ) : (
-          onboardingContent
+        {wrapWithPostHog(
+          featureFlags.userAccounts ? (
+            <AuthProvider>{onboardingContent}</AuthProvider>
+          ) : (
+            onboardingContent
+          )
         )}
       </ErrorBoundary>
     );
@@ -103,6 +144,7 @@ export default function RootLayout() {
 
   return (
     <ErrorBoundary>
+    {wrapWithPostHog(
     <ThemeProvider value={BroadwayDark}>
       <ToastProvider>
       <DataProvider>
@@ -116,6 +158,7 @@ export default function RootLayout() {
       <Toast />
       </ToastProvider>
     </ThemeProvider>
+    )}
     </ErrorBoundary>
   );
 }

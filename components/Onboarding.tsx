@@ -20,6 +20,7 @@ import * as Haptics from 'expo-haptics';
 import { useAuth } from '@/lib/auth-context';
 import { featureFlags } from '@/lib/feature-flags';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
+import { trackOnboardingCompleted, trackOnboardingSkipped, trackOnboardingSignInTapped } from '@/lib/analytics';
 
 const ONBOARDING_KEY = '@broadwayScorecard:onboardingSeen';
 
@@ -102,8 +103,14 @@ export function Onboarding({ onDone }: OnboardingProps) {
     if (currentPage < pages.length - 1) {
       listRef.current?.scrollToIndex({ index: currentPage + 1, animated: true });
     } else {
+      trackOnboardingCompleted(currentPage + 1, pages.length);
       handleDone();
     }
+  };
+
+  const handleSkip = async () => {
+    trackOnboardingSkipped(currentPage + 1, pages.length);
+    await handleDone();
   };
 
   const handleDone = async () => {
@@ -114,6 +121,7 @@ export function Onboarding({ onDone }: OnboardingProps) {
 
   const handleSignIn = () => {
     if (Platform.OS === 'ios') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    trackOnboardingSignInTapped();
     signInTriggered.current = true;
     showSignIn('generic');
   };
@@ -163,14 +171,14 @@ export function Onboarding({ onDone }: OnboardingProps) {
           >
             <Text style={styles.nextText}>Sign In</Text>
           </Pressable>
-          <Pressable onPress={handleDone} style={styles.justBrowsingButton}>
+          <Pressable onPress={handleSkip} style={styles.justBrowsingButton}>
             <Text style={styles.justBrowsingText}>Just Browsing</Text>
           </Pressable>
         </View>
       ) : (
         <View style={[styles.buttons, isLast && styles.buttonsCentered]}>
           {!isLast && (
-            <Pressable onPress={handleDone} style={styles.skipButton}>
+            <Pressable onPress={handleSkip} style={styles.skipButton}>
               <Text style={styles.skipText}>Skip</Text>
             </Pressable>
           )}

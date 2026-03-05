@@ -2,7 +2,7 @@
  * Search tab — Fuse.js fuzzy search on show titles, venues, creative team.
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { View, Text, TextInput, FlatList, StyleSheet } from 'react-native';
 import Fuse, { IFuseOptions } from 'fuse.js';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -11,6 +11,7 @@ import { ShowCard } from '@/components/ShowCard';
 import { AnimatedListItem } from '@/components/AnimatedListItem';
 import { Show } from '@/lib/types';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
+import { trackSearchPerformed, trackSearchNoResults } from '@/lib/analytics';
 
 const FUSE_OPTIONS: IFuseOptions<Show> = {
   keys: [
@@ -35,6 +36,24 @@ export default function SearchScreen() {
     if (q.length < 2) return [];
     return fuse.search(q, { limit: 50 }).map(r => r.item);
   }, [fuse, query]);
+
+  // Debounced search tracking (1.5s after last keystroke)
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    const q = query.trim();
+    if (q.length < 2) return;
+    searchTimerRef.current = setTimeout(() => {
+      if (results.length > 0) {
+        trackSearchPerformed(q, results.length);
+      } else {
+        trackSearchNoResults(q);
+      }
+    }, 1500);
+    return () => {
+      if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    };
+  }, [query, results.length]);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>

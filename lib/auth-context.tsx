@@ -12,6 +12,7 @@ import { Platform } from 'react-native';
 import { getSupabaseClient } from './supabase';
 import type { UserProfile } from './user-types';
 import SignInSheet from '@/components/SignInSheet';
+import { trackSignInStarted, trackSignInCompleted, trackSignOut as trackSignOutEvent, identifyUser, resetAnalyticsUser } from '@/lib/analytics';
 
 // Lazy-load native auth modules — they crash at import time if native modules
 // aren't registered (e.g. dev client built without the plugin, or Expo Go).
@@ -90,9 +91,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         loadProfile(session.user.id);
         setSheetOpen(false);
         setSignInLoading(false);
+        identifyUser(session.user.id);
+        trackSignInCompleted(session.user.app_metadata?.provider || 'unknown');
       } else if (event === 'SIGNED_OUT') {
         setUser(null);
         setProfile(null);
+        trackSignOutEvent();
+        resetAnalyticsUser();
       }
     });
 
@@ -156,6 +161,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     try {
       setSignInLoading(true);
+      trackSignInStarted('apple');
       if (!AppleAuthentication) throw new Error('Apple Authentication not available');
       const credential = await AppleAuthentication.signInAsync({
         requestedScopes: [
@@ -192,6 +198,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     try {
       setSignInLoading(true);
+      trackSignInStarted('google');
 
       if (!GoogleSignin) throw new Error('Google Sign-In not available');
       await GoogleSignin.hasPlayServices();

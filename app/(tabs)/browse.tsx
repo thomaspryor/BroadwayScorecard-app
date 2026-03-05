@@ -15,6 +15,7 @@ import { ScoreToggle, ScoreMode } from '@/components/ScoreToggle';
 import { Show } from '@/lib/types';
 import { StaleBanner } from '@/components/StaleBanner';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
+import { trackFilterChanged, trackScoreModeToggled, trackMarketChanged, trackDataRefreshed } from '@/lib/analytics';
 
 type StatusFilter = 'all' | 'open' | 'previews' | 'closed';
 type TypeFilter = 'all' | 'musical' | 'play';
@@ -116,8 +117,40 @@ export default function BrowseScreen() {
     </AnimatedListItem>
   ), [scoreMode, statusFilter]);
 
+  const handleMarketChange = useCallback((m: Market) => {
+    setMarket(m);
+    trackMarketChanged(m, 'browse');
+  }, []);
+
+  const handleScoreModeChange = useCallback((m: ScoreMode) => {
+    setScoreMode(m);
+    trackScoreModeToggled(m, 'browse');
+  }, []);
+
+  const handleStatusFilter = useCallback((s: StatusFilter) => {
+    setStatusFilter(s);
+    trackFilterChanged('status', s, 'browse');
+  }, []);
+
+  const handleTypeFilter = useCallback((t: TypeFilter) => {
+    setTypeFilter(t);
+    trackFilterChanged('type', t, 'browse');
+  }, []);
+
+  const handleSortChange = useCallback((s: SortOption) => {
+    setSortBy(s);
+    trackFilterChanged('sort', s, 'browse');
+  }, []);
+
+  const handleOBToggle = useCallback(() => {
+    const newVal = !includeOB;
+    setIncludeOB(newVal);
+    trackFilterChanged('off_broadway', String(newVal), 'browse');
+  }, [includeOB]);
+
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
+    trackDataRefreshed('pull_to_refresh', 'browse');
     try { await refresh(); } catch {}
     setRefreshing(false);
   }, [refresh]);
@@ -151,7 +184,7 @@ export default function BrowseScreen() {
             <View style={styles.header}>
             <View style={styles.headerRow}>
               <Text style={styles.title}>{isWestEnd ? 'West End Shows' : 'Browse Shows'}</Text>
-              <MarketPicker market={market} onChange={setMarket} />
+              <MarketPicker market={market} onChange={handleMarketChange} />
             </View>
             <Text style={styles.count}>
               {filteredShows.length} of {totalForMarket} shows
@@ -165,11 +198,11 @@ export default function BrowseScreen() {
                     key={opt.key}
                     label={opt.label}
                     active={statusFilter === opt.key}
-                    onPress={() => setStatusFilter(opt.key)}
+                    onPress={() => handleStatusFilter(opt.key)}
                   />
                 ))}
               </ScrollView>
-              <ScoreToggle mode={scoreMode} onChange={setScoreMode} />
+              <ScoreToggle mode={scoreMode} onChange={handleScoreModeChange} />
             </View>
 
             {/* Type + Sort + OB toggle */}
@@ -180,7 +213,7 @@ export default function BrowseScreen() {
                     key={opt.key}
                     label={opt.label}
                     active={typeFilter === opt.key}
-                    onPress={() => setTypeFilter(opt.key)}
+                    onPress={() => handleTypeFilter(opt.key)}
                   />
                 ))}
                 <View style={styles.sortDivider} />
@@ -189,7 +222,7 @@ export default function BrowseScreen() {
                     key={opt.key}
                     label={opt.label}
                     active={sortBy === opt.key}
-                    onPress={() => setSortBy(opt.key)}
+                    onPress={() => handleSortChange(opt.key)}
                   />
                 ))}
                 {market === 'nyc' && (
@@ -198,7 +231,7 @@ export default function BrowseScreen() {
                     <FilterPill
                       label="Off-Bway"
                       active={includeOB}
-                      onPress={() => setIncludeOB(!includeOB)}
+                      onPress={handleOBToggle}
                       color="#14b8a6"
                     />
                   </>
