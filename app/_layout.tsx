@@ -12,6 +12,8 @@ import { DataProvider } from '@/lib/data-context';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { Onboarding, hasSeenOnboarding } from '@/components/Onboarding';
 import { AuthProvider } from '@/lib/auth-context';
+import { ToastProvider } from '@/lib/toast-context';
+import Toast from '@/components/Toast';
 import { featureFlags, loadFeatureFlagOverrides } from '@/lib/feature-flags';
 import { Colors } from '@/constants/theme';
 
@@ -83,6 +85,7 @@ export default function RootLayout() {
   return (
     <ErrorBoundary>
     <ThemeProvider value={BroadwayDark}>
+      <ToastProvider>
       <DataProvider>
         {featureFlags.userAccounts ? (
           <AuthProvider>{appContent}</AuthProvider>
@@ -91,6 +94,8 @@ export default function RootLayout() {
         )}
         <StatusBar style="light" />
       </DataProvider>
+      <Toast />
+      </ToastProvider>
     </ThemeProvider>
     </ErrorBoundary>
   );

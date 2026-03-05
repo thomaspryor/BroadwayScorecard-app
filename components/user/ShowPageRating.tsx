@@ -61,9 +61,6 @@ export default function ShowPageRating({
   const [watchlistLoading, setWatchlistLoading] = useState(false);
   const [autoEditLatest, setAutoEditLatest] = useState(false);
 
-  // Feature flag check — after all hooks (React rules)
-  if (!featureFlags.userAccounts) return null;
-
   // Load data when authenticated
   useEffect(() => {
     if (isAuthenticated && user) {
@@ -252,6 +249,9 @@ export default function ShowPageRating({
   }, [isAuthenticated, showId, pathname, showSignIn, isWatchlisted, addToWatchlist, removeFromWatchlist, showToast]);
 
   // ─── Render ──────────────────────────────────────────────
+
+  // Feature flag check — in render, after all hooks (React rules)
+  if (!featureFlags.userAccounts) return null;
 
   return (
     <View style={styles.container}>

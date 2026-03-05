@@ -193,6 +193,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         redirectUri,
         scopes: ['openid', 'profile', 'email'],
         responseType: AuthSession.ResponseType.IdToken,
+        usePKCE: false, // implicit flow (id_token) doesn't support PKCE
         extraParams: {
           nonce: hashedNonce,
         },

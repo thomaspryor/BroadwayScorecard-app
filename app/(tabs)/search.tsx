@@ -61,7 +61,7 @@ export default function SearchScreen() {
       ) : results.length === 0 ? (
         <View style={styles.emptyState}>
           <Text style={styles.emptyText}>
-            No shows found for &ldquo;{query}&rdquo;
+            No shows found for {'\u201C'}{query}{'\u201D'}
           </Text>
         </View>
       ) : (

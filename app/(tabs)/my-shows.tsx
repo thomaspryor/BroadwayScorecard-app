@@ -45,9 +45,6 @@ export default function MyShowsScreen() {
   const [diarySort, setDiarySort] = useState<DiarySort>('date-desc');
   const [watchlistSort, setWatchlistSort] = useState<WatchlistSort>('added-desc');
 
-  // Feature flag check — after all hooks
-  if (!featureFlags.userAccounts) return null;
-
   // Show lookup map
   const showMap = useMemo(() => {
     const map: Record<string, Show> = {};
@@ -139,6 +136,9 @@ export default function MyShowsScreen() {
     ? diarySort === 'date-desc' ? 'Newest' : diarySort === 'date-asc' ? 'Oldest' : 'Top Rated'
     : watchlistSort === 'added-desc' ? 'Recent' : watchlistSort === 'alphabetical' ? 'A-Z' : 'Closing Soon';
 
+  // Feature flag check — in render section, after all hooks (React rules)
+  if (!featureFlags.userAccounts) return null;
+
   // ─── Not authenticated ─────────────────────────────────
   if (!authLoading && !isAuthenticated) {
     return (
@@ -177,7 +177,7 @@ export default function MyShowsScreen() {
   const renderDiaryItem = ({ item }: { item: UserReview }) => {
     const show = showMap[item.show_id];
     const title = show?.title || item.show_id;
-    const posterUrl = show ? (getImageUrl(show.images.poster) || getImageUrl(show.images.thumbnail)) : null;
+    const posterUrl = show?.images ? (getImageUrl(show.images.poster) || getImageUrl(show.images.thumbnail)) : null;
 
     return (
       <Pressable
@@ -215,7 +215,7 @@ export default function MyShowsScreen() {
   const renderWatchlistItem = ({ item }: { item: WatchlistEntry }) => {
     const show = showMap[item.show_id];
     const title = show?.title || item.show_id;
-    const posterUrl = show ? (getImageUrl(show.images.poster) || getImageUrl(show.images.thumbnail)) : null;
+    const posterUrl = show?.images ? (getImageUrl(show.images.poster) || getImageUrl(show.images.thumbnail)) : null;
     const isClosingSoon = show?.closingDate && (() => {
       const closing = new Date(show.closingDate!);
       const fourWeeks = 28 * 24 * 60 * 60 * 1000;

@@ -127,7 +127,7 @@ export function Onboarding({ onDone }: OnboardingProps) {
       </View>
 
       {/* Buttons */}
-      <View style={styles.buttons}>
+      <View style={[styles.buttons, isLast && styles.buttonsCentered]}>
         {!isLast && (
           <Pressable onPress={handleDone} style={styles.skipButton}>
             <Text style={styles.skipText}>Skip</Text>
@@ -195,6 +195,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: Spacing.xl,
     paddingBottom: Spacing.xxl,
+  },
+  buttonsCentered: {
+    justifyContent: 'center',
   },
   skipButton: {
     width: 60,

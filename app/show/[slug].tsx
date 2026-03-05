@@ -92,7 +92,7 @@ export default function ShowDetailScreen() {
 
   // Primary ticket link: prefer TodayTix, then first available
   const primaryTicketLink = useMemo(() => {
-    if (show.ticketLinks.length === 0) return null;
+    if (!show.ticketLinks?.length) return null;
     const todayTix = show.ticketLinks.find(l => l.platform.toLowerCase().includes('todaytix'));
     return todayTix || show.ticketLinks[0];
   }, [show.ticketLinks]);
@@ -187,7 +187,7 @@ export default function ShowDetailScreen() {
                 <Text style={styles.linkButtonText}>Official Site</Text>
               </Pressable>
             )}
-            {show.status !== 'closed' && show.ticketLinks.map((link, i) => (
+            {show.status !== 'closed' && show.ticketLinks?.map((link, i) => (
               <Pressable
                 key={i}
                 style={({ pressed }) => [styles.linkButton, pressed && styles.pressed]}
@@ -207,10 +207,8 @@ export default function ShowDetailScreen() {
               <BreakdownBar breakdown={detail.breakdown} />
             </View>
           )}
-        </View>
 
-        {/* User rating + watchlist (feature-flagged) */}
-        <View style={styles.section}>
+          {/* User rating + watchlist (feature-flagged) — inside header card */}
           <ShowPageRating
             showId={show.id}
             showTitle={show.title}
@@ -379,7 +377,7 @@ export default function ShowDetailScreen() {
         )}
 
         {/* Creative Team */}
-        {show.creativeTeam.length > 0 && (
+        {show.creativeTeam?.length > 0 && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Creative Team</Text>
             {show.creativeTeam.map((member, i) => (
@@ -555,7 +553,7 @@ function ReviewRow({ review }: { review: ShowDetail['reviews'][0] }) {
       <View style={styles.reviewContent}>
         {review.pullQuote && (
           <Text style={styles.reviewQuote} numberOfLines={2}>
-            &ldquo;{review.pullQuote}&rdquo;
+            {'\u201C'}{review.pullQuote}{'\u201D'}
           </Text>
         )}
         <View style={styles.reviewFooter}>
