@@ -15,7 +15,7 @@ import { useShows } from '@/lib/data-context';
 import { fetchShowDetail } from '@/lib/api';
 import { getImageUrl } from '@/lib/images';
 import { getScoreColor, getScoreTier, getContrastTextColor } from '@/lib/score-utils';
-import { Show, ShowDetail, MobileShowDetail, mapShowDetail } from '@/lib/types';
+import { ShowDetail, MobileShowDetail, mapShowDetail } from '@/lib/types';
 import { ScoreBadge, StatusBadge, FormatPill, ProductionPill, CategoryBadge } from '@/components/show-cards';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
 import { trackTicketTap, trackBuyButtonTap, trackShowDetailViewed, trackShowShared, trackFullReviewTapped } from '@/lib/analytics';
@@ -88,6 +88,13 @@ export default function ShowDetailScreen() {
     }
   }, [show]);
 
+  // Primary ticket link: prefer TodayTix, then first available
+  const primaryTicketLink = useMemo(() => {
+    if (!show?.ticketLinks?.length) return null;
+    const todayTix = show.ticketLinks.find(l => l.platform.toLowerCase().includes('todaytix'));
+    return todayTix || show.ticketLinks[0];
+  }, [show?.ticketLinks]);
+
   if (!show) {
     return (
       <View style={styles.center}>
@@ -97,13 +104,6 @@ export default function ShowDetailScreen() {
   }
 
   const posterUrl = getImageUrl(show.images.poster) || getImageUrl(show.images.thumbnail);
-
-  // Primary ticket link: prefer TodayTix, then first available
-  const primaryTicketLink = useMemo(() => {
-    if (!show.ticketLinks?.length) return null;
-    const todayTix = show.ticketLinks.find(l => l.platform.toLowerCase().includes('todaytix'));
-    return todayTix || show.ticketLinks[0];
-  }, [show.ticketLinks]);
 
   // Minimum 3 reviews to show a score (1-2 reviews is not a meaningful composite)
   const hasEnoughReviews = (show.criticScore?.reviewCount ?? 0) >= 3;

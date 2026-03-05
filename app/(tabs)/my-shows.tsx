@@ -148,7 +148,7 @@ export default function MyShowsScreen() {
           <Text style={styles.ctaEmoji}>🎭</Text>
           <Text style={styles.ctaTitle}>Track your Broadway journey</Text>
           <Text style={styles.ctaDescription}>
-            Sign in to rate shows, keep a diary of what you've seen, and build your watchlist.
+            Sign in to rate shows, keep a diary of what you{"'"}ve seen, and build your watchlist.
           </Text>
           <Pressable
             style={({ pressed }) => [styles.ctaButton, pressed && styles.pressed]}
