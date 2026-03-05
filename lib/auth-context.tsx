@@ -1,7 +1,7 @@
 /**
  * AuthProvider for the mobile app.
  *
- * Provides sign-in (Apple native + Google via expo-auth-session),
+ * Provides sign-in (Apple native + Google native SDK),
  * sign-out, profile loading, and the sign-in sheet trigger.
  *
  * Ported from web's src/contexts/AuthContext.tsx with native auth flows.

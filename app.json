@@ -81,7 +81,7 @@
       "policy": "appVersion"
     },
     "extra": {
-      "features": "userAccounts",
+      "features": "",
       "router": {
         "origin": "https://broadwayscorecard.com"
       },
