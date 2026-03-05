@@ -10,15 +10,21 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
 import { Platform } from 'react-native';
 import * as AppleAuthentication from 'expo-apple-authentication';
-import * as AuthSession from 'expo-auth-session';
-import * as Crypto from 'expo-crypto';
+import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import { getSupabaseClient } from './supabase';
 import type { UserProfile } from './user-types';
 import SignInSheet from '@/components/SignInSheet';
 
-// Google OAuth client IDs — set in .env or app.json extra
+// Google OAuth — web client ID for server auth, iOS client ID for native SDK
 const GOOGLE_WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || '';
 const GOOGLE_IOS_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID || '';
+
+// Configure Google Sign-In native SDK
+GoogleSignin.configure({
+  iosClientId: GOOGLE_IOS_CLIENT_ID,
+  webClientId: GOOGLE_WEB_CLIENT_ID, // needed to get idToken
+  scopes: ['profile', 'email'],
+});
 
 type SignInContext = 'rating' | 'watchlist' | 'generic';
 
@@ -164,7 +170,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // ─── Google Sign In (expo-auth-session) ──────────────────
+  // ─── Google Sign In (native SDK) ─────────────────────────
   const signInWithGoogle = useCallback(async () => {
     const client = getSupabaseClient();
     if (!client) return;
@@ -172,40 +178,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       setSignInLoading(true);
 
-      // Generate nonce for security
-      const rawNonce = Crypto.randomUUID();
-      const hashedNonce = await Crypto.digestStringAsync(
-        Crypto.CryptoDigestAlgorithm.SHA256,
-        rawNonce,
-      );
+      await GoogleSignin.hasPlayServices();
+      const response = await GoogleSignin.signIn();
 
-      const redirectUri = AuthSession.makeRedirectUri();
-
-      const discovery = {
-        authorizationEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
-        tokenEndpoint: 'https://oauth2.googleapis.com/token',
-      };
-
-      const clientId = Platform.OS === 'ios' ? GOOGLE_IOS_CLIENT_ID : GOOGLE_WEB_CLIENT_ID;
-
-      const request = new AuthSession.AuthRequest({
-        clientId,
-        redirectUri,
-        scopes: ['openid', 'profile', 'email'],
-        responseType: AuthSession.ResponseType.IdToken,
-        usePKCE: false, // implicit flow (id_token) doesn't support PKCE
-        extraParams: {
-          nonce: hashedNonce,
-        },
-      });
-
-      const result = await request.promptAsync(discovery);
-
-      if (result.type === 'success' && result.params.id_token) {
+      if (response.type === 'success' && response.data?.idToken) {
         const { error } = await client.auth.signInWithIdToken({
           provider: 'google',
-          token: result.params.id_token,
-          nonce: rawNonce,
+          token: response.data.idToken,
         });
 
         if (error) throw error;
@@ -213,8 +192,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else {
         setSignInLoading(false);
       }
-    } catch (e) {
+    } catch (e: unknown) {
       setSignInLoading(false);
+      // User cancelled — not an error
+      if (e && typeof e === 'object' && 'code' in e && (e as { code: string }).code === 'SIGN_IN_CANCELLED') {
+        return;
+      }
       console.error('[Auth] Google sign-in failed:', e);
     }
   }, []);
