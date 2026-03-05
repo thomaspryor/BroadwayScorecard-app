@@ -34,6 +34,7 @@ import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
 type Tab = 'diary' | 'watchlist';
 type DiarySort = 'date-desc' | 'date-asc' | 'rating-desc';
 type WatchlistSort = 'added-desc' | 'alphabetical' | 'closing-soon';
+type ViewMode = 'list' | 'grid';
 
 export default function MyShowsScreen() {
   const insets = useSafeAreaInsets();
@@ -46,6 +47,7 @@ export default function MyShowsScreen() {
   const [activeTab, setActiveTab] = useState<Tab>('diary');
   const [diarySort, setDiarySort] = useState<DiarySort>('date-desc');
   const [watchlistSort, setWatchlistSort] = useState<WatchlistSort>('added-desc');
+  const [viewMode, setViewMode] = useState<ViewMode>('list');
 
   // Show lookup map
   const showMap = useMemo(() => {
@@ -240,6 +242,32 @@ export default function MyShowsScreen() {
     );
   };
 
+  // ─── Render diary grid item ───────────────────────────
+  const renderDiaryGridItem = ({ item }: { item: UserReview }) => {
+    const show = showMap[item.show_id];
+    const title = show?.title || item.show_id;
+    const posterUrl = show?.images ? (getImageUrl(show.images.poster) || getImageUrl(show.images.thumbnail)) : null;
+
+    return (
+      <Pressable
+        style={({ pressed }) => [styles.gridCard, pressed && styles.pressed]}
+        onPress={() => show && router.push(`/show/${show.slug}`)}
+      >
+        {posterUrl ? (
+          <Image source={{ uri: posterUrl }} style={styles.gridPoster} contentFit="cover" transition={200} />
+        ) : (
+          <View style={[styles.gridPoster, styles.cardPosterPlaceholder]}>
+            <Text style={styles.placeholderText}>{title.charAt(0)}</Text>
+          </View>
+        )}
+        <View style={styles.gridOverlay}>
+          <Text style={styles.gridRating}>{item.rating.toFixed(1)}</Text>
+        </View>
+        <Text style={styles.gridTitle} numberOfLines={2}>{title}</Text>
+      </Pressable>
+    );
+  };
+
   // ─── Render watchlist item (with swipe-to-delete) ─────
   const renderWatchlistItem = ({ item }: { item: WatchlistEntry }) => {
     return <SwipeableWatchlistItem item={item} showMap={showMap} onRemove={handleRemoveFromWatchlist} router={router} />;
@@ -253,6 +281,8 @@ export default function MyShowsScreen() {
     const daysUntil = item.planned_date
       ? Math.ceil((new Date(item.planned_date + 'T00:00:00').getTime() - Date.now()) / (1000 * 60 * 60 * 24))
       : null;
+    // Show "Rate" button if planned date is today or past
+    const canRate = daysUntil !== null && daysUntil <= 0;
 
     return (
       <Pressable
@@ -285,6 +315,18 @@ export default function MyShowsScreen() {
             </View>
           )}
         </View>
+        {canRate && show && (
+          <Pressable
+            style={styles.rateButton}
+            onPress={() => router.push(`/show/${show.slug}`)}
+            hitSlop={8}
+          >
+            <Svg width={14} height={14} viewBox="0 0 24 24" fill="#fcd34d">
+              <Path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+            </Svg>
+            <Text style={styles.rateButtonText}>Rate</Text>
+          </Pressable>
+        )}
       </Pressable>
     );
   };
@@ -325,15 +367,34 @@ export default function MyShowsScreen() {
             )}
           </Text>
         </Pressable>
-        <Pressable style={styles.sortButton} onPress={activeTab === 'diary' ? cycleDiarySort : cycleWatchlistSort}>
-          <Text style={styles.sortText}>{sortLabel}</Text>
-          <Svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke={Colors.text.muted} strokeWidth={2}>
-            <Path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-          </Svg>
-        </Pressable>
+        <View style={styles.tabBarRight}>
+          <Pressable style={styles.sortButton} onPress={activeTab === 'diary' ? cycleDiarySort : cycleWatchlistSort}>
+            <Text style={styles.sortText}>{sortLabel}</Text>
+            <Svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke={Colors.text.muted} strokeWidth={2}>
+              <Path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+            </Svg>
+          </Pressable>
+          {activeTab === 'diary' && (
+            <Pressable
+              style={styles.viewToggle}
+              onPress={() => setViewMode(prev => prev === 'list' ? 'grid' : 'list')}
+              hitSlop={8}
+            >
+              {viewMode === 'list' ? (
+                <Svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={Colors.text.muted} strokeWidth={2}>
+                  <Path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+                </Svg>
+              ) : (
+                <Svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={Colors.text.muted} strokeWidth={2}>
+                  <Path strokeLinecap="round" strokeLinejoin="round" d="M4 5h6v6H4zM14 5h6v6h-6zM4 15h6v6H4zM14 15h6v6h-6z" />
+                </Svg>
+              )}
+            </Pressable>
+          )}
+        </View>
       </View>
 
-      {/* Diary list */}
+      {/* Diary list/grid */}
       {activeTab === 'diary' && (
         sortedReviews.length === 0 ? (
           <EmptyState
@@ -341,6 +402,16 @@ export default function MyShowsScreen() {
             description="Start rating shows to build your personal theater diary!"
             ctaLabel="Browse Shows"
             onCta={() => router.push('/(tabs)/browse')}
+          />
+        ) : viewMode === 'grid' ? (
+          <FlatList
+            data={sortedReviews}
+            renderItem={renderDiaryGridItem}
+            keyExtractor={item => item.id}
+            numColumns={3}
+            contentContainerStyle={styles.gridContent}
+            columnWrapperStyle={styles.gridRow}
+            windowSize={5}
           />
         ) : (
           <FlatList
@@ -541,13 +612,21 @@ const styles = StyleSheet.create({
     color: Colors.text.muted,
     fontSize: FontSize.xs,
   },
-  sortButton: {
+  tabBarRight: {
     marginLeft: 'auto',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  sortButton: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
     paddingVertical: Spacing.sm,
     paddingHorizontal: Spacing.sm,
+  },
+  viewToggle: {
+    padding: Spacing.sm,
   },
   sortText: {
     color: Colors.text.muted,
@@ -651,6 +730,62 @@ const styles = StyleSheet.create({
     color: '#fcd34d',
     fontSize: FontSize.xs,
     fontWeight: '600',
+  },
+  rateButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.pill,
+    backgroundColor: 'rgba(255, 215, 0, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 215, 0, 0.3)',
+  },
+  rateButtonText: {
+    color: '#fcd34d',
+    fontSize: FontSize.xs,
+    fontWeight: '600',
+  },
+  // Grid view
+  gridContent: {
+    paddingHorizontal: Spacing.md,
+    paddingTop: Spacing.md,
+    paddingBottom: Spacing.xxl,
+  },
+  gridRow: {
+    gap: Spacing.sm,
+    marginBottom: Spacing.sm,
+  },
+  gridCard: {
+    flex: 1,
+    maxWidth: '33%',
+  },
+  gridPoster: {
+    width: '100%',
+    aspectRatio: 2 / 3,
+    borderRadius: BorderRadius.sm,
+    backgroundColor: Colors.surface.overlay,
+  },
+  gridOverlay: {
+    position: 'absolute',
+    top: Spacing.xs,
+    right: Spacing.xs,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: BorderRadius.sm,
+  },
+  gridRating: {
+    color: '#fcd34d',
+    fontSize: FontSize.xs,
+    fontWeight: '700',
+  },
+  gridTitle: {
+    color: Colors.text.primary,
+    fontSize: FontSize.xs,
+    fontWeight: '500',
+    marginTop: 4,
   },
   // CTA
   ctaContainer: {
