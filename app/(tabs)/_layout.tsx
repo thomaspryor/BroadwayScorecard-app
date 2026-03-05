@@ -1,6 +1,6 @@
 /**
- * Tab layout — 4 tabs: Home, Browse, Search, Settings.
- * Dark themed with brand accent color.
+ * Tab layout — 5 tabs: Home, Browse, My Shows, Search, Settings.
+ * My Shows tab hidden when userAccounts feature flag is off.
  */
 
 import { Tabs } from 'expo-router';
@@ -9,6 +9,7 @@ import React from 'react';
 import { HapticTab } from '@/components/haptic-tab';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
+import { featureFlags } from '@/lib/feature-flags';
 
 export default function TabLayout() {
   return (
@@ -40,6 +41,16 @@ export default function TabLayout() {
           tabBarIcon: ({ color }) => (
             <IconSymbol size={28} name="square.grid.2x2" color={color} />
           ),
+        }}
+      />
+      <Tabs.Screen
+        name="my-shows"
+        options={{
+          title: 'My Shows',
+          tabBarIcon: ({ color }) => (
+            <IconSymbol size={28} name="star.fill" color={color} />
+          ),
+          href: featureFlags.userAccounts ? '/(tabs)/my-shows' : null,
         }}
       />
       <Tabs.Screen

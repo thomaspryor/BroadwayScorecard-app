@@ -1,5 +1,6 @@
 /**
  * Settings / More tab — app info, data refresh, links to web features.
+ * When signed in: profile card + sign-out (gated by feature flag).
  */
 
 import React from 'react';
@@ -8,7 +9,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as WebBrowser from 'expo-web-browser';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
+import { useRouter } from 'expo-router';
 import { useShows } from '@/lib/data-context';
+import { useAuth } from '@/lib/auth-context';
+import { clearUserCache } from '@/lib/user-cache';
+import { featureFlags } from '@/lib/feature-flags';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
 
 const WEB = 'https://broadwayscorecard.com';
@@ -29,6 +34,11 @@ function SettingsRow({ label, value, onPress }: { label: string; value?: string;
 export default function SettingsScreen() {
   const { lastUpdated, refresh, shows } = useShows();
   const insets = useSafeAreaInsets();
+  const router = useRouter();
+
+  // Auth hooks — always called (React rules), but UI gated by feature flag
+  const auth = useAuth();
+  const { user, profile, isAuthenticated, signOut, showSignIn } = auth;
 
   const handleRefresh = async () => {
     try {
@@ -46,13 +56,31 @@ export default function SettingsScreen() {
         text: 'Clear',
         style: 'destructive',
         onPress: async () => {
-          // Preserve onboarding flag when clearing cache
+          // Preserve onboarding flag + auth SecureStore keys when clearing cache
           const onboardingSeen = await AsyncStorage.getItem('@broadwayScorecard:onboardingSeen');
+          // Clear user cache if signed in
+          if (user?.id) await clearUserCache(user.id);
+          // Clear AsyncStorage (show data cache) but preserve keys
           await AsyncStorage.clear();
           if (onboardingSeen) {
             await AsyncStorage.setItem('@broadwayScorecard:onboardingSeen', onboardingSeen);
           }
           Alert.alert('Done', 'Cache cleared. Pull down to refresh.');
+        },
+      },
+    ]);
+  };
+
+  const handleSignOut = () => {
+    Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Sign Out',
+        style: 'destructive',
+        onPress: async () => {
+          if (user?.id) await clearUserCache(user.id);
+          await signOut();
+          router.replace('/(tabs)');
         },
       },
     ]);
@@ -77,6 +105,35 @@ export default function SettingsScreen() {
       contentContainerStyle={styles.content}
     >
       <Text style={styles.title}>More</Text>
+
+      {/* Profile section — feature-flagged */}
+      {featureFlags.userAccounts && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>ACCOUNT</Text>
+          {isAuthenticated && profile ? (
+            <>
+              <View style={styles.profileCard}>
+                <View style={styles.profileAvatar}>
+                  <Text style={styles.profileAvatarText}>
+                    {(profile.display_name || user?.email || '?').charAt(0).toUpperCase()}
+                  </Text>
+                </View>
+                <View style={styles.profileInfo}>
+                  {profile.display_name && (
+                    <Text style={styles.profileName}>{profile.display_name}</Text>
+                  )}
+                  {user?.email && (
+                    <Text style={styles.profileEmail}>{user.email}</Text>
+                  )}
+                </View>
+              </View>
+              <SettingsRow label="Sign Out" onPress={handleSignOut} />
+            </>
+          ) : (
+            <SettingsRow label="Sign In" onPress={() => showSignIn()} />
+          )}
+        </View>
+      )}
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>DATA</Text>
@@ -161,5 +218,40 @@ const styles = StyleSheet.create({
   rowValue: {
     color: Colors.text.secondary,
     fontSize: FontSize.md,
+  },
+  profileCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
+    backgroundColor: Colors.surface.raised,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border.subtle,
+  },
+  profileAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 215, 0, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  profileAvatarText: {
+    color: '#FFD700',
+    fontSize: FontSize.lg,
+    fontWeight: '700',
+  },
+  profileInfo: {
+    flex: 1,
+  },
+  profileName: {
+    color: Colors.text.primary,
+    fontSize: FontSize.md,
+    fontWeight: '600',
+  },
+  profileEmail: {
+    color: Colors.text.muted,
+    fontSize: FontSize.sm,
   },
 });
