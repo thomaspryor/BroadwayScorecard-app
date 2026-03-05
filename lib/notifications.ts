@@ -15,11 +15,10 @@ import { router } from 'expo-router';
 const PUSH_TOKEN_KEY = '@bsc:pushToken';
 const PERMISSION_ASKED_KEY = '@bsc:notificationPermissionAsked';
 
-type Notifications = typeof import('expo-notifications');
-type Device = typeof import('expo-device');
-
-let Notifications: Notifications | null = null;
-let Device: Device | null = null;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let Notifications: any = null;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let Device: any = null;
 
 try {
   Notifications = require('expo-notifications');
@@ -118,7 +117,8 @@ export function setupNotificationHandler(): (() => void) | null {
 
   // Handle notification taps — navigate to the relevant screen
   const subscription = Notifications.addNotificationResponseReceivedListener(
-    (response) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (response: any) => {
       const data = response.notification.request.content.data;
 
       if (data?.showSlug && typeof data.showSlug === 'string') {
