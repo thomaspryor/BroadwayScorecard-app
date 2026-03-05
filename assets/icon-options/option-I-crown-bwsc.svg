@@ -1,0 +1,9 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1024" height="1024" fill="#0f0f14"/>
+  <!-- Gold crown -->
+  <g transform="translate(512, 200) scale(18)">
+    <path d="M0,6 L1,2 L3.5,4 L7,0 L10.5,4 L13,2 L14,6 Z" fill="#DAA520" transform="translate(-7, 0)"/>
+  </g>
+  <text x="512" y="570" text-anchor="middle" font-family="-apple-system, SF Pro Display, Helvetica Neue, sans-serif" font-size="260" font-weight="800" fill="#FFFFFF" letter-spacing="-6">BW</text>
+  <text x="512" y="810" text-anchor="middle" font-family="-apple-system, SF Pro Display, Helvetica Neue, sans-serif" font-size="260" font-weight="800" fill="#C9A96E" letter-spacing="-6">SC</text>
+</svg>
