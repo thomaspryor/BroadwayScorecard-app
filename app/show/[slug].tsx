@@ -20,6 +20,7 @@ import { ScoreBadge, StatusBadge, FormatPill, ProductionPill, CategoryBadge } fr
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
 import { trackTicketTap, trackBuyButtonTap } from '@/lib/analytics';
 import Svg, { Path } from 'react-native-svg';
+import ShowPageRating from '@/components/user/ShowPageRating';
 
 export default function ShowDetailScreen() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
@@ -206,6 +207,15 @@ export default function ShowDetailScreen() {
               <BreakdownBar breakdown={detail.breakdown} />
             </View>
           )}
+        </View>
+
+        {/* User rating + watchlist (feature-flagged) */}
+        <View style={styles.section}>
+          <ShowPageRating
+            showId={show.id}
+            showTitle={show.title}
+            closingDate={show.closingDate}
+          />
         </View>
 
         {/* Critic Reviews List — collapsed by default */}
