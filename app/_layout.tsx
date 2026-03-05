@@ -11,6 +11,8 @@ import 'react-native-reanimated';
 import { DataProvider } from '@/lib/data-context';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { Onboarding, hasSeenOnboarding } from '@/components/Onboarding';
+import { AuthProvider } from '@/lib/auth-context';
+import { featureFlags, loadFeatureFlagOverrides } from '@/lib/feature-flags';
 import { Colors } from '@/constants/theme';
 
 // Custom dark theme matching our design tokens
@@ -34,8 +36,12 @@ export default function RootLayout() {
   const [showOnboarding, setShowOnboarding] = useState<boolean | null>(null);
 
   useEffect(() => {
-    hasSeenOnboarding()
-      .then(seen => setShowOnboarding(!seen))
+    // Load feature flag overrides + onboarding check in parallel
+    Promise.all([
+      loadFeatureFlagOverrides(),
+      hasSeenOnboarding(),
+    ])
+      .then(([, seen]) => setShowOnboarding(!seen))
       .catch(() => setShowOnboarding(false));
   }, []);
 
@@ -51,30 +57,38 @@ export default function RootLayout() {
     );
   }
 
+  const appContent = (
+    <Stack
+      screenOptions={{
+        animation: 'slide_from_right',
+        animationDuration: 250,
+      }}
+    >
+      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack.Screen
+        name="show/[slug]"
+        options={{
+          headerShown: true,
+          headerBackTitle: 'Back',
+          headerStyle: { backgroundColor: Colors.surface.default },
+          headerTintColor: Colors.brand,
+          headerTitleStyle: { color: Colors.text.primary },
+          title: '',
+          animation: 'slide_from_right',
+        }}
+      />
+    </Stack>
+  );
+
   return (
     <ErrorBoundary>
     <ThemeProvider value={BroadwayDark}>
       <DataProvider>
-        <Stack
-          screenOptions={{
-            animation: 'slide_from_right',
-            animationDuration: 250,
-          }}
-        >
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen
-            name="show/[slug]"
-            options={{
-              headerShown: true,
-              headerBackTitle: 'Back',
-              headerStyle: { backgroundColor: Colors.surface.default },
-              headerTintColor: Colors.brand,
-              headerTitleStyle: { color: Colors.text.primary },
-              title: '',
-              animation: 'slide_from_right',
-            }}
-          />
-        </Stack>
+        {featureFlags.userAccounts ? (
+          <AuthProvider>{appContent}</AuthProvider>
+        ) : (
+          appContent
+        )}
         <StatusBar style="light" />
       </DataProvider>
     </ThemeProvider>

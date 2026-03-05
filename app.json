@@ -30,9 +30,16 @@
           "action": "VIEW",
           "autoVerify": true,
           "data": [
-            { "scheme": "https", "host": "broadwayscorecard.com", "pathPrefix": "/show/" }
+            {
+              "scheme": "https",
+              "host": "broadwayscorecard.com",
+              "pathPrefix": "/show/"
+            }
           ],
-          "category": ["BROWSABLE", "DEFAULT"]
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
         }
       ],
       "edgeToEdgeEnabled": true,
@@ -52,7 +59,10 @@
           "resizeMode": "contain",
           "backgroundColor": "#0f0f14"
         }
-      ]
+      ],
+      "expo-secure-store",
+      "expo-apple-authentication",
+      "@react-native-community/datetimepicker"
     ],
     "experiments": {
       "typedRoutes": true,
@@ -65,6 +75,7 @@
       "policy": "appVersion"
     },
     "extra": {
+      "features": "",
       "router": {
         "origin": "https://broadwayscorecard.com"
       },

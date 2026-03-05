@@ -1,0 +1,287 @@
+/**
+ * AuthProvider for the mobile app.
+ *
+ * Provides sign-in (Apple native + Google via expo-auth-session),
+ * sign-out, profile loading, and the sign-in sheet trigger.
+ *
+ * Ported from web's src/contexts/AuthContext.tsx with native auth flows.
+ */
+
+import React, { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
+import { Platform } from 'react-native';
+import * as AppleAuthentication from 'expo-apple-authentication';
+import * as AuthSession from 'expo-auth-session';
+import * as Crypto from 'expo-crypto';
+import { getSupabaseClient } from './supabase';
+import type { UserProfile } from './user-types';
+import SignInSheet from '@/components/SignInSheet';
+
+// Google OAuth client IDs — set in .env or app.json extra
+const GOOGLE_WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || '';
+const GOOGLE_IOS_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID || '';
+
+type SignInContext = 'rating' | 'watchlist' | 'generic';
+
+interface AuthContextValue {
+  user: { id: string; email: string } | null;
+  profile: UserProfile | null;
+  loading: boolean;
+  isAuthenticated: boolean;
+  signInWithApple: () => Promise<void>;
+  signInWithGoogle: () => Promise<void>;
+  signOut: () => Promise<void>;
+  /** Show sign-in sheet with context */
+  showSignIn: (context?: SignInContext) => void;
+}
+
+const AuthContext = createContext<AuthContextValue | null>(null);
+
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [user, setUser] = useState<{ id: string; email: string } | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [sheetContext, setSheetContext] = useState<SignInContext>('generic');
+  const [signInLoading, setSignInLoading] = useState(false);
+
+  // ─── Initialize auth state ───────────────────────────────
+  useEffect(() => {
+    const client = getSupabaseClient();
+    if (!client) {
+      setLoading(false);
+      return;
+    }
+
+    // Get existing session
+    client.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        setUser({ id: session.user.id, email: session.user.email || '' });
+        loadProfile(session.user.id);
+      }
+      setLoading(false);
+    });
+
+    // Listen for auth state changes
+    const {
+      data: { subscription },
+    } = client.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' && session?.user) {
+        setUser({ id: session.user.id, email: session.user.email || '' });
+        loadProfile(session.user.id);
+        setSheetOpen(false);
+        setSignInLoading(false);
+      } else if (event === 'SIGNED_OUT') {
+        setUser(null);
+        setProfile(null);
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  // ─── Profile loading ─────────────────────────────────────
+  const loadProfile = async (userId: string) => {
+    const client = getSupabaseClient();
+    if (!client) return;
+
+    try {
+      const { data } = await client.from('profiles').select('*').eq('id', userId).single();
+
+      if (data) {
+        setProfile(data as UserProfile);
+      } else {
+        await ensureProfile(userId);
+      }
+    } catch {
+      await ensureProfile(userId);
+    }
+  };
+
+  const ensureProfile = async (userId: string) => {
+    const client = getSupabaseClient();
+    if (!client) return;
+
+    try {
+      const {
+        data: { user: authUser },
+      } = await client.auth.getUser();
+      const meta = authUser?.user_metadata || {};
+      const { data } = await client
+        .from('profiles')
+        .upsert(
+          {
+            id: userId,
+            display_name: meta.full_name || meta.name || '',
+            avatar_url: meta.avatar_url || meta.picture || null,
+          },
+          { onConflict: 'id' },
+        )
+        .select()
+        .single();
+
+      if (data) {
+        setProfile(data as UserProfile);
+      }
+    } catch (e) {
+      console.error('[Auth] ensureProfile error:', e);
+    }
+  };
+
+  // ─── Apple Sign In (native) ──────────────────────────────
+  const signInWithApple = useCallback(async () => {
+    const client = getSupabaseClient();
+    if (!client) return;
+
+    try {
+      setSignInLoading(true);
+      const credential = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+      });
+
+      if (!credential.identityToken) {
+        throw new Error('No identity token from Apple');
+      }
+
+      const { error } = await client.auth.signInWithIdToken({
+        provider: 'apple',
+        token: credential.identityToken,
+      });
+
+      if (error) throw error;
+      // onAuthStateChange handles the rest
+    } catch (e: unknown) {
+      setSignInLoading(false);
+      // User cancelled — not an error
+      if (e && typeof e === 'object' && 'code' in e && (e as { code: string }).code === 'ERR_REQUEST_CANCELED') {
+        return;
+      }
+      console.error('[Auth] Apple sign-in failed:', e);
+    }
+  }, []);
+
+  // ─── Google Sign In (expo-auth-session) ──────────────────
+  const signInWithGoogle = useCallback(async () => {
+    const client = getSupabaseClient();
+    if (!client) return;
+
+    try {
+      setSignInLoading(true);
+
+      // Generate nonce for security
+      const rawNonce = Crypto.randomUUID();
+      const hashedNonce = await Crypto.digestStringAsync(
+        Crypto.CryptoDigestAlgorithm.SHA256,
+        rawNonce,
+      );
+
+      const redirectUri = AuthSession.makeRedirectUri();
+
+      const discovery = {
+        authorizationEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
+        tokenEndpoint: 'https://oauth2.googleapis.com/token',
+      };
+
+      const clientId = Platform.OS === 'ios' ? GOOGLE_IOS_CLIENT_ID : GOOGLE_WEB_CLIENT_ID;
+
+      const request = new AuthSession.AuthRequest({
+        clientId,
+        redirectUri,
+        scopes: ['openid', 'profile', 'email'],
+        responseType: AuthSession.ResponseType.IdToken,
+        extraParams: {
+          nonce: hashedNonce,
+        },
+      });
+
+      const result = await request.promptAsync(discovery);
+
+      if (result.type === 'success' && result.params.id_token) {
+        const { error } = await client.auth.signInWithIdToken({
+          provider: 'google',
+          token: result.params.id_token,
+          nonce: rawNonce,
+        });
+
+        if (error) throw error;
+        // onAuthStateChange handles the rest
+      } else {
+        setSignInLoading(false);
+      }
+    } catch (e) {
+      setSignInLoading(false);
+      console.error('[Auth] Google sign-in failed:', e);
+    }
+  }, []);
+
+  // ─── Sign Out ────────────────────────────────────────────
+  const signOut = useCallback(async () => {
+    const client = getSupabaseClient();
+    if (!client) return;
+
+    await client.auth.signOut();
+    setUser(null);
+    setProfile(null);
+  }, []);
+
+  // ─── Show Sign-In Sheet ──────────────────────────────────
+  const showSignIn = useCallback((context: SignInContext = 'generic') => {
+    setSheetContext(context);
+    setSheetOpen(true);
+  }, []);
+
+  const handleSheetSignIn = useCallback(
+    (provider: 'google' | 'apple') => {
+      if (provider === 'apple') {
+        signInWithApple();
+      } else {
+        signInWithGoogle();
+      }
+    },
+    [signInWithApple, signInWithGoogle],
+  );
+
+  return (
+    <AuthContext.Provider
+      value={{
+        user,
+        profile,
+        loading,
+        isAuthenticated: !!user,
+        signInWithApple,
+        signInWithGoogle,
+        signOut,
+        showSignIn,
+      }}
+    >
+      {children}
+      <SignInSheet
+        visible={sheetOpen}
+        onClose={() => setSheetOpen(false)}
+        onSignIn={handleSheetSignIn}
+        context={sheetContext}
+        loading={signInLoading}
+      />
+    </AuthContext.Provider>
+  );
+}
+
+const DEFAULT_AUTH: AuthContextValue = {
+  user: null,
+  profile: null,
+  loading: false,
+  isAuthenticated: false,
+  signInWithApple: async () => {},
+  signInWithGoogle: async () => {},
+  signOut: async () => {},
+  showSignIn: () => {},
+};
+
+export function useAuth(): AuthContextValue {
+  const context = useContext(AuthContext);
+  return context || DEFAULT_AUTH;
+}
