@@ -9,22 +9,36 @@
 
 import React, { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
 import { Platform } from 'react-native';
-import * as AppleAuthentication from 'expo-apple-authentication';
-import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import { getSupabaseClient } from './supabase';
 import type { UserProfile } from './user-types';
 import SignInSheet from '@/components/SignInSheet';
 
-// Google OAuth — web client ID for server auth, iOS client ID for native SDK
-const GOOGLE_WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || '';
-const GOOGLE_IOS_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID || '';
+// Lazy-load native auth modules — they crash at import time if native modules
+// aren't registered (e.g. dev client built without the plugin, or Expo Go).
+let AppleAuthentication: typeof import('expo-apple-authentication') | null = null;
+let GoogleSignin: (typeof import('@react-native-google-signin/google-signin'))['GoogleSignin'] | null = null;
 
-// Configure Google Sign-In native SDK
-GoogleSignin.configure({
-  iosClientId: GOOGLE_IOS_CLIENT_ID,
-  webClientId: GOOGLE_WEB_CLIENT_ID, // needed to get idToken
-  scopes: ['profile', 'email'],
-});
+try {
+  AppleAuthentication = require('expo-apple-authentication');
+} catch {
+  console.warn('[Auth] expo-apple-authentication not available');
+}
+
+try {
+  const mod = require('@react-native-google-signin/google-signin');
+  GoogleSignin = mod.GoogleSignin;
+
+  // Configure Google Sign-In native SDK
+  const GOOGLE_WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || '';
+  const GOOGLE_IOS_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID || '';
+  GoogleSignin.configure({
+    iosClientId: GOOGLE_IOS_CLIENT_ID,
+    webClientId: GOOGLE_WEB_CLIENT_ID,
+    scopes: ['profile', 'email'],
+  });
+} catch {
+  console.warn('[Auth] @react-native-google-signin not available');
+}
 
 type SignInContext = 'rating' | 'watchlist' | 'generic';
 
@@ -142,6 +156,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     try {
       setSignInLoading(true);
+      if (!AppleAuthentication) throw new Error('Apple Authentication not available');
       const credential = await AppleAuthentication.signInAsync({
         requestedScopes: [
           AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
@@ -178,6 +193,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       setSignInLoading(true);
 
+      if (!GoogleSignin) throw new Error('Google Sign-In not available');
       await GoogleSignin.hasPlayServices();
       const response = await GoogleSignin.signIn();
 

@@ -6,6 +6,7 @@ import React, { useEffect, useState } from 'react';
 import { DarkTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import * as Updates from 'expo-updates';
 import 'react-native-reanimated';
 
 import { DataProvider } from '@/lib/data-context';
@@ -45,6 +46,19 @@ export default function RootLayout() {
     ])
       .then(([, seen]) => setShowOnboarding(!seen))
       .catch(() => setShowOnboarding(false));
+
+    // Check for OTA updates in background (non-blocking)
+    if (!__DEV__) {
+      Updates.checkForUpdateAsync()
+        .then(({ isAvailable }) => {
+          if (isAvailable) {
+            Updates.fetchUpdateAsync().then(() => {
+              // Update downloaded — will apply on next app restart
+            });
+          }
+        })
+        .catch(() => {}); // Silent fail — network errors are fine
+    }
   }, []);
 
   // Wait for onboarding check before rendering
