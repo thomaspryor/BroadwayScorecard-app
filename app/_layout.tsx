@@ -51,11 +51,7 @@ export default function RootLayout() {
     if (!__DEV__) {
       Updates.checkForUpdateAsync()
         .then(({ isAvailable }) => {
-          if (isAvailable) {
-            Updates.fetchUpdateAsync().then(() => {
-              // Update downloaded — will apply on next app restart
-            });
-          }
+          if (isAvailable) return Updates.fetchUpdateAsync();
         })
         .catch(() => {}); // Silent fail — network errors are fine
     }
