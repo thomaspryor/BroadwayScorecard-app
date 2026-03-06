@@ -1,0 +1,41 @@
+# Show Page Rating — Watchlist Toggle
+# Verifies: Add/Remove from watchlist toggles correctly
+# Fixture: /test/show-rating-fixture?state=empty (not watchlisted)
+
+appId: com.broadwayscorecard.app
+---
+- launchApp
+- openLink: broadwayscorecard://test/show-rating-fixture?state=empty
+
+# Should start as "Add to watchlist"
+- assertVisible:
+    id: "Add to watchlist"
+
+# Tap to add
+- tapOn:
+    id: "Add to watchlist"
+
+# Should toggle to "Remove from watchlist"
+- assertVisible:
+    id: "Remove from watchlist"
+
+# Tap to remove
+- tapOn:
+    id: "Remove from watchlist"
+
+# Should toggle back to "Add to watchlist"
+- assertVisible:
+    id: "Add to watchlist"
+
+# Test from existing state (already watchlisted)
+- openLink: broadwayscorecard://test/show-rating-fixture?state=existing
+
+# Should show "Remove from watchlist" (existing state is watchlisted)
+- assertVisible:
+    id: "Remove from watchlist"
+
+# Toggle off
+- tapOn:
+    id: "Remove from watchlist"
+- assertVisible:
+    id: "Add to watchlist"
