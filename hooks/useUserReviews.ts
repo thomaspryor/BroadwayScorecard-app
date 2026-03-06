@@ -5,7 +5,7 @@
  * Adds AsyncStorage cache layer for offline-first behavior.
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getSupabaseClient } from '@/lib/supabase';
 import type { UserReview } from '@/lib/user-types';
@@ -16,6 +16,7 @@ export function useUserReviews(userId: string | null) {
   const [reviews, setReviews] = useState<UserReview[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const mutationVersion = useRef(0);
 
   const getReviewsForShow = useCallback(
     async (showId: string): Promise<UserReview[]> => {
@@ -34,7 +35,11 @@ export function useUserReviews(userId: string | null) {
 
         if (err) throw err;
         const result = (data || []) as UserReview[];
-        setReviews(result);
+        // Merge into existing reviews — replace matching show's reviews, keep the rest
+        setReviews(prev => {
+          const otherReviews = prev.filter(r => r.show_id !== showId);
+          return [...otherReviews, ...result];
+        });
         return result;
       } catch (e) {
         const msg = e instanceof Error ? e.message : 'Failed to load reviews';
@@ -59,8 +64,8 @@ export function useUserReviews(userId: string | null) {
       if (cached) {
         const parsed = JSON.parse(cached) as UserReview[];
         setReviews(parsed);
-        // Background refresh
-        refreshAllReviews(client, userId).catch(() => {});
+        // Background refresh — skip state update if mutations happen during fetch
+        refreshAllReviews(client, userId, mutationVersion.current).catch(() => {});
         return parsed;
       }
 
@@ -77,6 +82,7 @@ export function useUserReviews(userId: string | null) {
   const refreshAllReviews = async (
     client: NonNullable<ReturnType<typeof getSupabaseClient>>,
     uid: string,
+    versionAtStart?: number,
   ): Promise<UserReview[]> => {
     const { data, error: err } = await client
       .from('reviews')
@@ -86,7 +92,10 @@ export function useUserReviews(userId: string | null) {
 
     if (err) throw err;
     const result = (data || []) as UserReview[];
-    setReviews(result);
+    // Skip state update if a mutation happened while we were fetching
+    if (versionAtStart === undefined || versionAtStart === mutationVersion.current) {
+      setReviews(result);
+    }
 
     // Update cache
     await AsyncStorage.setItem(CACHE_KEY(uid), JSON.stringify(result)).catch(() => {});
@@ -123,7 +132,7 @@ export function useUserReviews(userId: string | null) {
             .single();
 
           if (err) throw err;
-          // Invalidate cache
+          mutationVersion.current++;
           await AsyncStorage.removeItem(CACHE_KEY(userId)).catch(() => {});
           return updated as UserReview;
         } else {
@@ -140,6 +149,7 @@ export function useUserReviews(userId: string | null) {
             .single();
 
           if (err) throw err;
+          mutationVersion.current++;
           await AsyncStorage.removeItem(CACHE_KEY(userId)).catch(() => {});
           return inserted as UserReview;
         }
@@ -166,6 +176,9 @@ export function useUserReviews(userId: string | null) {
           .eq('user_id', userId);
 
         if (err) throw err;
+        mutationVersion.current++;
+        // Remove from local state immediately
+        setReviews(prev => prev.filter(r => r.id !== reviewId));
         await AsyncStorage.removeItem(CACHE_KEY(userId)).catch(() => {});
       } catch (e) {
         const msg = e instanceof Error ? e.message : 'Failed to delete review';
@@ -176,6 +189,13 @@ export function useUserReviews(userId: string | null) {
     [userId],
   );
 
+  // Invalidate AsyncStorage cache so My Shows gets fresh data
+  const invalidateCache = useCallback(async () => {
+    if (userId) {
+      await AsyncStorage.removeItem(CACHE_KEY(userId)).catch(() => {});
+    }
+  }, [userId]);
+
   return {
     reviews,
     loading,
@@ -184,5 +204,6 @@ export function useUserReviews(userId: string | null) {
     getAllReviews,
     saveReview,
     deleteReview,
+    invalidateCache,
   };
 }

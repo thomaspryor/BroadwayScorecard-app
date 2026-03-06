@@ -64,6 +64,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [sheetContext, setSheetContext] = useState<SignInContext>('generic');
   const [signInLoading, setSignInLoading] = useState(false);
+  const [signInProvider, setSignInProvider] = useState<'google' | 'apple' | null>(null);
 
   // ─── Initialize auth state ───────────────────────────────
   useEffect(() => {
@@ -91,6 +92,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         loadProfile(session.user.id);
         setSheetOpen(false);
         setSignInLoading(false);
+        setSignInProvider(null);
         identifyUser(session.user.id);
         trackSignInCompleted(session.user.app_metadata?.provider || 'unknown');
       } else if (event === 'SIGNED_OUT') {
@@ -164,6 +166,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     try {
       setSignInLoading(true);
+      setSignInProvider('apple');
       trackSignInStarted('apple');
       if (!AppleAuthentication) throw new Error('Apple Authentication not available');
       const credential = await AppleAuthentication.signInAsync({
@@ -186,6 +189,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // onAuthStateChange handles the rest
     } catch (e: unknown) {
       setSignInLoading(false);
+      setSignInProvider(null);
       // User cancelled — not an error
       if (e && typeof e === 'object' && 'code' in e && (e as { code: string }).code === 'ERR_REQUEST_CANCELED') {
         return;
@@ -205,6 +209,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     try {
       setSignInLoading(true);
+      setSignInProvider('google');
       trackSignInStarted('google');
 
       if (!GoogleSignin) throw new Error('Google Sign-In not available');
@@ -221,9 +226,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // onAuthStateChange handles the rest
       } else {
         setSignInLoading(false);
+        setSignInProvider(null);
       }
     } catch (e: unknown) {
       setSignInLoading(false);
+      setSignInProvider(null);
       // User cancelled — not an error
       if (e && typeof e === 'object' && 'code' in e && (e as { code: string }).code === 'SIGN_IN_CANCELLED') {
         return;
@@ -280,6 +287,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         onSignIn={handleSheetSignIn}
         context={sheetContext}
         loading={signInLoading}
+        loadingProvider={signInProvider}
       />
     </AuthContext.Provider>
   );

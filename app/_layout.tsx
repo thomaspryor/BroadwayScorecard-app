@@ -84,6 +84,9 @@ export default function RootLayout() {
           .then(({ isAvailable }: { isAvailable: boolean }) => {
             if (isAvailable) return Updates.fetchUpdateAsync();
           })
+          .then((result: { isNew?: boolean } | undefined) => {
+            if (result?.isNew) Updates.reloadAsync();
+          })
           .catch(() => {}); // Silent fail — network errors are fine
       } catch {} // Native module not available in dev client
     }

@@ -5,7 +5,7 @@
  * Adds AsyncStorage cache and uses expo-crypto for UUID fallback.
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Crypto from 'expo-crypto';
 import { getSupabaseClient } from '@/lib/supabase';
@@ -17,6 +17,7 @@ export function useWatchlist(userId: string | null) {
   const [watchlist, setWatchlist] = useState<WatchlistEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const mutationVersion = useRef(0);
 
   const getWatchlist = useCallback(async (): Promise<WatchlistEntry[]> => {
     const client = getSupabaseClient();
@@ -30,8 +31,8 @@ export function useWatchlist(userId: string | null) {
       if (cached) {
         const parsed = JSON.parse(cached) as WatchlistEntry[];
         setWatchlist(parsed);
-        // Background refresh
-        refreshWatchlist(client, userId).catch(() => {});
+        // Background refresh — skip state update if mutations happen during fetch
+        refreshWatchlist(client, userId, mutationVersion.current).catch(() => {});
         return parsed;
       }
 
@@ -48,6 +49,7 @@ export function useWatchlist(userId: string | null) {
   const refreshWatchlist = async (
     client: NonNullable<ReturnType<typeof getSupabaseClient>>,
     uid: string,
+    versionAtStart?: number,
   ): Promise<WatchlistEntry[]> => {
     const { data, error: err } = await client
       .from('watchlist')
@@ -57,7 +59,10 @@ export function useWatchlist(userId: string | null) {
 
     if (err) throw err;
     const result = (data || []) as WatchlistEntry[];
-    setWatchlist(result);
+    // Skip state update if a mutation happened while we were fetching
+    if (versionAtStart === undefined || versionAtStart === mutationVersion.current) {
+      setWatchlist(result);
+    }
     await AsyncStorage.setItem(CACHE_KEY(uid), JSON.stringify(result)).catch(() => {});
     return result;
   };
@@ -80,7 +85,8 @@ export function useWatchlist(userId: string | null) {
 
         if (err) throw err;
 
-        // Optimistic update
+        // Optimistic update — bump version so background refresh won't clobber
+        mutationVersion.current++;
         setWatchlist(prev => [
           {
             id: Crypto.randomUUID(),
@@ -115,6 +121,7 @@ export function useWatchlist(userId: string | null) {
           .eq('show_id', showId);
 
         if (err) throw err;
+        mutationVersion.current++;
         setWatchlist(prev => prev.filter(w => w.show_id !== showId));
         await AsyncStorage.removeItem(CACHE_KEY(userId)).catch(() => {});
       } catch (e) {
@@ -140,6 +147,7 @@ export function useWatchlist(userId: string | null) {
           .eq('show_id', showId);
 
         if (err) throw err;
+        mutationVersion.current++;
         setWatchlist(prev => prev.map(w => (w.show_id === showId ? { ...w, planned_date: plannedDate } : w)));
         await AsyncStorage.removeItem(CACHE_KEY(userId)).catch(() => {});
       } catch (e) {

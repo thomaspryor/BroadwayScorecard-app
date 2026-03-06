@@ -130,7 +130,7 @@ export default function StarRating({
   // Calculate rating from touch X position relative to star row
   const getRatingFromX = useCallback(
     (pageX: number): number => {
-      const { x: rowX, width: rowWidth } = rowLayoutRef.current;
+      const { x: rowX } = rowLayoutRef.current;
       const relX = pageX - rowX;
       const totalStarWidth = starSize * 5 + gap * 4;
       const clampedX = Math.max(0, Math.min(relX, totalStarWidth));

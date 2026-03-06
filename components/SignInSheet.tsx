@@ -22,6 +22,7 @@ interface SignInSheetProps {
   onSignIn: (provider: 'google' | 'apple') => void;
   context?: SignInContext;
   loading?: boolean;
+  loadingProvider?: 'google' | 'apple' | null;
 }
 
 const HEADLINES: Record<SignInContext, string> = {
@@ -42,6 +43,7 @@ export default function SignInSheet({
   onSignIn,
   context = 'generic',
   loading = false,
+  loadingProvider = null,
 }: SignInSheetProps) {
   const insets = useSafeAreaInsets();
 
@@ -90,7 +92,7 @@ export default function SignInSheet({
             onPress={() => handlePress('google')}
             disabled={loading}
           >
-            {loading ? (
+            {loadingProvider === 'google' ? (
               <ActivityIndicator size="small" color="#333" />
             ) : (
               <>
@@ -106,7 +108,7 @@ export default function SignInSheet({
             onPress={() => handlePress('apple')}
             disabled={loading}
           >
-            {loading ? (
+            {loadingProvider === 'apple' ? (
               <ActivityIndicator size="small" color="#fff" />
             ) : (
               <>

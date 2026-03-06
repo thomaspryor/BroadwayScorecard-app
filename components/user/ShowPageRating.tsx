@@ -9,8 +9,9 @@
  */
 
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { View, Text, Pressable, StyleSheet } from 'react-native';
-import { useRouter, usePathname } from 'expo-router';
+import { View, Text, Pressable, StyleSheet, Platform } from 'react-native';
+import { usePathname } from 'expo-router';
+import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import Svg, { Path } from 'react-native-svg';
 import { useAuth } from '@/lib/auth-context';
 import { useUserReviews } from '@/hooks/useUserReviews';
@@ -39,7 +40,7 @@ export default function ShowPageRating({
   closingDate,
 }: ShowPageRatingProps) {
   const { user, isAuthenticated, showSignIn } = useAuth();
-  const { reviews, getReviewsForShow } = useUserReviews(user?.id || null);
+  const { reviews, getReviewsForShow, deleteReview, invalidateCache } = useUserReviews(user?.id || null);
   const {
     isWatchlisted,
     addToWatchlist,
@@ -49,17 +50,18 @@ export default function ShowPageRating({
     watchlist,
   } = useWatchlist(user?.id || null);
   const { showToast } = useToastSafe();
-  const router = useRouter();
   const pathname = usePathname();
 
   const hasExecutedPending = useRef(false);
   const lastSavedId = useRef<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [currentRating, setCurrentRating] = useState<number | null>(null);
   const [showPanel, setShowPanel] = useState(false);
   const [editingReview, setEditingReview] = useState<UserReview | null>(null);
   const [saving, setSaving] = useState(false);
   const [watchlistLoading, setWatchlistLoading] = useState(false);
   const [autoEditLatest, setAutoEditLatest] = useState(false);
+  const [showWatchlistDatePicker, setShowWatchlistDatePicker] = useState(false);
 
   // Load data when authenticated
   useEffect(() => {
@@ -69,13 +71,17 @@ export default function ShowPageRating({
     }
   }, [isAuthenticated, user, showId, getReviewsForShow, getWatchlist]);
 
+  // Reset lastSavedId when navigating to different show
+  useEffect(() => {
+    lastSavedId.current = null;
+  }, [showId]);
+
   // Derive state
   const showReviews = reviews.filter(r => r.show_id === showId);
   const latestReview =
     showReviews.length > 0
       ? showReviews.reduce((a, b) => (new Date(b.created_at) > new Date(a.created_at) ? b : a))
       : null;
-  const displayRating = editingReview?.rating ?? latestReview?.rating ?? currentRating;
   const viewCount = showReviews.length;
   const watchlistEntry = watchlist.find(w => w.show_id === showId);
 
@@ -111,6 +117,7 @@ export default function ShowPageRating({
           if (insertErr) throw new Error(insertErr.message);
 
           showToast('Added to Reviews — add date & notes below', 'success', '/(tabs)/my-shows');
+          await invalidateCache();
           await getReviewsForShow(showId);
           setAutoEditLatest(true);
         } catch (e) {
@@ -129,6 +136,7 @@ export default function ShowPageRating({
         showToast('Signed in successfully!', 'success');
       }
     })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once after auth, refs guard re-execution
   }, [isAuthenticated, user, showId]);
 
   // ─── Handlers ────────────────────────────────────────────
@@ -188,6 +196,7 @@ export default function ShowPageRating({
           showToast('Added to Reviews', 'success', '/(tabs)/my-shows');
         }
 
+        await invalidateCache();
         await getReviewsForShow(showId);
         setShowPanel(false);
         setEditingReview(null);
@@ -200,7 +209,7 @@ export default function ShowPageRating({
         setSaving(false);
       }
     },
-    [user, editingReview, latestReview, showId, getReviewsForShow, showToast],
+    [user, editingReview, showId, getReviewsForShow, invalidateCache, showToast],
   );
 
   const handleCancel = useCallback(() => {
@@ -214,6 +223,28 @@ export default function ShowPageRating({
     setCurrentRating(review.rating);
     setShowPanel(true);
   }, []);
+
+  const handleDelete = useCallback(
+    async (reviewId: string) => {
+      try {
+        await deleteReview(reviewId);
+        await invalidateCache();
+        showToast('Rating deleted.', 'info');
+        setConfirmDeleteId(null);
+        // If we deleted the review being edited, close panel
+        if (editingReview?.id === reviewId) {
+          setShowPanel(false);
+          setEditingReview(null);
+          setCurrentRating(null);
+        }
+        await getReviewsForShow(showId);
+      } catch (e) {
+        const detail = e instanceof Error ? e.message : 'Unknown error';
+        showToast(`Delete failed: ${detail}`, 'error');
+      }
+    },
+    [deleteReview, invalidateCache, showToast, editingReview, showId, getReviewsForShow],
+  );
 
   const handleToggleWatchlist = useCallback(async () => {
     if (!isAuthenticated) {
@@ -241,6 +272,19 @@ export default function ShowPageRating({
       setWatchlistLoading(false);
     }
   }, [isAuthenticated, showId, pathname, showSignIn, isWatchlisted, addToWatchlist, removeFromWatchlist, showToast]);
+
+  const handleWatchlistDateChange = useCallback(
+    (_event: DateTimePickerEvent, selectedDate?: Date) => {
+      setShowWatchlistDatePicker(Platform.OS === 'ios');
+      if (selectedDate) {
+        const iso = selectedDate.toISOString().split('T')[0];
+        updatePlannedDate(showId, iso).catch(() => {
+          showToast('Failed to save date.', 'error');
+        });
+      }
+    },
+    [showId, updatePlannedDate, showToast],
+  );
 
   // ─── Render ──────────────────────────────────────────────
 
@@ -272,6 +316,22 @@ export default function ShowPageRating({
                   </Svg>
                   <Text style={styles.editButtonText}>Edit</Text>
                 </Pressable>
+                {confirmDeleteId === latestReview.id ? (
+                  <View style={styles.confirmRow}>
+                    <Pressable onPress={() => handleDelete(latestReview.id)} hitSlop={8}>
+                      <Text style={styles.deleteConfirmText}>Delete?</Text>
+                    </Pressable>
+                    <Pressable onPress={() => setConfirmDeleteId(null)} hitSlop={8}>
+                      <Text style={styles.deleteCancelText}>Cancel</Text>
+                    </Pressable>
+                  </View>
+                ) : (
+                  <Pressable style={styles.editButton} onPress={() => setConfirmDeleteId(latestReview.id)} hitSlop={8}>
+                    <Svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke={Colors.text.muted} strokeWidth={2}>
+                      <Path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </Svg>
+                  </Pressable>
+                )}
                 <Pressable
                   style={styles.editButton}
                   onPress={() => {
@@ -294,30 +354,84 @@ export default function ShowPageRating({
           {viewCount > 1 && !showPanel && (
             <View style={styles.previousViewings}>
               {showReviews.slice(0, 3).map(review => (
-                <Pressable key={review.id} style={styles.viewingRow} onPress={() => handleEdit(review)}>
-                  <StarRating rating={review.rating} onRatingChange={() => {}} size="sm" readOnly hideLabel />
-                  {review.date_seen && (
-                    <Text style={styles.viewingDate}>
-                      {new Date(review.date_seen + 'T00:00:00').toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                        year: 'numeric',
-                      })}
-                    </Text>
+                <View key={review.id} style={styles.viewingRow}>
+                  <Pressable style={styles.viewingRowContent} onPress={() => handleEdit(review)}>
+                    <StarRating rating={review.rating} onRatingChange={() => {}} size="sm" readOnly hideLabel />
+                    {review.date_seen && (
+                      <Text style={styles.viewingDate}>
+                        {new Date(review.date_seen + 'T00:00:00').toLocaleDateString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric',
+                        })}
+                      </Text>
+                    )}
+                  </Pressable>
+                  {confirmDeleteId === review.id ? (
+                    <View style={styles.confirmRow}>
+                      <Pressable onPress={() => handleDelete(review.id)} hitSlop={8}>
+                        <Text style={styles.deleteConfirmText}>Delete?</Text>
+                      </Pressable>
+                      <Pressable onPress={() => setConfirmDeleteId(null)} hitSlop={8}>
+                        <Text style={styles.deleteCancelText}>No</Text>
+                      </Pressable>
+                    </View>
+                  ) : (
+                    <Pressable onPress={() => setConfirmDeleteId(review.id)} hitSlop={8} style={styles.viewingDeleteButton}>
+                      <Svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke={Colors.text.muted} strokeWidth={2}>
+                        <Path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </Svg>
+                    </Pressable>
                   )}
-                </Pressable>
+                </View>
               ))}
             </View>
           )}
         </View>
 
-        {/* Watchlist button */}
+        {/* Watchlist button + planned date */}
         <View style={styles.rightCol}>
           <WatchlistButton
             isWatchlisted={isWatchlisted(showId)}
             onToggle={handleToggleWatchlist}
             loading={watchlistLoading}
           />
+          {isWatchlisted(showId) && (
+            <View style={styles.watchlistDateCol}>
+              <Pressable
+                style={styles.watchlistDateButton}
+                onPress={() => setShowWatchlistDatePicker(true)}
+                hitSlop={8}
+              >
+                <Svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke={Colors.text.muted} strokeWidth={2}>
+                  <Path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </Svg>
+                <Text style={styles.watchlistDateText}>
+                  {watchlistEntry?.planned_date
+                    ? new Date(watchlistEntry.planned_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                    : 'Add date'}
+                </Text>
+              </Pressable>
+              {watchlistEntry?.planned_date && (
+                <Pressable
+                  onPress={() => updatePlannedDate(showId, null).catch(() => showToast('Failed to clear date.', 'error'))}
+                  hitSlop={8}
+                >
+                  <Text style={styles.watchlistClearDate}>Clear</Text>
+                </Pressable>
+              )}
+              {showWatchlistDatePicker && (
+                <DateTimePicker
+                  value={watchlistEntry?.planned_date ? new Date(watchlistEntry.planned_date + 'T00:00:00') : new Date()}
+                  mode="date"
+                  display="spinner"
+                  onChange={handleWatchlistDateChange}
+                  minimumDate={new Date()}
+                  themeVariant="dark"
+                />
+              )}
+            </View>
+          )}
         </View>
       </View>
 
@@ -398,6 +512,20 @@ const styles = StyleSheet.create({
     color: Colors.text.muted,
     fontSize: FontSize.xs,
   },
+  confirmRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  deleteConfirmText: {
+    color: '#ef4444',
+    fontSize: FontSize.xs,
+    fontWeight: '600',
+  },
+  deleteCancelText: {
+    color: Colors.text.muted,
+    fontSize: FontSize.xs,
+  },
   previousViewings: {
     marginTop: Spacing.sm,
     gap: Spacing.xs,
@@ -407,8 +535,35 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.sm,
   },
+  viewingRowContent: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  viewingDeleteButton: {
+    padding: 4,
+  },
   viewingDate: {
     color: Colors.text.muted,
     fontSize: FontSize.xs,
+  },
+  watchlistDateCol: {
+    alignItems: 'center',
+    marginTop: Spacing.xs,
+  },
+  watchlistDateButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  watchlistDateText: {
+    color: Colors.text.muted,
+    fontSize: 11,
+  },
+  watchlistClearDate: {
+    color: Colors.text.muted,
+    fontSize: 10,
+    marginTop: 2,
   },
 });

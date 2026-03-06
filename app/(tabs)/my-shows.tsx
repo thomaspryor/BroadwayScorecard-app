@@ -104,20 +104,27 @@ export default function MyShowsScreen() {
 
   // Split watchlist into upcoming (planned_date >= today) and rest
   const today = new Date().toISOString().split('T')[0];
-  const { upcomingWatchlist, regularWatchlist } = useMemo(() => {
+  const reviewedShowIds = useMemo(() => new Set(reviews.map(r => r.show_id)), [reviews]);
+
+  const { toBeRated, upcomingWatchlist, regularWatchlist } = useMemo(() => {
+    const toRate: typeof watchlist = [];
     const upcoming: typeof watchlist = [];
     const regular: typeof watchlist = [];
     for (const w of watchlist) {
-      if (w.planned_date && w.planned_date >= today) {
+      if (w.planned_date && w.planned_date < today && !reviewedShowIds.has(w.show_id)) {
+        // Past planned date + no review = to be rated
+        toRate.push(w);
+      } else if (w.planned_date && w.planned_date >= today) {
         upcoming.push(w);
       } else {
         regular.push(w);
       }
     }
-    // Sort upcoming by date ascending (soonest first)
+    // Sort by date
+    toRate.sort((a, b) => (b.planned_date || '').localeCompare(a.planned_date || ''));
     upcoming.sort((a, b) => (a.planned_date || '').localeCompare(b.planned_date || ''));
-    return { upcomingWatchlist: upcoming, regularWatchlist: regular };
-  }, [watchlist, today]);
+    return { toBeRated: toRate, upcomingWatchlist: upcoming, regularWatchlist: regular };
+  }, [watchlist, today, reviewedShowIds]);
 
   // Sorted watchlist (regular items only)
   const sortedWatchlist = useMemo(() => {
@@ -166,6 +173,18 @@ export default function MyShowsScreen() {
   const sortLabel = activeTab === 'diary'
     ? diarySort === 'date-desc' ? 'Newest' : diarySort === 'date-asc' ? 'Oldest' : 'Top Rated'
     : watchlistSort === 'added-desc' ? 'Recent' : watchlistSort === 'alphabetical' ? 'A-Z' : 'Closing Soon';
+
+  // Pad grid data so last row doesn't stretch
+  type GridItem = UserReview | { __spacer: true; id: string };
+  const gridData: GridItem[] = useMemo(() => {
+    const remainder = sortedReviews.length % 3;
+    if (remainder === 0) return sortedReviews;
+    const spacers = Array.from({ length: 3 - remainder }, (_, i) => ({
+      __spacer: true as const,
+      id: `spacer-${i}`,
+    }));
+    return [...sortedReviews, ...spacers];
+  }, [sortedReviews]);
 
   // Feature flag check — in render section, after all hooks (React rules)
   if (!featureFlags.userAccounts) return null;
@@ -243,7 +262,8 @@ export default function MyShowsScreen() {
   };
 
   // ─── Render diary grid item ───────────────────────────
-  const renderDiaryGridItem = ({ item }: { item: UserReview }) => {
+  const renderDiaryGridItem = ({ item }: { item: GridItem }) => {
+    if ('__spacer' in item) return <View style={styles.gridCardSpacer} />;
     const show = showMap[item.show_id];
     const title = show?.title || item.show_id;
     const posterUrl = show?.images ? (getImageUrl(show.images.poster) || getImageUrl(show.images.thumbnail)) : null;
@@ -344,6 +364,11 @@ export default function MyShowsScreen() {
         <Text style={styles.statText}>
           <Text style={styles.statNumber}>{watchlist.length}</Text> watchlist
         </Text>
+        {toBeRated.length > 0 && (
+          <Text style={styles.statText}>
+            <Text style={styles.statNumberAccent}>{toBeRated.length}</Text> to rate
+          </Text>
+        )}
       </View>
 
       {/* Tab bar */}
@@ -394,9 +419,44 @@ export default function MyShowsScreen() {
         </View>
       </View>
 
+      {/* To Be Rated banner (diary tab only) */}
+      {activeTab === 'diary' && toBeRated.length > 0 && (
+        <View style={styles.toBeRatedSection}>
+          <Text style={styles.toBeRatedHeader}>TO BE RATED</Text>
+          {toBeRated.map(item => {
+            const show = showMap[item.show_id];
+            const title = show?.title || item.show_id;
+            return (
+              <Pressable
+                key={item.id}
+                style={styles.toBeRatedCard}
+                onPress={() => show && router.push(`/show/${show.slug}`)}
+              >
+                <View style={styles.toBeRatedInfo}>
+                  <Text style={styles.toBeRatedTitle} numberOfLines={1}>{title}</Text>
+                  {item.planned_date && (
+                    <Text style={styles.toBeRatedDate}>
+                      Saw {new Date(item.planned_date + 'T00:00:00').toLocaleDateString('en-US', {
+                        month: 'short', day: 'numeric',
+                      })}
+                    </Text>
+                  )}
+                </View>
+                <View style={styles.toBeRatedAction}>
+                  <Svg width={14} height={14} viewBox="0 0 24 24" fill="#fcd34d">
+                    <Path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                  </Svg>
+                  <Text style={styles.toBeRatedActionText}>Rate</Text>
+                </View>
+              </Pressable>
+            );
+          })}
+        </View>
+      )}
+
       {/* Diary list/grid */}
       {activeTab === 'diary' && (
-        sortedReviews.length === 0 ? (
+        sortedReviews.length === 0 && toBeRated.length === 0 ? (
           <EmptyState
             title="Your diary is empty"
             description="Start rating shows to build your personal theater diary!"
@@ -405,7 +465,7 @@ export default function MyShowsScreen() {
           />
         ) : viewMode === 'grid' ? (
           <FlatList
-            data={sortedReviews}
+            data={gridData}
             renderItem={renderDiaryGridItem}
             keyExtractor={item => item.id}
             numColumns={3}
@@ -528,7 +588,7 @@ function SwipeableWatchlistItem({
       </View>
       <Pressable
         style={styles.removeButton}
-        onPress={() => onRemove(item.show_id)}
+        onPress={handleLongPress}
         hitSlop={8}
       >
         <Svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={Colors.text.muted} strokeWidth={2}>
@@ -582,6 +642,61 @@ const styles = StyleSheet.create({
   statNumber: {
     color: Colors.text.primary,
     fontWeight: '700',
+  },
+  statNumberAccent: {
+    color: '#fcd34d',
+    fontWeight: '700',
+  },
+  toBeRatedSection: {
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.md,
+    paddingBottom: Spacing.sm,
+    backgroundColor: 'rgba(245, 158, 11, 0.06)',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(245, 158, 11, 0.15)',
+  },
+  toBeRatedHeader: {
+    color: '#f59e0b',
+    fontSize: FontSize.xs,
+    fontWeight: '700',
+    letterSpacing: 1,
+    marginBottom: Spacing.sm,
+  },
+  toBeRatedCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: Spacing.sm,
+    gap: Spacing.md,
+  },
+  toBeRatedInfo: {
+    flex: 1,
+    gap: 2,
+  },
+  toBeRatedTitle: {
+    color: Colors.text.primary,
+    fontSize: FontSize.sm,
+    fontWeight: '600',
+  },
+  toBeRatedDate: {
+    color: Colors.text.muted,
+    fontSize: FontSize.xs,
+  },
+  toBeRatedAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs,
+    borderRadius: BorderRadius.pill,
+    backgroundColor: 'rgba(255, 215, 0, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 215, 0, 0.3)',
+  },
+  toBeRatedActionText: {
+    color: '#fcd34d',
+    fontSize: FontSize.xs,
+    fontWeight: '600',
   },
   tabBar: {
     flexDirection: 'row',
@@ -759,7 +874,11 @@ const styles = StyleSheet.create({
   },
   gridCard: {
     flex: 1,
-    maxWidth: '33%',
+    maxWidth: '33.33%',
+  },
+  gridCardSpacer: {
+    flex: 1,
+    maxWidth: '33.33%',
   },
   gridPoster: {
     width: '100%',
