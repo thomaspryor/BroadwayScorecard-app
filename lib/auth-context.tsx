@@ -8,7 +8,7 @@
  */
 
 import React, { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
-import { Alert, Platform } from 'react-native';
+import { Alert } from 'react-native';
 import { getSupabaseClient } from './supabase';
 import type { UserProfile } from './user-types';
 import SignInSheet from '@/components/SignInSheet';

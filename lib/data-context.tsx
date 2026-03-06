@@ -50,7 +50,6 @@ function parseShows(json: string): Show[] {
 
 function loadSeedData(): Show[] {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const seedData = require('@/assets/seed-data.json') as MobileDataResponse;
     return (seedData.shows || []).map(mapMobileShow);
   } catch {
