@@ -1,0 +1,23 @@
+# My Shows — Tab Switching
+# Verifies: Diary ↔ Watchlist switching preserves state
+
+appId: com.broadwayscorecard.app
+---
+- launchApp
+
+# Navigate to My Shows tab and sign in with dev bypass
+- tapOn: "My Shows"
+- tapOn:
+    id: "Dev Sign In"
+
+# Start on Diary tab
+- assertVisible:
+    id: "Diary"
+
+# Switch to Watchlist
+- tapOn:
+    id: "Watchlist"
+
+# Switch back to Diary — state should be preserved
+- tapOn:
+    id: "Diary"

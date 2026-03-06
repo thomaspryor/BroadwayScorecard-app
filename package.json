@@ -13,7 +13,9 @@
     "build:preview": "eas build --profile preview --platform ios",
     "build:prod": "eas build --profile production --platform ios",
     "submit": "eas submit --platform ios",
-    "update": "eas update --branch production"
+    "update": "eas update --branch production",
+    "test:e2e": "maestro test .maestro/",
+    "test:e2e:rating": "maestro test .maestro/show-rating/"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",

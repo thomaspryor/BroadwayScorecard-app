@@ -87,7 +87,7 @@ export default function ReviewPanel({
           <Text style={styles.fieldLabel}>
             Date Seen <Text style={styles.optional}>(optional)</Text>
           </Text>
-          <Pressable style={styles.dateButton} onPress={() => setShowDatePicker(true)}>
+          <Pressable style={styles.dateButton} onPress={() => setShowDatePicker(true)} accessibilityRole="button" accessibilityLabel="Choose date seen">
             <Svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke={Colors.text.muted} strokeWidth={2}>
               <Path
                 strokeLinecap="round"
@@ -119,7 +119,7 @@ export default function ReviewPanel({
             </View>
           )}
           {dateSeen && (
-            <Pressable onPress={() => { setDateSeen(''); setShowDatePicker(false); }}>
+            <Pressable onPress={() => { setDateSeen(''); setShowDatePicker(false); }} accessibilityRole="button" accessibilityLabel="Clear date">
               <Text style={styles.clearDate}>Clear date</Text>
             </Pressable>
           )}
@@ -140,6 +140,7 @@ export default function ReviewPanel({
             numberOfLines={3}
             maxLength={MAX_CHARS + 100}
             textAlignVertical="top"
+            accessibilityLabel="Private notes"
           />
           <Text
             style={[
@@ -150,6 +151,7 @@ export default function ReviewPanel({
                 ? styles.charCountWarn
                 : styles.charCountNormal,
             ]}
+            accessibilityLabel="Character count"
           >
             {charsRemaining.toLocaleString()} characters remaining
           </Text>
@@ -173,6 +175,8 @@ export default function ReviewPanel({
             style={({ pressed }) => [styles.saveButton, (isOverLimit || saving) && styles.saveDisabled, pressed && styles.buttonPressed]}
             onPress={handleSave}
             disabled={isOverLimit || saving}
+            accessibilityRole="button"
+            accessibilityLabel={saving ? 'Saving...' : 'Save'}
           >
             <Text style={styles.saveText}>{saving ? 'Saving...' : 'Save'}</Text>
           </Pressable>
@@ -180,6 +184,8 @@ export default function ReviewPanel({
             style={({ pressed }) => [styles.cancelButton, pressed && styles.buttonPressed]}
             onPress={onCancel}
             disabled={saving}
+            accessibilityRole="button"
+            accessibilityLabel="Cancel"
           >
             <Text style={styles.cancelText}>Cancel</Text>
           </Pressable>

@@ -306,7 +306,7 @@ export default function ShowPageRating({
           <View style={styles.labelRow}>
             <Text style={styles.sectionLabel}>{viewCount > 1 ? 'LATEST RATING' : 'YOUR RATING'}</Text>
             {viewCount > 1 && (
-              <View style={styles.seenBadge}>
+              <View style={styles.seenBadge} accessibilityLabel={`Seen ${viewCount} times`}>
                 <Text style={styles.seenText}>Seen {viewCount} times</Text>
               </View>
             )}
@@ -317,7 +317,7 @@ export default function ShowPageRating({
             <View>
               <StarRating rating={latestReview.rating} onRatingChange={handleRatingChange} size="lg" readOnly hideLabel />
               <View style={styles.editActions}>
-                <Pressable style={styles.editButton} onPress={() => handleEdit(latestReview)} hitSlop={8}>
+                <Pressable style={styles.editButton} onPress={() => handleEdit(latestReview)} hitSlop={8} accessibilityRole="button" accessibilityLabel="Edit rating">
                   <Svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke={Colors.text.muted} strokeWidth={2}>
                     <Path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                   </Svg>
@@ -333,7 +333,7 @@ export default function ShowPageRating({
                     </Pressable>
                   </View>
                 ) : (
-                  <Pressable style={styles.editButton} onPress={() => setConfirmDeleteId(latestReview.id)} hitSlop={8}>
+                  <Pressable style={styles.editButton} onPress={() => setConfirmDeleteId(latestReview.id)} hitSlop={8} accessibilityRole="button" accessibilityLabel="Delete rating">
                     <Svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke={Colors.text.muted} strokeWidth={2}>
                       <Path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                     </Svg>
@@ -349,6 +349,8 @@ export default function ShowPageRating({
                     // Small delay so state clears before opening panel
                     setTimeout(() => handleRatingChange(latestReview.rating), 50);
                   }}
+                  accessibilityRole="button"
+                  accessibilityLabel="New viewing"
                 >
                   <Text style={styles.newViewingText}>+ New Viewing</Text>
                 </Pressable>
@@ -380,7 +382,7 @@ export default function ShowPageRating({
             <View style={styles.previousViewings}>
               {showReviews.slice(0, 3).map(review => (
                 <View key={review.id} style={styles.viewingRow}>
-                  <Pressable style={styles.viewingRowContent} onPress={() => handleEdit(review)}>
+                  <Pressable style={styles.viewingRowContent} onPress={() => handleEdit(review)} accessibilityRole="button" accessibilityLabel="Edit this viewing">
                     <StarRating rating={review.rating} onRatingChange={() => {}} size="sm" readOnly hideLabel />
                     {review.date_seen && (
                       <Text style={styles.viewingDate}>
@@ -402,7 +404,7 @@ export default function ShowPageRating({
                       </Pressable>
                     </View>
                   ) : (
-                    <Pressable onPress={() => setConfirmDeleteId(review.id)} hitSlop={8} style={styles.viewingDeleteButton}>
+                    <Pressable onPress={() => setConfirmDeleteId(review.id)} hitSlop={8} style={styles.viewingDeleteButton} accessibilityRole="button" accessibilityLabel="Delete this viewing">
                       <Svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke={Colors.text.muted} strokeWidth={2}>
                         <Path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                       </Svg>

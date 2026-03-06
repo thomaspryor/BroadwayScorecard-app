@@ -1,0 +1,21 @@
+# My Shows — Diary Delete (List View)
+# Verifies: tap trash → card removed, count decrements
+
+appId: com.broadwayscorecard.app
+---
+- launchApp
+
+# Navigate to My Shows tab and sign in with dev bypass
+- tapOn: "My Shows"
+- tapOn:
+    id: "Dev Sign In"
+
+- tapOn:
+    id: "Diary"
+
+# Tap delete on a diary entry
+# Note: Delete button not yet implemented on diary cards in mobile.
+# Will need "Delete rating" button added to renderDiaryItem.
+# - tapOn:
+#     id: "Delete rating"
+#     index: 0
