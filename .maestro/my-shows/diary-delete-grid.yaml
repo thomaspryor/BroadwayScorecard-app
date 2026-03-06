@@ -1,21 +1,19 @@
-# REQUIRES: dev auth bypass
 # My Shows — Diary Delete (Grid View)
 # Verifies: single-toggle delete pattern (tap to arm, tap to confirm)
 
 appId: com.broadwayscorecard.app
 ---
 - launchApp
-# TODO: tap dev auth bypass button once it exists
-# - tapOn: "Dev Sign In"
+
+# Navigate to My Shows tab and sign in with dev bypass
+- tapOn: "My Shows"
+- tapOn:
+    id: "Dev Sign In"
 
 - tapOn:
     id: "Diary"
 
-# Switch to grid view
-- tapOn:
-    id: "Grid view"
-
-# Tap delete overlay on first card — should arm (turn red)
-# Tap again — should delete
-# Note: grid view delete pattern not yet implemented in mobile.
-# Stub for when it is.
+# Note: Grid view + grid delete not yet implemented in mobile.
+# Stub for when it is added.
+# - tapOn:
+#     id: "Grid view"

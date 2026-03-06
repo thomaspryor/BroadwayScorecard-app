@@ -20,6 +20,7 @@ interface SignInSheetProps {
   visible: boolean;
   onClose: () => void;
   onSignIn: (provider: 'google' | 'apple') => void;
+  onDevSignIn?: () => void;
   context?: SignInContext;
   loading?: boolean;
 }
@@ -40,6 +41,7 @@ export default function SignInSheet({
   visible,
   onClose,
   onSignIn,
+  onDevSignIn,
   context = 'generic',
   loading = false,
 }: SignInSheetProps) {
@@ -115,6 +117,18 @@ export default function SignInSheet({
               </>
             )}
           </Pressable>
+
+          {/* Dev bypass — only in __DEV__ builds */}
+          {__DEV__ && onDevSignIn && (
+            <Pressable
+              style={({ pressed }) => [styles.devButton, pressed && styles.buttonPressed]}
+              onPress={onDevSignIn}
+              accessibilityRole="button"
+              accessibilityLabel="Dev Sign In"
+            >
+              <Text style={styles.devText}>Dev Sign In (fake auth)</Text>
+            </Pressable>
+          )}
         </View>
 
         {/* Footer */}
@@ -247,6 +261,21 @@ const styles = StyleSheet.create({
   },
   appleText: {
     color: '#fff',
+    fontSize: FontSize.md,
+    fontWeight: '600',
+  },
+  devButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    backgroundColor: 'rgba(245, 158, 11, 0.15)',
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.3)',
+  },
+  devText: {
+    color: '#f59e0b',
     fontSize: FontSize.md,
     fontWeight: '600',
   },

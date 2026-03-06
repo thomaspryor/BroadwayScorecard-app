@@ -39,6 +39,8 @@ interface AuthContextValue {
   signOut: () => Promise<void>;
   /** Show sign-in sheet with context */
   showSignIn: (context?: SignInContext) => void;
+  /** DEV ONLY — bypass Apple/Google auth with fake user */
+  devSignIn?: () => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -236,6 +238,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [signInWithApple, signInWithGoogle],
   );
 
+  // ─── Dev auth bypass ───────────────────────────────────
+  const devSignIn = useCallback(() => {
+    if (!__DEV__) return;
+    const fakeUser = { id: 'dev-user-00000000', email: 'dev@broadwayscorecard.test' };
+    setUser(fakeUser);
+    setProfile({
+      id: fakeUser.id,
+      display_name: 'Dev Tester',
+      avatar_url: null,
+      default_visibility: 'private',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    });
+    setLoading(false);
+    setSheetOpen(false);
+  }, []);
+
   return (
     <AuthContext.Provider
       value={{
@@ -247,6 +266,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signInWithGoogle,
         signOut,
         showSignIn,
+        ...__DEV__ ? { devSignIn } : {},
       }}
     >
       {children}
@@ -254,6 +274,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         visible={sheetOpen}
         onClose={() => setSheetOpen(false)}
         onSignIn={handleSheetSignIn}
+        onDevSignIn={__DEV__ ? devSignIn : undefined}
         context={sheetContext}
         loading={signInLoading}
       />
@@ -270,6 +291,7 @@ const DEFAULT_AUTH: AuthContextValue = {
   signInWithGoogle: async () => {},
   signOut: async () => {},
   showSignIn: () => {},
+  devSignIn: undefined,
 };
 
 export function useAuth(): AuthContextValue {

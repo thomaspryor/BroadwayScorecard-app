@@ -1,16 +1,17 @@
-# REQUIRES: dev auth bypass
 # My Shows — Add Show Search
 # Verifies: "Add a show" opens search, can dismiss
 
 appId: com.broadwayscorecard.app
 ---
 - launchApp
-# TODO: tap dev auth bypass button once it exists
-# - tapOn: "Dev Sign In"
+
+# Navigate to My Shows tab and sign in with dev bypass
+- tapOn: "My Shows"
+- tapOn:
+    id: "Dev Sign In"
 
 # Note: "Add a show" button not yet implemented in mobile My Shows.
 # Stub for when it is added.
-
 # - tapOn:
 #     id: "Add a show"
 # - assertVisible: "Search to rate"

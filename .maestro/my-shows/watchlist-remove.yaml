@@ -1,12 +1,14 @@
-# REQUIRES: dev auth bypass
 # My Shows — Watchlist Remove
 # Verifies: tap remove → entry removed from list
 
 appId: com.broadwayscorecard.app
 ---
 - launchApp
-# TODO: tap dev auth bypass button once it exists
-# - tapOn: "Dev Sign In"
+
+# Navigate to My Shows tab and sign in with dev bypass
+- tapOn: "My Shows"
+- tapOn:
+    id: "Dev Sign In"
 
 # Switch to watchlist tab
 - tapOn:
@@ -18,4 +20,3 @@ appId: com.broadwayscorecard.app
     index: 0
 
 # Item should be removed — watchlist count should decrement
-# Note: Verify tab badge updates after removal

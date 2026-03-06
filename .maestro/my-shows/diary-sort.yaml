@@ -1,13 +1,16 @@
-# REQUIRES: dev auth bypass
 # My Shows — Diary Sort
 # Verifies: sort cycles through Newest → Oldest → Top Rated
 
 appId: com.broadwayscorecard.app
 ---
 - launchApp
-# TODO: tap dev auth bypass button once it exists
-# - tapOn: "Dev Sign In"
 
+# Navigate to My Shows tab and sign in with dev bypass
+- tapOn: "My Shows"
+- tapOn:
+    id: "Dev Sign In"
+
+# Start on Diary tab
 - tapOn:
     id: "Diary"
 

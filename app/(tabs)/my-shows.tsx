@@ -36,7 +36,7 @@ type WatchlistSort = 'added-desc' | 'alphabetical' | 'closing-soon';
 export default function MyShowsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { user, isAuthenticated, loading: authLoading, showSignIn } = useAuth();
+  const { user, isAuthenticated, loading: authLoading, showSignIn, devSignIn } = useAuth();
   const { reviews, getAllReviews, loading: reviewsLoading } = useUserReviews(user?.id || null);
   const { watchlist, getWatchlist, removeFromWatchlist, loading: watchlistLoading } = useWatchlist(user?.id || null);
   const { shows } = useShows();
@@ -156,6 +156,16 @@ export default function MyShowsScreen() {
           >
             <Text style={styles.ctaButtonText}>Sign In to Get Started</Text>
           </Pressable>
+          {__DEV__ && devSignIn && (
+            <Pressable
+              style={({ pressed }) => [styles.devButton, pressed && styles.pressed]}
+              onPress={devSignIn}
+              accessibilityRole="button"
+              accessibilityLabel="Dev Sign In"
+            >
+              <Text style={styles.devButtonText}>Dev Sign In (fake auth)</Text>
+            </Pressable>
+          )}
         </View>
       </View>
     );
@@ -561,6 +571,21 @@ const styles = StyleSheet.create({
     color: '#000',
     fontSize: FontSize.sm,
     fontWeight: '700',
+  },
+  devButton: {
+    marginTop: Spacing.md,
+    paddingHorizontal: Spacing.xl,
+    paddingVertical: Spacing.md,
+    backgroundColor: 'rgba(245, 158, 11, 0.15)',
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.3)',
+  },
+  devButtonText: {
+    color: '#f59e0b',
+    fontSize: FontSize.sm,
+    fontWeight: '600',
+    textAlign: 'center',
   },
   pressed: {
     opacity: 0.7,

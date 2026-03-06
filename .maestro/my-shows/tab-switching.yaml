@@ -1,12 +1,14 @@
-# REQUIRES: dev auth bypass
 # My Shows — Tab Switching
 # Verifies: Diary ↔ Watchlist switching preserves state
 
 appId: com.broadwayscorecard.app
 ---
 - launchApp
-# TODO: tap dev auth bypass button once it exists
-# - tapOn: "Dev Sign In"
+
+# Navigate to My Shows tab and sign in with dev bypass
+- tapOn: "My Shows"
+- tapOn:
+    id: "Dev Sign In"
 
 # Start on Diary tab
 - assertVisible:
@@ -16,9 +18,6 @@ appId: com.broadwayscorecard.app
 - tapOn:
     id: "Watchlist"
 
-# Watchlist content should be visible
-# Switch back to Diary
+# Switch back to Diary — state should be preserved
 - tapOn:
     id: "Diary"
-
-# Diary content should still be there (state preserved)

@@ -1,23 +1,21 @@
-# REQUIRES: dev auth bypass
 # My Shows — Diary View Switch
 # Verifies: grid/list toggle changes layout
 
 appId: com.broadwayscorecard.app
 ---
 - launchApp
-# TODO: tap dev auth bypass button once it exists
-# - tapOn: "Dev Sign In"
+
+# Navigate to My Shows tab and sign in with dev bypass
+- tapOn: "My Shows"
+- tapOn:
+    id: "Dev Sign In"
 
 - tapOn:
     id: "Diary"
 
-# Note: grid/list view switching not yet implemented in mobile My Shows.
+# Note: Grid/list view switching not yet implemented in mobile My Shows.
 # Currently list-only. Stub for when grid view is added.
-
-# Switch to grid
 # - tapOn:
 #     id: "Grid view"
-
-# Switch back to list
 # - tapOn:
 #     id: "List view"
