@@ -21,6 +21,7 @@ Before EVERY commit touching `app/`, `components/`, `lib/`, or config:
 2. `npx expo lint` — no new warnings
 3. `npx expo export --platform ios` — must succeed (catches import/runtime errors)
 4. For UI: test on iOS Simulator or Expo Go
+5. For UI changes: run `/review` before shipping
 
 ### 5. Design System
 Replicate the web project's visual language:
