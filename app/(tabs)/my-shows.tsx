@@ -387,7 +387,19 @@ export default function MyShowsScreen() {
   // ─── Main content ──────────────────────────────────────
   return (
     <GestureHandlerRootView style={[styles.container, { paddingTop: insets.top }]}>
-      <Text style={styles.pageTitle}>My Shows</Text>
+      <View style={styles.headerRow}>
+        <Text style={styles.pageTitle}>My Shows</Text>
+        <Pressable
+          style={({ pressed }) => [styles.addButton, pressed && styles.pressed]}
+          onPress={() => router.push('/(tabs)/search')}
+          hitSlop={8}
+          accessibilityLabel={activeTab === 'diary' ? 'Rate a show' : 'Add to watchlist'}
+        >
+          <Svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={Colors.text.secondary} strokeWidth={2.5}>
+            <Path strokeLinecap="round" d="M12 5v14M5 12h14" />
+          </Svg>
+        </Pressable>
+      </View>
 
       {/* Stats bar */}
       <View style={styles.statsBar}>
@@ -504,6 +516,7 @@ export default function MyShowsScreen() {
             contentContainerStyle={styles.gridContent}
             columnWrapperStyle={styles.gridRow}
             windowSize={5}
+            ListFooterComponent={<AddShowCard context="diary" onPress={() => router.push('/(tabs)/search')} />}
           />
         ) : (
           <FlatList
@@ -514,6 +527,7 @@ export default function MyShowsScreen() {
             contentContainerStyle={styles.listContent}
             windowSize={5}
             removeClippedSubviews
+            ListFooterComponent={<AddShowCard context="diary" onPress={() => router.push('/(tabs)/search')} />}
           />
         )
       )}
@@ -552,6 +566,7 @@ export default function MyShowsScreen() {
             contentContainerStyle={styles.listContent}
             windowSize={5}
             removeClippedSubviews={false}
+            ListFooterComponent={<AddShowCard context="watchlist" onPress={() => router.push('/(tabs)/search')} />}
           />
         )
       )}
@@ -636,6 +651,24 @@ function SwipeableWatchlistItem({
   );
 }
 
+function AddShowCard({ context, onPress }: { context: 'diary' | 'watchlist'; onPress: () => void }) {
+  return (
+    <Pressable
+      style={({ pressed }) => [styles.addShowCard, pressed && styles.pressed]}
+      onPress={onPress}
+    >
+      <View style={styles.addShowIconCircle}>
+        <Svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke={Colors.text.muted} strokeWidth={2}>
+          <Path strokeLinecap="round" d="M12 5v14M5 12h14" />
+        </Svg>
+      </View>
+      <Text style={styles.addShowText}>
+        {context === 'diary' ? 'Rate a show' : 'Add a show'}
+      </Text>
+    </Pressable>
+  );
+}
+
 function EmptyState({ title, description, ctaLabel, onCta }: {
   title: string;
   description: string;
@@ -658,13 +691,25 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.surface.default,
   },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.xl,
+    paddingBottom: Spacing.sm,
+  },
   pageTitle: {
     color: Colors.text.primary,
     fontSize: FontSize.xxl,
     fontWeight: '700',
-    paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.xl,
-    paddingBottom: Spacing.sm,
+  },
+  addButton: {
+    padding: Spacing.sm,
+    borderRadius: BorderRadius.md,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   statsBar: {
     flexDirection: 'row',
@@ -1020,5 +1065,31 @@ const styles = StyleSheet.create({
     fontSize: FontSize.sm,
     textAlign: 'center',
     marginBottom: Spacing.xl,
+  },
+  addShowCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+    paddingVertical: Spacing.lg,
+    marginTop: Spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border.subtle,
+    borderStyle: 'dashed',
+  },
+  addShowIconCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderStyle: 'dashed',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addShowText: {
+    color: Colors.text.muted,
+    fontSize: FontSize.sm,
+    fontWeight: '500',
   },
 });
