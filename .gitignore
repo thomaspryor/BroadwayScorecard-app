@@ -43,7 +43,10 @@ app-example
 /android
 
 # Claude Code
-.claude/
+.claude/*
+!.claude/commands/
+.claude/worktrees/
+.claude/settings.json
 .mcp.json
 
 # env
