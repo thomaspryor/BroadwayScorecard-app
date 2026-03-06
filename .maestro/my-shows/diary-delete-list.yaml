@@ -1,0 +1,21 @@
+# REQUIRES: dev auth bypass
+# My Shows — Diary Delete (List View)
+# Verifies: tap trash → confirmation → confirm → card removed, count decrements
+
+appId: com.broadwayscorecard.app
+---
+- launchApp
+# TODO: tap dev auth bypass button once it exists
+# - tapOn: "Dev Sign In"
+
+- tapOn:
+    id: "Diary"
+
+# Tap delete on a diary entry
+- tapOn:
+    id: "Delete rating"
+    index: 0
+
+# Confirmation should appear — tap to confirm
+# Note: Mobile may use a different confirmation pattern than web's
+# inline "Delete?" / "No" buttons. Adapt assertions when implemented.

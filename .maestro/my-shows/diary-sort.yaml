@@ -1,0 +1,30 @@
+# REQUIRES: dev auth bypass
+# My Shows — Diary Sort
+# Verifies: sort cycles through Newest → Oldest → Top Rated
+
+appId: com.broadwayscorecard.app
+---
+- launchApp
+# TODO: tap dev auth bypass button once it exists
+# - tapOn: "Dev Sign In"
+
+- tapOn:
+    id: "Diary"
+
+# Default sort should be "Newest"
+- assertVisible: "Newest"
+
+# Tap sort to cycle
+- tapOn:
+    id: "Sort diary"
+- assertVisible: "Oldest"
+
+# Tap again
+- tapOn:
+    id: "Sort diary"
+- assertVisible: "Top Rated"
+
+# Tap again — back to Newest
+- tapOn:
+    id: "Sort diary"
+- assertVisible: "Newest"
