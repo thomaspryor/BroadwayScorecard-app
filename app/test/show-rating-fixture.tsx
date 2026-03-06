@@ -79,9 +79,6 @@ const SEED_REVIEWS: Record<FixtureState, UserReview[]> = {
 };
 
 export default function ShowRatingFixtureScreen() {
-  // Production guard
-  if (!__DEV__) return null;
-
   const { state: stateParam } = useLocalSearchParams<{ state?: string }>();
   const fixtureState: FixtureState =
     stateParam === 'existing' || stateParam === 'multi' ? stateParam : 'empty';
@@ -100,7 +97,6 @@ export default function ShowRatingFixtureScreen() {
       ? reviews.reduce((a, b) => (new Date(b.created_at) > new Date(a.created_at) ? b : a))
       : null;
   const viewCount = reviews.length;
-  const displayRating = editingReview?.rating ?? latestReview?.rating ?? currentRating;
 
   // ─── Handlers (local state, no network) ─────────────
   const handleRatingChange = useCallback((rating: number) => {
@@ -175,6 +171,9 @@ export default function ShowRatingFixtureScreen() {
   }, []);
 
   // ─── Render ─────────────────────────────────────────
+  // Production guard — after all hooks (React rules)
+  if (!__DEV__) return null;
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Text style={styles.fixtureLabel}>TEST FIXTURE — state: {fixtureState}</Text>
