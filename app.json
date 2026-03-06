@@ -84,7 +84,7 @@
       "policy": "fingerprint"
     },
     "extra": {
-      "features": "",
+      "features": "userAccounts",
       "router": {
         "origin": "https://broadwayscorecard.com"
       },
