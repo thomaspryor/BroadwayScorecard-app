@@ -14,8 +14,8 @@
     "build:prod": "eas build --profile production --platform ios",
     "submit": "eas submit --platform ios",
     "update": "eas update --branch production",
-    "test:e2e": "maestro test .maestro/",
-    "test:e2e:rating": "maestro test .maestro/show-rating/"
+    "test:e2e": "for f in .maestro/**/*.yaml; do echo \"Running $f\" && maestro test \"$f\" || exit 1; done",
+    "test:e2e:rating": "for f in .maestro/show-rating/*.yaml; do echo \"Running $f\" && maestro test \"$f\" || exit 1; done"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",

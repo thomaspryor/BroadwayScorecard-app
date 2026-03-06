@@ -8,45 +8,36 @@ appId: com.broadwayscorecard.app
 - openLink: broadwayscorecard://test/show-rating-fixture?state=existing
 
 # Existing review should show edit button
-- assertVisible:
-    id: "Edit rating"
+- assertVisible: "Edit rating"
 
 # Tap edit to open panel
-- tapOn:
-    id: "Edit rating"
+- tapOn: "Edit rating"
 - assertVisible: "Save"
 - assertVisible: "Cancel"
 
 # Notes field should have existing text
-- assertVisible:
-    id: "Private notes"
+- assertVisible: "Private Notes (optional)"
 
 # Clear and type new text
-- tapOn:
-    id: "Private notes"
-- clearInput
+- tapOn: "Private Notes (optional)"
+- eraseText: 50
 - inputText: "Updated: Still amazing, even better than I remembered"
 
 # Save the edit
-- tapOn:
-    id: "Save"
+- tapOn: "Save"
 
 # Panel should close
 - assertNotVisible: "Save"
 - assertNotVisible: "Cancel"
 
 # Edit button should still be visible (review still exists)
-- assertVisible:
-    id: "Edit rating"
+- assertVisible: "Edit rating"
 
 # Test cancel flow — open edit, then cancel
-- tapOn:
-    id: "Edit rating"
+- tapOn: "Edit rating"
 - assertVisible: "Save"
-- tapOn:
-    id: "Cancel"
+- tapOn: "Cancel"
 
 # Panel should close, original data preserved
 - assertNotVisible: "Save"
-- assertVisible:
-    id: "Edit rating"
+- assertVisible: "Edit rating"
