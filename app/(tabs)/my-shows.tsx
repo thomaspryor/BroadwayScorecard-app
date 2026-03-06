@@ -254,6 +254,8 @@ export default function MyShowsScreen() {
           style={styles.removeButton}
           onPress={() => handleRemoveFromWatchlist(item.show_id)}
           hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="Remove from watchlist"
         >
           <Svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={Colors.text.muted} strokeWidth={2}>
             <Path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -283,6 +285,9 @@ export default function MyShowsScreen() {
         <Pressable
           style={[styles.tab, activeTab === 'diary' && styles.tabActive]}
           onPress={() => setActiveTab('diary')}
+          accessibilityRole="tab"
+          accessibilityLabel="Diary"
+          accessibilityState={{ selected: activeTab === 'diary' }}
         >
           <Text style={[styles.tabText, activeTab === 'diary' && styles.tabTextActive]}>
             Diary
@@ -291,6 +296,9 @@ export default function MyShowsScreen() {
         <Pressable
           style={[styles.tab, activeTab === 'watchlist' && styles.tabActive]}
           onPress={() => setActiveTab('watchlist')}
+          accessibilityRole="tab"
+          accessibilityLabel={`Watchlist${watchlist.length > 0 ? `, ${watchlist.length} shows` : ''}`}
+          accessibilityState={{ selected: activeTab === 'watchlist' }}
         >
           <Text style={[styles.tabText, activeTab === 'watchlist' && styles.tabTextActive]}>
             Watchlist
@@ -299,7 +307,12 @@ export default function MyShowsScreen() {
             )}
           </Text>
         </Pressable>
-        <Pressable style={styles.sortButton} onPress={activeTab === 'diary' ? cycleDiarySort : cycleWatchlistSort}>
+        <Pressable
+          style={styles.sortButton}
+          onPress={activeTab === 'diary' ? cycleDiarySort : cycleWatchlistSort}
+          accessibilityRole="button"
+          accessibilityLabel={activeTab === 'diary' ? 'Sort diary' : 'Sort watchlist'}
+        >
           <Text style={styles.sortText}>{sortLabel}</Text>
           <Svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke={Colors.text.muted} strokeWidth={2}>
             <Path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
