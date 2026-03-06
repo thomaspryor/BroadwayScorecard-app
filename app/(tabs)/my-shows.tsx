@@ -189,6 +189,19 @@ export default function MyShowsScreen() {
     return [...sortedReviews, ...spacers];
   }, [sortedReviews]);
 
+  // Watchlist grid data
+  type WatchlistGridItem = WatchlistEntry | { __spacer: true; id: string };
+  const watchlistGridData: WatchlistGridItem[] = useMemo(() => {
+    const allItems = [...upcomingWatchlist, ...sortedWatchlist];
+    const remainder = allItems.length % 3;
+    if (remainder === 0) return allItems;
+    const spacers = Array.from({ length: 3 - remainder }, (_, i) => ({
+      __spacer: true as const,
+      id: `wl-spacer-${i}`,
+    }));
+    return [...allItems, ...spacers];
+  }, [upcomingWatchlist, sortedWatchlist]);
+
   const handleDeleteDiaryItem = useCallback((review: UserReview) => {
     const show = showMap[review.show_id];
     const title = show?.title || review.show_id;
@@ -200,10 +213,7 @@ export default function MyShowsScreen() {
         {
           text: 'Delete',
           style: 'destructive',
-          onPress: async () => {
-            await deleteReview(review.id);
-            getAllReviews();
-          },
+          onPress: () => deleteReview(review.id),
         },
       ],
     );
@@ -305,6 +315,7 @@ export default function MyShowsScreen() {
       <Pressable
         style={({ pressed }) => [styles.gridCard, pressed && styles.pressed]}
         onPress={() => show && router.push(`/show/${show.slug}`)}
+        onLongPress={() => handleDeleteDiaryItem(item)}
       >
         {posterUrl ? (
           <Image source={{ uri: posterUrl }} style={styles.gridPoster} contentFit="cover" transition={200} />
@@ -324,6 +335,36 @@ export default function MyShowsScreen() {
   // ─── Render watchlist item (with swipe-to-delete) ─────
   const renderWatchlistItem = ({ item }: { item: WatchlistEntry }) => {
     return <SwipeableWatchlistItem item={item} showMap={showMap} onRemove={handleRemoveFromWatchlist} router={router} />;
+  };
+
+  // ─── Render watchlist grid item ─────────────────────────
+  const renderWatchlistGridItem = ({ item }: { item: WatchlistGridItem }) => {
+    if ('__spacer' in item) return <View style={styles.gridCardSpacer} />;
+    const show = showMap[item.show_id];
+    const title = show?.title || item.show_id;
+    const posterUrl = show?.images ? (getImageUrl(show.images.poster) || getImageUrl(show.images.thumbnail)) : null;
+
+    return (
+      <Pressable
+        style={({ pressed }) => [styles.gridCard, pressed && styles.pressed]}
+        onPress={() => show && router.push(`/show/${show.slug}`)}
+        onLongPress={() => {
+          Alert.alert('Remove from Watchlist', `Remove ${title}?`, [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Remove', style: 'destructive', onPress: () => handleRemoveFromWatchlist(item.show_id) },
+          ]);
+        }}
+      >
+        {posterUrl ? (
+          <Image source={{ uri: posterUrl }} style={styles.gridPoster} contentFit="cover" transition={200} />
+        ) : (
+          <View style={[styles.gridPoster, styles.cardPosterPlaceholder]}>
+            <Text style={styles.placeholderText}>{title.charAt(0)}</Text>
+          </View>
+        )}
+        <Text style={styles.gridTitle} numberOfLines={2}>{title}</Text>
+      </Pressable>
+    );
   };
 
   // ─── Render upcoming item ───────────────────────────────
@@ -449,13 +490,14 @@ export default function MyShowsScreen() {
             onPress={() => setViewMode(prev => prev === 'list' ? 'grid' : 'list')}
             hitSlop={8}
           >
+            {/* Show the icon of the mode you'll switch TO */}
             {viewMode === 'list' ? (
               <Svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={Colors.text.muted} strokeWidth={2}>
-                <Path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+                <Path strokeLinecap="round" strokeLinejoin="round" d="M4 5h6v6H4zM14 5h6v6h-6zM4 15h6v6H4zM14 15h6v6h-6z" />
               </Svg>
             ) : (
               <Svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={Colors.text.muted} strokeWidth={2}>
-                <Path strokeLinecap="round" strokeLinejoin="round" d="M4 5h6v6H4zM14 5h6v6h-6zM4 15h6v6H4zM14 15h6v6h-6z" />
+                <Path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
               </Svg>
             )}
           </Pressable>
@@ -532,7 +574,7 @@ export default function MyShowsScreen() {
         )
       )}
 
-      {/* Watchlist list */}
+      {/* Watchlist list/grid */}
       {activeTab === 'watchlist' && (
         watchlist.length === 0 ? (
           <EmptyState
@@ -541,8 +583,21 @@ export default function MyShowsScreen() {
             ctaLabel="Browse Shows"
             onCta={() => router.push('/(tabs)/browse')}
           />
+        ) : viewMode === 'grid' ? (
+          <FlatList
+            key="watchlist-grid"
+            data={watchlistGridData}
+            renderItem={renderWatchlistGridItem}
+            keyExtractor={item => item.id}
+            numColumns={3}
+            contentContainerStyle={styles.gridContent}
+            columnWrapperStyle={styles.gridRow}
+            windowSize={5}
+            ListFooterComponent={<AddShowCard context="watchlist" onPress={() => router.push('/(tabs)/search')} />}
+          />
         ) : (
           <FlatList
+            key="watchlist-list"
             data={[
               ...(upcomingWatchlist.length > 0 ? [{ __type: 'header' as const, label: 'Upcoming' }] : []),
               ...upcomingWatchlist.map(w => ({ __type: 'upcoming' as const, ...w })),
@@ -843,8 +898,8 @@ const styles = StyleSheet.create({
     borderBottomColor: Colors.border.subtle,
   },
   cardPoster: {
-    width: 48,
-    height: 64,
+    width: 56,
+    height: 75,
     borderRadius: BorderRadius.sm,
   },
   cardPosterPlaceholder: {
@@ -859,7 +914,7 @@ const styles = StyleSheet.create({
   },
   cardInfo: {
     flex: 1,
-    gap: 2,
+    gap: 3,
   },
   cardTitle: {
     color: Colors.text.primary,

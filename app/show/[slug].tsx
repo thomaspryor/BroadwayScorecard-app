@@ -31,6 +31,7 @@ export default function ShowDetailScreen() {
   const [detailLoading, setDetailLoading] = useState(true);
   const [showAllReviews, setShowAllReviews] = useState(false);
   const [showAllCast, setShowAllCast] = useState(false);
+  const [reviewPanelOpen, setReviewPanelOpen] = useState(false);
 
   const show = useMemo(() => shows.find(s => s.slug === slug), [shows, slug]);
 
@@ -186,6 +187,13 @@ export default function ShowDetailScreen() {
             </View>
           </View>
 
+          {/* Score Breakdown Bar — right under score row */}
+          {detail?.breakdown && hasEnoughReviews && (
+            <View style={styles.breakdownSection}>
+              <BreakdownBar breakdown={detail.breakdown} />
+            </View>
+          )}
+
           {/* Link buttons: Official Site, Ticket platforms */}
           <View style={styles.linkButtons}>
             {show.officialUrl && (
@@ -210,18 +218,12 @@ export default function ShowDetailScreen() {
             ))}
           </View>
 
-          {/* Score Breakdown Bar — inside header card */}
-          {detail?.breakdown && hasEnoughReviews && (
-            <View style={styles.breakdownSection}>
-              <BreakdownBar breakdown={detail.breakdown} />
-            </View>
-          )}
-
           {/* User rating + watchlist (feature-flagged) — inside header card */}
           <ShowPageRating
             showId={show.id}
             showTitle={show.title}
             closingDate={show.closingDate}
+            onPanelChange={setReviewPanelOpen}
           />
         </View>
 
@@ -457,8 +459,8 @@ export default function ShowDetailScreen() {
         </View>
       </ScrollView>
 
-      {/* Sticky Buy Tickets button */}
-      {primaryTicketLink && (
+      {/* Sticky Buy Tickets button — hidden when review panel is open */}
+      {primaryTicketLink && !reviewPanelOpen && (
         <View style={[styles.stickyButtonContainer, { paddingBottom: Math.max(insets.bottom, Spacing.md) }]}>
           <Pressable
             style={({ pressed }) => [styles.stickyBuyButton, pressed && styles.stickyBuyButtonPressed]}

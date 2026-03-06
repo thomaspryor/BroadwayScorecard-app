@@ -100,16 +100,16 @@ export default function ReviewPanel({
             </Text>
           </Pressable>
           {showDatePicker && (
-            <View>
+            <View style={styles.datePickerWrapper}>
               <DateTimePicker
                 value={dateValue}
                 mode="date"
-                display={Platform.OS === 'ios' ? 'inline' : 'default'}
+                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
                 onChange={handleDateChange}
                 maximumDate={maxDate}
                 minimumDate={new Date('1950-01-01')}
                 themeVariant="dark"
-                style={{ alignSelf: 'center' }}
+                style={{ height: 150 }}
               />
               {Platform.OS === 'ios' && (
                 <Pressable onPress={() => setShowDatePicker(false)} style={styles.datePickerDone}>
@@ -313,6 +313,12 @@ const styles = StyleSheet.create({
   },
   buttonPressed: {
     opacity: 0.7,
+  },
+  datePickerWrapper: {
+    marginTop: Spacing.sm,
+    borderRadius: BorderRadius.sm,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
   },
   datePickerDone: {
     alignSelf: 'center',

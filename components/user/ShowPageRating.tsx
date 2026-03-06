@@ -31,6 +31,7 @@ interface ShowPageRatingProps {
   showTitle: string;
   previewDate?: string | null;
   closingDate?: string | null;
+  onPanelChange?: (isOpen: boolean) => void;
 }
 
 export default function ShowPageRating({
@@ -38,6 +39,7 @@ export default function ShowPageRating({
   showTitle,
   previewDate,
   closingDate,
+  onPanelChange,
 }: ShowPageRatingProps) {
   const { user, isAuthenticated, showSignIn } = useAuth();
   const { reviews, getReviewsForShow, deleteReview, invalidateCache } = useUserReviews(user?.id || null);
@@ -84,6 +86,11 @@ export default function ShowPageRating({
       : null;
   const viewCount = showReviews.length;
   const watchlistEntry = watchlist.find(w => w.show_id === showId);
+
+  // Notify parent when panel opens/closes (for hiding sticky Buy Tickets)
+  useEffect(() => {
+    onPanelChange?.(showPanel);
+  }, [showPanel, onPanelChange]);
 
   // Auto-open panel after deferred auth saves
   useEffect(() => {
@@ -297,7 +304,7 @@ export default function ShowPageRating({
         <View style={styles.leftCol}>
           {/* Section label */}
           <View style={styles.labelRow}>
-            <Text style={styles.sectionLabel}>YOUR RATING</Text>
+            <Text style={styles.sectionLabel}>{viewCount > 1 ? 'LATEST RATING' : 'YOUR RATING'}</Text>
             {viewCount > 1 && (
               <View style={styles.seenBadge}>
                 <Text style={styles.seenText}>Seen {viewCount} times</Text>
@@ -308,7 +315,7 @@ export default function ShowPageRating({
           {/* Stars */}
           {latestReview && !showPanel ? (
             <View>
-              <StarRating rating={latestReview.rating} onRatingChange={handleRatingChange} size="lg" readOnly />
+              <StarRating rating={latestReview.rating} onRatingChange={handleRatingChange} size="lg" readOnly hideLabel />
               <View style={styles.editActions}>
                 <Pressable style={styles.editButton} onPress={() => handleEdit(latestReview)} hitSlop={8}>
                   <Svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke={Colors.text.muted} strokeWidth={2}>
@@ -523,13 +530,15 @@ const styles = StyleSheet.create({
   editActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.md,
+    gap: Spacing.lg,
     marginTop: Spacing.sm,
   },
   editButton: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
+    minHeight: 44,
+    paddingHorizontal: Spacing.xs,
   },
   editButtonText: {
     color: Colors.text.muted,
@@ -569,7 +578,11 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
   },
   viewingDeleteButton: {
-    padding: 4,
+    padding: Spacing.sm,
+    minWidth: 44,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   viewingDate: {
     color: Colors.text.muted,
@@ -577,33 +590,37 @@ const styles = StyleSheet.create({
   },
   watchlistDateCol: {
     alignItems: 'center',
-    marginTop: Spacing.xs,
+    marginTop: Spacing.md,
   },
   watchlistDateButton: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
+    minHeight: 44,
+    paddingHorizontal: Spacing.sm,
   },
   watchlistDateText: {
     color: Colors.text.muted,
-    fontSize: 11,
+    fontSize: FontSize.xs,
   },
   watchlistClearDate: {
     color: Colors.text.muted,
-    fontSize: 10,
-    marginTop: 2,
+    fontSize: FontSize.xs,
+    minHeight: 44,
+    textAlignVertical: 'center',
+    paddingVertical: Spacing.sm,
   },
   savedInfo: {
-    marginTop: Spacing.sm,
-    gap: 2,
+    marginTop: Spacing.md,
+    gap: 4,
   },
   savedDate: {
     color: Colors.text.muted,
-    fontSize: FontSize.xs,
+    fontSize: FontSize.sm,
   },
   savedReviewText: {
     color: Colors.text.secondary,
-    fontSize: FontSize.xs,
+    fontSize: FontSize.sm,
     fontStyle: 'italic',
   },
   datePickerContainer: {
