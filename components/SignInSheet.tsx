@@ -20,6 +20,7 @@ interface SignInSheetProps {
   visible: boolean;
   onClose: () => void;
   onSignIn: (provider: 'google' | 'apple') => void;
+  onDevSignIn?: () => void;
   context?: SignInContext;
   loading?: boolean;
   loadingProvider?: 'google' | 'apple' | null;
@@ -41,6 +42,7 @@ export default function SignInSheet({
   visible,
   onClose,
   onSignIn,
+  onDevSignIn,
   context = 'generic',
   loading = false,
   loadingProvider = null,
@@ -117,6 +119,17 @@ export default function SignInSheet({
               </>
             )}
           </Pressable>
+
+          {/* Dev-only sign-in for simulator testing */}
+          {__DEV__ && onDevSignIn && (
+            <Pressable
+              style={({ pressed }) => [styles.devButton, pressed && styles.buttonPressed]}
+              onPress={onDevSignIn}
+              disabled={loading}
+            >
+              <Text style={styles.devText}>Dev Sign In (Simulator)</Text>
+            </Pressable>
+          )}
         </View>
 
         {/* Footer */}
@@ -249,6 +262,22 @@ const styles = StyleSheet.create({
   },
   appleText: {
     color: '#fff',
+    fontSize: FontSize.md,
+    fontWeight: '600',
+  },
+  devButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    backgroundColor: 'rgba(139, 92, 246, 0.3)',
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: 'rgba(139, 92, 246, 0.5)',
+    borderStyle: 'dashed',
+  },
+  devText: {
+    color: '#a78bfa',
     fontSize: FontSize.md,
     fontWeight: '600',
   },

@@ -216,7 +216,7 @@ export default function MyShowsScreen() {
   if (!authLoading && !isAuthenticated) {
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
-        <Text style={styles.pageTitle}>My Shows</Text>
+        <Text style={[styles.pageTitle, { paddingHorizontal: Spacing.lg, paddingTop: Spacing.xl, paddingBottom: Spacing.sm }]}>My Shows</Text>
         <View style={styles.ctaContainer}>
           <Text style={styles.ctaEmoji}>🎭</Text>
           <Text style={styles.ctaTitle}>Track your Broadway journey</Text>
@@ -238,7 +238,7 @@ export default function MyShowsScreen() {
   if (loading) {
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
-        <Text style={styles.pageTitle}>My Shows</Text>
+        <Text style={[styles.pageTitle, { paddingHorizontal: Spacing.lg, paddingTop: Spacing.xl, paddingBottom: Spacing.sm }]}>My Shows</Text>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={Colors.brand} />
         </View>

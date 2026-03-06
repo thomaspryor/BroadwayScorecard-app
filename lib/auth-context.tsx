@@ -53,6 +53,8 @@ interface AuthContextValue {
   signOut: () => Promise<void>;
   /** Show sign-in sheet with context */
   showSignIn: (context?: SignInContext) => void;
+  /** Dev-only email/password sign-in for simulator testing */
+  devSignIn: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -75,12 +77,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     // Get existing session
-    client.auth.getSession().then(({ data: { session } }) => {
+    client.auth.getSession().then(async ({ data: { session } }) => {
       if (session?.user) {
         setUser({ id: session.user.id, email: session.user.email || '' });
         loadProfile(session.user.id);
+        setLoading(false);
+      } else if (__DEV__ && process.env.EXPO_PUBLIC_DEV_AUTO_SIGNIN === '1') {
+        // Auto-sign-in with dev test account for simulator testing
+        console.log('[Auth] Dev auto-sign-in triggered');
+        try {
+          const { error } = await client.auth.signInWithPassword({
+            email: 'dev-test@broadwayscorecard.com',
+            password: 'dev-test-local-only-2024',
+          });
+          if (error) console.error('[Auth] Dev auto-sign-in failed:', error.message);
+        } catch (e) {
+          console.error('[Auth] Dev auto-sign-in error:', e);
+        }
+        setLoading(false);
+      } else {
+        setLoading(false);
       }
-      setLoading(false);
     });
 
     // Listen for auth state changes
@@ -240,6 +257,54 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  // ─── Dev Sign In (simulator testing only) ───────────────
+  const devSignIn = useCallback(async () => {
+    if (!__DEV__) return;
+    const client = getSupabaseClient();
+    if (!client) {
+      Alert.alert('Dev Sign-In', 'Supabase client not available. Check env vars.');
+      return;
+    }
+
+    const email = 'dev-test@broadwayscorecard.com';
+    const password = 'dev-test-local-only-2024';
+
+    try {
+      setSignInLoading(true);
+      setSignInProvider(null);
+
+      // Try sign in first
+      const { error: signInError } = await client.auth.signInWithPassword({ email, password });
+
+      if (signInError) {
+        // If user doesn't exist, sign up
+        if (signInError.message.includes('Invalid login')) {
+          const { error: signUpError } = await client.auth.signUp({
+            email,
+            password,
+            options: { data: { full_name: 'Dev Tester', avatar_url: null } },
+          });
+          if (signUpError) throw signUpError;
+          // Supabase may require email confirmation — try signing in again
+          const { error: retryError } = await client.auth.signInWithPassword({ email, password });
+          if (retryError) {
+            Alert.alert('Dev Sign-In', 'Sign-up succeeded but email confirmation may be required. Check Supabase dashboard → Authentication → Users and confirm the dev user.');
+            setSignInLoading(false);
+            return;
+          }
+        } else {
+          throw signInError;
+        }
+      }
+      // onAuthStateChange handles the rest
+    } catch (e) {
+      setSignInLoading(false);
+      setSignInProvider(null);
+      console.error('[Auth] Dev sign-in failed:', e);
+      Alert.alert('Dev Sign-In Failed', e instanceof Error ? e.message : 'Unknown error');
+    }
+  }, []);
+
   // ─── Sign Out ────────────────────────────────────────────
   const signOut = useCallback(async () => {
     const client = getSupabaseClient();
@@ -278,6 +343,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signInWithGoogle,
         signOut,
         showSignIn,
+        devSignIn,
       }}
     >
       {children}
@@ -285,6 +351,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         visible={sheetOpen}
         onClose={() => setSheetOpen(false)}
         onSignIn={handleSheetSignIn}
+        onDevSignIn={__DEV__ ? devSignIn : undefined}
         context={sheetContext}
         loading={signInLoading}
         loadingProvider={signInProvider}
@@ -302,6 +369,7 @@ const DEFAULT_AUTH: AuthContextValue = {
   signInWithGoogle: async () => {},
   signOut: async () => {},
   showSignIn: () => {},
+  devSignIn: async () => {},
 };
 
 export function useAuth(): AuthContextValue {
