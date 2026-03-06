@@ -20,6 +20,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import Svg, { Path } from 'react-native-svg';
+import ReanimatedSwipeable from 'react-native-gesture-handler/ReanimatedSwipeable';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import Animated, { SharedValue, useAnimatedStyle } from 'react-native-reanimated';
 import { useAuth } from '@/lib/auth-context';
 import { useUserReviews } from '@/hooks/useUserReviews';
 import { useWatchlist } from '@/hooks/useWatchlist';
@@ -40,7 +43,7 @@ export default function MyShowsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user, isAuthenticated, loading: authLoading, showSignIn } = useAuth();
-  const { reviews, getAllReviews, loading: reviewsLoading } = useUserReviews(user?.id || null);
+  const { reviews, getAllReviews, deleteReview, loading: reviewsLoading } = useUserReviews(user?.id || null);
   const { watchlist, getWatchlist, removeFromWatchlist, loading: watchlistLoading } = useWatchlist(user?.id || null);
   const { shows } = useShows();
 
@@ -186,6 +189,26 @@ export default function MyShowsScreen() {
     return [...sortedReviews, ...spacers];
   }, [sortedReviews]);
 
+  const handleDeleteDiaryItem = useCallback((review: UserReview) => {
+    const show = showMap[review.show_id];
+    const title = show?.title || review.show_id;
+    Alert.alert(
+      'Delete Rating',
+      `Delete your ${review.rating.toFixed(1)}★ rating for ${title}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            await deleteReview(review.id);
+            getAllReviews();
+          },
+        },
+      ],
+    );
+  }, [showMap, deleteReview, getAllReviews]);
+
   // Feature flag check — in render section, after all hooks (React rules)
   if (!featureFlags.userAccounts) return null;
 
@@ -230,34 +253,44 @@ export default function MyShowsScreen() {
     const posterUrl = show?.images ? (getImageUrl(show.images.poster) || getImageUrl(show.images.thumbnail)) : null;
 
     return (
-      <Pressable
-        style={({ pressed }) => [styles.card, pressed && styles.pressed]}
-        onPress={() => show && router.push(`/show/${show.slug}`)}
-      >
-        {posterUrl ? (
-          <Image source={{ uri: posterUrl }} style={styles.cardPoster} contentFit="cover" transition={200} />
-        ) : (
-          <View style={[styles.cardPoster, styles.cardPosterPlaceholder]}>
-            <Text style={styles.placeholderText}>{title.charAt(0)}</Text>
-          </View>
+      <ReanimatedSwipeable
+        friction={2}
+        rightThreshold={40}
+        renderRightActions={(_progress, drag) => (
+          <SwipeDeleteAction onDelete={() => handleDeleteDiaryItem(item)} drag={drag} />
         )}
-        <View style={styles.cardInfo}>
-          <Text style={styles.cardTitle} numberOfLines={1}>{title}</Text>
-          {show?.venue && <Text style={styles.cardVenue} numberOfLines={1}>{show.venue}</Text>}
-          {item.review_text && <Text style={styles.cardNote} numberOfLines={1}>{item.review_text}</Text>}
-          {item.date_seen && (
-            <Text style={styles.cardDate}>
-              {new Date(item.date_seen + 'T00:00:00').toLocaleDateString('en-US', {
-                month: 'short', day: 'numeric', year: 'numeric',
-              })}
-            </Text>
+        overshootRight={false}
+      >
+        <Pressable
+          style={({ pressed }) => [styles.card, styles.cardSwipeable, pressed && styles.pressed]}
+          onPress={() => show && router.push(`/show/${show.slug}`)}
+          onLongPress={() => handleDeleteDiaryItem(item)}
+        >
+          {posterUrl ? (
+            <Image source={{ uri: posterUrl }} style={styles.cardPoster} contentFit="cover" transition={200} />
+          ) : (
+            <View style={[styles.cardPoster, styles.cardPosterPlaceholder]}>
+              <Text style={styles.placeholderText}>{title.charAt(0)}</Text>
+            </View>
           )}
-        </View>
-        <View style={styles.cardRating}>
-          <StarRating rating={item.rating} onRatingChange={() => {}} size="sm" readOnly hideLabel />
-          <Text style={styles.ratingText}>{item.rating.toFixed(1)}</Text>
-        </View>
-      </Pressable>
+          <View style={styles.cardInfo}>
+            <Text style={styles.cardTitle} numberOfLines={1}>{title}</Text>
+            {show?.venue && <Text style={styles.cardVenue} numberOfLines={1}>{show.venue}</Text>}
+            {item.review_text && <Text style={styles.cardNote} numberOfLines={1}>{item.review_text}</Text>}
+            {item.date_seen && (
+              <Text style={styles.cardDate}>
+                {new Date(item.date_seen + 'T00:00:00').toLocaleDateString('en-US', {
+                  month: 'short', day: 'numeric', year: 'numeric',
+                })}
+              </Text>
+            )}
+          </View>
+          <View style={styles.cardRating}>
+            <StarRating rating={item.rating} onRatingChange={() => {}} size="sm" readOnly hideLabel />
+            <Text style={styles.ratingText}>{item.rating.toFixed(1)}</Text>
+          </View>
+        </Pressable>
+      </ReanimatedSwipeable>
     );
   };
 
@@ -353,7 +386,7 @@ export default function MyShowsScreen() {
 
   // ─── Main content ──────────────────────────────────────
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
+    <GestureHandlerRootView style={[styles.container, { paddingTop: insets.top }]}>
       <Text style={styles.pageTitle}>My Shows</Text>
 
       {/* Stats bar */}
@@ -399,23 +432,21 @@ export default function MyShowsScreen() {
               <Path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
             </Svg>
           </Pressable>
-          {activeTab === 'diary' && (
-            <Pressable
-              style={styles.viewToggle}
-              onPress={() => setViewMode(prev => prev === 'list' ? 'grid' : 'list')}
-              hitSlop={8}
-            >
-              {viewMode === 'list' ? (
-                <Svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={Colors.text.muted} strokeWidth={2}>
-                  <Path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
-                </Svg>
-              ) : (
-                <Svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={Colors.text.muted} strokeWidth={2}>
-                  <Path strokeLinecap="round" strokeLinejoin="round" d="M4 5h6v6H4zM14 5h6v6h-6zM4 15h6v6H4zM14 15h6v6h-6z" />
-                </Svg>
-              )}
-            </Pressable>
-          )}
+          <Pressable
+            style={styles.viewToggle}
+            onPress={() => setViewMode(prev => prev === 'list' ? 'grid' : 'list')}
+            hitSlop={8}
+          >
+            {viewMode === 'list' ? (
+              <Svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={Colors.text.muted} strokeWidth={2}>
+                <Path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+              </Svg>
+            ) : (
+              <Svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={Colors.text.muted} strokeWidth={2}>
+                <Path strokeLinecap="round" strokeLinejoin="round" d="M4 5h6v6H4zM14 5h6v6h-6zM4 15h6v6H4zM14 15h6v6h-6z" />
+              </Svg>
+            )}
+          </Pressable>
         </View>
       </View>
 
@@ -465,6 +496,7 @@ export default function MyShowsScreen() {
           />
         ) : viewMode === 'grid' ? (
           <FlatList
+            key="grid"
             data={gridData}
             renderItem={renderDiaryGridItem}
             keyExtractor={item => item.id}
@@ -475,6 +507,7 @@ export default function MyShowsScreen() {
           />
         ) : (
           <FlatList
+            key="list"
             data={sortedReviews}
             renderItem={renderDiaryItem}
             keyExtractor={item => item.id}
@@ -522,7 +555,23 @@ export default function MyShowsScreen() {
           />
         )
       )}
-    </View>
+    </GestureHandlerRootView>
+  );
+}
+
+function SwipeDeleteAction({ onDelete, drag }: { onDelete: () => void; drag: SharedValue<number> }) {
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: Math.min(1, Math.abs(drag.value) / 80),
+  }));
+  return (
+    <Animated.View style={[styles.swipeDelete, animatedStyle]}>
+      <Pressable onPress={onDelete} style={styles.swipeDeleteInner}>
+        <Svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth={2}>
+          <Path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+        </Svg>
+        <Text style={styles.swipeDeleteText}>Delete</Text>
+      </Pressable>
+    </Animated.View>
   );
 }
 
@@ -546,56 +595,44 @@ function SwipeableWatchlistItem({
     return closing.getTime() - Date.now() < fourWeeks && closing > new Date();
   })();
 
-  const handleLongPress = useCallback(() => {
-    Alert.alert(
-      'Remove from Watchlist',
-      `Remove ${title}?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Remove', style: 'destructive', onPress: () => onRemove(item.show_id) },
-      ],
-    );
-  }, [title, item.show_id, onRemove]);
-
   return (
-    <Pressable
-      style={({ pressed }) => [styles.card, pressed && styles.pressed]}
-      onPress={() => show && router.push(`/show/${show.slug}`)}
-      onLongPress={handleLongPress}
-    >
-      {posterUrl ? (
-        <Image source={{ uri: posterUrl }} style={styles.cardPoster} contentFit="cover" transition={200} />
-      ) : (
-        <View style={[styles.cardPoster, styles.cardPosterPlaceholder]}>
-          <Text style={styles.placeholderText}>{title.charAt(0)}</Text>
-        </View>
+    <ReanimatedSwipeable
+      friction={2}
+      rightThreshold={40}
+      renderRightActions={(_progress, drag) => (
+        <SwipeDeleteAction onDelete={() => onRemove(item.show_id)} drag={drag} />
       )}
-      <View style={styles.cardInfo}>
-        <Text style={styles.cardTitle} numberOfLines={1}>{title}</Text>
-        {show?.venue && <Text style={styles.cardVenue} numberOfLines={1}>{show.venue}</Text>}
-        {isClosingSoon && (
-          <View style={styles.closingSoonBadge}>
-            <Text style={styles.closingSoonText}>Closing Soon</Text>
+      overshootRight={false}
+    >
+      <Pressable
+        style={({ pressed }) => [styles.card, styles.cardSwipeable, pressed && styles.pressed]}
+        onPress={() => show && router.push(`/show/${show.slug}`)}
+      >
+        {posterUrl ? (
+          <Image source={{ uri: posterUrl }} style={styles.cardPoster} contentFit="cover" transition={200} />
+        ) : (
+          <View style={[styles.cardPoster, styles.cardPosterPlaceholder]}>
+            <Text style={styles.placeholderText}>{title.charAt(0)}</Text>
           </View>
         )}
-        {item.planned_date && (
-          <Text style={styles.cardDate}>
-            Planned: {new Date(item.planned_date + 'T00:00:00').toLocaleDateString('en-US', {
-              month: 'short', day: 'numeric',
-            })}
-          </Text>
-        )}
-      </View>
-      <Pressable
-        style={styles.removeButton}
-        onPress={handleLongPress}
-        hitSlop={8}
-      >
-        <Svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={Colors.text.muted} strokeWidth={2}>
-          <Path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-        </Svg>
+        <View style={styles.cardInfo}>
+          <Text style={styles.cardTitle} numberOfLines={1}>{title}</Text>
+          {show?.venue && <Text style={styles.cardVenue} numberOfLines={1}>{show.venue}</Text>}
+          {isClosingSoon && (
+            <View style={styles.closingSoonBadge}>
+              <Text style={styles.closingSoonText}>Closing Soon</Text>
+            </View>
+          )}
+          {item.planned_date && (
+            <Text style={styles.cardDate}>
+              Planned: {new Date(item.planned_date + 'T00:00:00').toLocaleDateString('en-US', {
+                month: 'short', day: 'numeric',
+              })}
+            </Text>
+          )}
+        </View>
       </Pressable>
-    </Pressable>
+    </ReanimatedSwipeable>
   );
 }
 
@@ -821,8 +858,23 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     textTransform: 'uppercase',
   },
-  removeButton: {
-    padding: Spacing.sm,
+  cardSwipeable: {
+    backgroundColor: Colors.surface.default,
+  },
+  swipeDelete: {
+    backgroundColor: '#ef4444',
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 80,
+  },
+  swipeDeleteInner: {
+    alignItems: 'center',
+    gap: 2,
+  },
+  swipeDeleteText: {
+    color: '#fff',
+    fontSize: FontSize.xs,
+    fontWeight: '600',
   },
   sectionHeader: {
     paddingTop: Spacing.lg,

@@ -275,7 +275,7 @@ export default function ShowPageRating({
 
   const handleWatchlistDateChange = useCallback(
     (_event: DateTimePickerEvent, selectedDate?: Date) => {
-      setShowWatchlistDatePicker(Platform.OS === 'ios');
+      if (Platform.OS !== 'ios') setShowWatchlistDatePicker(false);
       if (selectedDate) {
         const iso = selectedDate.toISOString().split('T')[0];
         updatePlannedDate(showId, iso).catch(() => {
@@ -339,12 +339,30 @@ export default function ShowPageRating({
                     setCurrentRating(null);
                     lastSavedId.current = null;
                     setShowPanel(false);
-                    handleRatingChange(latestReview.rating);
+                    // Small delay so state clears before opening panel
+                    setTimeout(() => handleRatingChange(latestReview.rating), 50);
                   }}
                 >
                   <Text style={styles.newViewingText}>+ New Viewing</Text>
                 </Pressable>
               </View>
+              {/* Show saved date and review text */}
+              {(latestReview.date_seen || latestReview.review_text) && (
+                <View style={styles.savedInfo}>
+                  {latestReview.date_seen && (
+                    <Text style={styles.savedDate}>
+                      Saw {new Date(latestReview.date_seen + 'T00:00:00').toLocaleDateString('en-US', {
+                        month: 'short', day: 'numeric', year: 'numeric',
+                      })}
+                    </Text>
+                  )}
+                  {latestReview.review_text && (
+                    <Text style={styles.savedReviewText} numberOfLines={2}>
+                      {latestReview.review_text}
+                    </Text>
+                  )}
+                </View>
+              )}
             </View>
           ) : (
             <StarRating rating={currentRating} onRatingChange={handleRatingChange} size="lg" />
@@ -420,16 +438,25 @@ export default function ShowPageRating({
                   <Text style={styles.watchlistClearDate}>Clear</Text>
                 </Pressable>
               )}
-              {showWatchlistDatePicker && (
-                <DateTimePicker
-                  value={watchlistEntry?.planned_date ? new Date(watchlistEntry.planned_date + 'T00:00:00') : new Date()}
-                  mode="date"
-                  display="spinner"
-                  onChange={handleWatchlistDateChange}
-                  minimumDate={new Date()}
-                  themeVariant="dark"
-                />
-              )}
+            </View>
+          )}
+          {showWatchlistDatePicker && (
+            <View style={styles.datePickerContainer}>
+              <View style={styles.datePickerHeader}>
+                <Text style={styles.datePickerTitle}>When are you going?</Text>
+                <Pressable onPress={() => setShowWatchlistDatePicker(false)} hitSlop={8}>
+                  <Text style={styles.datePickerDone}>Done</Text>
+                </Pressable>
+              </View>
+              <DateTimePicker
+                value={watchlistEntry?.planned_date ? new Date(watchlistEntry.planned_date + 'T00:00:00') : new Date()}
+                mode="date"
+                display={Platform.OS === 'ios' ? 'inline' : 'default'}
+                onChange={handleWatchlistDateChange}
+                minimumDate={new Date()}
+                themeVariant="dark"
+                style={{ alignSelf: 'center' }}
+              />
             </View>
           )}
         </View>
@@ -565,5 +592,40 @@ const styles = StyleSheet.create({
     color: Colors.text.muted,
     fontSize: 10,
     marginTop: 2,
+  },
+  savedInfo: {
+    marginTop: Spacing.sm,
+    gap: 2,
+  },
+  savedDate: {
+    color: Colors.text.muted,
+    fontSize: FontSize.xs,
+  },
+  savedReviewText: {
+    color: Colors.text.secondary,
+    fontSize: FontSize.xs,
+    fontStyle: 'italic',
+  },
+  datePickerContainer: {
+    marginTop: Spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border.subtle,
+    paddingTop: Spacing.md,
+  },
+  datePickerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.sm,
+  },
+  datePickerTitle: {
+    color: Colors.text.secondary,
+    fontSize: FontSize.sm,
+    fontWeight: '500',
+  },
+  datePickerDone: {
+    color: Colors.brand,
+    fontSize: FontSize.sm,
+    fontWeight: '600',
   },
 });
