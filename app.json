@@ -78,7 +78,8 @@
           "organization": "broadway-scorecard",
           "project": "broadway-scorecard-ios"
         }
-      ]
+      ],
+      "expo-font"
     ],
     "experiments": {
       "typedRoutes": true,
