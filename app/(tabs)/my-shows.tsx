@@ -434,7 +434,7 @@ export default function MyShowsScreen() {
         {canRate && show && (
           <Pressable
             style={styles.rateButton}
-            onPress={() => router.push(`/show/${show.slug}`)}
+            onPress={() => router.push({ pathname: '/rate/[showId]', params: { showId: item.show_id, showTitle: show.title } })}
             hitSlop={8}
           >
             <Svg width={14} height={14} viewBox="0 0 24 24" fill="#fcd34d">
@@ -561,7 +561,7 @@ export default function MyShowsScreen() {
               <Pressable
                 key={item.id}
                 style={styles.toBeRatedCard}
-                onPress={() => show && router.push(`/show/${show.slug}`)}
+                onPress={() => show && router.push({ pathname: '/rate/[showId]', params: { showId: item.show_id, showTitle: title } })}
               >
                 <View style={styles.toBeRatedInfo}>
                   <Text style={styles.toBeRatedTitle} numberOfLines={1}>{title}</Text>
@@ -803,7 +803,7 @@ function SwipeableWatchlistItem({
           </Pressable>
           <Pressable
             style={styles.watchlistRateBtn}
-            onPress={(e) => { e.stopPropagation(); show && router.push(`/show/${show.slug}`); }}
+            onPress={(e) => { e.stopPropagation(); show && router.push({ pathname: '/rate/[showId]', params: { showId: item.show_id, showTitle: show.title } }); }}
             hitSlop={8}
           >
             <Svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke={Colors.text.muted} strokeWidth={1.5}>
