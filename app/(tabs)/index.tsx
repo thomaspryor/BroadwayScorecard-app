@@ -4,7 +4,8 @@
  */
 
 import React, { useMemo, useCallback, useState } from 'react';
-import { View, Text, FlatList, StyleSheet, ActivityIndicator, RefreshControl } from 'react-native';
+import { View, Text, FlatList, StyleSheet, RefreshControl } from 'react-native';
+import { ShowListSkeleton } from '@/components/Skeleton';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useShows } from '@/lib/data-context';
 import { ShowCard } from '@/components/ShowCard';
@@ -113,9 +114,8 @@ export default function HomeScreen() {
 
   if (isLoading && shows.length === 0) {
     return (
-      <View style={[styles.center, { paddingTop: insets.top }]}>
-        <ActivityIndicator size="large" color={Colors.brand} />
-        <Text style={styles.loadingText}>Loading shows...</Text>
+      <View style={[styles.container, { paddingTop: insets.top }]}>
+        <ShowListSkeleton count={10} />
       </View>
     );
   }

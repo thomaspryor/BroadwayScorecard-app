@@ -4,7 +4,8 @@
  */
 
 import React, { useMemo, useState, useCallback } from 'react';
-import { View, Text, FlatList, StyleSheet, ActivityIndicator, ScrollView, Pressable, RefreshControl, Platform } from 'react-native';
+import { View, Text, FlatList, StyleSheet, ScrollView, Pressable, RefreshControl, Platform } from 'react-native';
+import { ShowListSkeleton } from '@/components/Skeleton';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useShows } from '@/lib/data-context';
@@ -157,8 +158,8 @@ export default function BrowseScreen() {
 
   if (isLoading && shows.length === 0) {
     return (
-      <View style={[styles.center, { paddingTop: insets.top }]}>
-        <ActivityIndicator size="large" color={Colors.brand} />
+      <View style={[styles.container, { paddingTop: insets.top }]}>
+        <ShowListSkeleton count={12} />
       </View>
     );
   }

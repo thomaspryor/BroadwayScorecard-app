@@ -4,8 +4,8 @@
  * from CDN on mount, layered on top of browse-level show data.
  */
 
-import React, { useMemo, useEffect, useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, Pressable, ActivityIndicator, Share, Platform } from 'react-native';
+import React, { useMemo, useEffect, useState, useRef } from 'react';
+import { View, Text, ScrollView, StyleSheet, Pressable, Share, Platform } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -22,6 +22,8 @@ import { trackTicketTap, trackBuyButtonTap, trackShowDetailViewed, trackShowShar
 import Svg, { Path } from 'react-native-svg';
 import ShowPageRating from '@/components/user/ShowPageRating';
 import { recordShowView } from '@/lib/store-review';
+import { ShareCardWithRef, ShareCardHandle } from '@/components/ShareCard';
+import { ShowDetailSkeleton } from '@/components/Skeleton';
 
 export default function ShowDetailScreen() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
@@ -32,6 +34,7 @@ export default function ShowDetailScreen() {
   const [detailLoading, setDetailLoading] = useState(true);
   const [showAllReviews, setShowAllReviews] = useState(false);
   const [showAllCast, setShowAllCast] = useState(false);
+  const shareCardRef = useRef<ShareCardHandle>(null);
 
   const show = useMemo(() => shows.find(s => s.slug === slug), [shows, slug]);
 
@@ -56,12 +59,8 @@ export default function ShowDetailScreen() {
 
   const handleShare = async () => {
     if (!show) return;
-    if (Platform.OS === 'ios') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    trackShowShared(show.id, show.title);
-    const scoreText = show.compositeScore ? ` (Score: ${Math.round(show.compositeScore)})` : '';
-    await Share.share({
-      message: `Check out ${show.title}${scoreText} on Broadway Scorecard!\nhttps://broadwayscorecard.com/show/${show.slug}`,
-    });
+    // Try image share card first, falls back to text internally
+    await shareCardRef.current?.share();
   };
 
   useEffect(() => {
@@ -250,12 +249,9 @@ export default function ShowDetailScreen() {
           </View>
         )}
 
-        {/* Loading indicator for detail */}
+        {/* Loading skeleton for detail */}
         {detailLoading && (
-          <View style={styles.detailLoading}>
-            <ActivityIndicator size="small" color={Colors.brand} />
-            <Text style={styles.detailLoadingText}>Loading reviews...</Text>
-          </View>
+          <ShowDetailSkeleton />
         )}
 
         {/* Offline notice when detail fetch failed */}
@@ -446,13 +442,19 @@ export default function ShowDetailScreen() {
           </View>
         )}
 
+        {/* Hidden share card for image capture */}
+        <ShareCardWithRef ref={shareCardRef} show={show} />
+
         {/* Action buttons */}
         <View style={styles.actionButtons}>
           <Pressable
             style={({ pressed }) => [styles.shareButton, pressed && styles.pressed]}
             onPress={handleShare}
           >
-            <Text style={styles.shareButtonText}>Share This Show</Text>
+            <Svg width={18} height={18} viewBox="0 0 24 24" fill={Colors.text.primary} style={{ marginRight: 6 }}>
+              <Path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92-1.31-2.92-2.92-2.92z" />
+            </Svg>
+            <Text style={styles.shareButtonText}>Share Score Card</Text>
           </Pressable>
           <Pressable
             style={({ pressed }) => [styles.webLink, pressed && styles.pressed]}
@@ -1129,8 +1131,10 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing.lg,
   },
   shareButton: {
+    flexDirection: 'row',
     paddingVertical: Spacing.md,
     alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: Colors.surface.raised,
     borderRadius: BorderRadius.md,
     borderWidth: 1,
