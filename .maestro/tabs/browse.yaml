@@ -6,10 +6,11 @@ appId: com.broadwayscorecard.app
 - launchApp
 - openLink: broadwayscorecard:///browse
 
-# Dismiss iOS "Open in" dialog
-- tapOn:
-    text: "Open"
-    optional: true
+# Wait for and dismiss iOS "Open in" dialog
+- extendedWaitUntil:
+    visible: "Open"
+    timeout: 5000
+- tapOn: "Open"
 
 # Header visible — wait for navigation + data load
 - extendedWaitUntil:
