@@ -33,6 +33,7 @@ import StarRating from '@/components/user/StarRating';
 import type { UserReview, WatchlistEntry } from '@/lib/user-types';
 import type { Show } from '@/lib/types';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
+import { StaleBanner } from '@/components/StaleBanner';
 import * as haptics from '@/lib/haptics';
 
 type Tab = 'diary' | 'watchlist';
@@ -445,6 +446,8 @@ export default function MyShowsScreen() {
           </Svg>
         </Pressable>
       </View>
+
+      <StaleBanner />
 
       {/* Stats bar */}
       <View style={styles.statsBar}>

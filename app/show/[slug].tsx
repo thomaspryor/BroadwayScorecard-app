@@ -259,6 +259,13 @@ export default function ShowDetailScreen() {
           </View>
         )}
 
+        {/* Offline notice when detail fetch failed */}
+        {!detailLoading && !detail && (
+          <View style={styles.detailLoading}>
+            <Text style={styles.detailLoadingText}>Reviews unavailable offline</Text>
+          </View>
+        )}
+
         {/* Audience Scorecard — grade badge header + horizontal source cards */}
         {detail?.audience && show.audienceGrade && (
           <View style={styles.section}>
