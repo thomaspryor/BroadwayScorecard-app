@@ -37,15 +37,15 @@ Every fix MUST include prevention. Ask: "How do I prevent this permanently?"
 ### 7. Always Recommend Next Steps
 When wrapping up a task, recommend the best next task. Don't just say "done."
 
+### 8. Feature Parity (Session Start)
+Check `memory/feature-parity.md` for P0/P1 web features not yet in app. Note relevant items.
+
 ---
 
 ## Architecture
 
 ### Stack
-- **Expo SDK 54** / React Native 0.81 / TypeScript (strict mode)
-- **Expo Router** — file-based routing (like Next.js)
-- **expo-image** — optimized image loading
-- **react-native-reanimated** — animations
+**Expo SDK 54** / React Native 0.81 / TypeScript strict / Expo Router / expo-image / reanimated
 
 ### Data Strategy
 The mobile app consumes pre-computed data from the web project. All scoring is done server-side.
