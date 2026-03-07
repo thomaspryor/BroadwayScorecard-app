@@ -283,7 +283,11 @@ export default function ShowPageRating({
           {/* Previous viewings */}
           {viewCount > 1 && (
             <View style={styles.previousViewings}>
-              {showReviews.slice(0, 3).map(review => (
+              {showReviews
+                .filter(r => r.id !== latestReview?.id)
+                .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+                .slice(0, 3)
+                .map(review => (
                 <View key={review.id} style={styles.viewingRow}>
                   <Pressable style={styles.viewingRowContent} onPress={() => handleEdit(review.id)} accessibilityRole="button" accessibilityLabel="Edit this viewing" testID={`viewing-${review.id}`}>
                     <StarRating rating={review.rating} onRatingChange={() => {}} size="sm" readOnly hideLabel />

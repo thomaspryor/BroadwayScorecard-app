@@ -34,7 +34,6 @@ import { useUserReviews } from '@/hooks/useUserReviews';
 import { useShows } from '@/lib/data-context';
 import { useToastSafe } from '@/lib/toast-context';
 import { supabaseRestInsert, supabaseRestUpdate } from '@/lib/supabase-rest';
-import { savePendingAction, getPendingAction, clearPendingAction } from '@/lib/deferred-auth';
 import { recordRatingGiven } from '@/lib/store-review';
 import { getImageUrl } from '@/lib/images';
 import * as haptics from '@/lib/haptics';
@@ -47,8 +46,8 @@ export default function RateModal() {
   const params = useLocalSearchParams<{ showId: string; showTitle: string; reviewId?: string; initialRating?: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { user, isAuthenticated } = useAuth();
-  const { reviews, getReviewsForShow, invalidateCache } = useUserReviews(user?.id || null);
+  const { user } = useAuth();
+  const { getReviewsForShow, invalidateCache } = useUserReviews(user?.id || null);
   const { shows } = useShows();
   const { showToast } = useToastSafe();
 
@@ -72,11 +71,11 @@ export default function RateModal() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [loadingReview, setLoadingReview] = useState(!!reviewId);
   const isDirty = useRef(false);
-  const initialLoadDone = useRef(false);
+  const populatingRef = useRef(!!reviewId); // true while loading edit data
 
-  // Track dirty state
+  // Track dirty state — skip changes from initial data population
   useEffect(() => {
-    if (initialLoadDone.current) {
+    if (!populatingRef.current) {
       isDirty.current = true;
     }
   }, [currentRating, reviewText, dateSeen]);
@@ -85,9 +84,10 @@ export default function RateModal() {
   useEffect(() => {
     if (!reviewId || !user) {
       setLoadingReview(false);
-      initialLoadDone.current = true;
+      populatingRef.current = false;
       return;
     }
+    populatingRef.current = true;
     (async () => {
       try {
         const showReviews = await getReviewsForShow(showId);
@@ -101,8 +101,10 @@ export default function RateModal() {
         // If fetch fails, user can still enter new data
       } finally {
         setLoadingReview(false);
-        // Small delay so the initial state changes don't trigger isDirty
-        setTimeout(() => { initialLoadDone.current = true; }, 100);
+        // React batches the state updates above, so the dirty-tracking effect
+        // fires on the NEXT render. We clear populatingRef in a microtask to
+        // ensure it's still true when the batched render fires the effect.
+        queueMicrotask(() => { populatingRef.current = false; });
       }
     })();
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -145,7 +147,11 @@ export default function RateModal() {
   }, [router]);
 
   const handleSave = useCallback(async () => {
-    if (!canSave || !currentRating || !user) return;
+    if (!canSave || currentRating === null) return;
+    if (!user) {
+      setSaveError('You must be signed in to save. Please close and try again.');
+      return;
+    }
     setSaving(true);
     setSaveError(null);
 
