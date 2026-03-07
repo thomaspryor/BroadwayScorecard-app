@@ -32,7 +32,6 @@ export default function ShowDetailScreen() {
   const [detailLoading, setDetailLoading] = useState(true);
   const [showAllReviews, setShowAllReviews] = useState(false);
   const [showAllCast, setShowAllCast] = useState(false);
-  const [reviewPanelOpen, setReviewPanelOpen] = useState(false);
 
   const show = useMemo(() => shows.find(s => s.slug === slug), [shows, slug]);
 
@@ -225,7 +224,7 @@ export default function ShowDetailScreen() {
             showId={show.id}
             showTitle={show.title}
             closingDate={show.closingDate}
-            onPanelChange={setReviewPanelOpen}
+
           />
         </View>
 
@@ -468,8 +467,8 @@ export default function ShowDetailScreen() {
         </View>
       </ScrollView>
 
-      {/* Sticky Buy Tickets button — hidden when review panel is open */}
-      {primaryTicketLink && !reviewPanelOpen && (
+      {/* Sticky Buy Tickets button */}
+      {primaryTicketLink && (
         <View style={[styles.stickyButtonContainer, { paddingBottom: Math.max(insets.bottom, Spacing.md) }]}>
           <Pressable
             style={({ pressed }) => [styles.stickyBuyButton, pressed && styles.stickyBuyButtonPressed]}

@@ -1,16 +1,15 @@
 /**
- * ShowPageRating — combined connected + presentational rating section.
+ * ShowPageRating — rating section on show detail page.
  *
- * Combines web's ShowPageRating.tsx + ShowPageRatingConnected.tsx
- * (no RSC boundary in React Native).
+ * Displays existing ratings as read-only, with action buttons that open
+ * the Rating Modal for editing. Star taps also navigate to the modal.
  *
- * Wires: useAuth(), useUserReviews(), useWatchlist(), deferred auth,
- * supabase-rest for reliable saves, toast for feedback.
+ * Watchlist functionality remains inline.
  */
 
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { View, Text, Pressable, StyleSheet, Platform } from 'react-native';
-import { usePathname } from 'expo-router';
+import { usePathname, useRouter } from 'expo-router';
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import Svg, { Path } from 'react-native-svg';
 import { useAuth } from '@/lib/auth-context';
@@ -18,14 +17,10 @@ import { useUserReviews } from '@/hooks/useUserReviews';
 import { useWatchlist } from '@/hooks/useWatchlist';
 import { useToastSafe } from '@/lib/toast-context';
 import { savePendingAction, getPendingAction, clearPendingAction } from '@/lib/deferred-auth';
-import { supabaseRestInsert, supabaseRestUpdate } from '@/lib/supabase-rest';
 import { featureFlags } from '@/lib/feature-flags';
-import { recordRatingGiven } from '@/lib/store-review';
 import * as haptics from '@/lib/haptics';
 import StarRating from './StarRating';
-import ReviewPanel from './ReviewPanel';
 import WatchlistButton from './WatchlistButton';
-import type { UserReview } from '@/lib/user-types';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
 
 interface ShowPageRatingProps {
@@ -33,7 +28,6 @@ interface ShowPageRatingProps {
   showTitle: string;
   previewDate?: string | null;
   closingDate?: string | null;
-  onPanelChange?: (isOpen: boolean) => void;
 }
 
 export default function ShowPageRating({
@@ -41,7 +35,6 @@ export default function ShowPageRating({
   showTitle,
   previewDate,
   closingDate,
-  onPanelChange,
 }: ShowPageRatingProps) {
   const { user, isAuthenticated, showSignIn } = useAuth();
   const { reviews, getReviewsForShow, deleteReview, invalidateCache } = useUserReviews(user?.id || null);
@@ -55,16 +48,11 @@ export default function ShowPageRating({
   } = useWatchlist(user?.id || null);
   const { showToast } = useToastSafe();
   const pathname = usePathname();
+  const router = useRouter();
 
   const hasExecutedPending = useRef(false);
-  const lastSavedId = useRef<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
-  const [currentRating, setCurrentRating] = useState<number | null>(null);
-  const [showPanel, setShowPanel] = useState(false);
-  const [editingReview, setEditingReview] = useState<UserReview | null>(null);
-  const [saving, setSaving] = useState(false);
   const [watchlistLoading, setWatchlistLoading] = useState(false);
-  const [autoEditLatest, setAutoEditLatest] = useState(false);
   const [showWatchlistDatePicker, setShowWatchlistDatePicker] = useState(false);
 
   // Load data when authenticated
@@ -75,11 +63,6 @@ export default function ShowPageRating({
     }
   }, [isAuthenticated, user, showId, getReviewsForShow, getWatchlist]);
 
-  // Reset lastSavedId when navigating to different show
-  useEffect(() => {
-    lastSavedId.current = null;
-  }, [showId]);
-
   // Derive state
   const showReviews = reviews.filter(r => r.show_id === showId);
   const latestReview =
@@ -88,20 +71,6 @@ export default function ShowPageRating({
       : null;
   const viewCount = showReviews.length;
   const watchlistEntry = watchlist.find(w => w.show_id === showId);
-
-  // Notify parent when panel opens/closes (for hiding sticky Buy Tickets)
-  useEffect(() => {
-    onPanelChange?.(showPanel);
-  }, [showPanel, onPanelChange]);
-
-  // Auto-open panel after deferred auth saves
-  useEffect(() => {
-    if (autoEditLatest && latestReview && !showPanel) {
-      setEditingReview(latestReview);
-      setCurrentRating(latestReview.rating);
-      setShowPanel(true);
-    }
-  }, [autoEditLatest, latestReview, showPanel]);
 
   // ─── Execute pending action after auth ───────────────────
   useEffect(() => {
@@ -115,24 +84,11 @@ export default function ShowPageRating({
       await clearPendingAction();
 
       if (pending.type === 'rating' && pending.rating) {
-        try {
-          const { error: insertErr } = await supabaseRestInsert('reviews', {
-            user_id: user.id,
-            show_id: showId,
-            rating: pending.rating,
-            review_text: null,
-            date_seen: null,
-          });
-          if (insertErr) throw new Error(insertErr.message);
-
-          showToast('Added to Reviews — add date & notes below', 'success', '/(tabs)/my-shows');
-          await invalidateCache();
-          await getReviewsForShow(showId);
-          setAutoEditLatest(true);
-        } catch (e) {
-          const detail = e instanceof Error ? e.message : 'Unknown error';
-          showToast(`Save failed: ${detail}`, 'error');
-        }
+        // Navigate to rating modal with the pending rating pre-filled
+        router.push({
+          pathname: '/rate/[showId]',
+          params: { showId, showTitle, initialRating: String(pending.rating) },
+        });
       } else if (pending.type === 'watchlist') {
         try {
           await addToWatchlist(showId);
@@ -153,7 +109,6 @@ export default function ShowPageRating({
   const handleRatingChange = useCallback(
     (rating: number) => {
       if (!isAuthenticated) {
-        setCurrentRating(rating);
         savePendingAction({
           type: 'rating',
           showId,
@@ -164,78 +119,31 @@ export default function ShowPageRating({
         showSignIn('rating');
         return;
       }
-      setCurrentRating(rating);
-      setShowPanel(true);
-      setEditingReview(null);
+      // Navigate to rating modal with the tapped rating pre-filled
+      router.push({
+        pathname: '/rate/[showId]',
+        params: { showId, showTitle, initialRating: String(rating) },
+      });
     },
-    [isAuthenticated, showId, pathname, showSignIn],
+    [isAuthenticated, showId, showTitle, pathname, showSignIn, router],
   );
 
-  const handleSave = useCallback(
-    async (data: { rating: number; reviewText: string | null; dateSeen: string | null }) => {
-      if (!user) {
-        showToast('Please sign in to save ratings.', 'error');
-        return;
-      }
-      setSaving(true);
-      try {
-        const idToPass = editingReview?.id || lastSavedId.current || undefined;
-
-        if (idToPass) {
-          const filters = `id=eq.${idToPass}&user_id=eq.${user.id}`;
-          const { data: updated, error } = await supabaseRestUpdate<{ id: string }>('reviews', filters, {
-            rating: data.rating,
-            review_text: data.reviewText || null,
-            date_seen: data.dateSeen || null,
-            updated_at: new Date().toISOString(),
-          });
-          if (error) throw new Error(error.message);
-          if (updated?.id) lastSavedId.current = updated.id;
-          showToast('Updated in Reviews', 'success', '/(tabs)/my-shows');
-        } else {
-          const { data: inserted, error } = await supabaseRestInsert<{ id: string }>('reviews', {
-            user_id: user.id,
-            show_id: showId,
-            rating: data.rating,
-            review_text: data.reviewText || null,
-            date_seen: data.dateSeen || null,
-          });
-          if (error) throw new Error(error.message);
-          if (inserted?.id) lastSavedId.current = inserted.id;
-          showToast('Added to Reviews', 'success', '/(tabs)/my-shows');
-        }
-
-        await invalidateCache();
-        await getReviewsForShow(showId);
-        setShowPanel(false);
-        setEditingReview(null);
-        setCurrentRating(null);
-        lastSavedId.current = null;
-        haptics.success();
-        // Positive moment — consider prompting for App Store review
-        recordRatingGiven();
-      } catch (e) {
-        const detail = e instanceof Error ? e.message : 'Unknown error';
-        haptics.error();
-        showToast(`Save failed: ${detail}`, 'error');
-      } finally {
-        setSaving(false);
-      }
+  const handleEdit = useCallback(
+    (reviewId: string) => {
+      router.push({
+        pathname: '/rate/[showId]',
+        params: { showId, showTitle, reviewId },
+      });
     },
-    [user, editingReview, showId, getReviewsForShow, invalidateCache, showToast],
+    [showId, showTitle, router],
   );
 
-  const handleCancel = useCallback(() => {
-    setShowPanel(false);
-    setEditingReview(null);
-    if (!latestReview) setCurrentRating(null);
-  }, [latestReview]);
-
-  const handleEdit = useCallback((review: UserReview) => {
-    setEditingReview(review);
-    setCurrentRating(review.rating);
-    setShowPanel(true);
-  }, []);
+  const handleNewViewing = useCallback(() => {
+    router.push({
+      pathname: '/rate/[showId]',
+      params: { showId, showTitle },
+    });
+  }, [showId, showTitle, router]);
 
   const handleDelete = useCallback(
     async (reviewId: string) => {
@@ -245,19 +153,13 @@ export default function ShowPageRating({
         haptics.action();
         showToast('Rating deleted.', 'info');
         setConfirmDeleteId(null);
-        // If we deleted the review being edited, close panel
-        if (editingReview?.id === reviewId) {
-          setShowPanel(false);
-          setEditingReview(null);
-          setCurrentRating(null);
-        }
         await getReviewsForShow(showId);
       } catch (e) {
         const detail = e instanceof Error ? e.message : 'Unknown error';
         showToast(`Delete failed: ${detail}`, 'error');
       }
     },
-    [deleteReview, invalidateCache, showToast, editingReview, showId, getReviewsForShow],
+    [deleteReview, invalidateCache, showToast, showId, getReviewsForShow],
   );
 
   const handleToggleWatchlist = useCallback(async () => {
@@ -319,12 +221,12 @@ export default function ShowPageRating({
             )}
           </View>
 
-          {/* Stars */}
-          {latestReview && !showPanel ? (
+          {/* Stars — read-only display when review exists, interactive when no review */}
+          {latestReview ? (
             <View>
               <StarRating rating={latestReview.rating} onRatingChange={handleRatingChange} size="lg" readOnly hideLabel />
               <View style={styles.editActions}>
-                <Pressable style={styles.editButton} onPress={() => handleEdit(latestReview)} hitSlop={8} accessibilityRole="button" accessibilityLabel="Edit rating" testID="edit-rating">
+                <Pressable style={styles.editButton} onPress={() => handleEdit(latestReview.id)} hitSlop={8} accessibilityRole="button" accessibilityLabel="Edit rating" testID="edit-rating">
                   <Svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke={Colors.text.muted} strokeWidth={2}>
                     <Path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                   </Svg>
@@ -348,14 +250,7 @@ export default function ShowPageRating({
                 )}
                 <Pressable
                   style={styles.editButton}
-                  onPress={() => {
-                    setEditingReview(null);
-                    setCurrentRating(null);
-                    lastSavedId.current = null;
-                    setShowPanel(false);
-                    // Small delay so state clears before opening panel
-                    setTimeout(() => handleRatingChange(latestReview.rating), 50);
-                  }}
+                  onPress={handleNewViewing}
                   accessibilityRole="button"
                   accessibilityLabel="New viewing"
                   testID="new-viewing"
@@ -382,15 +277,15 @@ export default function ShowPageRating({
               )}
             </View>
           ) : (
-            <StarRating rating={currentRating} onRatingChange={handleRatingChange} size="lg" />
+            <StarRating rating={null} onRatingChange={handleRatingChange} size="lg" />
           )}
 
           {/* Previous viewings */}
-          {viewCount > 1 && !showPanel && (
+          {viewCount > 1 && (
             <View style={styles.previousViewings}>
               {showReviews.slice(0, 3).map(review => (
                 <View key={review.id} style={styles.viewingRow}>
-                  <Pressable style={styles.viewingRowContent} onPress={() => handleEdit(review)} accessibilityRole="button" accessibilityLabel="Edit this viewing" testID={`viewing-${review.id}`}>
+                  <Pressable style={styles.viewingRowContent} onPress={() => handleEdit(review.id)} accessibilityRole="button" accessibilityLabel="Edit this viewing" testID={`viewing-${review.id}`}>
                     <StarRating rating={review.rating} onRatingChange={() => {}} size="sm" readOnly hideLabel />
                     {review.date_seen && (
                       <Text style={styles.viewingDate}>
@@ -478,20 +373,6 @@ export default function ShowPageRating({
           )}
         </View>
       </View>
-
-      {/* Expandable review panel */}
-      {showPanel && currentRating !== null && (
-        <ReviewPanel
-          rating={currentRating}
-          existingReviewText={editingReview?.review_text}
-          existingDateSeen={editingReview?.date_seen}
-          showTitle={showTitle}
-          latestDate={closingDate}
-          onSave={handleSave}
-          onCancel={handleCancel}
-          saving={saving}
-        />
-      )}
     </View>
   );
 }
