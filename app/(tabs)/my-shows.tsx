@@ -28,6 +28,8 @@ import Animated, { SharedValue, useAnimatedStyle } from 'react-native-reanimated
 import { useAuth } from '@/lib/auth-context';
 import { useUserReviews } from '@/hooks/useUserReviews';
 import { useWatchlist } from '@/hooks/useWatchlist';
+import { useUserLists } from '@/hooks/useUserLists';
+import ListsTab from '@/components/user/ListsTab';
 import { useShows } from '@/lib/data-context';
 import { getImageUrl } from '@/lib/images';
 import { featureFlags } from '@/lib/feature-flags';
@@ -39,7 +41,7 @@ import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
 import { StaleBanner } from '@/components/StaleBanner';
 import * as haptics from '@/lib/haptics';
 
-type Tab = 'diary' | 'watchlist';
+type Tab = 'diary' | 'watchlist' | 'lists';
 type DiarySort = 'date-desc' | 'date-asc' | 'rating-desc';
 type WatchlistSort = 'added-desc' | 'alphabetical' | 'closing-soon';
 type ViewMode = 'list' | 'grid';
@@ -50,6 +52,7 @@ export default function MyShowsScreen() {
   const { user, isAuthenticated, loading: authLoading, showSignIn } = useAuth();
   const { reviews, getAllReviews, deleteReview, loading: reviewsLoading } = useUserReviews(user?.id || null);
   const { watchlist, getWatchlist, removeFromWatchlist, updatePlannedDate, loading: watchlistLoading } = useWatchlist(user?.id || null);
+  const { lists, getLists, loading: listsLoading } = useUserLists(user?.id || null);
   const { shows } = useShows();
 
   const [activeTab, setActiveTab] = useState<Tab>('diary');
@@ -70,8 +73,9 @@ export default function MyShowsScreen() {
     if (isAuthenticated && user) {
       getAllReviews();
       getWatchlist();
+      getLists();
     }
-  }, [isAuthenticated, user, getAllReviews, getWatchlist]);
+  }, [isAuthenticated, user, getAllReviews, getWatchlist, getLists]);
 
   // Re-fetch when tab gains focus (picks up changes from show pages)
   useFocusEffect(
@@ -79,11 +83,12 @@ export default function MyShowsScreen() {
       if (isAuthenticated && user) {
         getAllReviews();
         getWatchlist();
+        getLists();
       }
-    }, [isAuthenticated, user, getAllReviews, getWatchlist]),
+    }, [isAuthenticated, user, getAllReviews, getWatchlist, getLists]),
   );
 
-  const loading = authLoading || reviewsLoading || watchlistLoading;
+  const loading = authLoading || reviewsLoading || watchlistLoading || listsLoading;
 
   // Stats
   const showsSeen = new Set(reviews.map(r => r.show_id)).size;
@@ -479,6 +484,11 @@ export default function MyShowsScreen() {
         <Text style={styles.statText}>
           <Text style={styles.statNumber}>{watchlist.length}</Text> watchlist
         </Text>
+        {lists.length > 0 && (
+          <Text style={styles.statText}>
+            <Text style={styles.statNumber}>{lists.length}</Text> {lists.length === 1 ? 'list' : 'lists'}
+          </Text>
+        )}
         {toBeRated.length > 0 && (
           <Text style={styles.statText}>
             <Text style={styles.statNumberAccent}>{toBeRated.length}</Text> to rate
@@ -515,7 +525,22 @@ export default function MyShowsScreen() {
             )}
           </Text>
         </Pressable>
-        <View style={styles.tabBarRight}>
+        <Pressable
+          style={[styles.tab, activeTab === 'lists' && styles.tabActive]}
+          onPress={() => { haptics.tap(); setActiveTab('lists'); }}
+          accessibilityRole="tab"
+          accessibilityLabel={`Lists${lists.length > 0 ? `, ${lists.length} lists` : ''}`}
+          accessibilityState={{ selected: activeTab === 'lists' }}
+          testID="lists-tab"
+        >
+          <Text style={[styles.tabText, activeTab === 'lists' && styles.tabTextActive]}>
+            Lists
+            {lists.length > 0 && (
+              <Text style={styles.tabBadge}> {lists.length}</Text>
+            )}
+          </Text>
+        </Pressable>
+        {activeTab !== 'lists' && <View style={styles.tabBarRight}>
           <Pressable
             style={styles.sortButton}
             onPress={activeTab === 'diary' ? cycleDiarySort : cycleWatchlistSort}
@@ -547,8 +572,13 @@ export default function MyShowsScreen() {
               </Svg>
             )}
           </Pressable>
-        </View>
+        </View>}
       </View>
+
+      {/* Lists tab */}
+      {activeTab === 'lists' && user && (
+        <ListsTab userId={user.id} showMap={showMap} />
+      )}
 
       {/* To Be Rated banner (diary tab only) */}
       {activeTab === 'diary' && toBeRated.length > 0 && (
