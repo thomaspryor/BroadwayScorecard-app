@@ -100,15 +100,23 @@ export default function ReviewPanel({
             </Text>
           </Pressable>
           {showDatePicker && (
-            <DateTimePicker
-              value={dateValue}
-              mode="date"
-              display="spinner"
-              onChange={handleDateChange}
-              maximumDate={maxDate}
-              minimumDate={new Date('1950-01-01')}
-              themeVariant="dark"
-            />
+            <View style={styles.datePickerWrapper}>
+              <DateTimePicker
+                value={dateValue}
+                mode="date"
+                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                onChange={handleDateChange}
+                maximumDate={maxDate}
+                minimumDate={new Date('1950-01-01')}
+                themeVariant="dark"
+                style={{ height: 150 }}
+              />
+              {Platform.OS === 'ios' && (
+                <Pressable onPress={() => setShowDatePicker(false)} style={styles.datePickerDone}>
+                  <Text style={styles.datePickerDoneText}>Done</Text>
+                </Pressable>
+              )}
+            </View>
           )}
           {dateSeen && (
             <Pressable onPress={() => { setDateSeen(''); setShowDatePicker(false); }} accessibilityRole="button" accessibilityLabel="Clear date" testID="clear-date">
@@ -315,5 +323,20 @@ const styles = StyleSheet.create({
   },
   buttonPressed: {
     opacity: 0.7,
+  },
+  datePickerWrapper: {
+    marginTop: Spacing.sm,
+    borderRadius: BorderRadius.sm,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+  },
+  datePickerDone: {
+    alignSelf: 'center',
+    paddingVertical: Spacing.sm,
+  },
+  datePickerDoneText: {
+    color: Colors.score.gold,
+    fontSize: FontSize.sm,
+    fontWeight: '600',
   },
 });

@@ -18,6 +18,7 @@ import Toast from '@/components/Toast';
 import { featureFlags, loadFeatureFlagOverrides } from '@/lib/feature-flags';
 import { setPostHogInstance } from '@/lib/analytics';
 import { Colors } from '@/constants/theme';
+import { registerForPushNotifications, setupNotificationHandler, configureNotificationChannels } from '@/lib/notifications';
 
 // Custom dark theme matching our design tokens
 const BroadwayDark = {
@@ -36,11 +37,12 @@ export const unstable_settings = {
   anchor: '(tabs)',
 };
 
-// Initialize PostHog client at module scope (async — resolves before provider renders)
+// Initialize PostHog client (guarded against double-init in strict mode)
 const POSTHOG_API_KEY = process.env.EXPO_PUBLIC_POSTHOG_API_KEY || '';
+let phInitialized = false;
 
 function initPostHog(): PostHog | null {
-  if (!POSTHOG_API_KEY) return null;
+  if (!POSTHOG_API_KEY || phInitialized) return null;
   try {
     const client = new PostHog(POSTHOG_API_KEY, {
       host: 'https://us.i.posthog.com',
@@ -48,6 +50,7 @@ function initPostHog(): PostHog | null {
       captureAppLifecycleEvents: true,
     });
     setPostHogInstance(client);
+    phInitialized = true;
     return client;
   } catch (e) {
     if (__DEV__) console.warn('[PostHog] Init failed:', e);
@@ -70,13 +73,34 @@ export default function RootLayout() {
       loadFeatureFlagOverrides(),
       hasSeenOnboarding(),
     ])
-      .then(([, seen]) => {
-        setShowOnboarding(!seen);
-      })
-      .catch(() => {
-        setShowOnboarding(false);
-      });
+      .then(([, seen]) => setShowOnboarding(!seen))
+      .catch(() => setShowOnboarding(false));
+
+    // Check for OTA updates in background (non-blocking)
+    if (!__DEV__) {
+      try {
+        const Updates = require('expo-updates');
+        Updates.checkForUpdateAsync()
+          .then(({ isAvailable }: { isAvailable: boolean }) => {
+            if (isAvailable) return Updates.fetchUpdateAsync();
+          })
+          .then((result: { isNew?: boolean } | undefined) => {
+            if (result?.isNew) Updates.reloadAsync();
+          })
+          .catch(() => {}); // Silent fail — network errors are fine
+      } catch {} // Native module not available in dev client
+    }
   }, []);
+
+  // Register push notifications + set up tap handler
+  // Runs once; actual permission prompt only fires after onboarding is dismissed
+  useEffect(() => {
+    if (showOnboarding !== false) return; // Wait until onboarding is done
+    configureNotificationChannels();
+    registerForPushNotifications();
+    const cleanup = setupNotificationHandler();
+    return () => { cleanup?.(); };
+  }, [showOnboarding]);
 
   // Wait for onboarding check + PostHog before rendering
   if (showOnboarding === null || !phReady) return null;

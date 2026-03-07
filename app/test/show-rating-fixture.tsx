@@ -92,6 +92,19 @@ export default function ShowRatingFixtureScreen() {
   const [saving, setSaving] = useState(false);
   const [watchlistLoading, setWatchlistLoading] = useState(false);
 
+  // Reset state when deep link changes fixture state (component is reused)
+  const [prevFixtureState, setPrevFixtureState] = useState(fixtureState);
+  if (fixtureState !== prevFixtureState) {
+    setPrevFixtureState(fixtureState);
+    setReviews(SEED_REVIEWS[fixtureState]);
+    setIsWatchlisted(fixtureState !== 'empty');
+    setShowPanel(false);
+    setCurrentRating(null);
+    setEditingReview(null);
+    setSaving(false);
+    setWatchlistLoading(false);
+  }
+
   const latestReview =
     reviews.length > 0
       ? reviews.reduce((a, b) => (new Date(b.created_at) > new Date(a.created_at) ? b : a))
@@ -225,21 +238,23 @@ export default function ShowRatingFixtureScreen() {
                   .filter(r => r.id !== latestReview?.id)
                   .slice(0, 3)
                   .map(review => (
-                    <Pressable key={review.id} style={styles.viewingRow} onPress={() => handleEdit(review)} accessibilityRole="button" accessibilityLabel="Edit this viewing">
-                      <StarRating rating={review.rating} onRatingChange={() => {}} size="sm" readOnly hideLabel />
-                      {review.date_seen && (
-                        <Text style={styles.viewingDate}>
-                          {new Date(review.date_seen + 'T00:00:00').toLocaleDateString('en-US', {
-                            month: 'short',
-                            day: 'numeric',
-                            year: 'numeric',
-                          })}
-                        </Text>
-                      )}
+                    <View key={review.id} style={styles.viewingRow}>
+                      <Pressable style={styles.viewingRowContent} onPress={() => handleEdit(review)} accessibilityRole="button" accessibilityLabel="Edit this viewing">
+                        <StarRating rating={review.rating} onRatingChange={() => {}} size="sm" readOnly hideLabel />
+                        {review.date_seen && (
+                          <Text style={styles.viewingDate}>
+                            {new Date(review.date_seen + 'T00:00:00').toLocaleDateString('en-US', {
+                              month: 'short',
+                              day: 'numeric',
+                              year: 'numeric',
+                            })}
+                          </Text>
+                        )}
+                      </Pressable>
                       <Pressable onPress={() => handleDelete(review.id)} hitSlop={8} accessibilityRole="button" accessibilityLabel="Delete this viewing">
                         <Text style={styles.actionIcon}>🗑️</Text>
                       </Pressable>
-                    </Pressable>
+                    </View>
                   ))}
               </View>
             )}
@@ -350,6 +365,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.sm,
+  },
+  viewingRowContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    flex: 1,
   },
   viewingDate: {
     color: Colors.text.muted,

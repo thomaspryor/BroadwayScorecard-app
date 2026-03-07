@@ -51,11 +51,12 @@
     },
     "plugins": [
       "expo-router",
+      "expo-updates",
       [
         "expo-splash-screen",
         {
           "image": "./assets/images/splash-icon.png",
-          "imageWidth": 200,
+          "imageWidth": 280,
           "resizeMode": "contain",
           "backgroundColor": "#0f0f14"
         }
@@ -69,7 +70,8 @@
           "iosUrlScheme": "com.googleusercontent.apps.1084460721483-40sgpbtf0mdrfmbtjifec7pku6pslj1o"
         }
       ],
-      "expo-localization"
+      "expo-localization",
+      "expo-notifications"
     ],
     "experiments": {
       "typedRoutes": true,
@@ -79,10 +81,10 @@
       "url": "https://u.expo.dev/8948052e-aa32-4767-9eeb-9f33288f8e6d"
     },
     "runtimeVersion": {
-      "policy": "appVersion"
+      "policy": "fingerprint"
     },
     "extra": {
-      "features": "",
+      "features": "userAccounts",
       "router": {
         "origin": "https://broadwayscorecard.com"
       },

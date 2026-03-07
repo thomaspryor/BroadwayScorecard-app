@@ -8,24 +8,38 @@
  */
 
 import React, { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
-import { Platform } from 'react-native';
-import * as AppleAuthentication from 'expo-apple-authentication';
-import { GoogleSignin } from '@react-native-google-signin/google-signin';
+import { Alert } from 'react-native';
 import { getSupabaseClient } from './supabase';
 import type { UserProfile } from './user-types';
 import SignInSheet from '@/components/SignInSheet';
 import { trackSignInStarted, trackSignInCompleted, trackSignOut as trackSignOutEvent, identifyUser, resetAnalyticsUser } from '@/lib/analytics';
 
-// Google OAuth — web client ID for server auth, iOS client ID for native SDK
-const GOOGLE_WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || '';
-const GOOGLE_IOS_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID || '';
+// Lazy-load native auth modules — they crash at import time if native modules
+// aren't registered (e.g. dev client built without the plugin, or Expo Go).
+let AppleAuthentication: typeof import('expo-apple-authentication') | null = null;
+let GoogleSignin: (typeof import('@react-native-google-signin/google-signin'))['GoogleSignin'] | null = null;
 
-// Configure Google Sign-In native SDK
-GoogleSignin.configure({
-  iosClientId: GOOGLE_IOS_CLIENT_ID,
-  webClientId: GOOGLE_WEB_CLIENT_ID, // needed to get idToken
-  scopes: ['profile', 'email'],
-});
+try {
+  AppleAuthentication = require('expo-apple-authentication');
+} catch {
+  console.warn('[Auth] expo-apple-authentication not available');
+}
+
+try {
+  const mod = require('@react-native-google-signin/google-signin');
+  GoogleSignin = mod.GoogleSignin;
+
+  // Configure Google Sign-In native SDK
+  const GOOGLE_WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || '';
+  const GOOGLE_IOS_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID || '';
+  GoogleSignin!.configure({
+    iosClientId: GOOGLE_IOS_CLIENT_ID,
+    webClientId: GOOGLE_WEB_CLIENT_ID,
+    scopes: ['profile', 'email'],
+  });
+} catch {
+  console.warn('[Auth] @react-native-google-signin not available');
+}
 
 type SignInContext = 'rating' | 'watchlist' | 'generic';
 
@@ -39,8 +53,8 @@ interface AuthContextValue {
   signOut: () => Promise<void>;
   /** Show sign-in sheet with context */
   showSignIn: (context?: SignInContext) => void;
-  /** DEV ONLY — bypass Apple/Google auth with fake user */
-  devSignIn?: () => void;
+  /** Dev-only email/password sign-in for simulator testing */
+  devSignIn: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -52,6 +66,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [sheetContext, setSheetContext] = useState<SignInContext>('generic');
   const [signInLoading, setSignInLoading] = useState(false);
+  const [signInProvider, setSignInProvider] = useState<'google' | 'apple' | null>(null);
 
   // ─── Initialize auth state ───────────────────────────────
   useEffect(() => {
@@ -62,12 +77,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     // Get existing session
-    client.auth.getSession().then(({ data: { session } }) => {
+    client.auth.getSession().then(async ({ data: { session } }) => {
       if (session?.user) {
         setUser({ id: session.user.id, email: session.user.email || '' });
         loadProfile(session.user.id);
+        setLoading(false);
+      } else if (__DEV__ && process.env.EXPO_PUBLIC_DEV_AUTO_SIGNIN === '1') {
+        // Auto-sign-in with dev test account for simulator testing
+        console.log('[Auth] Dev auto-sign-in triggered');
+        try {
+          const { error } = await client.auth.signInWithPassword({
+            email: 'dev-test@broadwayscorecard.com',
+            password: 'dev-test-local-only-2024',
+          });
+          if (error) console.error('[Auth] Dev auto-sign-in failed:', error.message);
+        } catch (e) {
+          console.error('[Auth] Dev auto-sign-in error:', e);
+        }
+        setLoading(false);
+      } else {
+        setLoading(false);
       }
-      setLoading(false);
     });
 
     // Listen for auth state changes
@@ -79,6 +109,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         loadProfile(session.user.id);
         setSheetOpen(false);
         setSignInLoading(false);
+        setSignInProvider(null);
         identifyUser(session.user.id);
         trackSignInCompleted(session.user.app_metadata?.provider || 'unknown');
       } else if (event === 'SIGNED_OUT') {
@@ -145,11 +176,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // ─── Apple Sign In (native) ──────────────────────────────
   const signInWithApple = useCallback(async () => {
     const client = getSupabaseClient();
-    if (!client) return;
+    if (!client) {
+      Alert.alert('Sign-In Unavailable', 'Unable to connect to the server. Please try again later.');
+      return;
+    }
 
     try {
       setSignInLoading(true);
+      setSignInProvider('apple');
       trackSignInStarted('apple');
+      if (!AppleAuthentication) throw new Error('Apple Authentication not available');
       const credential = await AppleAuthentication.signInAsync({
         requestedScopes: [
           AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
@@ -170,23 +206,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // onAuthStateChange handles the rest
     } catch (e: unknown) {
       setSignInLoading(false);
+      setSignInProvider(null);
       // User cancelled — not an error
       if (e && typeof e === 'object' && 'code' in e && (e as { code: string }).code === 'ERR_REQUEST_CANCELED') {
         return;
       }
       console.error('[Auth] Apple sign-in failed:', e);
+      Alert.alert('Sign-In Failed', e instanceof Error ? e.message : 'Apple sign-in failed. Please try again.');
     }
   }, []);
 
   // ─── Google Sign In (native SDK) ─────────────────────────
   const signInWithGoogle = useCallback(async () => {
     const client = getSupabaseClient();
-    if (!client) return;
+    if (!client) {
+      Alert.alert('Sign-In Unavailable', 'Unable to connect to the server. Please try again later.');
+      return;
+    }
 
     try {
       setSignInLoading(true);
+      setSignInProvider('google');
       trackSignInStarted('google');
 
+      if (!GoogleSignin) throw new Error('Google Sign-In not available');
       await GoogleSignin.hasPlayServices();
       const response = await GoogleSignin.signIn();
 
@@ -200,14 +243,65 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // onAuthStateChange handles the rest
       } else {
         setSignInLoading(false);
+        setSignInProvider(null);
       }
     } catch (e: unknown) {
       setSignInLoading(false);
+      setSignInProvider(null);
       // User cancelled — not an error
       if (e && typeof e === 'object' && 'code' in e && (e as { code: string }).code === 'SIGN_IN_CANCELLED') {
         return;
       }
       console.error('[Auth] Google sign-in failed:', e);
+      Alert.alert('Sign-In Failed', e instanceof Error ? e.message : 'Google sign-in failed. Please try again.');
+    }
+  }, []);
+
+  // ─── Dev Sign In (simulator testing only) ───────────────
+  const devSignIn = useCallback(async () => {
+    if (!__DEV__) return;
+    const client = getSupabaseClient();
+    if (!client) {
+      Alert.alert('Dev Sign-In', 'Supabase client not available. Check env vars.');
+      return;
+    }
+
+    const email = 'dev-test@broadwayscorecard.com';
+    const password = 'dev-test-local-only-2024';
+
+    try {
+      setSignInLoading(true);
+      setSignInProvider(null);
+
+      // Try sign in first
+      const { error: signInError } = await client.auth.signInWithPassword({ email, password });
+
+      if (signInError) {
+        // If user doesn't exist, sign up
+        if (signInError.message.includes('Invalid login')) {
+          const { error: signUpError } = await client.auth.signUp({
+            email,
+            password,
+            options: { data: { full_name: 'Dev Tester', avatar_url: null } },
+          });
+          if (signUpError) throw signUpError;
+          // Supabase may require email confirmation — try signing in again
+          const { error: retryError } = await client.auth.signInWithPassword({ email, password });
+          if (retryError) {
+            Alert.alert('Dev Sign-In', 'Sign-up succeeded but email confirmation may be required. Check Supabase dashboard → Authentication → Users and confirm the dev user.');
+            setSignInLoading(false);
+            return;
+          }
+        } else {
+          throw signInError;
+        }
+      }
+      // onAuthStateChange handles the rest
+    } catch (e) {
+      setSignInLoading(false);
+      setSignInProvider(null);
+      console.error('[Auth] Dev sign-in failed:', e);
+      Alert.alert('Dev Sign-In Failed', e instanceof Error ? e.message : 'Unknown error');
     }
   }, []);
 
@@ -238,23 +332,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [signInWithApple, signInWithGoogle],
   );
 
-  // ─── Dev auth bypass ───────────────────────────────────
-  const devSignIn = useCallback(() => {
-    if (!__DEV__) return;
-    const fakeUser = { id: 'dev-user-00000000', email: 'dev@broadwayscorecard.test' };
-    setUser(fakeUser);
-    setProfile({
-      id: fakeUser.id,
-      display_name: 'Dev Tester',
-      avatar_url: null,
-      default_visibility: 'private',
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    });
-    setLoading(false);
-    setSheetOpen(false);
-  }, []);
-
   return (
     <AuthContext.Provider
       value={{
@@ -266,7 +343,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signInWithGoogle,
         signOut,
         showSignIn,
-        ...__DEV__ ? { devSignIn } : {},
+        devSignIn,
       }}
     >
       {children}
@@ -277,6 +354,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         onDevSignIn={__DEV__ ? devSignIn : undefined}
         context={sheetContext}
         loading={signInLoading}
+        loadingProvider={signInProvider}
       />
     </AuthContext.Provider>
   );
@@ -291,7 +369,7 @@ const DEFAULT_AUTH: AuthContextValue = {
   signInWithGoogle: async () => {},
   signOut: async () => {},
   showSignIn: () => {},
-  devSignIn: undefined,
+  devSignIn: async () => {},
 };
 
 export function useAuth(): AuthContextValue {

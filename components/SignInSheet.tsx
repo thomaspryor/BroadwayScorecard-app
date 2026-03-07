@@ -23,6 +23,7 @@ interface SignInSheetProps {
   onDevSignIn?: () => void;
   context?: SignInContext;
   loading?: boolean;
+  loadingProvider?: 'google' | 'apple' | null;
 }
 
 const HEADLINES: Record<SignInContext, string> = {
@@ -44,6 +45,7 @@ export default function SignInSheet({
   onDevSignIn,
   context = 'generic',
   loading = false,
+  loadingProvider = null,
 }: SignInSheetProps) {
   const insets = useSafeAreaInsets();
 
@@ -92,7 +94,7 @@ export default function SignInSheet({
             onPress={() => handlePress('google')}
             disabled={loading}
           >
-            {loading ? (
+            {loadingProvider === 'google' ? (
               <ActivityIndicator size="small" color="#333" />
             ) : (
               <>
@@ -108,7 +110,7 @@ export default function SignInSheet({
             onPress={() => handlePress('apple')}
             disabled={loading}
           >
-            {loading ? (
+            {loadingProvider === 'apple' ? (
               <ActivityIndicator size="small" color="#fff" />
             ) : (
               <>
@@ -118,15 +120,14 @@ export default function SignInSheet({
             )}
           </Pressable>
 
-          {/* Dev bypass — only in __DEV__ builds */}
+          {/* Dev-only sign-in for simulator testing */}
           {__DEV__ && onDevSignIn && (
             <Pressable
               style={({ pressed }) => [styles.devButton, pressed && styles.buttonPressed]}
               onPress={onDevSignIn}
-              accessibilityRole="button"
-              accessibilityLabel="Dev Sign In"
+              disabled={loading}
             >
-              <Text style={styles.devText}>Dev Sign In (fake auth)</Text>
+              <Text style={styles.devText}>Dev Sign In (Simulator)</Text>
             </Pressable>
           )}
         </View>
@@ -269,13 +270,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 14,
-    backgroundColor: 'rgba(245, 158, 11, 0.15)',
+    backgroundColor: 'rgba(139, 92, 246, 0.3)',
     borderRadius: BorderRadius.md,
     borderWidth: 1,
-    borderColor: 'rgba(245, 158, 11, 0.3)',
+    borderColor: 'rgba(139, 92, 246, 0.5)',
+    borderStyle: 'dashed',
   },
   devText: {
-    color: '#f59e0b',
+    color: '#a78bfa',
     fontSize: FontSize.md,
     fontWeight: '600',
   },

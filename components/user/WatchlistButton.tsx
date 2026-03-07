@@ -8,7 +8,7 @@
 import React from 'react';
 import { Text, Pressable, StyleSheet, ActivityIndicator, Platform } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import Svg, { Path, Circle } from 'react-native-svg';
+import Svg, { Path } from 'react-native-svg';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
 
 interface WatchlistButtonProps {

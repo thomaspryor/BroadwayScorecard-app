@@ -6,7 +6,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { getFormatInfo } from '@/lib/score-utils';
-import { FontSize, BorderRadius, Spacing } from '@/constants/theme';
+import { FontSize, BorderRadius } from '@/constants/theme';
 
 interface FormatPillProps {
   type: string;

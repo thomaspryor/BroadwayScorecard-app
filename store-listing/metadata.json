@@ -1,19 +1,26 @@
 {
   "app_name": "Broadway Scorecard",
-  "subtitle": "Critic Scores & Show Reviews",
-  "description": "Broadway Scorecard brings every professional theater review together in one place. Browse critic scores and audience grades for Broadway, Off-Broadway, and West End shows.\n\nFEATURES\n\n- Comprehensive Scores: Critic scores and audience grades for every show, drawn from hundreds of professional reviews and audience sources.\n\n- Every Review: Read summaries from every major critic and outlet — The New York Times, Vulture, Variety, The Guardian, and many more.\n\n- Three Markets: Browse shows across Broadway, Off-Broadway, and the West End. Filter by musicals, plays, open shows, and more.\n\n- Show Details: Cast, creative team, venue, running dates, ticket links, and complete review breakdowns for every production.\n\n- Smart Search: Find any show instantly with fuzzy search across all markets.\n\n- Score Toggle: Switch between critic scores and audience grades to see how professional reviewers and theatergoers compare.\n\n- Always Current: Scores and reviews update automatically as new reviews are published.\n\n- Dark Mode: Designed for a beautiful dark-themed experience.",
-  "keywords": "broadway,theater,theatre,reviews,scores,musicals,plays,off-broadway,west end,critic,ratings,audience",
+  "subtitle": "Critic Scores for Every Show",
+  "description": "Broadway Scorecard is the definitive guide to Broadway and West End theatre, powered by critic reviews from 400+ outlets.\n\nWHAT YOU GET:\n- Composite critic scores for every Broadway, Off-Broadway, and West End show\n- Reviews from The New York Times, Variety, Vulture, The Guardian, and 400+ outlets\n- Audience grades from Show-Score, Mezzanine, and Reddit\n- Score breakdowns (positive/mixed/negative review counts)\n- Cast lists, creative teams, and show details\n- Ticket links to TodayTix, Telecharge, and more\n\nFEATURES:\n- Browse all currently playing shows, sorted by score or opening date\n- Filter by musicals, plays, open shows, previews, or closed\n- Switch between NYC (Broadway + Off-Broadway) and London (West End)\n- Toggle between critic scores and audience grades\n- Search by show title, theater, or creative team member\n- Featured rows: Top Shows, Best Musicals, Best Plays, Closing Soon, Great for Kids\n- Offline support — cached data works without internet\n\nHOW SCORING WORKS:\nBroadway Scorecard aggregates reviews from 400+ outlets and assigns each a score from 0-100. Reviews are weighted by outlet tier: top-tier outlets (NYT, Variety, Vulture) carry more weight than smaller publications. The composite score gives you an instant, reliable measure of critical reception.\n\nFree. No account required. No ads.",
+  "keywords": "broadway,theater,theatre,reviews,scores,musicals,plays,nyc,west end,tickets,critics,shows,ratings",
   "primary_category": "Entertainment",
   "secondary_category": "Reference",
   "privacy_url": "https://broadwayscorecard.com/privacy",
-  "support_url": "https://broadwayscorecard.com",
+  "support_url": "https://broadwayscorecard.com/feedback",
   "marketing_url": "https://broadwayscorecard.com",
-  "copyright": "2025 Broadway Scorecard",
+  "copyright": "2026 Broadway Scorecard",
   "age_rating": "4+",
   "price": "Free",
   "privacy_nutrition_labels": {
     "data_not_collected": true,
     "note": "Broadway Scorecard does not collect any personal data in v1.0.0. The app fetches publicly available show data from our CDN. No analytics, tracking, or user accounts in this version."
   },
-  "app_review_notes": "Broadway Scorecard is a theater review aggregator. It displays critic scores and audience grades for Broadway, Off-Broadway, and West End shows. All data comes from publicly available professional reviews. No login or account is required to use the app. The app fetches show data from our CDN at broadwayscorecard.com/data/."
+  "app_review_notes": "This app displays aggregated public theater critic review scores and audience ratings for Broadway, Off-Broadway, and West End shows. No login or account is required to use any features. The app fetches pre-computed data from our public website (broadwayscorecard.com). No user data is collected or transmitted to external services.",
+  "app_review_contact": {
+    "firstName": "Thomas",
+    "lastName": "Pryor",
+    "email": "tom@broadwayscorecard.com",
+    "phone": "+1 212 555 0199",
+    "demoAccountRequired": false
+  }
 }

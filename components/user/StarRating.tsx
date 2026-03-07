@@ -1,18 +1,16 @@
 /**
  * Interactive star rating — 5 stars with half-star precision.
  *
- * Full rewrite for React Native (web version uses DOM events/CSS).
- * Reuses same SVG star path geometry from web.
- *
- * Mobile: tap = full star, "Make it X.5" button for half-stars.
+ * Supports both tap (full star) and horizontal drag for half-star precision.
+ * Dragging across the star row snaps to 0.5 increments based on finger position.
  */
 
-import React, { useState, useCallback } from 'react';
-import { View, Text, Pressable, StyleSheet, Platform } from 'react-native';
+import React, { useState, useCallback, useRef } from 'react';
+import { View, Text, Pressable, StyleSheet, Platform, type GestureResponderEvent, type LayoutChangeEvent } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import Svg, { Path, Defs, ClipPath, Rect } from 'react-native-svg';
 import Animated, { useAnimatedStyle, withSequence, withTiming, useSharedValue } from 'react-native-reanimated';
-import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
+import { Colors, FontSize } from '@/constants/theme';
 
 interface StarRatingProps {
   rating: number | null;
@@ -82,16 +80,13 @@ function Star({
           <Path d={STAR_PATH} fill="none" stroke={EMPTY} strokeWidth={1.5} strokeLinejoin="round" />
         </Svg>
       ) : (
-        // Half-filled: outline + gold left half using clipPath
         <Svg width={starSize} height={starSize} viewBox="0 0 24 24">
           <Defs>
             <ClipPath id={`half-${index}`}>
               <Rect x="0" y="0" width="12" height="24" />
             </ClipPath>
           </Defs>
-          {/* Outline background */}
           <Path d={STAR_PATH} fill="none" stroke={EMPTY} strokeWidth={1.5} strokeLinejoin="round" />
-          {/* Gold left half */}
           <Path d={STAR_PATH} fill={GOLD} clipPath={`url(#half-${index})`} />
         </Svg>
       )}
@@ -106,11 +101,13 @@ export default function StarRating({
   readOnly = false,
   hideLabel = false,
 }: StarRatingProps) {
-  const [showHalfButton, setShowHalfButton] = useState(false);
-  const [lastTappedStar, setLastTappedStar] = useState<number | null>(null);
   const { star: starSize, gap } = SIZE_MAP[size];
+  const rowLayoutRef = useRef({ x: 0, width: 0 });
+  const lastHapticRating = useRef<number | null>(null);
+  const [dragRating, setDragRating] = useState<number | null>(null);
+  const isDragging = useRef(false);
 
-  const displayRating = rating ?? 0;
+  const displayRating = dragRating ?? rating ?? 0;
 
   const handleStarPress = useCallback(
     (starIndex: number) => {
@@ -118,26 +115,97 @@ export default function StarRating({
       if (Platform.OS === 'ios') {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       }
-      onRatingChange(starIndex);
-      setLastTappedStar(starIndex);
-      setShowHalfButton(true);
+      // If tapping same full star that's already selected, toggle to half
+      if (rating === starIndex) {
+        onRatingChange(starIndex - 0.5);
+      } else if (rating === starIndex - 0.5) {
+        // If tapping the half-star that's already selected, go back to full
+        onRatingChange(starIndex);
+      } else {
+        onRatingChange(starIndex);
+      }
     },
-    [readOnly, onRatingChange],
+    [readOnly, onRatingChange, rating],
   );
 
-  const handleHalfStarPress = useCallback(() => {
-    if (lastTappedStar !== null) {
-      if (Platform.OS === 'ios') {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  // Calculate rating from touch X position relative to star row
+  const getRatingFromX = useCallback(
+    (pageX: number): number => {
+      const { x: rowX } = rowLayoutRef.current;
+      const relX = pageX - rowX;
+      const totalStarWidth = starSize * 5 + gap * 4;
+      const clampedX = Math.max(0, Math.min(relX, totalStarWidth));
+
+      // Which star are we over? Each star unit = starSize + gap (except last has no trailing gap)
+      const unitWidth = starSize + gap;
+      const starFloat = clampedX / unitWidth;
+      const starIndex = Math.floor(starFloat);
+      const withinStar = (clampedX - starIndex * unitWidth) / starSize;
+
+      if (starIndex >= 5) return 5;
+      if (withinStar <= 0.5) return starIndex + 0.5;
+      return starIndex + 1;
+    },
+    [starSize, gap],
+  );
+
+  const handleRowLayout = useCallback((e: LayoutChangeEvent) => {
+    e.target.measureInWindow((x: number) => {
+      rowLayoutRef.current = { x, width: e.nativeEvent.layout.width };
+    });
+  }, []);
+
+  const handleTouchStart = useCallback(
+    (e: GestureResponderEvent) => {
+      if (readOnly) return;
+      isDragging.current = false;
+      lastHapticRating.current = null;
+    },
+    [readOnly],
+  );
+
+  const handleTouchMove = useCallback(
+    (e: GestureResponderEvent) => {
+      if (readOnly) return;
+      isDragging.current = true;
+      const newRating = getRatingFromX(e.nativeEvent.pageX);
+      setDragRating(newRating);
+
+      // Haptic on each new half-star increment
+      if (lastHapticRating.current !== newRating && Platform.OS === 'ios') {
+        Haptics.selectionAsync();
+        lastHapticRating.current = newRating;
       }
-      onRatingChange(lastTappedStar - 0.5);
-      setShowHalfButton(false);
-    }
-  }, [lastTappedStar, onRatingChange]);
+    },
+    [readOnly, getRatingFromX],
+  );
+
+  const handleTouchEnd = useCallback(
+    (e: GestureResponderEvent) => {
+      if (readOnly) return;
+      if (isDragging.current && dragRating !== null) {
+        onRatingChange(dragRating);
+        if (Platform.OS === 'ios') {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        }
+      }
+      setDragRating(null);
+      isDragging.current = false;
+    },
+    [readOnly, dragRating, onRatingChange],
+  );
 
   return (
     <View>
-      <View style={[styles.starsRow, { gap }]}>
+      <View
+        style={[styles.starsRow, { gap }]}
+        onLayout={handleRowLayout}
+        onStartShouldSetResponder={() => !readOnly}
+        onMoveShouldSetResponder={() => !readOnly}
+        onResponderStart={handleTouchStart}
+        onResponderMove={handleTouchMove}
+        onResponderRelease={handleTouchEnd}
+      >
         {[1, 2, 3, 4, 5].map(i => (
           <Star
             key={i}
@@ -150,26 +218,17 @@ export default function StarRating({
         ))}
 
         {/* Rating label */}
-        {rating !== null && !hideLabel && (
+        {(rating !== null || dragRating !== null) && !hideLabel && (
           <Text
             style={[
               styles.label,
               size === 'sm' ? styles.labelSm : size === 'lg' ? styles.labelLg : styles.labelMd,
             ]}
           >
-            {rating.toFixed(1)}
+            {displayRating.toFixed(1)}
           </Text>
         )}
       </View>
-
-      {/* Mobile half-star button */}
-      {showHalfButton && !readOnly && lastTappedStar !== null && (
-        <Pressable style={styles.halfButton} onPress={handleHalfStarPress}>
-          <Text style={styles.halfButtonText}>
-            Make it {(lastTappedStar - 0.5).toFixed(1)} ½
-          </Text>
-        </Pressable>
-      )}
     </View>
   );
 }
@@ -187,19 +246,4 @@ const styles = StyleSheet.create({
   labelSm: { fontSize: FontSize.xs },
   labelMd: { fontSize: FontSize.sm },
   labelLg: { fontSize: FontSize.md },
-  halfButton: {
-    marginTop: Spacing.sm,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.xs,
-    backgroundColor: 'rgba(255, 215, 0, 0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 215, 0, 0.2)',
-    borderRadius: BorderRadius.pill,
-    alignSelf: 'flex-start',
-  },
-  halfButtonText: {
-    color: '#fcd34d',
-    fontSize: FontSize.xs,
-    fontWeight: '600',
-  },
 });

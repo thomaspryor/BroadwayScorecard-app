@@ -1,0 +1,71 @@
+name: Send Push Notifications
+
+on:
+  # Manual dispatch for new-score announcements
+  workflow_dispatch:
+    inputs:
+      type:
+        description: 'Notification type'
+        required: true
+        type: choice
+        options:
+          - new-score
+          - rate-show
+          - test
+      show:
+        description: 'Show slug (for new-score)'
+        required: false
+      title:
+        description: 'Show title (for new-score)'
+        required: false
+      score:
+        description: 'Score value (for new-score)'
+        required: false
+      token:
+        description: 'Push token (for test only)'
+        required: false
+
+  # Nightly at 11pm ET — "How was the show?" prompts
+  schedule:
+    - cron: '0 4 * * *'  # 4:00 UTC = 11:00 PM ET (EST) / midnight EDT
+
+jobs:
+  send:
+    name: Send notifications
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install tsx
+        run: npm install -g tsx
+
+      - name: Send notification (dispatch)
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          ARGS="--type ${{ inputs.type }}"
+          if [ "${{ inputs.type }}" = "new-score" ]; then
+            ARGS="$ARGS --show '${{ inputs.show }}' --title '${{ inputs.title }}' --score '${{ inputs.score }}'"
+          elif [ "${{ inputs.type }}" = "test" ]; then
+            ARGS="$ARGS --token '${{ inputs.token }}'"
+          fi
+          eval "tsx scripts/send-notifications.ts $ARGS"
+
+      - name: Send rate-show prompts (scheduled)
+        if: github.event_name == 'schedule'
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: tsx scripts/send-notifications.ts --type rate-show

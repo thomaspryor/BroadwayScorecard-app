@@ -66,6 +66,10 @@ export async function clearFeatureFlagOverride(): Promise<void> {
 /** Convenience: check userAccounts flag */
 export const featureFlags = {
   get userAccounts(): boolean {
-    return isFeatureEnabled('userAccounts');
+    const enabled = isFeatureEnabled('userAccounts');
+    if (__DEV__ && !enabled) {
+      console.warn('[FeatureFlags] userAccounts is OFF. Set "features": "userAccounts" in app.json extra.');
+    }
+    return enabled;
   },
 };

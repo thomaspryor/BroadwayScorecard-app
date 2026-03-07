@@ -15,7 +15,7 @@ import { useShows } from '@/lib/data-context';
 import { fetchShowDetail } from '@/lib/api';
 import { getImageUrl } from '@/lib/images';
 import { getScoreColor, getScoreTier, getContrastTextColor } from '@/lib/score-utils';
-import { Show, ShowDetail, MobileShowDetail, mapShowDetail } from '@/lib/types';
+import { ShowDetail, MobileShowDetail, mapShowDetail } from '@/lib/types';
 import { ScoreBadge, StatusBadge, FormatPill, ProductionPill, CategoryBadge } from '@/components/show-cards';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
 import { trackTicketTap, trackBuyButtonTap, trackShowDetailViewed, trackShowShared, trackFullReviewTapped } from '@/lib/analytics';
@@ -31,6 +31,7 @@ export default function ShowDetailScreen() {
   const [detailLoading, setDetailLoading] = useState(true);
   const [showAllReviews, setShowAllReviews] = useState(false);
   const [showAllCast, setShowAllCast] = useState(false);
+  const [reviewPanelOpen, setReviewPanelOpen] = useState(false);
 
   const show = useMemo(() => shows.find(s => s.slug === slug), [shows, slug]);
 
@@ -81,12 +82,20 @@ export default function ShowDetailScreen() {
     return () => { cancelled = true; };
   }, [show]);
 
-  // Track show detail view (once per show load)
+  // Track show detail view (once per show load — keyed on id, not object ref)
   useEffect(() => {
     if (show) {
       trackShowDetailViewed(show.id, show.title, show.category, show.compositeScore ?? null);
     }
-  }, [show]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [show?.id]);
+
+  // Primary ticket link: prefer TodayTix, then first available
+  const primaryTicketLink = useMemo(() => {
+    if (!show?.ticketLinks?.length) return null;
+    const todayTix = show.ticketLinks.find(l => l.platform.toLowerCase().includes('todaytix'));
+    return todayTix || show.ticketLinks[0];
+  }, [show?.ticketLinks]);
 
   if (!show) {
     return (
@@ -97,13 +106,6 @@ export default function ShowDetailScreen() {
   }
 
   const posterUrl = getImageUrl(show.images.poster) || getImageUrl(show.images.thumbnail);
-
-  // Primary ticket link: prefer TodayTix, then first available
-  const primaryTicketLink = useMemo(() => {
-    if (!show.ticketLinks?.length) return null;
-    const todayTix = show.ticketLinks.find(l => l.platform.toLowerCase().includes('todaytix'));
-    return todayTix || show.ticketLinks[0];
-  }, [show.ticketLinks]);
 
   // Minimum 3 reviews to show a score (1-2 reviews is not a meaningful composite)
   const hasEnoughReviews = (show.criticScore?.reviewCount ?? 0) >= 3;
@@ -185,6 +187,13 @@ export default function ShowDetailScreen() {
             </View>
           </View>
 
+          {/* Score Breakdown Bar — right under score row */}
+          {detail?.breakdown && hasEnoughReviews && (
+            <View style={styles.breakdownSection}>
+              <BreakdownBar breakdown={detail.breakdown} />
+            </View>
+          )}
+
           {/* Link buttons: Official Site, Ticket platforms */}
           <View style={styles.linkButtons}>
             {show.officialUrl && (
@@ -209,18 +218,12 @@ export default function ShowDetailScreen() {
             ))}
           </View>
 
-          {/* Score Breakdown Bar — inside header card */}
-          {detail?.breakdown && hasEnoughReviews && (
-            <View style={styles.breakdownSection}>
-              <BreakdownBar breakdown={detail.breakdown} />
-            </View>
-          )}
-
           {/* User rating + watchlist (feature-flagged) — inside header card */}
           <ShowPageRating
             showId={show.id}
             showTitle={show.title}
             closingDate={show.closingDate}
+            onPanelChange={setReviewPanelOpen}
           />
         </View>
 
@@ -456,8 +459,8 @@ export default function ShowDetailScreen() {
         </View>
       </ScrollView>
 
-      {/* Sticky Buy Tickets button */}
-      {primaryTicketLink && (
+      {/* Sticky Buy Tickets button — hidden when review panel is open */}
+      {primaryTicketLink && !reviewPanelOpen && (
         <View style={[styles.stickyButtonContainer, { paddingBottom: Math.max(insets.bottom, Spacing.md) }]}>
           <Pressable
             style={({ pressed }) => [styles.stickyBuyButton, pressed && styles.stickyBuyButtonPressed]}
@@ -971,20 +974,23 @@ const styles = StyleSheet.create({
   },
   infoRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border.subtle,
+    gap: Spacing.md,
   },
   infoLabel: {
     color: Colors.text.muted,
     fontSize: FontSize.md,
+    flexShrink: 0,
   },
   infoValue: {
     color: Colors.text.primary,
     fontSize: FontSize.md,
     fontWeight: '500',
+    flex: 1,
+    textAlign: 'right',
   },
   section: {
     paddingHorizontal: Spacing.lg,

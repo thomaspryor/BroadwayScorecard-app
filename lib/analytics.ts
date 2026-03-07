@@ -16,16 +16,30 @@ type AnalyticsEvent = {
 const MAX_QUEUE_SIZE = 500;
 const eventQueue: AnalyticsEvent[] = [];
 
-// PostHog client instance — set from _layout.tsx after initAsync resolves
+// Pending identity calls queued before PostHog is ready
+let pendingIdentify: { userId: string; properties?: Record<string, string> } | null = null;
+let pendingReset = false;
+
+// PostHog client instance — set from _layout.tsx after init
 let posthog: PostHog | null = null;
 
 /** Called from _layout.tsx to bridge the PostHog client instance */
 export function setPostHogInstance(client: PostHog) {
   posthog = client;
 
-  // Flush any queued events
+  // Flush any queued identity calls
+  if (pendingIdentify) {
+    client.identify(pendingIdentify.userId, pendingIdentify.properties);
+    pendingIdentify = null;
+  }
+  if (pendingReset) {
+    client.reset();
+    pendingReset = false;
+  }
+
+  // Flush any queued events (preserve original timestamps)
   for (const entry of eventQueue) {
-    client.capture(entry.event, entry.properties);
+    client.capture(entry.event, { ...entry.properties, $timestamp: entry.timestamp });
   }
   eventQueue.length = 0;
 }
@@ -173,12 +187,17 @@ export function trackSignOut() {
 export function identifyUser(userId: string, properties?: Record<string, string>) {
   if (posthog) {
     posthog.identify(userId, properties);
+  } else {
+    pendingIdentify = { userId, properties };
   }
 }
 
 export function resetAnalyticsUser() {
   if (posthog) {
     posthog.reset();
+  } else {
+    pendingReset = true;
+    pendingIdentify = null;
   }
 }
 

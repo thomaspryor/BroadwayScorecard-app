@@ -59,14 +59,23 @@ export default function SettingsScreen() {
         style: 'destructive',
         onPress: async () => {
           trackCacheCleared();
-          // Preserve onboarding flag + auth SecureStore keys when clearing cache
-          const onboardingSeen = await AsyncStorage.getItem('@broadwayScorecard:onboardingSeen');
+          // Preserve onboarding flag, push token, and notification state when clearing cache
+          const keysToPreserve = [
+            '@broadwayScorecard:onboardingSeen',
+            '@bsc:pushToken',
+            '@bsc:notificationPermissionAsked',
+          ];
+          const preserved: [string, string][] = [];
+          for (const key of keysToPreserve) {
+            const val = await AsyncStorage.getItem(key);
+            if (val !== null) preserved.push([key, val]);
+          }
           // Clear user cache if signed in
           if (user?.id) await clearUserCache(user.id);
-          // Clear AsyncStorage (show data cache) but preserve keys
+          // Clear AsyncStorage (show data cache) but restore preserved keys
           await AsyncStorage.clear();
-          if (onboardingSeen) {
-            await AsyncStorage.setItem('@broadwayScorecard:onboardingSeen', onboardingSeen);
+          for (const [key, val] of preserved) {
+            await AsyncStorage.setItem(key, val);
           }
           Alert.alert('Done', 'Cache cleared. Pull down to refresh.');
         },
