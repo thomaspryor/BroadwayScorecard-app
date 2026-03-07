@@ -1,0 +1,12 @@
+# CI Helper — Skip onboarding on first launch
+# Fresh installs show a welcome carousel. Tap Skip to dismiss it.
+# After this, subsequent launchApp calls go straight to Home.
+
+appId: com.broadwayscorecard.app
+---
+- launchApp
+- tapOn:
+    text: "Skip"
+- extendedWaitUntil:
+    visible: "Broadway Scorecard"
+    timeout: 30000

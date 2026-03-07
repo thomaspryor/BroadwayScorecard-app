@@ -108,6 +108,10 @@ jobs:
           path: /tmp/app-screenshot.png
           retention-days: 3
 
+      - name: Dismiss onboarding screen
+        run: |
+          maestro test .maestro/ci-skip-onboarding.yaml
+
       - name: Run Maestro tests
         run: |
           case "${{ inputs.suite }}" in
