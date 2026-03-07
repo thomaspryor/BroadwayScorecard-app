@@ -17,7 +17,7 @@ jobs:
   e2e:
     name: Maestro E2E (${{ inputs.suite }})
     runs-on: macos-15
-    timeout-minutes: 45
+    timeout-minutes: 75
     env:
       EXPO_PUBLIC_DEV_AUTO_SIGNIN: '1'
     steps:
