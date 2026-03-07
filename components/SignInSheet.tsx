@@ -14,7 +14,7 @@ import Svg, { Path } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
 
-type SignInContext = 'rating' | 'watchlist' | 'generic';
+type SignInContext = 'rating' | 'watchlist' | 'list' | 'generic';
 
 interface SignInSheetProps {
   visible: boolean;
@@ -29,12 +29,14 @@ interface SignInSheetProps {
 const HEADLINES: Record<SignInContext, string> = {
   rating: 'Sign in to save your rating',
   watchlist: 'Sign in to save your watchlist',
+  list: 'Sign in to manage your lists',
   generic: 'Sign in to Broadway Scorecard',
 };
 
 const SUBTEXTS: Record<SignInContext, string> = {
   rating: 'Your rating will be saved automatically after sign-in.',
   watchlist: 'Your watchlist will be saved automatically after sign-in.',
+  list: 'Your lists will be available after sign-in.',
   generic: 'Track shows, rate performances, and build your theater diary.',
 };
 

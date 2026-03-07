@@ -21,6 +21,7 @@ import { featureFlags } from '@/lib/feature-flags';
 import * as haptics from '@/lib/haptics';
 import StarRating from './StarRating';
 import WatchlistButton from './WatchlistButton';
+import AddToListSheet from './AddToListSheet';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
 
 interface ShowPageRatingProps {
@@ -54,6 +55,7 @@ export default function ShowPageRating({
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [watchlistLoading, setWatchlistLoading] = useState(false);
   const [showWatchlistDatePicker, setShowWatchlistDatePicker] = useState(false);
+  const [showListSheet, setShowListSheet] = useState(false);
 
   // Load data when authenticated
   useEffect(() => {
@@ -97,6 +99,8 @@ export default function ShowPageRating({
         } catch {
           showToast('Failed to add to watchlist.', 'error');
         }
+      } else if (pending.type === 'add-to-list') {
+        setShowListSheet(true);
       } else {
         showToast('Signed in successfully!', 'success');
       }
@@ -188,6 +192,21 @@ export default function ShowPageRating({
       setWatchlistLoading(false);
     }
   }, [isAuthenticated, showId, pathname, showSignIn, isWatchlisted, addToWatchlist, removeFromWatchlist, showToast]);
+
+  const handleListPress = useCallback(() => {
+    if (!isAuthenticated) {
+      savePendingAction({
+        type: 'add-to-list',
+        showId,
+        returnRoute: pathname,
+        timestamp: Date.now(),
+      });
+      showSignIn('list');
+      return;
+    }
+    haptics.tap();
+    setShowListSheet(true);
+  }, [isAuthenticated, showId, pathname, showSignIn]);
 
   const handleWatchlistDateChange = useCallback(
     (_event: DateTimePickerEvent, selectedDate?: Date) => {
@@ -330,6 +349,18 @@ export default function ShowPageRating({
             onToggle={handleToggleWatchlist}
             loading={watchlistLoading}
           />
+          <Pressable
+            style={styles.listButton}
+            onPress={handleListPress}
+            accessibilityRole="button"
+            accessibilityLabel="Add to list"
+            testID="add-to-list-button"
+          >
+            <Svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={Colors.text.muted} strokeWidth={2}>
+              <Path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+            </Svg>
+            <Text style={styles.listButtonText}>List</Text>
+          </Pressable>
           {isWatchlisted(showId) && (
             <View style={styles.watchlistDateCol}>
               <Pressable
@@ -377,6 +408,14 @@ export default function ShowPageRating({
           )}
         </View>
       </View>
+      {isAuthenticated && user && (
+        <AddToListSheet
+          showId={showId}
+          userId={user.id}
+          visible={showListSheet}
+          onClose={() => setShowListSheet(false)}
+        />
+      )}
     </View>
   );
 }
@@ -482,6 +521,20 @@ const styles = StyleSheet.create({
   viewingDate: {
     color: Colors.text.muted,
     fontSize: FontSize.xs,
+  },
+  listButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    marginTop: Spacing.sm,
+    minHeight: 44,
+    paddingHorizontal: Spacing.sm,
+  },
+  listButtonText: {
+    color: Colors.text.muted,
+    fontSize: FontSize.xs,
+    fontWeight: '500',
   },
   watchlistDateCol: {
     alignItems: 'center',

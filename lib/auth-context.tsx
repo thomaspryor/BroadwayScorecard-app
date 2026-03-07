@@ -42,7 +42,7 @@ try {
   console.warn('[Auth] @react-native-google-signin not available');
 }
 
-type SignInContext = 'rating' | 'watchlist' | 'generic';
+type SignInContext = 'rating' | 'watchlist' | 'list' | 'generic';
 
 interface AuthContextValue {
   user: { id: string; email: string } | null;
