@@ -11,6 +11,7 @@ on:
           - all
           - show-rating
           - my-shows
+          - tabs
 
 jobs:
   e2e:
@@ -43,17 +44,6 @@ jobs:
           curl -Ls "https://get.maestro.mobile.dev" | bash
           echo "$HOME/.maestro/bin" >> $GITHUB_PATH
 
-      - name: Cache Xcode build
-        uses: actions/cache@v4
-        with:
-          path: ios/build
-          key: xcode-build-${{ runner.os }}-${{ hashFiles('ios/Podfile.lock', 'package-lock.json') }}
-          restore-keys: |
-            xcode-build-${{ runner.os }}-
-
-      - name: Install CocoaPods
-        run: cd ios && pod install --repo-update
-
       - name: Boot iOS Simulator
         run: |
           DEVICE_ID=$(xcrun simctl list devices available -j | python3 -c "
@@ -74,9 +64,22 @@ jobs:
           xcrun simctl boot "$DEVICE_ID" 2>/dev/null || true
           echo "DEVICE_ID=$DEVICE_ID" >> $GITHUB_ENV
 
+      - name: Expo prebuild (generate ios/)
+        run: npx expo prebuild --platform ios --clean
+
+      - name: Cache Xcode build
+        uses: actions/cache@v4
+        with:
+          path: ios/build
+          key: xcode-build-${{ runner.os }}-${{ hashFiles('ios/Podfile.lock', 'package-lock.json') }}
+          restore-keys: |
+            xcode-build-${{ runner.os }}-
+
+      - name: Install CocoaPods
+        run: cd ios && pod install --repo-update
+
       - name: Build app for Simulator
         run: |
-          npx expo prebuild --platform ios --clean
           xcodebuild \
             -workspace ios/BroadwayScorecard.xcworkspace \
             -scheme BroadwayScorecard \
@@ -86,7 +89,7 @@ jobs:
             -derivedDataPath ios/build \
             build \
             CODE_SIGNING_ALLOWED=NO \
-            | xcbeautify --quiet || true
+            2>&1 | tail -50
 
       - name: Install app on Simulator
         run: |
@@ -103,13 +106,12 @@ jobs:
 
       - name: Run Maestro tests
         run: |
-          if [ "${{ inputs.suite }}" = "all" ]; then
-            PATTERN=".maestro/**/*.yaml"
-          elif [ "${{ inputs.suite }}" = "show-rating" ]; then
-            PATTERN=".maestro/show-rating/*.yaml"
-          else
-            PATTERN=".maestro/my-shows/*.yaml"
-          fi
+          case "${{ inputs.suite }}" in
+            all)          PATTERN=".maestro/**/*.yaml" ;;
+            show-rating)  PATTERN=".maestro/show-rating/*.yaml" ;;
+            my-shows)     PATTERN=".maestro/my-shows/*.yaml" ;;
+            tabs)         PATTERN=".maestro/tabs/*.yaml" ;;
+          esac
 
           FAILED=0
           for f in $PATTERN; do
