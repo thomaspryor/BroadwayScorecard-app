@@ -182,6 +182,28 @@ export function trackSignOut() {
   trackEvent('sign_out', {});
 }
 
+// ─── Lists events (P1) ────────────────────────────────
+
+export function trackListCreated(listId: string, name: string, isRanked: boolean) {
+  trackEvent('list_created', { list_id: listId, name, is_ranked: isRanked });
+}
+
+export function trackListDeleted(listId: string) {
+  trackEvent('list_deleted', { list_id: listId });
+}
+
+export function trackShowAddedToList(listId: string, showId: string, source: 'list_detail' | 'show_page') {
+  trackEvent('show_added_to_list', { list_id: listId, show_id: showId, source });
+}
+
+export function trackShowRemovedFromList(listId: string, showId: string) {
+  trackEvent('show_removed_from_list', { list_id: listId, show_id: showId });
+}
+
+export function trackListReordered(listId: string, itemCount: number) {
+  trackEvent('list_reordered', { list_id: listId, item_count: itemCount });
+}
+
 // ─── Identity helpers ──────────────────────────────────
 
 export function identifyUser(userId: string, properties?: Record<string, string>) {

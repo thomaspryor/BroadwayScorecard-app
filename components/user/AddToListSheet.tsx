@@ -22,6 +22,7 @@ import { useToastSafe } from '@/lib/toast-context';
 import { featureFlags } from '@/lib/feature-flags';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
 import * as haptics from '@/lib/haptics';
+import { trackShowAddedToList, trackShowRemovedFromList, trackListCreated } from '@/lib/analytics';
 
 interface AddToListSheetProps {
   showId: string;
@@ -51,11 +52,13 @@ export default function AddToListSheet({ showId, userId, visible, onClose }: Add
       if (isInList) {
         await removeFromList(listId, showId);
         haptics.action();
+        trackShowRemovedFromList(listId, showId);
         const list = lists.find(l => l.id === listId);
         showToast(`Removed from ${list?.name || 'list'}`, 'info');
       } else {
         await addToList(listId, showId);
         haptics.action();
+        trackShowAddedToList(listId, showId, 'show_page');
         const list = lists.find(l => l.id === listId);
         showToast(`Added to ${list?.name || 'list'}`, 'success');
       }
@@ -77,7 +80,9 @@ export default function AddToListSheet({ showId, userId, visible, onClose }: Add
     try {
       const newList = await createList(name);
       if (newList) {
+        trackListCreated(newList.id, name, false);
         await addToList(newList.id, showId);
+        trackShowAddedToList(newList.id, showId, 'show_page');
         haptics.action();
         showToast(`Added to ${name}`, 'success');
         setNewListName('');

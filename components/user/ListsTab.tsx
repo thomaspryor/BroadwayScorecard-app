@@ -32,6 +32,7 @@ import { useShows } from '@/lib/data-context';
 import { getImageUrl } from '@/lib/images';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
 import * as haptics from '@/lib/haptics';
+import { trackListCreated, trackListDeleted, trackShowAddedToList, trackShowRemovedFromList, trackListReordered } from '@/lib/analytics';
 import type { UserList, ListItem } from '@/lib/user-types';
 import type { Show } from '@/lib/types';
 
@@ -111,6 +112,7 @@ export default function ListsTab({ userId, showMap, createTrigger }: ListsTabPro
     haptics.action();
     const newList = await createList(name, description, isRanked);
     if (newList) {
+      trackListCreated(newList.id, name, isRanked);
       setShowModal(null);
     }
   };
@@ -135,6 +137,7 @@ export default function ListsTab({ userId, showMap, createTrigger }: ListsTabPro
           onPress: async () => {
             haptics.action();
             await deleteList(listId);
+            trackListDeleted(listId);
             setActiveListId(null);
           },
         },
@@ -146,6 +149,7 @@ export default function ListsTab({ userId, showMap, createTrigger }: ListsTabPro
     if (!activeListId) return;
     haptics.action();
     await addToList(activeListId, showId);
+    trackShowAddedToList(activeListId, showId, 'list_detail');
     // Refresh items
     const items = await getListItems(activeListId);
     setListItems(items);
@@ -156,6 +160,7 @@ export default function ListsTab({ userId, showMap, createTrigger }: ListsTabPro
     if (!activeListId) return;
     haptics.action();
     await removeFromList(activeListId, showId);
+    trackShowRemovedFromList(activeListId, showId);
     setListItems(prev => prev.filter(i => i.show_id !== showId));
   };
 
@@ -168,7 +173,9 @@ export default function ListsTab({ userId, showMap, createTrigger }: ListsTabPro
     const itemIds = data.map(i => i.id);
     const positions = data.map((_, idx) => (idx + 1) * POSITION_GAP);
     const success = await reorderList(activeListId, itemIds, positions);
-    if (!success) {
+    if (success) {
+      trackListReordered(activeListId, data.length);
+    } else {
       // Revert on failure
       setListItems(prevItems);
     }
