@@ -78,43 +78,25 @@ jobs:
       - name: Install CocoaPods
         run: cd ios && pod install --repo-update
 
-      - name: Build app for Simulator
+      - name: Build app for Simulator (Release — JS bundled)
         run: |
           xcodebuild \
             -workspace ios/BroadwayScorecard.xcworkspace \
             -scheme BroadwayScorecard \
             -sdk iphonesimulator \
-            -configuration Debug \
+            -configuration Release \
             -destination "platform=iOS Simulator,id=$DEVICE_ID" \
             -derivedDataPath ios/build \
             build \
             CODE_SIGNING_ALLOWED=NO \
             2>&1 | tail -50
 
-      - name: Install app on Simulator
+      - name: Install and launch app
         run: |
           APP_PATH=$(find ios/build -name "*.app" -type d | head -1)
           xcrun simctl install "$DEVICE_ID" "$APP_PATH"
-
-      - name: Start Metro and pre-warm bundle
-        run: |
-          npx expo start --port 8081 &
-          echo "Waiting for Metro to start..."
-          for i in $(seq 1 60); do
-            if curl -s http://localhost:8081/status 2>/dev/null | grep -q "packager-status:running"; then
-              echo "Metro is running"
-              break
-            fi
-            sleep 2
-          done
-          echo "Pre-warming JS bundle (this takes 30-60s on first run)..."
-          curl -s "http://localhost:8081/index.bundle?platform=ios&dev=true&minify=false" > /dev/null
-          echo "Bundle ready"
-
-      - name: Connect dev client to Metro
-        run: |
-          # Run Maestro flow to dismiss dev launcher and connect to Metro
-          maestro test .maestro/ci-connect-metro.yaml || true
+          xcrun simctl launch "$DEVICE_ID" com.broadwayscorecard.app
+          sleep 5
           # Take a diagnostic screenshot
           xcrun simctl io "$DEVICE_ID" screenshot /tmp/app-screenshot.png || true
 
