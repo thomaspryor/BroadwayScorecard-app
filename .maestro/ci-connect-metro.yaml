@@ -1,0 +1,28 @@
+# CI Helper — Connect dev client to Metro
+# Taps the localhost:8081 server in the Expo dev launcher,
+# then waits for the app to render content.
+
+appId: com.broadwayscorecard.app
+---
+- launchApp
+
+# Dismiss any "Open in Broadway Scorecard?" dialog
+- tapOn:
+    text: "Open"
+    optional: true
+- tapOn:
+    text: "Open"
+    optional: true
+
+# Wait for dev launcher to settle
+- waitForAnimationToEnd
+
+# Tap the Metro server URL to connect
+- tapOn:
+    text: ".*localhost:8081.*"
+    optional: true
+
+# Wait for the app to load (Metro needs to serve the bundle)
+- extendedWaitUntil:
+    visible: "Home"
+    timeout: 60000

@@ -111,14 +111,10 @@ jobs:
           curl -s "http://localhost:8081/index.bundle?platform=ios&dev=true&minify=false" > /dev/null
           echo "Bundle ready"
 
-      - name: Launch app and connect to Metro
+      - name: Connect dev client to Metro
         run: |
-          # Launch app first
-          xcrun simctl launch "$DEVICE_ID" com.broadwayscorecard.app
-          sleep 3
-          # Connect dev client to Metro via expo-development-client URL scheme
-          xcrun simctl openurl "$DEVICE_ID" "exp+broadwayscorecard://expo-development-client/?url=http%3A%2F%2Flocalhost%3A8081"
-          sleep 10
+          # Run Maestro flow to dismiss dev launcher and connect to Metro
+          maestro test .maestro/ci-connect-metro.yaml || true
           # Take a diagnostic screenshot
           xcrun simctl io "$DEVICE_ID" screenshot /tmp/app-screenshot.png || true
 
