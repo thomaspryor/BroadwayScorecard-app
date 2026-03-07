@@ -9,6 +9,7 @@ import { useState, useCallback, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Crypto from 'expo-crypto';
 import { getSupabaseClient } from '@/lib/supabase';
+import { enqueue, isOnline } from '@/lib/offline-queue';
 import type { WatchlistEntry } from '@/lib/user-types';
 
 const CACHE_KEY = (userId: string) => `@bsc:watchlist:${userId}`;
@@ -79,26 +80,33 @@ export function useWatchlist(userId: string | null) {
       const client = getSupabaseClient();
       if (!client || !userId) return;
 
+      const optimistic: WatchlistEntry = {
+        id: Crypto.randomUUID(),
+        user_id: userId,
+        show_id: showId,
+        planned_date: null,
+        created_at: new Date().toISOString(),
+      };
+
       setError(null);
       try {
         const { error: err } = await client.from('watchlist').insert({ user_id: userId, show_id: showId });
-
         if (err) throw err;
-
-        // Optimistic update — bump version so background refresh won't clobber
         mutationVersion.current++;
-        setWatchlist(prev => [
-          {
-            id: Crypto.randomUUID(),
-            user_id: userId,
-            show_id: showId,
-            planned_date: null,
-            created_at: new Date().toISOString(),
-          },
-          ...prev,
-        ]);
+        setWatchlist(prev => [optimistic, ...prev]);
         await AsyncStorage.removeItem(CACHE_KEY(userId)).catch(() => {});
       } catch (e) {
+        if (await isNetworkError(e)) {
+          await enqueue({
+            table: 'watchlist',
+            action: 'insert',
+            data: { user_id: userId, show_id: showId },
+            filters: {},
+          });
+          mutationVersion.current++;
+          setWatchlist(prev => [optimistic, ...prev]);
+          return;
+        }
         const msg = e instanceof Error ? e.message : 'Failed to add to watchlist';
         setError(msg);
         throw new Error(msg);
@@ -125,6 +133,16 @@ export function useWatchlist(userId: string | null) {
         setWatchlist(prev => prev.filter(w => w.show_id !== showId));
         await AsyncStorage.removeItem(CACHE_KEY(userId)).catch(() => {});
       } catch (e) {
+        if (await isNetworkError(e)) {
+          await enqueue({
+            table: 'watchlist',
+            action: 'delete',
+            filters: { user_id: userId, show_id: showId },
+          });
+          mutationVersion.current++;
+          setWatchlist(prev => prev.filter(w => w.show_id !== showId));
+          return;
+        }
         const msg = e instanceof Error ? e.message : 'Failed to remove from watchlist';
         setError(msg);
         throw new Error(msg);
@@ -151,6 +169,17 @@ export function useWatchlist(userId: string | null) {
         setWatchlist(prev => prev.map(w => (w.show_id === showId ? { ...w, planned_date: plannedDate } : w)));
         await AsyncStorage.removeItem(CACHE_KEY(userId)).catch(() => {});
       } catch (e) {
+        if (await isNetworkError(e)) {
+          await enqueue({
+            table: 'watchlist',
+            action: 'update',
+            data: { planned_date: plannedDate },
+            filters: { user_id: userId, show_id: showId },
+          });
+          mutationVersion.current++;
+          setWatchlist(prev => prev.map(w => (w.show_id === showId ? { ...w, planned_date: plannedDate } : w)));
+          return;
+        }
         const msg = e instanceof Error ? e.message : 'Failed to update date';
         setError(msg);
         throw new Error(msg);
@@ -169,4 +198,10 @@ export function useWatchlist(userId: string | null) {
     removeFromWatchlist,
     updatePlannedDate,
   };
+}
+
+async function isNetworkError(e: unknown): Promise<boolean> {
+  const msg = e instanceof Error ? e.message : String(e);
+  if (/network|fetch|load failed|timeout|aborterror/i.test(msg)) return true;
+  return !(await isOnline());
 }

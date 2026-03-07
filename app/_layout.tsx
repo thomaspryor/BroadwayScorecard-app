@@ -20,6 +20,7 @@ import { setPostHogInstance } from '@/lib/analytics';
 import { Colors } from '@/constants/theme';
 import { registerForPushNotifications, setupNotificationHandler, configureNotificationChannels } from '@/lib/notifications';
 import { initSentry, wrapWithSentry } from '@/lib/sentry';
+import { startAutoFlush, flushQueue } from '@/lib/offline-queue';
 
 // Custom dark theme matching our design tokens
 const BroadwayDark = {
@@ -67,6 +68,10 @@ function RootLayout() {
   useEffect(() => {
     // Init crash reporting first — catches errors during startup
     initSentry();
+
+    // Start offline queue auto-flush + flush any pending operations
+    startAutoFlush();
+    flushQueue().catch(() => {});
 
     // Init PostHog synchronously (constructor), load flags + onboarding async
     const client = initPostHog();

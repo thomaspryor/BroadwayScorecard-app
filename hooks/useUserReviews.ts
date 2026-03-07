@@ -7,7 +7,9 @@
 
 import { useState, useCallback, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Crypto from 'expo-crypto';
 import { getSupabaseClient } from '@/lib/supabase';
+import { enqueue, isOnline } from '@/lib/offline-queue';
 import type { UserReview } from '@/lib/user-types';
 
 const CACHE_KEY = (userId: string) => `@bsc:reviews:${userId}`;
@@ -118,14 +120,15 @@ export function useUserReviews(userId: string | null) {
       setError(null);
       try {
         if (data.reviewId) {
+          const updateData = {
+            rating: data.rating,
+            review_text: data.reviewText || null,
+            date_seen: data.dateSeen || null,
+            updated_at: new Date().toISOString(),
+          };
           const { data: updated, error: err } = await client
             .from('reviews')
-            .update({
-              rating: data.rating,
-              review_text: data.reviewText || null,
-              date_seen: data.dateSeen || null,
-              updated_at: new Date().toISOString(),
-            })
+            .update(updateData)
             .eq('id', data.reviewId)
             .eq('user_id', userId)
             .select()
@@ -136,15 +139,16 @@ export function useUserReviews(userId: string | null) {
           await AsyncStorage.removeItem(CACHE_KEY(userId)).catch(() => {});
           return updated as UserReview;
         } else {
+          const insertData = {
+            user_id: userId,
+            show_id: data.showId,
+            rating: data.rating,
+            review_text: data.reviewText || null,
+            date_seen: data.dateSeen || null,
+          };
           const { data: inserted, error: err } = await client
             .from('reviews')
-            .insert({
-              user_id: userId,
-              show_id: data.showId,
-              rating: data.rating,
-              review_text: data.reviewText || null,
-              date_seen: data.dateSeen || null,
-            })
+            .insert(insertData)
             .select()
             .single();
 
@@ -154,12 +158,69 @@ export function useUserReviews(userId: string | null) {
           return inserted as UserReview;
         }
       } catch (e) {
+        // Network error — queue for later and apply optimistic state
+        if (await isNetworkError(e)) {
+          const now = new Date().toISOString();
+          if (data.reviewId) {
+            await enqueue({
+              table: 'reviews',
+              action: 'update',
+              data: {
+                rating: data.rating,
+                review_text: data.reviewText || null,
+                date_seen: data.dateSeen || null,
+                updated_at: now,
+              },
+              filters: { id: data.reviewId, user_id: userId },
+            });
+            // Optimistic local update
+            const optimistic: UserReview = {
+              ...(reviews.find(r => r.id === data.reviewId) as UserReview),
+              rating: data.rating,
+              review_text: data.reviewText || null,
+              date_seen: data.dateSeen || null,
+              updated_at: now,
+            };
+            mutationVersion.current++;
+            setReviews(prev => prev.map(r => r.id === data.reviewId ? optimistic : r));
+            return optimistic;
+          } else {
+            const tempId = Crypto.randomUUID();
+            await enqueue({
+              table: 'reviews',
+              action: 'insert',
+              data: {
+                user_id: userId,
+                show_id: data.showId,
+                rating: data.rating,
+                review_text: data.reviewText || null,
+                date_seen: data.dateSeen || null,
+              },
+              filters: {},
+            });
+            // Optimistic local insert
+            const optimistic: UserReview = {
+              id: tempId,
+              user_id: userId,
+              show_id: data.showId,
+              rating: data.rating,
+              review_text: data.reviewText || null,
+              date_seen: data.dateSeen || null,
+              visibility: 'private',
+              created_at: now,
+              updated_at: now,
+            };
+            mutationVersion.current++;
+            setReviews(prev => [optimistic, ...prev]);
+            return optimistic;
+          }
+        }
         const msg = e instanceof Error ? e.message : 'Failed to save review';
         setError(msg);
         throw new Error(msg);
       }
     },
-    [userId],
+    [userId, reviews],
   );
 
   const deleteReview = useCallback(
@@ -177,10 +238,19 @@ export function useUserReviews(userId: string | null) {
 
         if (err) throw err;
         mutationVersion.current++;
-        // Remove from local state immediately
         setReviews(prev => prev.filter(r => r.id !== reviewId));
         await AsyncStorage.removeItem(CACHE_KEY(userId)).catch(() => {});
       } catch (e) {
+        if (await isNetworkError(e)) {
+          await enqueue({
+            table: 'reviews',
+            action: 'delete',
+            filters: { id: reviewId, user_id: userId },
+          });
+          mutationVersion.current++;
+          setReviews(prev => prev.filter(r => r.id !== reviewId));
+          return;
+        }
         const msg = e instanceof Error ? e.message : 'Failed to delete review';
         setError(msg);
         throw new Error(msg);
@@ -206,4 +276,12 @@ export function useUserReviews(userId: string | null) {
     deleteReview,
     invalidateCache,
   };
+}
+
+/** Check if an error is a network/connectivity issue (vs a server/auth error) */
+async function isNetworkError(e: unknown): Promise<boolean> {
+  const msg = e instanceof Error ? e.message : String(e);
+  if (/network|fetch|load failed|timeout|aborterror/i.test(msg)) return true;
+  // Also check actual connectivity
+  return !(await isOnline());
 }
