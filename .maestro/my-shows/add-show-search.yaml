@@ -1,19 +1,10 @@
-# My Shows — Add Show Search
-# Verifies: "Add a show" opens search, can dismiss
+# My Shows — Add Show Button
+# Verifies: "Rate a show" card visible at bottom of diary
 
 appId: com.broadwayscorecard.app
 ---
 - launchApp
+- openLink: broadwayscorecard:///my-shows
 
-# Navigate to My Shows tab and sign in with dev bypass
-- tapOn: "My Shows"
-- tapOn:
-    id: "Dev Sign In"
-
-# Note: "Add a show" button not yet implemented in mobile My Shows.
-# Stub for when it is added.
-# - tapOn:
-#     id: "Add a show"
-# - assertVisible: "Search to rate"
-# - tapOn:
-#     id: "Close search"
+# The footer card in diary mode
+- assertVisible: "Rate a show"

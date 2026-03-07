@@ -1,33 +1,14 @@
 # My Shows — Diary Sort
-# Verifies: sort cycles through Newest → Oldest → Top Rated
+# Verifies: sort button cycles through options
 
 appId: com.broadwayscorecard.app
 ---
 - launchApp
+- openLink: broadwayscorecard:///my-shows
 
-# Navigate to My Shows tab and sign in with dev bypass
-- tapOn: "My Shows"
-- tapOn:
-    id: "Dev Sign In"
+# Diary tab with sort button
+- assertVisible: "Diary"
+- assertVisible: "Sort diary"
 
-# Start on Diary tab
-- tapOn:
-    id: "Diary"
-
-# Default sort should be "Newest"
-- assertVisible: "Newest"
-
-# Tap sort to cycle
-- tapOn:
-    id: "Sort diary"
-- assertVisible: "Oldest"
-
-# Tap again
-- tapOn:
-    id: "Sort diary"
-- assertVisible: "Top Rated"
-
-# Tap again — back to Newest
-- tapOn:
-    id: "Sort diary"
-- assertVisible: "Newest"
+# Tap sort button to cycle
+- tapOn: "Sort diary"

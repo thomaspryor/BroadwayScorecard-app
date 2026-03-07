@@ -8,34 +8,26 @@ appId: com.broadwayscorecard.app
 - openLink: broadwayscorecard://test/show-rating-fixture?state=empty
 
 # Should start as "Add to watchlist"
-- assertVisible:
-    id: "Add to watchlist"
+- assertVisible: "Add to watchlist"
 
 # Tap to add
-- tapOn:
-    id: "Add to watchlist"
+- tapOn: "Add to watchlist"
 
 # Should toggle to "Remove from watchlist"
-- assertVisible:
-    id: "Remove from watchlist"
+- assertVisible: "Remove from watchlist"
 
 # Tap to remove
-- tapOn:
-    id: "Remove from watchlist"
+- tapOn: "Remove from watchlist"
 
 # Should toggle back to "Add to watchlist"
-- assertVisible:
-    id: "Add to watchlist"
+- assertVisible: "Add to watchlist"
 
 # Test from existing state (already watchlisted)
 - openLink: broadwayscorecard://test/show-rating-fixture?state=existing
 
 # Should show "Remove from watchlist" (existing state is watchlisted)
-- assertVisible:
-    id: "Remove from watchlist"
+- assertVisible: "Remove from watchlist"
 
 # Toggle off
-- tapOn:
-    id: "Remove from watchlist"
-- assertVisible:
-    id: "Add to watchlist"
+- tapOn: "Remove from watchlist"
+- assertVisible: "Add to watchlist"

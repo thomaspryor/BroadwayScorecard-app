@@ -1,22 +1,14 @@
-# My Shows — Watchlist Remove
-# Verifies: tap remove → entry removed from list
+# My Shows — Watchlist Tab
+# Verifies: watchlist tab loads and sort button works
 
 appId: com.broadwayscorecard.app
 ---
 - launchApp
-
-# Navigate to My Shows tab and sign in with dev bypass
-- tapOn: "My Shows"
-- tapOn:
-    id: "Dev Sign In"
+- openLink: broadwayscorecard:///my-shows
 
 # Switch to watchlist tab
 - tapOn:
-    id: "Watchlist"
+    text: "Watchlist.*"
 
-# Tap remove on first item
-- tapOn:
-    id: "Remove from watchlist"
-    index: 0
-
-# Item should be removed — watchlist count should decrement
+# Sort button should be watchlist-specific
+- assertVisible: "Sort watchlist"

@@ -8,45 +8,36 @@ appId: com.broadwayscorecard.app
 - openLink: broadwayscorecard://test/show-rating-fixture?state=multi
 
 # "Seen N times" badge should be visible
-- assertVisible:
-    id: "Seen 3 times"
+- assertVisible: "Seen 3 times"
 
 # Latest review edit/delete buttons
-- assertVisible:
-    id: "Edit rating"
-- assertVisible:
-    id: "Delete rating"
-- assertVisible:
-    id: "New viewing"
+- assertVisible: "Edit rating"
+- assertVisible: "Delete rating"
+- assertVisible: "New viewing"
 
-# Previous viewings should be listed (up to 3, minus latest = 2 shown)
-- assertVisible:
-    id: "Edit this viewing"
+# Previous viewings should be listed
+- assertVisible: "Edit this viewing"
 
 # Tap edit on a previous viewing — panel should open
 - tapOn:
-    id: "Edit this viewing"
+    text: "Edit this viewing"
     index: 0
 - assertVisible: "Save"
 - assertVisible: "Cancel"
 
 # Cancel out
-- tapOn:
-    id: "Cancel"
+- tapOn: "Cancel"
 - assertNotVisible: "Save"
 
 # Delete a previous viewing
 - tapOn:
-    id: "Delete this viewing"
+    text: "Delete this viewing"
     index: 0
 
 # Badge should update (now 2 viewings)
-- assertVisible:
-    id: "Seen 2 times"
+- assertVisible: "Seen 2 times"
 
 # Tap "+ New Viewing" to add another
-- tapOn:
-    id: "New viewing"
+- tapOn: "New viewing"
 - assertVisible: "Save"
-- assertVisible:
-    id: "Private notes"
+- assertVisible: "Private Notes (optional)"

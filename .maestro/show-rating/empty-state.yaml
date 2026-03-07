@@ -9,34 +9,24 @@ appId: com.broadwayscorecard.app
 - assertVisible: "YOUR RATING"
 
 # Verify all 5 star buttons are visible
-- assertVisible:
-    id: "1 star"
-- assertVisible:
-    id: "2 stars"
-- assertVisible:
-    id: "3 stars"
-- assertVisible:
-    id: "4 stars"
-- assertVisible:
-    id: "5 stars"
+- assertVisible: "1 star"
+- assertVisible: "2 stars"
+- assertVisible: "3 stars"
+- assertVisible: "4 stars"
+- assertVisible: "5 stars"
 
 # No edit/delete/new viewing buttons in empty state
-- assertNotVisible:
-    id: "Edit rating"
-- assertNotVisible:
-    id: "New viewing"
+- assertNotVisible: "Edit rating"
+- assertNotVisible: "New viewing"
 
 # Watchlist button should be visible
-- assertVisible:
-    id: "Add to watchlist"
+- assertVisible: "Add to watchlist"
 
 # Tap 4th star — ReviewPanel should open
-- tapOn:
-    id: "4 stars"
+- tapOn: "4 stars"
 - assertVisible: "Save"
 - assertVisible: "Cancel"
-- assertVisible: "Private notes"
+- assertVisible: "Private Notes (optional)"
 - assertVisible: "Only visible to you"
 - assertVisible: "Character count"
-- assertVisible:
-    id: "Choose date seen"
+- assertVisible: "Choose date seen"

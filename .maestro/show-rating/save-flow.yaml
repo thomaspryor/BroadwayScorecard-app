@@ -8,27 +8,21 @@ appId: com.broadwayscorecard.app
 - openLink: broadwayscorecard://test/show-rating-fixture?state=empty
 
 # Tap 4 stars to open panel
-- tapOn:
-    id: "4 stars"
+- tapOn: "4 stars"
 - assertVisible: "Save"
 
 # Fill in review text
-- tapOn:
-    id: "Private notes"
+- tapOn: "Private Notes (optional)"
 - inputText: "Incredible performances, Lin-Manuel Miranda is a genius"
 
 # Tap Save
-- tapOn:
-    id: "Save"
+- tapOn: "Save"
 
 # Panel should close — Save/Cancel should disappear
 - assertNotVisible: "Save"
 - assertNotVisible: "Cancel"
 
 # Edit and delete buttons should now be visible
-- assertVisible:
-    id: "Edit rating"
-- assertVisible:
-    id: "Delete rating"
-- assertVisible:
-    id: "New viewing"
+- assertVisible: "Edit rating"
+- assertVisible: "Delete rating"
+- assertVisible: "New viewing"

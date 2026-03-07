@@ -1,5 +1,5 @@
 # Show Page Rating — Delete Flow
-# Verifies: tap Delete → confirmation → confirm → reset to empty state
+# Verifies: tap Delete → reset to empty state
 # Fixture: /test/show-rating-fixture?state=existing
 
 appId: com.broadwayscorecard.app
@@ -8,17 +8,12 @@ appId: com.broadwayscorecard.app
 - openLink: broadwayscorecard://test/show-rating-fixture?state=existing
 
 # Existing review should show delete button
-- assertVisible:
-    id: "Delete rating"
+- assertVisible: "Delete rating"
 
-# Tap delete — confirmation should appear
-- tapOn:
-    id: "Delete rating"
+# Tap delete
+- tapOn: "Delete rating"
 
 # After delete, should reset to empty state (interactive stars, no edit/delete)
-- assertVisible:
-    id: "1 star"
-- assertVisible:
-    id: "5 stars"
-- assertNotVisible:
-    id: "Edit rating"
+- assertVisible: "1 star"
+- assertVisible: "5 stars"
+- assertNotVisible: "Edit rating"
