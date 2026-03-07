@@ -10,8 +10,9 @@ appId: com.broadwayscorecard.app
     visible: "Broadway Scorecard"
     timeout: 30000
 
-# Navigate to Browse tab
-- tapOn: "Browse"
+# Navigate to Browse tab (iOS labels tabs as "Browse, tab, 2 of 5")
+- tapOn:
+    text: "Browse, tab.*"
 
 # Header visible — wait for data load
 - extendedWaitUntil:
