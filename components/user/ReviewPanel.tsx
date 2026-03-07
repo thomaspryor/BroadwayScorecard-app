@@ -10,6 +10,7 @@ import { View, Text, TextInput, Pressable, StyleSheet, KeyboardAvoidingView, Pla
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import Svg, { Path } from 'react-native-svg';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
+import * as haptics from '@/lib/haptics';
 
 interface ReviewPanelProps {
   rating: number;
@@ -43,6 +44,7 @@ export default function ReviewPanel({
 
   const handleSave = useCallback(() => {
     if (isOverLimit || saving) return;
+    haptics.action();
     onSave({
       rating,
       reviewText: reviewText.trim() || null,

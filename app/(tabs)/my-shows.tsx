@@ -33,6 +33,7 @@ import StarRating from '@/components/user/StarRating';
 import type { UserReview, WatchlistEntry } from '@/lib/user-types';
 import type { Show } from '@/lib/types';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
+import * as haptics from '@/lib/haptics';
 
 type Tab = 'diary' | 'watchlist';
 type DiarySort = 'date-desc' | 'date-asc' | 'rating-desc';
@@ -158,6 +159,7 @@ export default function MyShowsScreen() {
 
   // Sort cycling
   const cycleDiarySort = useCallback(() => {
+    haptics.tap();
     setDiarySort(prev => {
       if (prev === 'date-desc') return 'date-asc';
       if (prev === 'date-asc') return 'rating-desc';
@@ -166,6 +168,7 @@ export default function MyShowsScreen() {
   }, []);
 
   const cycleWatchlistSort = useCallback(() => {
+    haptics.tap();
     setWatchlistSort(prev => {
       if (prev === 'added-desc') return 'alphabetical';
       if (prev === 'alphabetical') return 'closing-soon';
@@ -203,6 +206,7 @@ export default function MyShowsScreen() {
   }, [upcomingWatchlist, sortedWatchlist]);
 
   const handleDeleteDiaryItem = useCallback((review: UserReview) => {
+    haptics.action();
     const show = showMap[review.show_id];
     const title = show?.title || review.show_id;
     Alert.alert(
@@ -461,7 +465,7 @@ export default function MyShowsScreen() {
       <View style={styles.tabBar}>
         <Pressable
           style={[styles.tab, activeTab === 'diary' && styles.tabActive]}
-          onPress={() => setActiveTab('diary')}
+          onPress={() => { haptics.tap(); setActiveTab('diary'); }}
           accessibilityRole="tab"
           accessibilityLabel="Diary"
           accessibilityState={{ selected: activeTab === 'diary' }}
@@ -473,7 +477,7 @@ export default function MyShowsScreen() {
         </Pressable>
         <Pressable
           style={[styles.tab, activeTab === 'watchlist' && styles.tabActive]}
-          onPress={() => setActiveTab('watchlist')}
+          onPress={() => { haptics.tap(); setActiveTab('watchlist'); }}
           accessibilityRole="tab"
           accessibilityLabel={`Watchlist${watchlist.length > 0 ? `, ${watchlist.length} shows` : ''}`}
           accessibilityState={{ selected: activeTab === 'watchlist' }}
@@ -501,7 +505,7 @@ export default function MyShowsScreen() {
           </Pressable>
           <Pressable
             style={styles.viewToggle}
-            onPress={() => setViewMode(prev => prev === 'list' ? 'grid' : 'list')}
+            onPress={() => { haptics.tap(); setViewMode(prev => prev === 'list' ? 'grid' : 'list'); }}
             hitSlop={8}
             accessibilityRole="button"
             accessibilityLabel={viewMode === 'list' ? 'Grid view' : 'List view'}

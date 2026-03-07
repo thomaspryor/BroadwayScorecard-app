@@ -21,6 +21,7 @@ import { savePendingAction, getPendingAction, clearPendingAction } from '@/lib/d
 import { supabaseRestInsert, supabaseRestUpdate } from '@/lib/supabase-rest';
 import { featureFlags } from '@/lib/feature-flags';
 import { recordRatingGiven } from '@/lib/store-review';
+import * as haptics from '@/lib/haptics';
 import StarRating from './StarRating';
 import ReviewPanel from './ReviewPanel';
 import WatchlistButton from './WatchlistButton';
@@ -210,10 +211,12 @@ export default function ShowPageRating({
         setEditingReview(null);
         setCurrentRating(null);
         lastSavedId.current = null;
+        haptics.success();
         // Positive moment — consider prompting for App Store review
         recordRatingGiven();
       } catch (e) {
         const detail = e instanceof Error ? e.message : 'Unknown error';
+        haptics.error();
         showToast(`Save failed: ${detail}`, 'error');
       } finally {
         setSaving(false);
@@ -239,6 +242,7 @@ export default function ShowPageRating({
       try {
         await deleteReview(reviewId);
         await invalidateCache();
+        haptics.action();
         showToast('Rating deleted.', 'info');
         setConfirmDeleteId(null);
         // If we deleted the review being edited, close panel

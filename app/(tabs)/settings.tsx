@@ -16,6 +16,7 @@ import { clearUserCache } from '@/lib/user-cache';
 import { featureFlags } from '@/lib/feature-flags';
 import { Colors, Spacing, FontSize } from '@/constants/theme';
 import { trackDataRefreshed, trackCacheCleared } from '@/lib/analytics';
+import * as haptics from '@/lib/haptics';
 
 const WEB = 'https://broadwayscorecard.com';
 
@@ -42,6 +43,7 @@ export default function SettingsScreen() {
   const { user, profile, isAuthenticated, signOut, showSignIn } = auth;
 
   const handleRefresh = async () => {
+    haptics.tap();
     trackDataRefreshed('manual', 'settings');
     try {
       await refresh();
@@ -52,6 +54,7 @@ export default function SettingsScreen() {
   };
 
   const handleClearCache = () => {
+    haptics.action();
     Alert.alert('Clear Cache', 'This will remove all cached data. The app will re-download show data on next launch.', [
       { text: 'Cancel', style: 'cancel' },
       {
@@ -84,6 +87,7 @@ export default function SettingsScreen() {
   };
 
   const handleSignOut = () => {
+    haptics.action();
     Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
       { text: 'Cancel', style: 'cancel' },
       {
