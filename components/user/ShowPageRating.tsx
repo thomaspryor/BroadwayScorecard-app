@@ -311,7 +311,7 @@ export default function ShowPageRating({
         <View style={styles.leftCol}>
           {/* Section label */}
           <View style={styles.labelRow}>
-            <Text style={styles.sectionLabel}>{viewCount > 1 ? 'LATEST RATING' : 'YOUR RATING'}</Text>
+            <Text style={styles.sectionLabel}>MY RATING & REVIEW</Text>
             {viewCount > 1 && (
               <View style={styles.seenBadge} accessibilityLabel={`Seen ${viewCount} times`} testID="seen-badge">
                 <Text style={styles.seenText}>Seen {viewCount} times</Text>
@@ -574,7 +574,7 @@ const styles = StyleSheet.create({
   },
   previousViewings: {
     marginTop: Spacing.sm,
-    gap: Spacing.xs,
+    gap: 6,
   },
   viewingRow: {
     flexDirection: 'row',

@@ -30,6 +30,7 @@ import { useShows } from '@/lib/data-context';
 import { getImageUrl } from '@/lib/images';
 import { featureFlags } from '@/lib/feature-flags';
 import StarRating from '@/components/user/StarRating';
+import MiniStars from '@/components/user/MiniStars';
 import type { UserReview, WatchlistEntry } from '@/lib/user-types';
 import type { Show } from '@/lib/types';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
@@ -329,8 +330,13 @@ export default function MyShowsScreen() {
             <Text style={styles.placeholderText}>{title.charAt(0)}</Text>
           </View>
         )}
-        <View style={styles.gridOverlay}>
-          <Text style={styles.gridRating}>{item.rating.toFixed(1)}</Text>
+        <View style={styles.gridCardInfo}>
+          {item.rating > 0 && <MiniStars rating={item.rating} />}
+          <Text style={styles.gridDateText}>
+            {item.date_seen
+              ? new Date(item.date_seen + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+              : '\u00A0'}
+          </Text>
         </View>
         <Text style={styles.gridTitle} numberOfLines={2}>{title}</Text>
       </Pressable>
@@ -452,8 +458,13 @@ export default function MyShowsScreen() {
       {/* Stats bar */}
       <View style={styles.statsBar}>
         <Text style={styles.statText}>
-          <Text style={styles.statNumber}>{showsSeen}</Text> seen
+          <Text style={styles.statNumber}>{showsSeen}</Text> shows seen
         </Text>
+        {upcomingWatchlist.length > 0 && (
+          <Text style={styles.statText}>
+            <Text style={styles.statNumber}>{upcomingWatchlist.length}</Text> upcoming
+          </Text>
+        )}
         <Text style={styles.statText}>
           <Text style={styles.statNumber}>{watchlist.length}</Text> watchlist
         </Text>
@@ -567,6 +578,7 @@ export default function MyShowsScreen() {
       {activeTab === 'diary' && (
         sortedReviews.length === 0 && toBeRated.length === 0 ? (
           <EmptyState
+            emoji="🎭"
             title="Your diary is empty"
             description="Start rating shows to build your personal theater diary!"
             ctaLabel="Browse Shows"
@@ -602,6 +614,7 @@ export default function MyShowsScreen() {
       {activeTab === 'watchlist' && (
         watchlist.length === 0 ? (
           <EmptyState
+            emoji="📋"
             title="Your watchlist is empty"
             description="Add shows you want to see!"
             ctaLabel="Browse Shows"
@@ -748,7 +761,8 @@ function AddShowCard({ context, onPress }: { context: 'diary' | 'watchlist'; onP
   );
 }
 
-function EmptyState({ title, description, ctaLabel, onCta }: {
+function EmptyState({ emoji, title, description, ctaLabel, onCta }: {
+  emoji?: string;
   title: string;
   description: string;
   ctaLabel: string;
@@ -756,6 +770,7 @@ function EmptyState({ title, description, ctaLabel, onCta }: {
 }) {
   return (
     <View style={styles.emptyContainer}>
+      {emoji && <Text style={styles.emptyEmoji}>{emoji}</Text>}
       <Text style={styles.emptyTitle}>{title}</Text>
       <Text style={styles.emptyDescription}>{description}</Text>
       <Pressable style={({ pressed }) => [styles.ctaButton, pressed && styles.pressed]} onPress={onCta}>
@@ -942,7 +957,7 @@ const styles = StyleSheet.create({
   },
   cardTitle: {
     color: Colors.text.primary,
-    fontSize: FontSize.md,
+    fontSize: 17,
     fontWeight: '600',
   },
   cardVenue: {
@@ -951,7 +966,8 @@ const styles = StyleSheet.create({
   },
   cardNote: {
     color: Colors.text.secondary,
-    fontSize: FontSize.xs,
+    fontSize: 13,
+    fontStyle: 'italic',
     marginTop: 2,
   },
   cardDate: {
@@ -965,7 +981,7 @@ const styles = StyleSheet.create({
   },
   ratingText: {
     color: '#fcd34d',
-    fontSize: FontSize.xs,
+    fontSize: 14,
     fontWeight: '600',
   },
   closingSoonBadge: {
@@ -1062,25 +1078,26 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.sm,
     backgroundColor: Colors.surface.overlay,
   },
-  gridOverlay: {
-    position: 'absolute',
-    top: Spacing.xs,
-    right: Spacing.xs,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: BorderRadius.sm,
+  gridCardInfo: {
+    alignItems: 'center',
+    paddingHorizontal: 4,
+    paddingTop: 6,
+    paddingBottom: 2,
   },
-  gridRating: {
+  gridDateText: {
     color: '#fcd34d',
-    fontSize: FontSize.xs,
-    fontWeight: '700',
+    fontSize: 11,
+    fontWeight: '500',
+    textAlign: 'center',
+    marginTop: 1,
+    minHeight: 14,
   },
   gridTitle: {
     color: Colors.text.primary,
     fontSize: FontSize.xs,
     fontWeight: '500',
-    marginTop: 4,
+    marginTop: 2,
+    paddingHorizontal: 2,
   },
   // CTA
   ctaContainer: {
@@ -1132,6 +1149,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: Spacing.xl,
+  },
+  emptyEmoji: {
+    fontSize: 48,
+    marginBottom: Spacing.md,
   },
   emptyTitle: {
     color: Colors.text.primary,
