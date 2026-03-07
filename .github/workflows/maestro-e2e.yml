@@ -1,0 +1,134 @@
+name: Maestro E2E Tests
+on:
+  workflow_dispatch:
+    inputs:
+      suite:
+        description: 'Test suite to run'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - show-rating
+          - my-shows
+
+jobs:
+  e2e:
+    name: Maestro E2E (${{ inputs.suite }})
+    runs-on: macos-15
+    timeout-minutes: 45
+    env:
+      EXPO_PUBLIC_DEV_AUTO_SIGNIN: '1'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Setup Java (for Maestro)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Install Maestro
+        run: |
+          curl -Ls "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> $GITHUB_PATH
+
+      - name: Cache Xcode build
+        uses: actions/cache@v4
+        with:
+          path: ios/build
+          key: xcode-build-${{ runner.os }}-${{ hashFiles('ios/Podfile.lock', 'package-lock.json') }}
+          restore-keys: |
+            xcode-build-${{ runner.os }}-
+
+      - name: Install CocoaPods
+        run: cd ios && pod install --repo-update
+
+      - name: Boot iOS Simulator
+        run: |
+          DEVICE_ID=$(xcrun simctl list devices available -j | python3 -c "
+          import json, sys
+          data = json.load(sys.stdin)
+          for runtime, devices in data['devices'].items():
+            if 'iOS' in runtime:
+              for d in devices:
+                if 'iPhone' in d['name'] and d['isAvailable']:
+                  print(d['udid'])
+                  sys.exit(0)
+          " 2>/dev/null || true)
+
+          if [ -z "$DEVICE_ID" ]; then
+            DEVICE_ID=$(xcrun simctl create "Test iPhone" "iPhone 16 Pro" 2>/dev/null || true)
+          fi
+
+          xcrun simctl boot "$DEVICE_ID" 2>/dev/null || true
+          echo "DEVICE_ID=$DEVICE_ID" >> $GITHUB_ENV
+
+      - name: Build app for Simulator
+        run: |
+          npx expo prebuild --platform ios --clean
+          xcodebuild \
+            -workspace ios/BroadwayScorecard.xcworkspace \
+            -scheme BroadwayScorecard \
+            -sdk iphonesimulator \
+            -configuration Debug \
+            -destination "platform=iOS Simulator,id=$DEVICE_ID" \
+            -derivedDataPath ios/build \
+            build \
+            CODE_SIGNING_ALLOWED=NO \
+            | xcbeautify --quiet || true
+
+      - name: Install app on Simulator
+        run: |
+          APP_PATH=$(find ios/build -name "*.app" -type d | head -1)
+          xcrun simctl install "$DEVICE_ID" "$APP_PATH"
+
+      - name: Start Metro bundler
+        run: |
+          npx expo start --port 8081 &
+          sleep 10
+
+      - name: Launch app
+        run: xcrun simctl launch "$DEVICE_ID" com.broadwayscorecard.app
+
+      - name: Run Maestro tests
+        run: |
+          if [ "${{ inputs.suite }}" = "all" ]; then
+            PATTERN=".maestro/**/*.yaml"
+          elif [ "${{ inputs.suite }}" = "show-rating" ]; then
+            PATTERN=".maestro/show-rating/*.yaml"
+          else
+            PATTERN=".maestro/my-shows/*.yaml"
+          fi
+
+          FAILED=0
+          for f in $PATTERN; do
+            echo "=== Running $f ==="
+            if ! maestro test "$f"; then
+              FAILED=$((FAILED + 1))
+              echo "FAILED: $f"
+            fi
+          done
+
+          if [ $FAILED -gt 0 ]; then
+            echo "::error::$FAILED test(s) failed"
+            exit 1
+          fi
+
+      - name: Upload test artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: maestro-test-results
+          path: ~/.maestro/tests/
+          retention-days: 7
