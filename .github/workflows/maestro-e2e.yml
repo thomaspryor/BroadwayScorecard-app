@@ -97,7 +97,11 @@ jobs:
           xcrun simctl install "$DEVICE_ID" "$APP_PATH"
           xcrun simctl launch "$DEVICE_ID" com.broadwayscorecard.app
           sleep 5
-          # Take a diagnostic screenshot
+
+      - name: Dismiss onboarding screen
+        run: |
+          maestro test .maestro/ci-skip-onboarding.yaml
+          # Diagnostic screenshot after onboarding
           xcrun simctl io "$DEVICE_ID" screenshot /tmp/app-screenshot.png || true
 
       - name: Upload diagnostic screenshot
@@ -107,10 +111,6 @@ jobs:
           name: app-screenshot
           path: /tmp/app-screenshot.png
           retention-days: 3
-
-      - name: Dismiss onboarding screen
-        run: |
-          maestro test .maestro/ci-skip-onboarding.yaml
 
       - name: Run Maestro tests
         run: |

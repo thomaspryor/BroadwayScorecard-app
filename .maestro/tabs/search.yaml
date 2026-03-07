@@ -6,6 +6,11 @@ appId: com.broadwayscorecard.app
 - launchApp
 - openLink: broadwayscorecard:///search
 
+# Dismiss iOS "Open in" dialog
+- tapOn:
+    text: "Open"
+    optional: true
+
 # Header visible — wait for navigation
 - extendedWaitUntil:
     visible: "Search"
