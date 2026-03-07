@@ -71,6 +71,7 @@ function Star({
       style={[{ width: starSize, height: starSize }, animatedStyle]}
       accessibilityRole="button"
       accessibilityLabel={`${index} star${index !== 1 ? 's' : ''}`}
+      testID={`star-${index}`}
     >
       {fillType === 'full' ? (
         <Svg width={starSize} height={starSize} viewBox="0 0 24 24">

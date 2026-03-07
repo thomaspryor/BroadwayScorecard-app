@@ -261,7 +261,7 @@ export default function ShowPageRating({
           <View style={styles.labelRow}>
             <Text style={styles.sectionLabel}>YOUR RATING</Text>
             {viewCount > 1 && (
-              <View style={styles.seenBadge} accessibilityLabel={`Seen ${viewCount} times`}>
+              <View style={styles.seenBadge} accessibilityLabel={`Seen ${viewCount} times`} testID="seen-badge">
                 <Text style={styles.seenText}>Seen {viewCount} times</Text>
               </View>
             )}
@@ -271,7 +271,7 @@ export default function ShowPageRating({
           {latestReview && !showPanel ? (
             <View style={styles.existingRow}>
               <StarRating rating={latestReview.rating} onRatingChange={handleRatingChange} size="lg" readOnly />
-              <Pressable onPress={() => handleEdit(latestReview)} hitSlop={8} accessibilityRole="button" accessibilityLabel="Edit rating">
+              <Pressable onPress={() => handleEdit(latestReview)} hitSlop={8} accessibilityRole="button" accessibilityLabel="Edit rating" testID="edit-rating">
                 <Svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={Colors.text.muted} strokeWidth={2}>
                   <Path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                 </Svg>
@@ -286,6 +286,7 @@ export default function ShowPageRating({
                 }}
                 accessibilityRole="button"
                 accessibilityLabel="New viewing"
+                testID="new-viewing"
               >
                 <Text style={styles.newViewingText}>+ New Viewing</Text>
               </Pressable>
@@ -298,7 +299,7 @@ export default function ShowPageRating({
           {viewCount > 1 && !showPanel && (
             <View style={styles.previousViewings}>
               {showReviews.slice(0, 3).map(review => (
-                <Pressable key={review.id} style={styles.viewingRow} onPress={() => handleEdit(review)} accessibilityRole="button" accessibilityLabel="Edit this viewing">
+                <Pressable key={review.id} style={styles.viewingRow} onPress={() => handleEdit(review)} accessibilityRole="button" accessibilityLabel="Edit this viewing" testID={`viewing-${review.id}`}>
                   <StarRating rating={review.rating} onRatingChange={() => {}} size="sm" readOnly hideLabel />
                   {review.date_seen && (
                     <Text style={styles.viewingDate}>

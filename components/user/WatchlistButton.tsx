@@ -37,6 +37,7 @@ export default function WatchlistButton({ isWatchlisted, onToggle, loading = fal
       ]}
       accessibilityRole="button"
       accessibilityLabel={isWatchlisted ? 'Remove from watchlist' : 'Add to watchlist'}
+      testID="watchlist-button"
     >
       {loading ? (
         <ActivityIndicator size="small" color={isWatchlisted ? '#FFD700' : Colors.text.secondary} />
