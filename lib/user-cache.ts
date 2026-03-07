@@ -9,6 +9,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const REVIEWS_KEY = (userId: string) => `@bsc:reviews:${userId}`;
 const WATCHLIST_KEY = (userId: string) => `@bsc:watchlist:${userId}`;
+const LISTS_KEY = (userId: string) => `@bsc:lists:${userId}`;
 const PENDING_ACTION_KEY = '@bsc:pending_action';
 
 /** Clear all cached user data (reviews, watchlist, pending actions) */
@@ -17,6 +18,7 @@ export async function clearUserCache(userId: string): Promise<void> {
     await AsyncStorage.multiRemove([
       REVIEWS_KEY(userId),
       WATCHLIST_KEY(userId),
+      LISTS_KEY(userId),
       PENDING_ACTION_KEY,
     ]);
   } catch {
@@ -42,4 +44,14 @@ export async function getUserWatchlistCache(userId: string): Promise<string | nu
 /** Set cached watchlist for a user */
 export async function setUserWatchlistCache(userId: string, data: string): Promise<void> {
   await AsyncStorage.setItem(WATCHLIST_KEY(userId), data);
+}
+
+/** Get cached lists for a user */
+export async function getUserListsCache(userId: string): Promise<string | null> {
+  return AsyncStorage.getItem(LISTS_KEY(userId));
+}
+
+/** Set cached lists for a user */
+export async function setUserListsCache(userId: string, data: string): Promise<void> {
+  await AsyncStorage.setItem(LISTS_KEY(userId), data);
 }
