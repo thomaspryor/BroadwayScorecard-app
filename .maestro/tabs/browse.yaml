@@ -1,0 +1,15 @@
+# Tab Smoke Test — Browse
+# Verifies: browse tab loads with filters and show list
+
+appId: com.broadwayscorecard.app
+---
+- launchApp
+- openLink: broadwayscorecard:///browse
+
+# Header visible
+- assertVisible: "Browse Shows"
+
+# Filter pills should be present
+- assertVisible: "Now Playing"
+- assertVisible: "Musicals"
+- assertVisible: "Plays"

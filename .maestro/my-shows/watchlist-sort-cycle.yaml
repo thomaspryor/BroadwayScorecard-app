@@ -1,0 +1,31 @@
+# My Shows — Watchlist Sort Cycling
+# Verifies: sort button cycles Recent → A-Z → Closing Soon → Recent
+
+appId: com.broadwayscorecard.app
+---
+- launchApp
+- openLink: broadwayscorecard:///my-shows
+
+# Switch to watchlist
+- tapOn:
+    text: "Watchlist.*"
+- assertVisible:
+    text: "Sort watchlist, Recent"
+
+# Tap sort → A-Z
+- tapOn:
+    text: "Sort watchlist.*"
+- assertVisible:
+    text: "Sort watchlist, A-Z"
+
+# Tap sort → Closing Soon
+- tapOn:
+    text: "Sort watchlist.*"
+- assertVisible:
+    text: "Sort watchlist, Closing Soon"
+
+# Tap sort → back to Recent
+- tapOn:
+    text: "Sort watchlist.*"
+- assertVisible:
+    text: "Sort watchlist, Recent"

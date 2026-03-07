@@ -491,7 +491,7 @@ export default function MyShowsScreen() {
             style={styles.sortButton}
             onPress={activeTab === 'diary' ? cycleDiarySort : cycleWatchlistSort}
             accessibilityRole="button"
-            accessibilityLabel={activeTab === 'diary' ? 'Sort diary' : 'Sort watchlist'}
+            accessibilityLabel={`${activeTab === 'diary' ? 'Sort diary' : 'Sort watchlist'}, ${sortLabel}`}
             testID="sort-button"
           >
             <Text style={styles.sortText}>{sortLabel}</Text>
@@ -503,6 +503,9 @@ export default function MyShowsScreen() {
             style={styles.viewToggle}
             onPress={() => setViewMode(prev => prev === 'list' ? 'grid' : 'list')}
             hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={viewMode === 'list' ? 'Grid view' : 'List view'}
+            testID="view-toggle"
           >
             {/* Show the icon of the mode you'll switch TO */}
             {viewMode === 'list' ? (

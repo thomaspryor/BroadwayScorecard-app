@@ -1,0 +1,22 @@
+# My Shows — Grid/List View Toggle
+# Verifies: tapping view toggle switches between list and grid
+
+appId: com.broadwayscorecard.app
+---
+- launchApp
+- openLink: broadwayscorecard:///my-shows
+
+# Default is list view — toggle button should say "Grid view"
+- assertVisible: "Grid view"
+
+# Tap to switch to grid
+- tapOn: "Grid view"
+
+# Now toggle button should say "List view"
+- assertVisible: "List view"
+
+# Tap back to list
+- tapOn: "List view"
+
+# Back to grid view button
+- assertVisible: "Grid view"

@@ -11,4 +11,5 @@ appId: com.broadwayscorecard.app
     text: "Watchlist.*"
 
 # Sort button should be watchlist-specific
-- assertVisible: "Sort watchlist"
+- assertVisible:
+    text: "Sort watchlist.*"

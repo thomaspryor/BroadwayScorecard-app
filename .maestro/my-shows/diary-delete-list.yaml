@@ -10,4 +10,5 @@ appId: com.broadwayscorecard.app
 - assertVisible: "Diary"
 
 # Sort button visible
-- assertVisible: "Sort diary"
+- assertVisible:
+    text: "Sort diary.*"

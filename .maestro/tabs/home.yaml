@@ -1,0 +1,14 @@
+# Tab Smoke Test — Home
+# Verifies: home tab loads with show data
+
+appId: com.broadwayscorecard.app
+---
+- launchApp
+
+# Home tab is the default — should show header
+- assertVisible: "Broadway Scorecard"
+
+# Should have show sections with data loaded
+- assertVisible: "Top Shows"
+- assertVisible:
+    text: ".*shows scored by critics"

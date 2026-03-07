@@ -8,4 +8,5 @@ appId: com.broadwayscorecard.app
 
 # Diary with sort
 - assertVisible: "Diary"
-- assertVisible: "Sort diary"
+- assertVisible:
+    text: "Sort diary.*"

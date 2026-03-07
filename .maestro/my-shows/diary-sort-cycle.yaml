@@ -1,0 +1,30 @@
+# My Shows — Diary Sort Cycling
+# Verifies: sort button cycles Newest → Oldest → Top Rated → Newest
+
+appId: com.broadwayscorecard.app
+---
+- launchApp
+- openLink: broadwayscorecard:///my-shows
+
+# Start on diary — default sort is "Newest"
+- assertVisible: "Diary"
+- assertVisible:
+    text: "Sort diary, Newest"
+
+# Tap sort → Oldest
+- tapOn:
+    text: "Sort diary.*"
+- assertVisible:
+    text: "Sort diary, Oldest"
+
+# Tap sort → Top Rated
+- tapOn:
+    text: "Sort diary.*"
+- assertVisible:
+    text: "Sort diary, Top Rated"
+
+# Tap sort → back to Newest
+- tapOn:
+    text: "Sort diary.*"
+- assertVisible:
+    text: "Sort diary, Newest"

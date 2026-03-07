@@ -1,0 +1,17 @@
+# Tab Smoke Test — Search
+# Verifies: search tab loads, input accepts text
+
+appId: com.broadwayscorecard.app
+---
+- launchApp
+- openLink: broadwayscorecard:///search
+
+# Header visible
+- assertVisible: "Search"
+
+# Search input with placeholder
+- assertVisible: "Search shows, theaters, creative team..."
+
+# Type a search query
+- tapOn: "Search shows, theaters, creative team..."
+- inputText: "Hamilton"

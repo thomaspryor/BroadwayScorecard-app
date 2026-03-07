@@ -8,7 +8,9 @@ appId: com.broadwayscorecard.app
 
 # Diary tab with sort button
 - assertVisible: "Diary"
-- assertVisible: "Sort diary"
+- assertVisible:
+    text: "Sort diary.*"
 
 # Tap sort button to cycle
-- tapOn: "Sort diary"
+- tapOn:
+    text: "Sort diary.*"

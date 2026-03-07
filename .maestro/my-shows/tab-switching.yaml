@@ -12,8 +12,10 @@ appId: com.broadwayscorecard.app
 # Switch to Watchlist
 - tapOn:
     text: "Watchlist.*"
-- assertVisible: "Sort watchlist"
+- assertVisible:
+    text: "Sort watchlist.*"
 
 # Switch back to Diary
 - tapOn: "Diary"
-- assertVisible: "Sort diary"
+- assertVisible:
+    text: "Sort diary.*"
