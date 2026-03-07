@@ -71,7 +71,14 @@
         }
       ],
       "expo-localization",
-      "expo-notifications"
+      "expo-notifications",
+      [
+        "@sentry/react-native",
+        {
+          "organization": "broadway-scorecard",
+          "project": "broadway-scorecard-ios"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

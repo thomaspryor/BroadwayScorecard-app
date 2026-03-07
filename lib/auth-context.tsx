@@ -13,6 +13,7 @@ import { getSupabaseClient } from './supabase';
 import type { UserProfile } from './user-types';
 import SignInSheet from '@/components/SignInSheet';
 import { trackSignInStarted, trackSignInCompleted, trackSignOut as trackSignOutEvent, identifyUser, resetAnalyticsUser } from '@/lib/analytics';
+import { setSentryUser, clearSentryUser } from '@/lib/sentry';
 
 // Lazy-load native auth modules — they crash at import time if native modules
 // aren't registered (e.g. dev client built without the plugin, or Expo Go).
@@ -111,12 +112,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setSignInLoading(false);
         setSignInProvider(null);
         identifyUser(session.user.id);
+        setSentryUser(session.user.id, session.user.email);
         trackSignInCompleted(session.user.app_metadata?.provider || 'unknown');
       } else if (event === 'SIGNED_OUT') {
         setUser(null);
         setProfile(null);
         trackSignOutEvent();
         resetAnalyticsUser();
+        clearSentryUser();
       }
     });
 

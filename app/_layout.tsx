@@ -19,6 +19,7 @@ import { featureFlags, loadFeatureFlagOverrides } from '@/lib/feature-flags';
 import { setPostHogInstance } from '@/lib/analytics';
 import { Colors } from '@/constants/theme';
 import { registerForPushNotifications, setupNotificationHandler, configureNotificationChannels } from '@/lib/notifications';
+import { initSentry, wrapWithSentry } from '@/lib/sentry';
 
 // Custom dark theme matching our design tokens
 const BroadwayDark = {
@@ -58,12 +59,15 @@ function initPostHog(): PostHog | null {
   }
 }
 
-export default function RootLayout() {
+function RootLayout() {
   const [showOnboarding, setShowOnboarding] = useState<boolean | null>(null);
   const [phClient, setPhClient] = useState<PostHog | null>(null);
   const [phReady, setPhReady] = useState(!POSTHOG_API_KEY); // skip wait if no key
 
   useEffect(() => {
+    // Init crash reporting first — catches errors during startup
+    initSentry();
+
     // Init PostHog synchronously (constructor), load flags + onboarding async
     const client = initPostHog();
     if (client) setPhClient(client);
@@ -180,3 +184,6 @@ export default function RootLayout() {
     </ErrorBoundary>
   );
 }
+
+// Wrap with Sentry's error boundary for native crash capture
+export default wrapWithSentry(RootLayout);
