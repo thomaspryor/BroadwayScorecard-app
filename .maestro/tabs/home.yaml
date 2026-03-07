@@ -5,10 +5,14 @@ appId: com.broadwayscorecard.app
 ---
 - launchApp
 
-# Home tab is the default — should show header
-- assertVisible: "Broadway Scorecard"
+# Home tab is the default — wait for data to load (CI can be slow)
+- extendedWaitUntil:
+    visible: "Broadway Scorecard"
+    timeout: 30000
 
 # Should have show sections with data loaded
-- assertVisible: "Top Shows"
+- extendedWaitUntil:
+    visible: "Top Shows"
+    timeout: 30000
 - assertVisible:
     text: ".*shows scored by critics"

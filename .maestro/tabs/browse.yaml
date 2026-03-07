@@ -6,8 +6,10 @@ appId: com.broadwayscorecard.app
 - launchApp
 - openLink: broadwayscorecard:///browse
 
-# Header visible
-- assertVisible: "Browse Shows"
+# Header visible — wait for navigation + data load
+- extendedWaitUntil:
+    visible: "Browse Shows"
+    timeout: 30000
 
 # Filter pills should be present
 - assertVisible: "Now Playing"

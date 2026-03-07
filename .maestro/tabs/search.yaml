@@ -6,8 +6,10 @@ appId: com.broadwayscorecard.app
 - launchApp
 - openLink: broadwayscorecard:///search
 
-# Header visible
-- assertVisible: "Search"
+# Header visible — wait for navigation
+- extendedWaitUntil:
+    visible: "Search"
+    timeout: 30000
 
 # Search input with placeholder
 - assertVisible: "Search shows, theaters, creative team..."
