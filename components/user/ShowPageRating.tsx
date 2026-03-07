@@ -20,6 +20,7 @@ import { useToastSafe } from '@/lib/toast-context';
 import { savePendingAction, getPendingAction, clearPendingAction } from '@/lib/deferred-auth';
 import { supabaseRestInsert, supabaseRestUpdate } from '@/lib/supabase-rest';
 import { featureFlags } from '@/lib/feature-flags';
+import { recordRatingGiven } from '@/lib/store-review';
 import StarRating from './StarRating';
 import ReviewPanel from './ReviewPanel';
 import WatchlistButton from './WatchlistButton';
@@ -209,6 +210,8 @@ export default function ShowPageRating({
         setEditingReview(null);
         setCurrentRating(null);
         lastSavedId.current = null;
+        // Positive moment — consider prompting for App Store review
+        recordRatingGiven();
       } catch (e) {
         const detail = e instanceof Error ? e.message : 'Unknown error';
         showToast(`Save failed: ${detail}`, 'error');

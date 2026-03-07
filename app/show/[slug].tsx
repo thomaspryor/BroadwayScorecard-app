@@ -21,6 +21,7 @@ import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
 import { trackTicketTap, trackBuyButtonTap, trackShowDetailViewed, trackShowShared, trackFullReviewTapped } from '@/lib/analytics';
 import Svg, { Path } from 'react-native-svg';
 import ShowPageRating from '@/components/user/ShowPageRating';
+import { recordShowView } from '@/lib/store-review';
 
 export default function ShowDetailScreen() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
@@ -86,6 +87,7 @@ export default function ShowDetailScreen() {
   useEffect(() => {
     if (show) {
       trackShowDetailViewed(show.id, show.title, show.category, show.compositeScore ?? null);
+      recordShowView(show.id);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [show?.id]);
