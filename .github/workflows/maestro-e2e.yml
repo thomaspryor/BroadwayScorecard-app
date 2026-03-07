@@ -20,6 +20,7 @@ jobs:
     timeout-minutes: 75
     env:
       EXPO_PUBLIC_DEV_AUTO_SIGNIN: '1'
+      SENTRY_DISABLE_AUTO_UPLOAD: 'true'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
