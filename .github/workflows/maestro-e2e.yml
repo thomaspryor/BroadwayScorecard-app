@@ -96,13 +96,25 @@ jobs:
           APP_PATH=$(find ios/build -name "*.app" -type d | head -1)
           xcrun simctl install "$DEVICE_ID" "$APP_PATH"
 
-      - name: Start Metro bundler
+      - name: Start Metro and pre-warm bundle
         run: |
           npx expo start --port 8081 &
-          sleep 10
+          echo "Waiting for Metro to start..."
+          for i in $(seq 1 60); do
+            if curl -s http://localhost:8081/status 2>/dev/null | grep -q "packager-status:running"; then
+              echo "Metro is running"
+              break
+            fi
+            sleep 2
+          done
+          echo "Pre-warming JS bundle (this takes 30-60s on first run)..."
+          curl -s "http://localhost:8081/index.bundle?platform=ios&dev=true&minify=false" > /dev/null
+          echo "Bundle ready"
 
       - name: Launch app
-        run: xcrun simctl launch "$DEVICE_ID" com.broadwayscorecard.app
+        run: |
+          xcrun simctl launch "$DEVICE_ID" com.broadwayscorecard.app
+          sleep 5
 
       - name: Run Maestro tests
         run: |
