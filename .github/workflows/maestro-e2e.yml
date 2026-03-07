@@ -111,10 +111,24 @@ jobs:
           curl -s "http://localhost:8081/index.bundle?platform=ios&dev=true&minify=false" > /dev/null
           echo "Bundle ready"
 
-      - name: Launch app
+      - name: Launch app and connect to Metro
         run: |
+          # Launch app first
           xcrun simctl launch "$DEVICE_ID" com.broadwayscorecard.app
-          sleep 5
+          sleep 3
+          # Connect dev client to Metro via expo-development-client URL scheme
+          xcrun simctl openurl "$DEVICE_ID" "exp+broadwayscorecard://expo-development-client/?url=http%3A%2F%2Flocalhost%3A8081"
+          sleep 10
+          # Take a diagnostic screenshot
+          xcrun simctl io "$DEVICE_ID" screenshot /tmp/app-screenshot.png || true
+
+      - name: Upload diagnostic screenshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-screenshot
+          path: /tmp/app-screenshot.png
+          retention-days: 3
 
       - name: Run Maestro tests
         run: |
