@@ -1,7 +1,7 @@
 name: Send Push Notifications
 
 on:
-  # Manual dispatch for new-score announcements
+  # Manual dispatch or called from web repo's broadcast workflow
   workflow_dispatch:
     inputs:
       type:
@@ -9,17 +9,18 @@ on:
         required: true
         type: choice
         options:
+          - reviews-in
           - new-score
           - rate-show
           - test
       show:
-        description: 'Show slug (for new-score)'
+        description: 'Show slug (for reviews-in / new-score)'
         required: false
       title:
-        description: 'Show title (for new-score)'
+        description: 'Show title (for reviews-in / new-score)'
         required: false
       score:
-        description: 'Score value (for new-score)'
+        description: 'Score value (for new-score only)'
         required: false
       token:
         description: 'Push token (for test only)'
@@ -33,6 +34,7 @@ jobs:
   send:
     name: Send notifications
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -56,7 +58,9 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
           ARGS="--type ${{ inputs.type }}"
-          if [ "${{ inputs.type }}" = "new-score" ]; then
+          if [ "${{ inputs.type }}" = "reviews-in" ]; then
+            ARGS="$ARGS --show '${{ inputs.show }}' --title '${{ inputs.title }}'"
+          elif [ "${{ inputs.type }}" = "new-score" ]; then
             ARGS="$ARGS --show '${{ inputs.show }}' --title '${{ inputs.title }}' --score '${{ inputs.score }}'"
           elif [ "${{ inputs.type }}" = "test" ]; then
             ARGS="$ARGS --token '${{ inputs.token }}'"
