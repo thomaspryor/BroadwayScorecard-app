@@ -14,7 +14,9 @@ import {
   StyleSheet,
   ActivityIndicator,
   Alert,
+  Platform,
 } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -47,13 +49,14 @@ export default function MyShowsScreen() {
   const router = useRouter();
   const { user, isAuthenticated, loading: authLoading, showSignIn } = useAuth();
   const { reviews, getAllReviews, deleteReview, loading: reviewsLoading } = useUserReviews(user?.id || null);
-  const { watchlist, getWatchlist, removeFromWatchlist, loading: watchlistLoading } = useWatchlist(user?.id || null);
+  const { watchlist, getWatchlist, removeFromWatchlist, updatePlannedDate, loading: watchlistLoading } = useWatchlist(user?.id || null);
   const { shows } = useShows();
 
   const [activeTab, setActiveTab] = useState<Tab>('diary');
   const [diarySort, setDiarySort] = useState<DiarySort>('date-desc');
   const [watchlistSort, setWatchlistSort] = useState<WatchlistSort>('added-desc');
   const [viewMode, setViewMode] = useState<ViewMode>('list');
+  const [datePickingShowId, setDatePickingShowId] = useState<string | null>(null);
 
   // Show lookup map
   const showMap = useMemo(() => {
@@ -158,6 +161,14 @@ export default function MyShowsScreen() {
   const handleRemoveFromWatchlist = useCallback(async (showId: string) => {
     await removeFromWatchlist(showId);
   }, [removeFromWatchlist]);
+
+  const handleDateChange = useCallback((_event: unknown, selectedDate?: Date) => {
+    if (Platform.OS === 'android') setDatePickingShowId(null);
+    if (selectedDate && datePickingShowId) {
+      const isoDate = selectedDate.toISOString().split('T')[0];
+      updatePlannedDate(datePickingShowId, isoDate);
+    }
+  }, [datePickingShowId, updatePlannedDate]);
 
   // Sort cycling
   const cycleDiarySort = useCallback(() => {
@@ -345,7 +356,7 @@ export default function MyShowsScreen() {
 
   // ─── Render watchlist item (with swipe-to-delete) ─────
   const renderWatchlistItem = ({ item }: { item: WatchlistEntry }) => {
-    return <SwipeableWatchlistItem item={item} showMap={showMap} onRemove={handleRemoveFromWatchlist} router={router} />;
+    return <SwipeableWatchlistItem item={item} showMap={showMap} onRemove={handleRemoveFromWatchlist} onDatePress={setDatePickingShowId} router={router} />;
   };
 
   // ─── Render watchlist grid item ─────────────────────────
@@ -662,6 +673,48 @@ export default function MyShowsScreen() {
           />
         )
       )}
+      {/* Date picker for watchlist items */}
+      {datePickingShowId && Platform.OS === 'ios' && (
+        <View style={styles.datePickerOverlay}>
+          <View style={styles.datePickerContainer}>
+            <View style={styles.datePickerHeader}>
+              <Text style={styles.datePickerTitle}>When are you going?</Text>
+              <Pressable onPress={() => setDatePickingShowId(null)} hitSlop={8}>
+                <Text style={styles.datePickerDone}>Done</Text>
+              </Pressable>
+            </View>
+            <DateTimePicker
+              value={(() => {
+                const entry = watchlist.find(w => w.show_id === datePickingShowId);
+                return entry?.planned_date ? new Date(entry.planned_date + 'T00:00:00') : new Date();
+              })()}
+              mode="date"
+              display="spinner"
+              onChange={handleDateChange}
+              minimumDate={new Date()}
+              themeVariant="dark"
+            />
+            <Pressable
+              style={styles.datePickerClear}
+              onPress={() => {
+                updatePlannedDate(datePickingShowId, null);
+                setDatePickingShowId(null);
+              }}
+            >
+              <Text style={styles.datePickerClearText}>Clear date</Text>
+            </Pressable>
+          </View>
+        </View>
+      )}
+      {datePickingShowId && Platform.OS === 'android' && (
+        <DateTimePicker
+          value={new Date()}
+          mode="date"
+          display="default"
+          onChange={handleDateChange}
+          minimumDate={new Date()}
+        />
+      )}
     </GestureHandlerRootView>
   );
 }
@@ -686,11 +739,13 @@ function SwipeableWatchlistItem({
   item,
   showMap,
   onRemove,
+  onDatePress,
   router,
 }: {
   item: WatchlistEntry;
   showMap: Record<string, Show>;
   onRemove: (showId: string) => Promise<void>;
+  onDatePress: (showId: string) => void;
   router: ReturnType<typeof useRouter>;
 }) {
   const show = showMap[item.show_id];
@@ -730,13 +785,32 @@ function SwipeableWatchlistItem({
               <Text style={styles.closingSoonText}>Closing Soon</Text>
             </View>
           )}
-          {item.planned_date && (
-            <Text style={styles.cardDate}>
-              Planned: {new Date(item.planned_date + 'T00:00:00').toLocaleDateString('en-US', {
-                month: 'short', day: 'numeric',
-              })}
+        </View>
+        <View style={styles.watchlistActions}>
+          <Pressable
+            style={styles.watchlistDateBtn}
+            onPress={(e) => { e.stopPropagation(); onDatePress(item.show_id); }}
+            hitSlop={8}
+          >
+            <Svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke={item.planned_date ? '#fcd34d' : Colors.text.muted} strokeWidth={2}>
+              <Path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </Svg>
+            <Text style={[styles.watchlistDateLabel, item.planned_date && styles.watchlistDateSet]}>
+              {item.planned_date
+                ? new Date(item.planned_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                : 'Add date'}
             </Text>
-          )}
+          </Pressable>
+          <Pressable
+            style={styles.watchlistRateBtn}
+            onPress={(e) => { e.stopPropagation(); show && router.push(`/show/${show.slug}`); }}
+            hitSlop={8}
+          >
+            <Svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke={Colors.text.muted} strokeWidth={1.5}>
+              <Path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+            </Svg>
+            <Text style={styles.watchlistRateLabel}>Rate</Text>
+          </Pressable>
         </View>
       </Pressable>
     </ReanimatedSwipeable>
@@ -1165,6 +1239,77 @@ const styles = StyleSheet.create({
     fontSize: FontSize.sm,
     textAlign: 'center',
     marginBottom: Spacing.xl,
+  },
+  watchlistActions: {
+    alignItems: 'flex-end',
+    gap: 4,
+  },
+  watchlistDateBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    minHeight: 32,
+    paddingHorizontal: 6,
+  },
+  watchlistDateLabel: {
+    color: Colors.text.muted,
+    fontSize: 11,
+  },
+  watchlistDateSet: {
+    color: '#fcd34d',
+    fontWeight: '500',
+  },
+  watchlistRateBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    minHeight: 28,
+    paddingHorizontal: 6,
+  },
+  watchlistRateLabel: {
+    color: Colors.text.muted,
+    fontSize: 11,
+  },
+  datePickerOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    paddingBottom: Spacing.xxl,
+  },
+  datePickerContainer: {
+    backgroundColor: Colors.surface.raised,
+    borderTopLeftRadius: BorderRadius.lg,
+    borderTopRightRadius: BorderRadius.lg,
+    paddingTop: Spacing.md,
+  },
+  datePickerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.lg,
+    paddingBottom: Spacing.sm,
+  },
+  datePickerTitle: {
+    color: Colors.text.secondary,
+    fontSize: FontSize.sm,
+    fontWeight: '500',
+  },
+  datePickerDone: {
+    color: Colors.brand,
+    fontSize: FontSize.sm,
+    fontWeight: '600',
+  },
+  datePickerClear: {
+    alignItems: 'center',
+    paddingVertical: Spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border.subtle,
+  },
+  datePickerClearText: {
+    color: Colors.text.muted,
+    fontSize: FontSize.xs,
   },
   addShowCard: {
     flexDirection: 'row',
