@@ -76,7 +76,7 @@
         "@sentry/react-native",
         {
           "organization": "broadway-scorecard",
-          "project": "broadway-scorecard-ios"
+          "project": "broadway-scorecard"
         }
       ],
       "expo-font"
