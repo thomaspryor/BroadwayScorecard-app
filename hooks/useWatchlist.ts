@@ -10,6 +10,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Crypto from 'expo-crypto';
 import { getSupabaseClient } from '@/lib/supabase';
 import { enqueue, isOnline } from '@/lib/offline-queue';
+import { scheduleRateReminder, cancelRateReminder, cancelAllRemindersForShow } from '@/lib/local-notifications';
 import type { WatchlistEntry } from '@/lib/user-types';
 
 const CACHE_KEY = (userId: string) => `@bsc:watchlist:${userId}`;
@@ -147,12 +148,15 @@ export function useWatchlist(userId: string | null) {
         setError(msg);
         throw new Error(msg);
       }
+
+      // Cancel any scheduled notifications for this show
+      cancelAllRemindersForShow(showId).catch(() => {});
     },
     [userId],
   );
 
   const updatePlannedDate = useCallback(
-    async (showId: string, plannedDate: string | null): Promise<void> => {
+    async (showId: string, plannedDate: string | null, showTitle?: string): Promise<void> => {
       const client = getSupabaseClient();
       if (!client || !userId) return;
 
@@ -183,6 +187,13 @@ export function useWatchlist(userId: string | null) {
         const msg = e instanceof Error ? e.message : 'Failed to update date';
         setError(msg);
         throw new Error(msg);
+      }
+
+      // Schedule or cancel local notification
+      if (plannedDate && showTitle) {
+        scheduleRateReminder(showId, showTitle, plannedDate).catch(() => {});
+      } else {
+        cancelAllRemindersForShow(showId).catch(() => {});
       }
     },
     [userId],

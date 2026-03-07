@@ -21,6 +21,7 @@ import { Colors } from '@/constants/theme';
 import { registerForPushNotifications, setupNotificationHandler, configureNotificationChannels } from '@/lib/notifications';
 import { initSentry, wrapWithSentry } from '@/lib/sentry';
 import { startAutoFlush, flushQueue } from '@/lib/offline-queue';
+import { rescheduleAllReminders } from '@/lib/local-notifications';
 
 // Custom dark theme matching our design tokens
 const BroadwayDark = {
@@ -108,6 +109,34 @@ function RootLayout() {
     configureNotificationChannels();
     registerForPushNotifications();
     const cleanup = setupNotificationHandler();
+
+    // Re-schedule local rate reminders from cached watchlist data
+    // (Recovers from app kill / iOS clearing notifications)
+    (async () => {
+      try {
+        const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+        // Find the watchlist cache key (pattern: @bsc:watchlist:{userId})
+        const keys = await AsyncStorage.getAllKeys();
+        const watchlistKey = keys.find((k: string) => k.startsWith('@bsc:watchlist:'));
+        const showsRaw = await AsyncStorage.getItem('mobile-shows-data');
+        if (!watchlistKey || !showsRaw) return;
+
+        const watchlist = JSON.parse(await AsyncStorage.getItem(watchlistKey) || '[]');
+        const showsData = JSON.parse(showsRaw);
+        const showMap = new Map<string, string>();
+        for (const s of showsData.shows || []) {
+          showMap.set(s.id || s.sl, s.t || s.title || s.id || 'Show');
+        }
+
+        await rescheduleAllReminders(
+          watchlist,
+          (showId: string) => showMap.get(showId) || 'Your show',
+        );
+      } catch {
+        // Non-critical — reminders just won't be rescheduled this launch
+      }
+    })();
+
     return () => { cleanup?.(); };
   }, [showOnboarding]);
 
