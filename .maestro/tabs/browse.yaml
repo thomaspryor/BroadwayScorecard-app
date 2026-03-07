@@ -4,15 +4,16 @@
 appId: com.broadwayscorecard.app
 ---
 - launchApp
-- openLink: broadwayscorecard:///browse
 
-# Wait for and dismiss iOS "Open in" dialog
+# Wait for app to load (home is default tab)
 - extendedWaitUntil:
-    visible: "Open"
-    timeout: 5000
-- tapOn: "Open"
+    visible: "Broadway Scorecard"
+    timeout: 30000
 
-# Header visible — wait for navigation + data load
+# Navigate to Browse tab
+- tapOn: "Browse"
+
+# Header visible — wait for data load
 - extendedWaitUntil:
     visible: "Browse Shows"
     timeout: 30000
