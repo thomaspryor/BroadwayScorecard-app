@@ -27,7 +27,8 @@
         "ascAppId": "6760090370",
         "appleTeamId": "2837Q6TK6Y",
         "ascApiKeyId": "7MPPJ2254M",
-        "ascApiKeyIssuerId": "2d03cc88-e016-4fb7-8d89-a70a4a912875"
+        "ascApiKeyIssuerId": "2d03cc88-e016-4fb7-8d89-a70a4a912875",
+        "ascApiKeyPath": "/tmp/AuthKey.p8"
       }
     }
   }
