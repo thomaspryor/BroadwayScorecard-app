@@ -31,4 +31,6 @@ jobs:
       - name: Build iOS & submit to TestFlight
         env:
           EXPO_ASC_API_KEY_PATH: /tmp/AuthKey.p8
+          EXPO_ASC_API_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
+          EXPO_ASC_API_KEY_ISSUER_ID: ${{ secrets.ASC_API_KEY_ISSUER_ID }}
         run: eas build --platform ios --profile production --non-interactive --auto-submit
