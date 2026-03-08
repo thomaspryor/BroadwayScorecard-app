@@ -13,8 +13,6 @@ Last audited: 2026-03-07
 
 | Feature | Pri | Flagged | Notes |
 |---|---|---|---|
-| User Lists (CRUD, ranked/unranked, reorder) | P0 | 2026-03-07 | Web: `hooks/useUserLists.ts`, `my-shows/ListsTab.tsx`. Supabase: `lists`, `list_items` tables. Third tab on My Shows. Drag-to-reorder via sparse positions. |
-| Add-to-list from show page | P0 | 2026-03-07 | Web: `ShowPageAddToListButton.tsx`. Dropdown + quick-create. Depends on Lists. |
 | Mezzanine import | P1 | 2026-03-07 | Web: `MezzanineImport.tsx`. Import diary from Mezzanine JSON. File picker + fuzzy match. |
 | Lotteries directory | P2 | 2026-03-07 | Web: `app/lotteries/`. List of lottery-eligible shows with links. |
 | Rush tickets directory | P2 | 2026-03-07 | Web: `app/rush/`. List of rush-eligible shows with links. |
@@ -38,6 +36,8 @@ Last audited: 2026-03-07
 | Push notifications | `lib/local-notifications.ts` | 2026-03 |
 | Deep linking | `app.json` config | 2026-03 |
 | Rating Modal | `app/rate/[showId].tsx` | 2026-03 |
+| User Lists (CRUD, ranked/unranked, reorder) | `components/user/ListsTab.tsx`, `hooks/useUserLists.ts` | 2026-03 |
+| Add-to-list from show page | `components/user/AddToListSheet.tsx`, `ShowPageRating.tsx` | 2026-03 |
 
 ## Web-Only (Not Planned for App)
 
