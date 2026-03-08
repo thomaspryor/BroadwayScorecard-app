@@ -12,10 +12,15 @@
   "age_rating": "4+",
   "price": "Free",
   "privacy_nutrition_labels": {
-    "data_not_collected": true,
-    "note": "Broadway Scorecard does not collect any personal data in v1.0.0. The app fetches publicly available show data from our CDN. No analytics, tracking, or user accounts in this version."
+    "data_not_collected": false,
+    "data_collected": [
+      "User ID (for account functionality, linked to user)",
+      "Email address (for account sign-in, linked to user)",
+      "Product interaction (analytics for app improvement, not linked to user)"
+    ],
+    "note": "Broadway Scorecard offers optional user accounts (Google/Apple sign-in) for saving reviews, watchlists, and lists. Anonymous analytics (PostHog) track feature usage for app improvement. Users who do not sign in have no data collected."
   },
-  "app_review_notes": "This app displays aggregated public theater critic review scores and audience ratings for Broadway, Off-Broadway, and West End shows. No login or account is required to use any features. The app fetches pre-computed data from our public website (broadwayscorecard.com). No user data is collected or transmitted to external services.",
+  "app_review_notes": "This app displays aggregated public theater critic review scores and audience ratings for Broadway, Off-Broadway, and West End shows. Optional user accounts (Google or Apple sign-in via Supabase) allow users to save personal reviews, watchlists, and custom lists. Anonymous analytics (PostHog) are used for app improvement. Users can use all browsing features without an account.",
   "app_review_contact": {
     "firstName": "Thomas",
     "lastName": "Pryor",
