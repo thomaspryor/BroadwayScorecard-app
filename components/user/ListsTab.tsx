@@ -50,11 +50,16 @@ export default function ListsTab({ userId, showMap, createTrigger }: ListsTabPro
   const router = useRouter();
   const {
     lists, loading,
-    getListItems,
+    getLists, getListItems,
     createList, updateList, deleteList,
     addToList, removeFromList, reorderList,
   } = useUserLists(userId);
   const { shows } = useShows();
+
+  // Load lists on mount
+  useEffect(() => {
+    getLists();
+  }, [getLists]);
 
   const [activeListId, setActiveListId] = useState<string | null>(null);
   const [listItems, setListItems] = useState<ListItem[]>([]);
@@ -98,14 +103,17 @@ export default function ListsTab({ userId, showMap, createTrigger }: ListsTabPro
     });
   }, [shows]);
 
-  const searchResults = useMemo(() => {
-    if (!searchQuery.trim()) return [];
-    return fuse.search(searchQuery.trim()).slice(0, 6).map(r => r.item);
-  }, [fuse, searchQuery]);
-
   const alreadyInList = useMemo(() => {
     return new Set(listItems.map(i => i.show_id));
   }, [listItems]);
+
+  const searchResults = useMemo(() => {
+    if (!searchQuery.trim()) return [];
+    return fuse.search(searchQuery.trim())
+      .filter(r => !alreadyInList.has(r.item.id))
+      .slice(0, 6)
+      .map(r => r.item);
+  }, [fuse, searchQuery, alreadyInList]);
 
   // ─── Handlers ───────────────────────────────────────────
   const handleCreateList = async (name: string, description: string | null, isRanked: boolean) => {
@@ -323,9 +331,9 @@ export default function ListsTab({ userId, showMap, createTrigger }: ListsTabPro
           keyExtractor={item => item.id}
           onDragEnd={({ data }) => handleDragEnd(data)}
           contentContainerStyle={styles.listContent}
-          renderItem={({ item, drag, isActive }: RenderItemParams<ListItem>) => {
+          renderItem={({ item, drag, isActive, getIndex }: RenderItemParams<ListItem>) => {
             const show = showMap[item.show_id];
-            const idx = listItems.indexOf(item);
+            const idx = getIndex() ?? 0;
             return (
               <ScaleDecorator>
                 <Pressable
@@ -377,6 +385,13 @@ export default function ListsTab({ userId, showMap, createTrigger }: ListsTabPro
             );
           }}
           ListFooterComponent={<AddShowSearch />}
+          ListEmptyComponent={
+            !showSearch ? (
+              <View style={styles.emptyDetailContainer}>
+                <Text style={styles.emptyDetailText}>No shows in this list yet</Text>
+              </View>
+            ) : null
+          }
         />
       ) : (
         /* Unranked: regular FlatList */

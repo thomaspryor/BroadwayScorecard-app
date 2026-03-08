@@ -427,6 +427,7 @@ export function useUserLists(userId: string | null) {
     if (!client || !userId) return false;
 
     setError(null);
+    pendingMutations.current++;
     try {
       const { error: err } = await client.rpc('reorder_list_items', {
         p_list_id: listId,
@@ -435,11 +436,14 @@ export function useUserLists(userId: string | null) {
       });
 
       if (err) throw err;
+      mutationVersion.current++;
       return true;
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Failed to reorder list';
       setError(msg);
       return false;
+    } finally {
+      pendingMutations.current--;
     }
   }, [userId]);
 
