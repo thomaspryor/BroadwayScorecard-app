@@ -1,15 +1,6 @@
 name: Build iOS App
 on:
   workflow_dispatch:
-    inputs:
-      profile:
-        description: 'Build profile'
-        required: true
-        default: 'preview'
-        type: choice
-        options:
-          - preview
-          - production
 
 jobs:
   build:
@@ -34,5 +25,5 @@ jobs:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
 
-      - name: Build iOS
-        run: eas build --platform ios --profile ${{ inputs.profile }} --non-interactive
+      - name: Build iOS & submit to TestFlight
+        run: eas build --platform ios --profile production --non-interactive --auto-submit
