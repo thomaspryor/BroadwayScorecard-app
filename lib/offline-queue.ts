@@ -19,7 +19,7 @@ const QUEUE_KEY = '@bsc:offlineQueue';
 
 export interface QueuedOperation {
   id: string;
-  table: 'reviews' | 'watchlist';
+  table: 'reviews' | 'watchlist' | 'lists' | 'list_items';
   action: 'insert' | 'update' | 'delete';
   /** Row data for insert, or partial data for update */
   data?: Record<string, unknown>;
