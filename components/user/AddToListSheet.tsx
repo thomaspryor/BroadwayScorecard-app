@@ -5,7 +5,7 @@
  * each user list, with inline create-new-list row.
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -17,6 +17,7 @@ import {
   StyleSheet,
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useUserLists } from '@/hooks/useUserLists';
 import { useToastSafe } from '@/lib/toast-context';
 import { featureFlags } from '@/lib/feature-flags';
@@ -34,15 +35,22 @@ interface AddToListSheetProps {
 export default function AddToListSheet({ showId, userId, visible, onClose }: AddToListSheetProps) {
   const {
     lists,
+    getLists,
     createList,
     addToList,
     removeFromList,
   } = useUserLists(userId);
   const { showToast } = useToastSafe();
+  const insets = useSafeAreaInsets();
 
   const [mutatingLists, setMutatingLists] = useState<Set<string>>(new Set());
   const [newListName, setNewListName] = useState('');
   const [creating, setCreating] = useState(false);
+
+  // Fetch lists when sheet opens
+  useEffect(() => {
+    if (visible) getLists();
+  }, [visible, getLists]);
 
   if (!featureFlags.userAccounts) return null;
 
@@ -102,7 +110,7 @@ export default function AddToListSheet({ showId, userId, visible, onClose }: Add
       onRequestClose={onClose}
     >
       <Pressable style={styles.overlay} onPress={onClose}>
-        <Pressable style={styles.sheet} onPress={() => {}}>
+        <Pressable style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 16) }]} onPress={() => {}}>
           {/* Header */}
           <View style={styles.header}>
             <Text style={styles.title}>Add to List</Text>
@@ -196,7 +204,6 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
     maxHeight: '70%',
-    paddingBottom: 34, // safe area
   },
   header: {
     flexDirection: 'row',
