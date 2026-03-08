@@ -11,6 +11,7 @@ import { useShows } from '@/lib/data-context';
 import { ShowCard } from '@/components/ShowCard';
 import { AnimatedListItem } from '@/components/AnimatedListItem';
 import { FeaturedCarousel } from '@/components/FeaturedCarousel';
+import { ClosingSoon } from '@/components/ClosingSoon';
 import { MarketPicker, Market, filterByMarketCategory } from '@/components/MarketPicker';
 import { Show } from '@/lib/types';
 import { StaleBanner } from '@/components/StaleBanner';
@@ -62,15 +63,6 @@ export default function HomeScreen() {
     const plays = marketShows.filter(s => isOpen(s) && s.type === 'play' && s.compositeScore != null).sort(byScore).slice(0, 10);
     if (plays.length >= 3) rows.push({ title: 'Best Plays', shows: plays });
 
-    // Closing Soon (has closingDate in the next 3 months)
-    const threeMonths = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000);
-    const closing = marketShows.filter(s => {
-      if (!s.closingDate || s.status === 'closed') return false;
-      const d = new Date(s.closingDate);
-      return d >= now && d <= threeMonths;
-    }).sort((a, b) => (a.closingDate ?? '').localeCompare(b.closingDate ?? '')).slice(0, 10);
-    if (closing.length >= 2) rows.push({ title: 'Closing Soon', shows: closing });
-
     // Great for Kids
     const kids = marketShows.filter(s => {
       if (!isOpen(s)) return false;
@@ -84,6 +76,20 @@ export default function HomeScreen() {
     if (previews.length >= 2) rows.push({ title: 'Coming Up', shows: previews });
 
     return rows;
+  }, [marketShows]);
+
+  // Closing Soon — dedicated section with 30-day window and countdown badges
+  const closingSoon = useMemo(() => {
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    const cutoff = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+    return marketShows
+      .filter(s => {
+        if (!s.closingDate || s.status === 'closed') return false;
+        const d = new Date(s.closingDate);
+        return d >= now && d <= cutoff;
+      })
+      .sort((a, b) => (a.closingDate ?? '').localeCompare(b.closingDate ?? ''));
   }, [marketShows]);
 
   const scoredCount = useMemo(() =>
@@ -163,6 +169,9 @@ export default function HomeScreen() {
                 <FeaturedCarousel shows={row.shows} />
               </View>
             ))}
+
+            {/* Closing Soon — dedicated section with countdown badges */}
+            {closingSoon.length >= 2 && <ClosingSoon shows={closingSoon} />}
 
             {/* Main list title */}
             <Text style={styles.sectionTitle}>Now Playing</Text>

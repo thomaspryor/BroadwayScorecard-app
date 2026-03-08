@@ -12,7 +12,6 @@ import {
   FlatList,
   Pressable,
   StyleSheet,
-  ActivityIndicator,
   Alert,
   Platform,
 } from 'react-native';
@@ -40,6 +39,7 @@ import type { Show } from '@/lib/types';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
 import { StaleBanner } from '@/components/StaleBanner';
 import * as haptics from '@/lib/haptics';
+import { Skeleton } from '@/components/Skeleton';
 
 type Tab = 'diary' | 'watchlist' | 'lists';
 type DiarySort = 'date-desc' | 'date-asc' | 'rating-desc';
@@ -272,7 +272,23 @@ export default function MyShowsScreen() {
       <View style={[styles.container, { paddingTop: insets.top }]}>
         <Text style={[styles.pageTitle, { paddingHorizontal: Spacing.lg, paddingTop: Spacing.xl, paddingBottom: Spacing.sm }]}>My Shows</Text>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={Colors.brand} />
+          {/* Skeleton tabs */}
+          <View style={{ flexDirection: 'row', gap: Spacing.lg, paddingHorizontal: Spacing.lg, marginBottom: Spacing.xl }}>
+            <Skeleton width={60} height={20} />
+            <Skeleton width={80} height={20} />
+            <Skeleton width={50} height={20} />
+          </View>
+          {/* Skeleton list items */}
+          {[0, 1, 2, 3, 4].map(i => (
+            <View key={i} style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingVertical: Spacing.md, gap: Spacing.md }}>
+              <Skeleton width={48} height={64} borderRadius={BorderRadius.sm} />
+              <View style={{ flex: 1 }}>
+                <Skeleton width="75%" height={16} />
+                <Skeleton width="50%" height={12} style={{ marginTop: 6 }} />
+              </View>
+              <Skeleton width={40} height={40} borderRadius={BorderRadius.sm} />
+            </View>
+          ))}
         </View>
       </View>
     );
