@@ -10,6 +10,7 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { View, Text, Pressable, StyleSheet, Platform } from 'react-native';
 import { usePathname, useRouter } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import Svg, { Path } from 'react-native-svg';
 import { useAuth } from '@/lib/auth-context';
@@ -64,6 +65,16 @@ export default function ShowPageRating({
       getWatchlist();
     }
   }, [isAuthenticated, user, showId, getReviewsForShow, getWatchlist]);
+
+  // Refresh when returning from rate modal (focus regained)
+  useFocusEffect(
+    useCallback(() => {
+      if (isAuthenticated && user) {
+        getReviewsForShow(showId);
+        getWatchlist();
+      }
+    }, [isAuthenticated, user, showId, getReviewsForShow, getWatchlist]),
+  );
 
   // Derive state
   const showReviews = reviews.filter(r => r.show_id === showId);

@@ -36,6 +36,7 @@ import type { UserReview, WatchlistEntry } from '@/lib/user-types';
 import type { Show } from '@/lib/types';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
 import { Skeleton } from '@/components/Skeleton';
+import { ShowSearchModal } from '@/components/ShowSearchModal';
 import * as haptics from '@/lib/haptics';
 
 type DiarySort = 'date-desc' | 'date-asc' | 'rating-desc';
@@ -95,6 +96,7 @@ export default function WatchedScreen() {
 
   const [diarySort, setDiarySort] = useState<DiarySort>('date-desc');
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
+  const [showSearchModal, setShowSearchModal] = useState(false);
 
   const showMap = useMemo(() => {
     const map: Record<string, Show> = {};
@@ -329,7 +331,7 @@ export default function WatchedScreen() {
         <Text style={styles.pageTitle}>My Watched Shows</Text>
         <Pressable
           style={({ pressed }) => [styles.addButton, pressed && styles.pressed]}
-          onPress={() => router.push('/(tabs)/search')}
+          onPress={() => setShowSearchModal(true)}
           hitSlop={8}
           accessibilityLabel="Rate a show"
         >
@@ -419,7 +421,7 @@ export default function WatchedScreen() {
           title="Your diary is empty"
           subtitle="Rate shows you've seen to build your personal diary."
           actionLabel="Rate a Show"
-          onAction={() => router.push('/(tabs)/search')}
+          onAction={() => setShowSearchModal(true)}
         />
       ) : viewMode === 'grid' ? (
         <FlatList
@@ -431,8 +433,8 @@ export default function WatchedScreen() {
           contentContainerStyle={styles.gridContainer}
           showsVerticalScrollIndicator={false}
           ListFooterComponent={
-            <View style={styles.gridRow}>
-              <AddShowCard label="Rate a show" onPress={() => router.push('/(tabs)/search')} />
+            <View style={styles.gridFooterRow}>
+              <AddShowCard label="Rate a show" onPress={() => setShowSearchModal(true)} />
               <View style={styles.gridCardSpacer} />
               <View style={styles.gridCardSpacer} />
               <View style={styles.gridCardSpacer} />
@@ -449,7 +451,7 @@ export default function WatchedScreen() {
           ListFooterComponent={
             <Pressable
               style={({ pressed }) => [styles.card, pressed && styles.pressed]}
-              onPress={() => router.push('/(tabs)/search')}
+              onPress={() => setShowSearchModal(true)}
             >
               <View style={[styles.cardPoster, styles.cardPosterPlaceholder]}>
                 <Svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke={Colors.text.muted} strokeWidth={2}>
@@ -463,6 +465,19 @@ export default function WatchedScreen() {
           }
         />
       )}
+      {/* Search modal — select show → rate it immediately */}
+      <ShowSearchModal
+        visible={showSearchModal}
+        title="Rate a Show"
+        onSelect={(show) => {
+          setShowSearchModal(false);
+          router.push({
+            pathname: '/rate/[showId]' as any,
+            params: { showId: show.id, showTitle: show.title },
+          });
+        }}
+        onClose={() => setShowSearchModal(false)}
+      />
     </GestureHandlerRootView>
   );
 }
@@ -540,6 +555,7 @@ const styles = StyleSheet.create({
   // Grid view
   gridContainer: { paddingHorizontal: Spacing.lg, paddingBottom: Spacing.xxl },
   gridRow: { gap: Spacing.sm, paddingBottom: Spacing.sm },
+  gridFooterRow: { flexDirection: 'row', gap: Spacing.sm, paddingBottom: Spacing.sm },
   gridCard: { flex: 1, alignItems: 'center' },
   gridCardSpacer: { flex: 1 },
   gridPoster: {

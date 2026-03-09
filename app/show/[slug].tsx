@@ -18,15 +18,13 @@ import { getScoreColor, getScoreTier, getContrastTextColor } from '@/lib/score-u
 import { ShowDetail, MobileShowDetail, mapShowDetail } from '@/lib/types';
 import { ScoreBadge, StatusBadge, FormatPill, ProductionPill, CategoryBadge } from '@/components/show-cards';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
-import { trackTicketTap, trackBuyButtonTap, trackShowDetailViewed, trackShowShared, trackFullReviewTapped } from '@/lib/analytics';
+import { trackTicketTap, trackShowDetailViewed, trackShowShared, trackFullReviewTapped } from '@/lib/analytics';
 import Svg, { Path } from 'react-native-svg';
 import ShowPageRating from '@/components/user/ShowPageRating';
 import { recordShowView } from '@/lib/store-review';
 import { ShareCardWithRef, ShareCardHandle } from '@/components/ShareCard';
 import { ShowDetailSkeleton } from '@/components/Skeleton';
-import { BookmarkOverlay } from '@/components/BookmarkOverlay';
 import { useAuth } from '@/lib/auth-context';
-import { useWatchlist } from '@/hooks/useWatchlist';
 
 export default function ShowDetailScreen() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
@@ -41,8 +39,6 @@ export default function ShowDetailScreen() {
 
   const show = useMemo(() => shows.find(s => s.slug === slug), [shows, slug]);
   const { user } = useAuth();
-  const { watchlist, addToWatchlist, removeFromWatchlist } = useWatchlist(user?.id || null);
-  const isWatchlisted = useMemo(() => watchlist.some(w => w.show_id === show?.id), [watchlist, show?.id]);
 
   // Related shows: same type, similar score, currently open
   const relatedShows = useMemo(() => {
@@ -96,13 +92,6 @@ export default function ShowDetailScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [show?.id]);
 
-  // Primary ticket link: prefer TodayTix, then first available
-  const primaryTicketLink = useMemo(() => {
-    if (!show?.ticketLinks?.length) return null;
-    const todayTix = show.ticketLinks.find(l => l.platform.toLowerCase().includes('todaytix'));
-    return todayTix || show.ticketLinks[0];
-  }, [show?.ticketLinks]);
-
   if (!show) {
     return (
       <View style={styles.center}>
@@ -127,15 +116,6 @@ export default function ShowDetailScreen() {
           {/* Top row: Poster + Title/Meta */}
           <View style={styles.headerTopRow}>
             <View>
-              {show && (
-                <BookmarkOverlay
-                  isWatchlisted={isWatchlisted}
-                  onToggle={() => {
-                    if (isWatchlisted) removeFromWatchlist(show.id);
-                    else addToWatchlist(show.id);
-                  }}
-                />
-              )}
               {posterUrl ? (
                 <Image
                   source={{ uri: posterUrl }}
@@ -485,22 +465,6 @@ export default function ShowDetailScreen() {
           </Pressable>
         </View>
       </ScrollView>
-
-      {/* Sticky Buy Tickets button */}
-      {primaryTicketLink && (
-        <View style={[styles.stickyButtonContainer, { paddingBottom: Math.max(insets.bottom, Spacing.md) }]}>
-          <Pressable
-            style={({ pressed }) => [styles.stickyBuyButton, pressed && styles.stickyBuyButtonPressed]}
-            onPress={() => {
-              trackBuyButtonTap(show.id, show.title, primaryTicketLink.platform, primaryTicketLink.url);
-              WebBrowser.openBrowserAsync(primaryTicketLink.url);
-            }}
-          >
-            <Text style={styles.stickyBuyText}>Buy Tickets</Text>
-            <Text style={styles.stickyBuySubtext}>on {primaryTicketLink.platform}</Text>
-          </Pressable>
-        </View>
-      )}
       </View>
     </>
   );
@@ -693,7 +657,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    paddingBottom: 100, // room for sticky button
+    paddingBottom: Spacing.xxl,
   },
   center: {
     flex: 1,
@@ -1103,41 +1067,6 @@ const styles = StyleSheet.create({
     color: Colors.text.muted,
     fontSize: FontSize.sm,
     fontWeight: '600',
-  },
-
-  // Sticky buy button
-  stickyButtonContainer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.md,
-    backgroundColor: Colors.surface.default,
-    borderTopWidth: 1,
-    borderTopColor: Colors.border.subtle,
-  },
-  stickyBuyButton: {
-    backgroundColor: Colors.brand,
-    paddingVertical: Spacing.md,
-    borderRadius: BorderRadius.md,
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: Spacing.sm,
-  },
-  stickyBuyButtonPressed: {
-    opacity: 0.85,
-  },
-  stickyBuyText: {
-    color: Colors.text.inverse,
-    fontSize: FontSize.lg,
-    fontWeight: '700',
-  },
-  stickyBuySubtext: {
-    color: Colors.text.inverse,
-    fontSize: FontSize.sm,
-    opacity: 0.8,
   },
 
   // Action buttons

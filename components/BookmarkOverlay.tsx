@@ -1,7 +1,7 @@
 /**
- * BookmarkOverlay — small bookmark icon for top-right of poster cards.
+ * BookmarkOverlay — subtle bookmark icon for top-right of poster cards.
+ * Matches TodayTix style: semi-transparent, no background circle.
  * Shows filled bookmark if watchlisted, outline if not.
- * Tapping toggles watchlist status.
  */
 
 import React, { memo } from 'react';
@@ -29,11 +29,11 @@ export const BookmarkOverlay = memo(function BookmarkOverlay({ isWatchlisted, on
       hitSlop={6}
       accessibilityLabel={isWatchlisted ? 'Remove from watchlist' : 'Add to watchlist'}
     >
-      <Svg width={16} height={16} viewBox="0 0 24 24">
+      <Svg width={20} height={20} viewBox="0 0 24 24">
         <Path
           d="M5 2h14a1 1 0 0 1 1 1v19.143a.5.5 0 0 1-.766.424L12 18.03l-7.234 4.536A.5.5 0 0 1 4 22.143V3a1 1 0 0 1 1-1z"
-          fill={isWatchlisted ? '#FFD700' : 'none'}
-          stroke={isWatchlisted ? '#FFD700' : 'rgba(255,255,255,0.7)'}
+          fill={isWatchlisted ? 'rgba(255,255,255,0.9)' : 'none'}
+          stroke="rgba(255,255,255,0.85)"
           strokeWidth={1.5}
         />
       </Svg>
@@ -47,8 +47,12 @@ const styles = StyleSheet.create({
     top: 6,
     right: 6,
     zIndex: 10,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    borderRadius: 6,
-    padding: 4,
+    // No background — matches TodayTix style
+    // Drop shadow for visibility on any poster
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.6,
+    shadowRadius: 2,
+    elevation: 4,
   },
 });

@@ -240,13 +240,6 @@ export default function RateModal() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* Close X button (iOS 15 safety) */}
-          <Pressable onPress={handleCancel} style={styles.closeButton} hitSlop={12} accessibilityLabel="Close">
-            <Svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke={Colors.text.muted} strokeWidth={2.5}>
-              <Path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </Svg>
-          </Pressable>
-
           {/* Poster thumbnail */}
           {posterUrl && (
             <View style={styles.posterContainer}>
@@ -424,11 +417,6 @@ const styles = StyleSheet.create({
   content: {
     paddingHorizontal: Spacing.xl,
     paddingTop: Spacing.lg,
-  },
-  closeButton: {
-    alignSelf: 'flex-end',
-    padding: Spacing.xs,
-    marginBottom: Spacing.sm,
   },
   posterContainer: {
     alignItems: 'center',

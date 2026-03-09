@@ -706,7 +706,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.md,
-    paddingVertical: Spacing.md,
+    paddingVertical: Spacing.lg,
+    minHeight: 90,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border.subtle,
   },
@@ -744,9 +745,9 @@ const styles = StyleSheet.create({
     gap: 3,
   },
   previewPoster: {
-    width: 32,
-    height: 43,
-    borderRadius: 3,
+    width: 40,
+    height: 54,
+    borderRadius: 4,
   },
   previewPlaceholder: {
     backgroundColor: Colors.surface.overlay,

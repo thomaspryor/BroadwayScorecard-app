@@ -34,6 +34,7 @@ import type { WatchlistEntry } from '@/lib/user-types';
 import type { Show } from '@/lib/types';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
 import { Skeleton } from '@/components/Skeleton';
+import { ShowSearchModal } from '@/components/ShowSearchModal';
 import * as haptics from '@/lib/haptics';
 
 type WatchlistSort = 'added-desc' | 'alphabetical' | 'closing-soon';
@@ -74,12 +75,13 @@ export default function ToWatchScreen() {
   const router = useRouter();
   const { user, isAuthenticated, loading: authLoading, showSignIn } = useAuth();
   const { reviews, getAllReviews } = useUserReviews(user?.id || null);
-  const { watchlist, getWatchlist, removeFromWatchlist, updatePlannedDate, loading: watchlistLoading } = useWatchlist(user?.id || null);
+  const { watchlist, getWatchlist, addToWatchlist, removeFromWatchlist, updatePlannedDate, loading: watchlistLoading } = useWatchlist(user?.id || null);
   const { shows } = useShows();
 
   const [watchlistSort, setWatchlistSort] = useState<WatchlistSort>('added-desc');
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [datePickingShowId, setDatePickingShowId] = useState<string | null>(null);
+  const [showSearchModal, setShowSearchModal] = useState(false);
 
   const showMap = useMemo(() => {
     const map: Record<string, Show> = {};
@@ -286,7 +288,7 @@ export default function ToWatchScreen() {
         <Text style={styles.pageTitle}>To Watch</Text>
         <Pressable
           style={({ pressed }) => [styles.addButton, pressed && styles.pressed]}
-          onPress={() => router.push('/(tabs)/search')}
+          onPress={() => setShowSearchModal(true)}
           hitSlop={8}
           accessibilityLabel="Add to watchlist"
         >
@@ -363,7 +365,7 @@ export default function ToWatchScreen() {
                     {sortedWatchlist.map(renderWatchlistGridItem)}
                     <Pressable
                       style={({ pressed }) => [styles.addShowCard, pressed && styles.pressed]}
-                      onPress={() => router.push('/(tabs)/search')}
+                      onPress={() => setShowSearchModal(true)}
                     >
                       <Svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke={Colors.text.muted} strokeWidth={2}>
                         <Path strokeLinecap="round" d="M12 5v14M5 12h14" />
@@ -390,6 +392,20 @@ export default function ToWatchScreen() {
           minimumDate={new Date()}
         />
       )}
+
+      {/* Search modal — select show → auto-add to watchlist */}
+      <ShowSearchModal
+        visible={showSearchModal}
+        title="Add to Watchlist"
+        excludeIds={new Set(watchlist.map(w => w.show_id))}
+        onSelect={async (show) => {
+          setShowSearchModal(false);
+          haptics.action();
+          await addToWatchlist(show.id);
+          await getWatchlist();
+        }}
+        onClose={() => setShowSearchModal(false)}
+      />
     </GestureHandlerRootView>
   );
 }

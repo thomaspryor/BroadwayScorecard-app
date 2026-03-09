@@ -41,13 +41,14 @@ export default function WatchlistButton({ isWatchlisted, onToggle, loading = fal
     >
       {loading ? (
         <ActivityIndicator size="small" color={isWatchlisted ? '#FFD700' : Colors.text.secondary} />
-      ) : isWatchlisted ? (
-        <Svg width={16} height={16} viewBox="0 0 24 24" fill="#FFD700">
-          <Path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" />
-        </Svg>
       ) : (
-        <Svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={Colors.text.secondary} strokeWidth={2.5}>
-          <Path strokeLinecap="round" d="M12 5v14M5 12h14" />
+        <Svg width={16} height={16} viewBox="0 0 24 24">
+          <Path
+            d="M5 2h14a1 1 0 0 1 1 1v19.143a.5.5 0 0 1-.766.424L12 18.03l-7.234 4.536A.5.5 0 0 1 4 22.143V3a1 1 0 0 1 1-1z"
+            fill={isWatchlisted ? '#FFD700' : 'none'}
+            stroke={isWatchlisted ? '#FFD700' : Colors.text.secondary}
+            strokeWidth={1.5}
+          />
         </Svg>
       )}
       <Text style={[styles.label, isWatchlisted ? styles.labelActive : styles.labelInactive]}>

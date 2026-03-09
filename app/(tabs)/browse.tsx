@@ -130,7 +130,9 @@ export default function BrowseScreen() {
           result.sort((a, b) => {
             const aOrder = GRADE_ORDER[a.audienceGrade?.grade ?? ''] ?? 99;
             const bOrder = GRADE_ORDER[b.audienceGrade?.grade ?? ''] ?? 99;
-            return aOrder - bOrder;
+            if (aOrder !== bOrder) return aOrder - bOrder;
+            // Tiebreaker: higher composite score first within same grade
+            return (b.compositeScore ?? -1) - (a.compositeScore ?? -1);
           });
         } else {
           result.sort((a, b) => (b.compositeScore ?? -1) - (a.compositeScore ?? -1));
