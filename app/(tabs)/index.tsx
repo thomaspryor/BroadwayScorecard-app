@@ -30,12 +30,17 @@ export default function HomeScreen() {
   const router = useRouter();
   const [market] = useState<Market>('nyc');
   const [refreshing, setRefreshing] = useState(false);
-  const { user } = useAuth();
+  const { user, isAuthenticated, showSignIn } = useAuth();
   const { watchlist, addToWatchlist, removeFromWatchlist } = useWatchlist(user?.id || null);
   const watchlistSet = useMemo(() => new Set(watchlist.map(w => w.show_id)), [watchlist]);
-  const toggleWatchlist = useCallback((showId: string) => {
-    if (watchlistSet.has(showId)) removeFromWatchlist(showId);
-    else addToWatchlist(showId);
+  const toggleWatchlist = useCallback(async (showId: string) => {
+    if (!isAuthenticated) { showSignIn('watchlist'); return; }
+    try {
+      if (watchlistSet.has(showId)) await removeFromWatchlist(showId);
+      else await addToWatchlist(showId);
+    } catch {
+      // Hook already sets error state; swallow re-throw to prevent unhandled rejection
+    }
   }, [watchlistSet, addToWatchlist, removeFromWatchlist]);
 
   // Home: Broadway-only for NYC (no off-broadway), all west-end for London

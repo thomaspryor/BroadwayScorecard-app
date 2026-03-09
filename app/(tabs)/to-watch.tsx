@@ -136,7 +136,11 @@ export default function ToWatchScreen() {
   const totalCount = upcomingWatchlist.length + regularWatchlist.length;
 
   const handleRemove = useCallback(async (showId: string) => {
-    await removeFromWatchlist(showId);
+    try {
+      await removeFromWatchlist(showId);
+    } catch {
+      // Hook sets error state
+    }
   }, [removeFromWatchlist]);
 
   const handleDateChange = useCallback((_event: unknown, selectedDate?: Date) => {
@@ -393,8 +397,12 @@ export default function ToWatchScreen() {
         onSelect={async (show) => {
           setShowSearchModal(false);
           haptics.action();
-          await addToWatchlist(show.id);
-          await getWatchlist();
+          try {
+            await addToWatchlist(show.id);
+            await getWatchlist();
+          } catch {
+            // Hook sets error state
+          }
         }}
         onClose={() => setShowSearchModal(false)}
       />

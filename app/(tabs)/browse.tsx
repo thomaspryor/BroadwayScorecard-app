@@ -98,13 +98,18 @@ export default function BrowseScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const searchInputRef = useRef<TextInput>(null);
   const isWestEnd = market === 'london';
-  const { user } = useAuth();
+  const { user, isAuthenticated, showSignIn } = useAuth();
   const { watchlist, addToWatchlist, removeFromWatchlist } = useWatchlist(user?.id || null);
   const watchlistSet = useMemo(() => new Set(watchlist.map(w => w.show_id)), [watchlist]);
-  const toggleWatchlist = useCallback((showId: string) => {
-    if (watchlistSet.has(showId)) removeFromWatchlist(showId);
-    else addToWatchlist(showId);
-  }, [watchlistSet, addToWatchlist, removeFromWatchlist]);
+  const toggleWatchlist = useCallback(async (showId: string) => {
+    if (!isAuthenticated) { showSignIn('watchlist'); return; }
+    try {
+      if (watchlistSet.has(showId)) await removeFromWatchlist(showId);
+      else await addToWatchlist(showId);
+    } catch {
+      // Hook already sets error state; swallow re-throw to prevent unhandled rejection
+    }
+  }, [isAuthenticated, showSignIn, watchlistSet, addToWatchlist, removeFromWatchlist]);
 
   // Fuse search
   const fuse = useMemo(() => new Fuse(shows, FUSE_OPTIONS), [shows]);
