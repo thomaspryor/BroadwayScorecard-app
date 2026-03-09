@@ -56,6 +56,7 @@ export default function ShowPageRating({
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [watchlistLoading, setWatchlistLoading] = useState(false);
   const [showWatchlistDatePicker, setShowWatchlistDatePicker] = useState(false);
+  const [pendingWatchlistDate, setPendingWatchlistDate] = useState<Date>(new Date());
   const [showListSheet, setShowListSheet] = useState(false);
 
   // Load data when authenticated
@@ -221,12 +222,18 @@ export default function ShowPageRating({
 
   const handleWatchlistDateChange = useCallback(
     (_event: DateTimePickerEvent, selectedDate?: Date) => {
-      if (Platform.OS !== 'ios') setShowWatchlistDatePicker(false);
-      if (selectedDate) {
-        const iso = selectedDate.toISOString().split('T')[0];
-        updatePlannedDate(showId, iso).catch(() => {
-          showToast('Failed to save date.', 'error');
-        });
+      if (Platform.OS !== 'ios') {
+        // Android: picker dismisses on selection, save immediately
+        setShowWatchlistDatePicker(false);
+        if (selectedDate) {
+          const iso = selectedDate.toISOString().split('T')[0];
+          updatePlannedDate(showId, iso).catch(() => {
+            showToast('Failed to save date.', 'error');
+          });
+        }
+      } else if (selectedDate) {
+        // iOS inline: store selection, save on "Done" tap
+        setPendingWatchlistDate(selectedDate);
       }
     },
     [showId, updatePlannedDate, showToast],
@@ -376,7 +383,12 @@ export default function ShowPageRating({
             <View style={styles.watchlistDateCol}>
               <Pressable
                 style={styles.watchlistDateButton}
-                onPress={() => setShowWatchlistDatePicker(true)}
+                onPress={() => {
+                  setPendingWatchlistDate(
+                    watchlistEntry?.planned_date ? new Date(watchlistEntry.planned_date + 'T00:00:00') : new Date()
+                  );
+                  setShowWatchlistDatePicker(true);
+                }}
                 hitSlop={8}
               >
                 <Svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke={Colors.text.muted} strokeWidth={2}>
@@ -402,12 +414,18 @@ export default function ShowPageRating({
             <View style={styles.datePickerContainer}>
               <View style={styles.datePickerHeader}>
                 <Text style={styles.datePickerTitle}>When are you going?</Text>
-                <Pressable onPress={() => setShowWatchlistDatePicker(false)} hitSlop={8}>
+                <Pressable onPress={() => {
+                  const iso = pendingWatchlistDate.toISOString().split('T')[0];
+                  updatePlannedDate(showId, iso).catch(() => {
+                    showToast('Failed to save date.', 'error');
+                  });
+                  setShowWatchlistDatePicker(false);
+                }} hitSlop={8}>
                   <Text style={styles.datePickerDone}>Done</Text>
                 </Pressable>
               </View>
               <DateTimePicker
-                value={watchlistEntry?.planned_date ? new Date(watchlistEntry.planned_date + 'T00:00:00') : new Date()}
+                value={pendingWatchlistDate}
                 mode="date"
                 display={Platform.OS === 'ios' ? 'inline' : 'default'}
                 onChange={handleWatchlistDateChange}

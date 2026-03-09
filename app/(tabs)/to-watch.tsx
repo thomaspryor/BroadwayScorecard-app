@@ -64,6 +64,7 @@ export default function ToWatchScreen() {
 
   const [watchlistSort, setWatchlistSort] = useState<WatchlistSort>('added-desc');
   const [datePickingShowId, setDatePickingShowId] = useState<string | null>(null);
+  const [pendingDate, setPendingDate] = useState<Date>(new Date());
   const [showSearchModal, setShowSearchModal] = useState(false);
 
   const showMap = useMemo(() => {
@@ -139,10 +140,16 @@ export default function ToWatchScreen() {
   }, [removeFromWatchlist]);
 
   const handleDateChange = useCallback((_event: unknown, selectedDate?: Date) => {
-    if (Platform.OS === 'android') setDatePickingShowId(null);
-    if (selectedDate && datePickingShowId) {
-      const isoDate = selectedDate.toISOString().split('T')[0];
-      updatePlannedDate(datePickingShowId, isoDate);
+    if (Platform.OS === 'android') {
+      // Android: picker dismisses on selection, save immediately
+      setDatePickingShowId(null);
+      if (selectedDate && datePickingShowId) {
+        const isoDate = selectedDate.toISOString().split('T')[0];
+        updatePlannedDate(datePickingShowId, isoDate);
+      }
+    } else if (selectedDate) {
+      // iOS inline: just store the selection, save on "Done" tap
+      setPendingDate(selectedDate);
     }
   }, [datePickingShowId, updatePlannedDate]);
 
@@ -212,7 +219,7 @@ export default function ToWatchScreen() {
         key={item.id}
         style={({ pressed }) => [styles.gridCard, pressed && styles.pressed]}
         onPress={() => show && router.push(`/show/${show.slug}`)}
-        onLongPress={() => setDatePickingShowId(item.show_id)}
+        onLongPress={() => { setPendingDate(new Date()); setDatePickingShowId(item.show_id); }}
       >
         {posterUrl ? (
           <Image source={{ uri: posterUrl }} style={styles.gridPoster} contentFit="cover" transition={200} />
@@ -356,12 +363,18 @@ export default function ToWatchScreen() {
           <View style={styles.datePickerCard}>
             <View style={styles.datePickerHeader}>
               <Text style={styles.datePickerTitle}>When are you going?</Text>
-              <Pressable onPress={() => setDatePickingShowId(null)} hitSlop={8}>
+              <Pressable onPress={() => {
+                if (datePickingShowId) {
+                  const isoDate = pendingDate.toISOString().split('T')[0];
+                  updatePlannedDate(datePickingShowId, isoDate);
+                }
+                setDatePickingShowId(null);
+              }} hitSlop={8}>
                 <Text style={styles.datePickerDone}>Done</Text>
               </Pressable>
             </View>
             <DateTimePicker
-              value={new Date()}
+              value={pendingDate}
               mode="date"
               display={Platform.OS === 'ios' ? 'inline' : 'default'}
               onChange={handleDateChange}
