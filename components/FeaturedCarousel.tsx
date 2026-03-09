@@ -10,13 +10,16 @@ import { useRouter } from 'expo-router';
 import { Show } from '@/lib/types';
 import { getImageUrl } from '@/lib/images';
 import { ScoreBadge } from '@/components/show-cards';
+import { BookmarkOverlay } from '@/components/BookmarkOverlay';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
 
 interface FeaturedCarouselProps {
   shows: Show[];
+  watchlistSet?: Set<string>;
+  onToggleWatchlist?: (showId: string) => void;
 }
 
-const FeaturedCard = memo(function FeaturedCard({ show, cardWidth }: { show: Show; cardWidth: number }) {
+const FeaturedCard = memo(function FeaturedCard({ show, cardWidth, isWatchlisted, onToggle }: { show: Show; cardWidth: number; isWatchlisted?: boolean; onToggle?: () => void }) {
   const router = useRouter();
   const posterUrl = getImageUrl(show.images.poster) || getImageUrl(show.images.thumbnail);
   const cardHeight = cardWidth * 1.5;
@@ -30,8 +33,11 @@ const FeaturedCard = memo(function FeaturedCard({ show, cardWidth }: { show: Sho
       ]}
       onPress={() => router.push(`/show/${show.slug}`)}
     >
-      {/* Image container with score badge overlapping bottom-right */}
+      {/* Image container with bookmark top-right + score badge bottom-right */}
       <View style={[styles.imageContainer, { height: cardHeight }]}>
+        {isWatchlisted !== undefined && onToggle && (
+          <BookmarkOverlay isWatchlisted={isWatchlisted} onToggle={onToggle} />
+        )}
         {posterUrl ? (
           <Image
             source={{ uri: posterUrl }}
@@ -59,7 +65,7 @@ const FeaturedCard = memo(function FeaturedCard({ show, cardWidth }: { show: Sho
   );
 });
 
-export function FeaturedCarousel({ shows }: FeaturedCarouselProps) {
+export function FeaturedCarousel({ shows, watchlistSet, onToggleWatchlist }: FeaturedCarouselProps) {
   const { width } = useWindowDimensions();
   if (shows.length === 0) return null;
 
@@ -72,7 +78,14 @@ export function FeaturedCarousel({ shows }: FeaturedCarouselProps) {
         horizontal
         data={shows}
         keyExtractor={item => item.id}
-        renderItem={({ item }) => <FeaturedCard show={item} cardWidth={cardWidth} />}
+        renderItem={({ item }) => (
+          <FeaturedCard
+            show={item}
+            cardWidth={cardWidth}
+            isWatchlisted={watchlistSet?.has(item.id)}
+            onToggle={onToggleWatchlist ? () => onToggleWatchlist(item.id) : undefined}
+          />
+        )}
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.list}
         snapToInterval={cardWidth + Spacing.md}

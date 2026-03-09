@@ -1,6 +1,8 @@
 /**
- * Tab layout — 5 tabs: Home, Browse, My Shows, Search, Settings.
- * My Shows tab hidden when userAccounts feature flag is off.
+ * Tab layout — 5 tabs: Home, Watched, To Watch, Lists, Browse.
+ * Watched/To Watch/Lists hidden when userAccounts feature flag is off.
+ * Search is integrated into Browse. Settings/Profile via profile icon on Home.
+ * Legacy tabs (my-shows, search, settings) kept as hidden routes for backward compat.
  */
 
 import { Tabs } from 'expo-router';
@@ -12,6 +14,8 @@ import { Colors } from '@/constants/theme';
 import { featureFlags } from '@/lib/feature-flags';
 
 export default function TabLayout() {
+  const showUserTabs = featureFlags.userAccounts;
+
   return (
     <Tabs
       screenOptions={{
@@ -35,6 +39,36 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="watched"
+        options={{
+          title: 'Watched',
+          tabBarIcon: ({ color }) => (
+            <IconSymbol size={28} name="star.fill" color={color} />
+          ),
+          href: showUserTabs ? ('/(tabs)/watched' as any) : null,
+        }}
+      />
+      <Tabs.Screen
+        name="to-watch"
+        options={{
+          title: 'To Watch',
+          tabBarIcon: ({ color }) => (
+            <IconSymbol size={28} name="bookmark.fill" color={color} />
+          ),
+          href: showUserTabs ? ('/(tabs)/to-watch' as any) : null,
+        }}
+      />
+      <Tabs.Screen
+        name="lists"
+        options={{
+          title: 'Lists',
+          tabBarIcon: ({ color }) => (
+            <IconSymbol size={28} name="list.bullet" color={color} />
+          ),
+          href: showUserTabs ? ('/(tabs)/lists' as any) : null,
+        }}
+      />
+      <Tabs.Screen
         name="browse"
         options={{
           title: 'Browse',
@@ -43,34 +77,10 @@ export default function TabLayout() {
           ),
         }}
       />
-      <Tabs.Screen
-        name="my-shows"
-        options={{
-          title: 'My Shows',
-          tabBarIcon: ({ color }) => (
-            <IconSymbol size={28} name="star.fill" color={color} />
-          ),
-          href: featureFlags.userAccounts ? '/(tabs)/my-shows' : null,
-        }}
-      />
-      <Tabs.Screen
-        name="search"
-        options={{
-          title: 'Search',
-          tabBarIcon: ({ color }) => (
-            <IconSymbol size={28} name="magnifyingglass" color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="settings"
-        options={{
-          title: 'More',
-          tabBarIcon: ({ color }) => (
-            <IconSymbol size={28} name="gearshape.fill" color={color} />
-          ),
-        }}
-      />
+      {/* Hidden legacy routes — kept for deep links / backward compat */}
+      <Tabs.Screen name="my-shows" options={{ href: null }} />
+      <Tabs.Screen name="search" options={{ href: null }} />
+      <Tabs.Screen name="settings" options={{ href: null }} />
     </Tabs>
   );
 }

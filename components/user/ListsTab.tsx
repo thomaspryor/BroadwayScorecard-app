@@ -122,6 +122,8 @@ export default function ListsTab({ userId, showMap, createTrigger }: ListsTabPro
     if (newList) {
       trackListCreated(newList.id, name, isRanked);
       setShowModal(null);
+      // Navigate into the new list detail
+      setActiveListId(newList.id);
     }
   };
 

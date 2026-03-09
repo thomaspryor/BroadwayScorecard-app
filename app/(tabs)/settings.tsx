@@ -3,7 +3,7 @@
  * When signed in: profile card + sign-out (gated by feature flag).
  */
 
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, Pressable, ScrollView, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as WebBrowser from 'expo-web-browser';
@@ -14,8 +14,9 @@ import { useShows } from '@/lib/data-context';
 import { useAuth } from '@/lib/auth-context';
 import { clearUserCache } from '@/lib/user-cache';
 import { featureFlags } from '@/lib/feature-flags';
+import { MarketPicker, Market } from '@/components/MarketPicker';
 import { Colors, Spacing, FontSize } from '@/constants/theme';
-import { trackDataRefreshed, trackCacheCleared } from '@/lib/analytics';
+import { trackDataRefreshed, trackCacheCleared, trackMarketChanged } from '@/lib/analytics';
 import * as haptics from '@/lib/haptics';
 
 const WEB = 'https://broadwayscorecard.com';
@@ -37,6 +38,11 @@ export default function SettingsScreen() {
   const { lastUpdated, refresh, shows } = useShows();
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const [market, setMarket] = useState<Market>('nyc');
+  const handleMarketChange = useCallback((m: Market) => {
+    setMarket(m);
+    trackMarketChanged(m, 'settings');
+  }, []);
 
   // Auth hooks — always called (React rules), but UI gated by feature flag
   const auth = useAuth();
@@ -120,7 +126,15 @@ export default function SettingsScreen() {
       style={[styles.container, { paddingTop: insets.top }]}
       contentContainerStyle={styles.content}
     >
-      <Text style={styles.title}>More</Text>
+      <Text style={styles.title}>Settings</Text>
+
+      {/* Market picker */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>MARKET</Text>
+        <View style={styles.marketRow}>
+          <MarketPicker market={market} onChange={handleMarketChange} />
+        </View>
+      </View>
 
       {/* Profile section — feature-flagged */}
       {featureFlags.userAccounts && (
@@ -234,6 +248,11 @@ const styles = StyleSheet.create({
   rowValue: {
     color: Colors.text.secondary,
     fontSize: FontSize.md,
+  },
+  marketRow: {
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
+    backgroundColor: Colors.surface.raised,
   },
   profileCard: {
     flexDirection: 'row',

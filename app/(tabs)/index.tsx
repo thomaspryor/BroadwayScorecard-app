@@ -1,28 +1,42 @@
 /**
- * Home tab — market picker, featured rows, currently playing shows.
+ * Home tab — featured rows, currently playing shows.
  * Defaults to NYC market (Broadway only — no off-broadway). Critics mode only.
+ * Profile icon top-right links to settings/profile screen.
  */
 
 import React, { useMemo, useCallback, useState } from 'react';
-import { View, Text, FlatList, StyleSheet, RefreshControl } from 'react-native';
+import { View, Text, FlatList, StyleSheet, RefreshControl, Pressable } from 'react-native';
 import { ShowListSkeleton } from '@/components/Skeleton';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
+import Svg, { Path, Circle } from 'react-native-svg';
 import { useShows } from '@/lib/data-context';
+import { useAuth } from '@/lib/auth-context';
+import { useWatchlist } from '@/hooks/useWatchlist';
 import { ShowCard } from '@/components/ShowCard';
 import { AnimatedListItem } from '@/components/AnimatedListItem';
 import { FeaturedCarousel } from '@/components/FeaturedCarousel';
 import { ClosingSoon } from '@/components/ClosingSoon';
-import { MarketPicker, Market, filterByMarketCategory } from '@/components/MarketPicker';
+import { filterByMarketCategory } from '@/components/MarketPicker';
+import type { Market } from '@/components/MarketPicker';
 import { Show } from '@/lib/types';
 import { StaleBanner } from '@/components/StaleBanner';
 import { Colors, Spacing, FontSize } from '@/constants/theme';
-import { trackMarketChanged, trackDataRefreshed } from '@/lib/analytics';
+import { trackDataRefreshed } from '@/lib/analytics';
 
 export default function HomeScreen() {
   const { shows, isLoading, error, refresh } = useShows();
   const insets = useSafeAreaInsets();
-  const [market, setMarket] = useState<Market>('nyc');
+  const router = useRouter();
+  const [market] = useState<Market>('nyc');
   const [refreshing, setRefreshing] = useState(false);
+  const { user } = useAuth();
+  const { watchlist, addToWatchlist, removeFromWatchlist } = useWatchlist(user?.id || null);
+  const watchlistSet = useMemo(() => new Set(watchlist.map(w => w.show_id)), [watchlist]);
+  const toggleWatchlist = useCallback((showId: string) => {
+    if (watchlistSet.has(showId)) removeFromWatchlist(showId);
+    else addToWatchlist(showId);
+  }, [watchlistSet, addToWatchlist, removeFromWatchlist]);
 
   // Home: Broadway-only for NYC (no off-broadway), all west-end for London
   const marketShows = useMemo(
@@ -97,19 +111,23 @@ export default function HomeScreen() {
     [marketShows]
   );
 
+  const totalReviews = useMemo(() =>
+    marketShows.reduce((sum, s) => sum + (s.criticScore?.reviewCount ?? 0), 0),
+    [marketShows]
+  );
+
   const isWestEnd = market === 'london';
   const accentColor = isWestEnd ? Colors.brandWestEnd : Colors.brand;
 
   const renderItem = useCallback(({ item, index }: { item: Show; index: number }) => (
     <AnimatedListItem index={index}>
-      <ShowCard show={item} hideStatus />
+      <ShowCard show={item} hideStatus isWatchlisted={watchlistSet.has(item.id)} onToggleWatchlist={() => toggleWatchlist(item.id)} />
     </AnimatedListItem>
-  ), []);
+  ), [watchlistSet, toggleWatchlist]);
 
-  const handleMarketChange = useCallback((m: Market) => {
-    setMarket(m);
-    trackMarketChanged(m, 'home');
-  }, []);
+  const handleProfilePress = useCallback(() => {
+    router.push('/(tabs)/settings');
+  }, [router]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -147,17 +165,27 @@ export default function HomeScreen() {
         removeClippedSubviews
         ListHeaderComponent={
           <View>
-            {/* Brand header + market picker */}
+            {/* Brand header + profile icon */}
             <View style={styles.header}>
               <View style={styles.headerRow}>
                 <Text style={styles.brandText}>
                   {isWestEnd ? 'WestEnd' : 'Broadway'}{' '}
                   <Text style={[styles.brandAccent, { color: accentColor }]}>Scorecard</Text>
                 </Text>
-                <MarketPicker market={market} onChange={handleMarketChange} />
+                <Pressable
+                  style={({ pressed }) => [styles.profileIcon, pressed && { opacity: 0.7 }]}
+                  onPress={handleProfilePress}
+                  hitSlop={8}
+                  accessibilityLabel="Profile and settings"
+                >
+                  <Svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke={Colors.text.secondary} strokeWidth={2}>
+                    <Path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                    <Circle cx={12} cy={7} r={4} />
+                  </Svg>
+                </Pressable>
               </View>
               <Text style={styles.subtitle}>
-                {scoredCount} shows scored by critics
+                {scoredCount} shows scored by {totalReviews.toLocaleString()} reviews
               </Text>
               <StaleBanner />
             </View>
@@ -166,7 +194,7 @@ export default function HomeScreen() {
             {featuredRows.map((row, i) => (
               <View key={i}>
                 <Text style={styles.sectionTitle}>{row.title}</Text>
-                <FeaturedCarousel shows={row.shows} />
+                <FeaturedCarousel shows={row.shows} watchlistSet={watchlistSet} onToggleWatchlist={toggleWatchlist} />
               </View>
             ))}
 
@@ -236,6 +264,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
+  },
+  profileIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: Colors.surface.overlay,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 4,
   },
   brandText: {
     color: Colors.text.primary,

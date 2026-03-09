@@ -24,6 +24,9 @@ import ShowPageRating from '@/components/user/ShowPageRating';
 import { recordShowView } from '@/lib/store-review';
 import { ShareCardWithRef, ShareCardHandle } from '@/components/ShareCard';
 import { ShowDetailSkeleton } from '@/components/Skeleton';
+import { BookmarkOverlay } from '@/components/BookmarkOverlay';
+import { useAuth } from '@/lib/auth-context';
+import { useWatchlist } from '@/hooks/useWatchlist';
 
 export default function ShowDetailScreen() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
@@ -37,6 +40,9 @@ export default function ShowDetailScreen() {
   const shareCardRef = useRef<ShareCardHandle>(null);
 
   const show = useMemo(() => shows.find(s => s.slug === slug), [shows, slug]);
+  const { user } = useAuth();
+  const { watchlist, addToWatchlist, removeFromWatchlist } = useWatchlist(user?.id || null);
+  const isWatchlisted = useMemo(() => watchlist.some(w => w.show_id === show?.id), [watchlist, show?.id]);
 
   // Related shows: same type, similar score, currently open
   const relatedShows = useMemo(() => {
@@ -120,18 +126,29 @@ export default function ShowDetailScreen() {
         <View style={styles.headerCard}>
           {/* Top row: Poster + Title/Meta */}
           <View style={styles.headerTopRow}>
-            {posterUrl ? (
-              <Image
-                source={{ uri: posterUrl }}
-                style={styles.posterCard}
-                contentFit="cover"
-                transition={200}
-              />
-            ) : (
-              <View style={[styles.posterCard, styles.posterPlaceholder]}>
-                <Text style={styles.posterPlaceholderText}>{show.title.charAt(0)}</Text>
-              </View>
-            )}
+            <View>
+              {show && (
+                <BookmarkOverlay
+                  isWatchlisted={isWatchlisted}
+                  onToggle={() => {
+                    if (isWatchlisted) removeFromWatchlist(show.id);
+                    else addToWatchlist(show.id);
+                  }}
+                />
+              )}
+              {posterUrl ? (
+                <Image
+                  source={{ uri: posterUrl }}
+                  style={styles.posterCard}
+                  contentFit="cover"
+                  transition={200}
+                />
+              ) : (
+                <View style={[styles.posterCard, styles.posterPlaceholder]}>
+                  <Text style={styles.posterPlaceholderText}>{show.title.charAt(0)}</Text>
+                </View>
+              )}
+            </View>
 
             <View style={styles.headerInfo}>
               <View style={styles.pills}>

@@ -15,26 +15,29 @@ const STAR_SIZE = 14;
 export default function MiniStars({ rating }: { rating: number }) {
   const id = useId();
 
+  // Only render filled (full/half) stars — no empty outlines
+  const fullStars = Math.floor(rating);
+  const hasHalf = rating - fullStars >= 0.5;
+  const starsToRender = hasHalf ? fullStars + 1 : fullStars;
+
   return (
     <View style={styles.row}>
-      {[1, 2, 3, 4, 5].map(i => {
-        const fill = rating >= i ? 'full' : rating >= i - 0.5 ? 'half' : 'empty';
+      {Array.from({ length: starsToRender }, (_, idx) => {
+        const i = idx + 1;
+        const isHalf = i > fullStars && hasHalf;
         return (
           <Svg key={i} width={STAR_SIZE} height={STAR_SIZE} viewBox="0 0 24 24">
-            {fill === 'full' ? (
-              <Path d={STAR_PATH} fill={GOLD} />
-            ) : fill === 'empty' ? (
-              <Path d={STAR_PATH} fill="none" stroke={EMPTY} strokeWidth={1.5} strokeLinejoin="round" />
-            ) : (
+            {isHalf ? (
               <>
                 <Defs>
                   <ClipPath id={`mini-half-${id}-${i}`}>
                     <Rect x="0" y="0" width="12" height="24" />
                   </ClipPath>
                 </Defs>
-                <Path d={STAR_PATH} fill="none" stroke={EMPTY} strokeWidth={1.5} strokeLinejoin="round" />
                 <Path d={STAR_PATH} fill={GOLD} clipPath={`url(#mini-half-${id}-${i})`} />
               </>
+            ) : (
+              <Path d={STAR_PATH} fill={GOLD} />
             )}
           </Svg>
         );

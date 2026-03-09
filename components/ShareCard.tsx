@@ -11,7 +11,8 @@ import { View, Text, StyleSheet, Share, Platform } from 'react-native';
 import { Image } from 'expo-image';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
-import ViewShot from 'react-native-view-shot';
+let ViewShot: any;
+try { ViewShot = require('react-native-view-shot').default; } catch { ViewShot = View; }
 import Svg, { Path } from 'react-native-svg';
 import { getScoreTier, getScoreColor, getContrastTextColor } from '@/lib/score-utils';
 import { getImageUrl } from '@/lib/images';
@@ -39,7 +40,7 @@ const GOLD_GRADIENT: [string, string, string, string, string] = [
 ];
 
 export function ShareCard({ show, onShared }: ShareCardProps) {
-  const viewShotRef = useRef<ViewShot>(null);
+  const viewShotRef = useRef<any>(null);
 
   const handleShare = useCallback(async () => {
     if (Platform.OS === 'ios') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -189,7 +190,7 @@ export interface ShareCardHandle {
 
 export const ShareCardWithRef = React.forwardRef<ShareCardHandle, ShareCardProps>(
   function ShareCardWithRef(props, ref) {
-    const viewShotRef = useRef<ViewShot>(null);
+    const viewShotRef = useRef<any>(null);
 
     const share = useCallback(async () => {
       if (Platform.OS === 'ios') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);

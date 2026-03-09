@@ -17,6 +17,7 @@ import { Show } from '@/lib/types';
 import { getImageUrl } from '@/lib/images';
 import { ScoreBadge, StatusBadge, FormatPill, ProductionPill, CategoryBadge, AudienceChip } from '@/components/show-cards';
 import { getContrastTextColor } from '@/lib/score-utils';
+import { BookmarkOverlay } from '@/components/BookmarkOverlay';
 import { Colors, Spacing, BorderRadius, FontSize } from '@/constants/theme';
 import type { ScoreMode } from '@/components/ScoreToggle';
 
@@ -24,6 +25,8 @@ interface ShowCardProps {
   show: Show;
   scoreMode?: ScoreMode;
   hideStatus?: boolean;
+  isWatchlisted?: boolean;
+  onToggleWatchlist?: () => void;
 }
 
 const MARKET_LABELS: Record<string, string> = {
@@ -69,7 +72,7 @@ function getClosingInfo(closingDate: string | null, status: string): string | nu
   return null;
 }
 
-export const ShowCard = memo(function ShowCard({ show, scoreMode = 'critics', hideStatus = false }: ShowCardProps) {
+export const ShowCard = memo(function ShowCard({ show, scoreMode = 'critics', hideStatus = false, isWatchlisted, onToggleWatchlist }: ShowCardProps) {
   const router = useRouter();
   const imageUrl = getImageUrl(show.images.poster ?? show.images.thumbnail);
   const scoreText = show.compositeScore ? `Score ${Math.round(show.compositeScore)}` : 'No score';
@@ -90,8 +93,11 @@ export const ShowCard = memo(function ShowCard({ show, scoreMode = 'critics', hi
       accessibilityLabel={accessLabel}
       accessibilityRole="button"
     >
-      {/* Square image */}
+      {/* Square image with bookmark overlay */}
       <View style={styles.imageContainer}>
+        {isWatchlisted !== undefined && onToggleWatchlist && (
+          <BookmarkOverlay isWatchlisted={isWatchlisted} onToggle={onToggleWatchlist} />
+        )}
         {imageUrl ? (
           <Image
             source={{ uri: imageUrl }}

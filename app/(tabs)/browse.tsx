@@ -3,8 +3,9 @@
  * Defaults to NYC market (broadway + off-broadway).
  */
 
-import React, { useMemo, useState, useCallback } from 'react';
-import { View, Text, FlatList, StyleSheet, ScrollView, Pressable, RefreshControl, Platform } from 'react-native';
+import React, { useMemo, useState, useCallback, useRef } from 'react';
+import { View, Text, TextInput, FlatList, StyleSheet, ScrollView, Pressable, RefreshControl, Platform } from 'react-native';
+import Fuse, { IFuseOptions } from 'fuse.js';
 import { ShowListSkeleton } from '@/components/Skeleton';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -15,8 +16,19 @@ import { MarketPicker, Market, filterByMarketCategory } from '@/components/Marke
 import { ScoreToggle, ScoreMode } from '@/components/ScoreToggle';
 import { Show } from '@/lib/types';
 import { StaleBanner } from '@/components/StaleBanner';
+import { useAuth } from '@/lib/auth-context';
+import { useWatchlist } from '@/hooks/useWatchlist';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
 import { trackFilterChanged, trackScoreModeToggled, trackMarketChanged, trackDataRefreshed } from '@/lib/analytics';
+
+// Grade ordering: A+ is best (0), then A (1), A- (2), B+ (3), etc.
+const GRADE_ORDER: Record<string, number> = {
+  'A+': 0, 'A': 1, 'A-': 2,
+  'B+': 3, 'B': 4, 'B-': 5,
+  'C+': 6, 'C': 7, 'C-': 8,
+  'D+': 9, 'D': 10, 'D-': 11,
+  'F': 12,
+};
 
 type StatusFilter = 'all' | 'open' | 'previews' | 'closed';
 type TypeFilter = 'all' | 'musical' | 'play';
@@ -62,6 +74,17 @@ function FilterPill({ label, active, onPress, color }: { label: string; active: 
   );
 }
 
+const FUSE_OPTIONS: IFuseOptions<Show> = {
+  keys: [
+    { name: 'title', weight: 2 },
+    { name: 'venue', weight: 1 },
+    { name: 'creativeTeam.name', weight: 0.7 },
+  ],
+  threshold: 0.35,
+  includeScore: true,
+  minMatchCharLength: 2,
+};
+
 export default function BrowseScreen() {
   const { shows, isLoading, refresh, error } = useShows();
   const [refreshing, setRefreshing] = useState(false);
@@ -72,7 +95,24 @@ export default function BrowseScreen() {
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
   const [sortBy, setSortBy] = useState<SortOption>('score');
   const [includeOB, setIncludeOB] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const searchInputRef = useRef<TextInput>(null);
   const isWestEnd = market === 'london';
+  const { user } = useAuth();
+  const { watchlist, addToWatchlist, removeFromWatchlist } = useWatchlist(user?.id || null);
+  const watchlistSet = useMemo(() => new Set(watchlist.map(w => w.show_id)), [watchlist]);
+  const toggleWatchlist = useCallback((showId: string) => {
+    if (watchlistSet.has(showId)) removeFromWatchlist(showId);
+    else addToWatchlist(showId);
+  }, [watchlistSet, addToWatchlist, removeFromWatchlist]);
+
+  // Fuse search
+  const fuse = useMemo(() => new Fuse(shows, FUSE_OPTIONS), [shows]);
+  const searchResults = useMemo(() => {
+    const q = searchQuery.trim();
+    if (q.length < 2) return null;
+    return fuse.search(q, { limit: 50 }).map(r => r.item);
+  }, [fuse, searchQuery]);
 
   const filteredShows = useMemo(() => {
     let result = shows.filter(s => filterByMarketCategory(s.category, market, includeOB));
@@ -88,9 +128,9 @@ export default function BrowseScreen() {
       case 'score':
         if (scoreMode === 'audience') {
           result.sort((a, b) => {
-            const aGrade = a.audienceGrade?.grade ?? 'Z';
-            const bGrade = b.audienceGrade?.grade ?? 'Z';
-            return aGrade.localeCompare(bGrade);
+            const aOrder = GRADE_ORDER[a.audienceGrade?.grade ?? ''] ?? 99;
+            const bOrder = GRADE_ORDER[b.audienceGrade?.grade ?? ''] ?? 99;
+            return aOrder - bOrder;
           });
         } else {
           result.sort((a, b) => (b.compositeScore ?? -1) - (a.compositeScore ?? -1));
@@ -114,9 +154,9 @@ export default function BrowseScreen() {
 
   const renderItem = useCallback(({ item, index }: { item: Show; index: number }) => (
     <AnimatedListItem index={index}>
-      <ShowCard show={item} scoreMode={scoreMode} hideStatus={statusFilter === 'open'} />
+      <ShowCard show={item} scoreMode={scoreMode} hideStatus={statusFilter === 'open'} isWatchlisted={watchlistSet.has(item.id)} onToggleWatchlist={() => toggleWatchlist(item.id)} />
     </AnimatedListItem>
-  ), [scoreMode, statusFilter]);
+  ), [scoreMode, statusFilter, watchlistSet, toggleWatchlist]);
 
   const handleMarketChange = useCallback((m: Market) => {
     setMarket(m);
@@ -176,7 +216,7 @@ export default function BrowseScreen() {
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <FlatList
-        data={filteredShows}
+        data={searchResults ?? filteredShows}
         keyExtractor={item => item.id}
         renderItem={renderItem}
         ListHeaderComponent={
@@ -184,15 +224,39 @@ export default function BrowseScreen() {
             <StaleBanner />
             <View style={styles.header}>
             <View style={styles.headerRow}>
-              <Text style={styles.title}>{isWestEnd ? 'West End Shows' : 'Browse Shows'}</Text>
+              <Text style={styles.title}>{isWestEnd ? 'West End Shows' : 'Browse'}</Text>
               <MarketPicker market={market} onChange={handleMarketChange} />
             </View>
+
+            {/* Search bar */}
+            <View style={styles.searchBar}>
+              <Text style={styles.searchIcon}>🔍</Text>
+              <TextInput
+                ref={searchInputRef}
+                style={styles.searchInput}
+                placeholder="Search shows..."
+                placeholderTextColor={Colors.text.muted}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                returnKeyType="search"
+                autoCorrect={false}
+                clearButtonMode="while-editing"
+              />
+            </View>
+
+            {!searchResults && (
             <Text style={styles.count}>
               {filteredShows.length} of {totalForMarket} shows
             </Text>
+            )}
+            {searchResults && (
+            <Text style={styles.count}>
+              {searchResults.length} result{searchResults.length !== 1 ? 's' : ''} for "{searchQuery.trim()}"
+            </Text>
+            )}
 
-            {/* Status filter + Score toggle */}
-            <View style={styles.statusRow}>
+            {/* Status filter + Score toggle (hidden during search) */}
+            {!searchResults && <View style={styles.statusRow}>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterGroup}>
                 {STATUS_OPTIONS.map(opt => (
                   <FilterPill
@@ -206,8 +270,9 @@ export default function BrowseScreen() {
               <ScoreToggle mode={scoreMode} onChange={handleScoreModeChange} />
             </View>
 
+            }
             {/* Type + Sort + OB toggle */}
-            <View style={styles.filterRowInline}>
+            {!searchResults && <View style={styles.filterRowInline}>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterGroup}>
                 {TYPE_OPTIONS.map(opt => (
                   <FilterPill
@@ -238,7 +303,7 @@ export default function BrowseScreen() {
                   </>
                 )}
               </ScrollView>
-            </View>
+            </View>}
           </View>
           </View>
         }
@@ -281,6 +346,26 @@ const styles = StyleSheet.create({
   header: {
     paddingTop: Spacing.xl,
     paddingBottom: Spacing.md,
+  },
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.surface.overlay,
+    borderRadius: BorderRadius.md,
+    marginHorizontal: Spacing.lg,
+    marginTop: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    height: 44,
+    gap: Spacing.sm,
+  },
+  searchIcon: {
+    fontSize: 16,
+  },
+  searchInput: {
+    flex: 1,
+    color: Colors.text.primary,
+    fontSize: FontSize.md,
+    padding: 0,
   },
   headerRow: {
     flexDirection: 'row',
