@@ -27,6 +27,7 @@ export const BookmarkOverlay = memo(function BookmarkOverlay({ isWatchlisted, on
       style={styles.container}
       onPress={handlePress}
       hitSlop={6}
+      testID="bookmark-overlay"
       accessibilityLabel={isWatchlisted ? 'Remove from watchlist' : 'Add to watchlist'}
     >
       <Svg width={20} height={20} viewBox="0 0 24 24">

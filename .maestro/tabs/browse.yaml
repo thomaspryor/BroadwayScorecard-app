@@ -14,9 +14,9 @@ appId: com.broadwayscorecard.app
 - tapOn:
     text: "Browse, tab.*"
 
-# Header visible — wait for data load
+# Header visible — wait for data load (header text is just "Browse" for NYC)
 - extendedWaitUntil:
-    visible: "Browse Shows"
+    visible: "Browse"
     timeout: 30000
 
 # Filter pills should be present

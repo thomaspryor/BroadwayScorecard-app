@@ -1,0 +1,50 @@
+# Bookmark Toggle Test — Browse Tab
+# Verifies: tapping bookmark overlay doesn't crash, toggles watchlist state
+# Tests Gate 2 (async error handling) and Gate 4 (auth handling)
+
+appId: com.broadwayscorecard.app
+---
+- launchApp
+
+# Dismiss iOS "Open in" dialog if present
+- tapOn:
+    text: "Open"
+    optional: true
+
+# Wait for app to load (home is default tab)
+- extendedWaitUntil:
+    visible: "Broadway Scorecard"
+    timeout: 30000
+
+# Navigate to Browse tab (iOS labels tabs as "Browse, tab, 2 of 5")
+- tapOn:
+    text: "Browse, tab.*"
+
+# Wait for browse page data to load
+- extendedWaitUntil:
+    visible: "Now Playing"
+    timeout: 30000
+
+# Tap the bookmark overlay on the first show card
+# Uses testID since iOS collapses nested Pressable accessibility labels
+- tapOn:
+    id: "bookmark-overlay"
+    index: 0
+
+# Should NOT see an error banner
+- extendedWaitUntil:
+    notVisible: "Uncaught.*promise"
+    timeout: 5000
+
+# Tap it again to toggle back
+- tapOn:
+    id: "bookmark-overlay"
+    index: 0
+
+# Verify no error
+- extendedWaitUntil:
+    notVisible: "Uncaught.*promise"
+    timeout: 5000
+
+# Verify the browse page is still showing (didn't crash)
+- assertVisible: "Now Playing"

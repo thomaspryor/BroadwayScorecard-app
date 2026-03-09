@@ -20,4 +20,4 @@ appId: com.broadwayscorecard.app
     visible: "Top Shows"
     timeout: 30000
 - assertVisible:
-    text: ".*shows scored by critics"
+    text: ".*shows scored by.*reviews"
