@@ -691,7 +691,7 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.pill,
   },
   ctaButtonText: {
-    color: '#fff',
+    color: '#0d0d1a',
     fontWeight: '700',
     fontSize: FontSize.sm,
   },

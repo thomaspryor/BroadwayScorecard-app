@@ -106,7 +106,7 @@ export default function ShowPageRating({
         try {
           await addToWatchlist(showId);
           await getWatchlist();
-          showToast('Added to Watchlist', 'success', '/(tabs)/my-shows');
+          showToast('Added to Watchlist', 'success', '/(tabs)/watched');
         } catch {
           showToast('Failed to add to watchlist.', 'error');
         }
@@ -195,7 +195,7 @@ export default function ShowPageRating({
         showToast('Removed from Watchlist', 'info');
       } else {
         await addToWatchlist(showId);
-        showToast('Added to Watchlist', 'success', '/(tabs)/my-shows');
+        showToast('Added to Watchlist', 'success', '/(tabs)/watched');
       }
     } catch {
       showToast('Failed to update watchlist.', 'error');

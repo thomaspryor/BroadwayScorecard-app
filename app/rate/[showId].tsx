@@ -183,7 +183,7 @@ export default function RateModal() {
       haptics.success();
       isDirty.current = false; // prevent discard alert
       router.back();
-      showToast(reviewId ? 'Rating updated' : 'Rating saved', 'success', '/(tabs)/my-shows');
+      showToast(reviewId ? 'Rating updated' : 'Rating saved', 'success', '/(tabs)/watched');
       recordRatingGiven();
     } catch (e) {
       const detail = e instanceof Error ? e.message : 'Unknown error';

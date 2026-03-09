@@ -22,8 +22,6 @@ import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import Svg, { Path } from 'react-native-svg';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import ReanimatedSwipeable from 'react-native-gesture-handler/ReanimatedSwipeable';
-import Animated, { SharedValue, useAnimatedStyle } from 'react-native-reanimated';
 import { useAuth } from '@/lib/auth-context';
 import { useUserReviews } from '@/hooks/useUserReviews';
 import { useWatchlist } from '@/hooks/useWatchlist';
@@ -38,20 +36,6 @@ import { ShowSearchModal } from '@/components/ShowSearchModal';
 import * as haptics from '@/lib/haptics';
 
 type WatchlistSort = 'added-desc' | 'alphabetical' | 'closing-soon';
-type ViewMode = 'list' | 'grid';
-
-function SwipeDeleteAction({ onDelete, drag }: { onDelete: () => void; drag: SharedValue<number> }) {
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: drag.value + 80 }],
-  }));
-  return (
-    <Animated.View style={[styles.swipeDelete, animatedStyle]}>
-      <Pressable style={styles.swipeDeleteInner} onPress={onDelete}>
-        <Text style={styles.swipeDeleteText}>Remove</Text>
-      </Pressable>
-    </Animated.View>
-  );
-}
 
 function EmptyState({ emoji, title, subtitle, actionLabel, onAction }: {
   emoji: string; title: string; subtitle: string; actionLabel?: string; onAction?: () => void;
@@ -79,7 +63,6 @@ export default function ToWatchScreen() {
   const { shows } = useShows();
 
   const [watchlistSort, setWatchlistSort] = useState<WatchlistSort>('added-desc');
-  const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [datePickingShowId, setDatePickingShowId] = useState<string | null>(null);
   const [showSearchModal, setShowSearchModal] = useState(false);
 
@@ -309,21 +292,6 @@ export default function ToWatchScreen() {
               <Path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
             </Svg>
           </Pressable>
-          <Pressable
-            style={styles.viewToggle}
-            onPress={() => { haptics.tap(); setViewMode(prev => prev === 'list' ? 'grid' : 'list'); }}
-            hitSlop={8}
-          >
-            {viewMode === 'list' ? (
-              <Svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={Colors.text.muted} strokeWidth={2}>
-                <Path strokeLinecap="round" strokeLinejoin="round" d="M4 5h6v6H4zM14 5h6v6h-6zM4 15h6v6H4zM14 15h6v6h-6z" />
-              </Svg>
-            ) : (
-              <Svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={Colors.text.muted} strokeWidth={2}>
-                <Path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
-              </Svg>
-            )}
-          </Pressable>
         </View>
       </View>
 
@@ -384,13 +352,24 @@ export default function ToWatchScreen() {
 
       {/* Date picker */}
       {datePickingShowId && (
-        <DateTimePicker
-          value={new Date()}
-          mode="date"
-          display={Platform.OS === 'ios' ? 'inline' : 'default'}
-          onChange={handleDateChange}
-          minimumDate={new Date()}
-        />
+        <View style={styles.datePickerOverlay}>
+          <View style={styles.datePickerCard}>
+            <View style={styles.datePickerHeader}>
+              <Text style={styles.datePickerTitle}>When are you going?</Text>
+              <Pressable onPress={() => setDatePickingShowId(null)} hitSlop={8}>
+                <Text style={styles.datePickerDone}>Done</Text>
+              </Pressable>
+            </View>
+            <DateTimePicker
+              value={new Date()}
+              mode="date"
+              display={Platform.OS === 'ios' ? 'inline' : 'default'}
+              onChange={handleDateChange}
+              minimumDate={new Date()}
+              themeVariant="dark"
+            />
+          </View>
+        </View>
       )}
 
       {/* Search modal — select show → auto-add to watchlist */}
@@ -435,10 +414,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.sm, paddingVertical: 6,
   },
   sortText: { color: Colors.text.secondary, fontSize: FontSize.xs, fontWeight: '500' },
-  viewToggle: {
-    backgroundColor: Colors.surface.overlay, borderRadius: 8,
-    padding: 6, alignItems: 'center', justifyContent: 'center',
-  },
   sectionHeader: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     paddingHorizontal: Spacing.lg, paddingVertical: Spacing.sm,
@@ -467,10 +442,6 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center', gap: 4,
   },
   addShowLabel: { color: Colors.text.muted, fontSize: 10, fontWeight: '500' },
-  // Swipe
-  swipeDelete: { width: 80, justifyContent: 'center', alignItems: 'center', backgroundColor: '#dc2626' },
-  swipeDeleteInner: { flex: 1, justifyContent: 'center', alignItems: 'center', width: 80 },
-  swipeDeleteText: { color: '#fff', fontSize: FontSize.sm, fontWeight: '600' },
   // Empty / CTA
   emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: Spacing.xxl },
   emptyEmoji: { fontSize: 48, marginBottom: Spacing.md },
@@ -490,4 +461,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.xxl, paddingVertical: Spacing.md,
   },
   ctaButtonText: { color: '#0d0d1a', fontSize: FontSize.md, fontWeight: '700' },
+  datePickerOverlay: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center',
+  },
+  datePickerCard: {
+    backgroundColor: Colors.surface.raised, borderRadius: BorderRadius.lg,
+    padding: Spacing.lg, marginHorizontal: Spacing.lg, width: '90%',
+  },
+  datePickerHeader: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    marginBottom: Spacing.md,
+  },
+  datePickerTitle: { color: Colors.text.secondary, fontSize: FontSize.sm, fontWeight: '500' },
+  datePickerDone: { color: Colors.brand, fontSize: FontSize.sm, fontWeight: '600' },
 });
