@@ -342,15 +342,17 @@ export default function ToWatchScreen() {
                   </View>
                   <View style={styles.posterGrid}>
                     {sortedWatchlist.map(renderWatchlistGridItem)}
-                    <Pressable
-                      style={({ pressed }) => [styles.addShowCard, pressed && styles.pressed]}
-                      onPress={() => setShowSearchModal(true)}
-                    >
-                      <Svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke={Colors.text.muted} strokeWidth={2}>
-                        <Path strokeLinecap="round" d="M12 5v14M5 12h14" />
-                      </Svg>
-                      <Text style={styles.addShowLabel}>Add Show</Text>
-                    </Pressable>
+                    <View style={styles.gridCard}>
+                      <Pressable
+                        style={({ pressed }) => [styles.addShowCard, pressed && styles.pressed]}
+                        onPress={() => setShowSearchModal(true)}
+                      >
+                        <Svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke={Colors.text.muted} strokeWidth={2}>
+                          <Path strokeLinecap="round" d="M12 5v14M5 12h14" />
+                        </Svg>
+                        <Text style={styles.addShowLabel}>Add Show</Text>
+                      </Pressable>
+                    </View>
                   </View>
                 </View>
               )}
@@ -468,7 +470,7 @@ const styles = StyleSheet.create({
     textAlign: 'center', lineHeight: 14, marginTop: 2,
   },
   addShowCard: {
-    width: '23%', aspectRatio: 2 / 3, borderRadius: BorderRadius.md,
+    width: '100%', aspectRatio: 2 / 3, borderRadius: BorderRadius.md,
     borderWidth: 2, borderStyle: 'dashed', borderColor: Colors.surface.overlay,
     alignItems: 'center', justifyContent: 'center', gap: 4,
   },

@@ -467,6 +467,8 @@ const styles = StyleSheet.create({
   },
   rightCol: {
     paddingTop: Spacing.xl,
+    flexShrink: 0,
+    alignItems: 'center',
   },
   labelRow: {
     flexDirection: 'row',
@@ -568,13 +570,13 @@ const styles = StyleSheet.create({
   },
   watchlistDateCol: {
     alignItems: 'center',
-    marginTop: Spacing.md,
+    marginTop: 2,
   },
   watchlistDateButton: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    minHeight: 44,
+    minHeight: 32,
     paddingHorizontal: Spacing.sm,
   },
   watchlistDateText: {

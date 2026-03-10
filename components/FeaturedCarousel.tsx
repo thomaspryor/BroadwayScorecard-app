@@ -35,9 +35,6 @@ const FeaturedCard = memo(function FeaturedCard({ show, cardWidth, isWatchlisted
     >
       {/* Image container with bookmark top-right + score badge bottom-right */}
       <View style={[styles.imageContainer, { height: cardHeight }]}>
-        {isWatchlisted !== undefined && onToggle && (
-          <BookmarkOverlay isWatchlisted={isWatchlisted} onToggle={onToggle} />
-        )}
         {posterUrl ? (
           <Image
             source={{ uri: posterUrl }}
@@ -49,6 +46,11 @@ const FeaturedCard = memo(function FeaturedCard({ show, cardWidth, isWatchlisted
           <View style={[styles.poster, styles.placeholderPoster]}>
             <Text style={styles.placeholderText}>{show.title.charAt(0)}</Text>
           </View>
+        )}
+
+        {/* Bookmark — rendered AFTER image so it's on top (z-order) */}
+        {isWatchlisted !== undefined && onToggle && (
+          <BookmarkOverlay isWatchlisted={isWatchlisted} onToggle={onToggle} />
         )}
 
         {/* Score badge — bottom-right, overlapping the image edge */}

@@ -33,8 +33,8 @@ export const BookmarkOverlay = memo(function BookmarkOverlay({ isWatchlisted, on
       <Svg width={20} height={20} viewBox="0 0 24 24">
         <Path
           d="M5 2h14a1 1 0 0 1 1 1v19.143a.5.5 0 0 1-.766.424L12 18.03l-7.234 4.536A.5.5 0 0 1 4 22.143V3a1 1 0 0 1 1-1z"
-          fill={isWatchlisted ? 'rgba(255,255,255,0.9)' : 'rgba(0,0,0,0.35)'}
-          stroke="rgba(255,255,255,0.85)"
+          fill={isWatchlisted ? '#FFD700' : 'rgba(0,0,0,0.35)'}
+          stroke={isWatchlisted ? '#FFD700' : 'rgba(255,255,255,0.85)'}
           strokeWidth={1.5}
         />
       </Svg>

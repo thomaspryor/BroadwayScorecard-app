@@ -5,7 +5,7 @@
  * Adds AsyncStorage cache and uses expo-crypto for UUID fallback.
  */
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Crypto from 'expo-crypto';
 import { getSupabaseClient } from '@/lib/supabase';
@@ -15,11 +15,28 @@ import type { WatchlistEntry } from '@/lib/user-types';
 
 const CACHE_KEY = (userId: string) => `@bsc:watchlist:${userId}`;
 
+// Shared state so all useWatchlist instances stay in sync
+type Listener = (entries: WatchlistEntry[]) => void;
+const listeners = new Set<Listener>();
+let sharedWatchlist: WatchlistEntry[] = [];
+
+function broadcastWatchlist(entries: WatchlistEntry[]) {
+  sharedWatchlist = entries;
+  listeners.forEach(fn => fn(entries));
+}
+
 export function useWatchlist(userId: string | null) {
-  const [watchlist, setWatchlist] = useState<WatchlistEntry[]>([]);
+  const [watchlist, setWatchlist] = useState<WatchlistEntry[]>(sharedWatchlist);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const mutationVersion = useRef(0);
+
+  // Subscribe to shared state changes from other hook instances
+  useEffect(() => {
+    const listener: Listener = (entries) => setWatchlist(entries);
+    listeners.add(listener);
+    return () => { listeners.delete(listener); };
+  }, []);
 
   const getWatchlist = useCallback(async (): Promise<WatchlistEntry[]> => {
     const client = getSupabaseClient();
@@ -32,7 +49,7 @@ export function useWatchlist(userId: string | null) {
       const cached = await AsyncStorage.getItem(CACHE_KEY(userId));
       if (cached) {
         const parsed = JSON.parse(cached) as WatchlistEntry[];
-        setWatchlist(parsed);
+        broadcastWatchlist(parsed);
         // Background refresh — skip state update if mutations happen during fetch
         refreshWatchlist(client, userId, mutationVersion.current).catch(() => {});
         return parsed;
@@ -63,7 +80,7 @@ export function useWatchlist(userId: string | null) {
     const result = (data || []) as WatchlistEntry[];
     // Skip state update if a mutation happened while we were fetching
     if (versionAtStart === undefined || versionAtStart === mutationVersion.current) {
-      setWatchlist(result);
+      broadcastWatchlist(result);
     }
     await AsyncStorage.setItem(CACHE_KEY(uid), JSON.stringify(result)).catch(() => {});
     return result;
@@ -94,7 +111,7 @@ export function useWatchlist(userId: string | null) {
         const { error: err } = await client.from('watchlist').insert({ user_id: userId, show_id: showId });
         if (err) throw err;
         mutationVersion.current++;
-        setWatchlist(prev => [optimistic, ...prev]);
+        broadcastWatchlist([optimistic, ...sharedWatchlist]);
         await AsyncStorage.removeItem(CACHE_KEY(userId)).catch(() => {});
       } catch (e) {
         if (await isNetworkError(e)) {
@@ -105,7 +122,7 @@ export function useWatchlist(userId: string | null) {
             filters: {},
           });
           mutationVersion.current++;
-          setWatchlist(prev => [optimistic, ...prev]);
+          broadcastWatchlist([optimistic, ...sharedWatchlist]);
           return;
         }
         const msg = e instanceof Error ? e.message : 'Failed to add to watchlist';
@@ -131,7 +148,7 @@ export function useWatchlist(userId: string | null) {
 
         if (err) throw err;
         mutationVersion.current++;
-        setWatchlist(prev => prev.filter(w => w.show_id !== showId));
+        broadcastWatchlist(sharedWatchlist.filter(w => w.show_id !== showId));
         await AsyncStorage.removeItem(CACHE_KEY(userId)).catch(() => {});
       } catch (e) {
         if (await isNetworkError(e)) {
@@ -141,7 +158,7 @@ export function useWatchlist(userId: string | null) {
             filters: { user_id: userId, show_id: showId },
           });
           mutationVersion.current++;
-          setWatchlist(prev => prev.filter(w => w.show_id !== showId));
+          broadcastWatchlist(sharedWatchlist.filter(w => w.show_id !== showId));
           return;
         }
         const msg = e instanceof Error ? e.message : 'Failed to remove from watchlist';
@@ -170,7 +187,7 @@ export function useWatchlist(userId: string | null) {
 
         if (err) throw err;
         mutationVersion.current++;
-        setWatchlist(prev => prev.map(w => (w.show_id === showId ? { ...w, planned_date: plannedDate } : w)));
+        broadcastWatchlist(sharedWatchlist.map(w => (w.show_id === showId ? { ...w, planned_date: plannedDate } : w)));
         await AsyncStorage.removeItem(CACHE_KEY(userId)).catch(() => {});
       } catch (e) {
         if (await isNetworkError(e)) {
@@ -181,7 +198,7 @@ export function useWatchlist(userId: string | null) {
             filters: { user_id: userId, show_id: showId },
           });
           mutationVersion.current++;
-          setWatchlist(prev => prev.map(w => (w.show_id === showId ? { ...w, planned_date: plannedDate } : w)));
+          broadcastWatchlist(sharedWatchlist.map(w => (w.show_id === showId ? { ...w, planned_date: plannedDate } : w)));
           return;
         }
         const msg = e instanceof Error ? e.message : 'Failed to update date';

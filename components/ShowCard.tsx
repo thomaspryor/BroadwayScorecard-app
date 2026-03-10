@@ -95,9 +95,6 @@ export const ShowCard = memo(function ShowCard({ show, scoreMode = 'critics', hi
     >
       {/* Square image with bookmark overlay */}
       <View style={styles.imageContainer}>
-        {isWatchlisted !== undefined && onToggleWatchlist && (
-          <BookmarkOverlay isWatchlisted={isWatchlisted} onToggle={onToggleWatchlist} />
-        )}
         {imageUrl ? (
           <Image
             source={{ uri: imageUrl }}
@@ -112,6 +109,10 @@ export const ShowCard = memo(function ShowCard({ show, scoreMode = 'critics', hi
               {show.title.charAt(0)}
             </Text>
           </View>
+        )}
+        {/* Bookmark — rendered AFTER image so it's on top (z-order) */}
+        {isWatchlisted !== undefined && onToggleWatchlist && (
+          <BookmarkOverlay isWatchlisted={isWatchlisted} onToggle={onToggleWatchlist} />
         )}
       </View>
 
