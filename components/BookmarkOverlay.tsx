@@ -1,6 +1,6 @@
 /**
  * BookmarkOverlay — subtle bookmark icon for top-right of poster cards.
- * Matches TodayTix style: semi-transparent, no background circle.
+ * Gold (#FFD700) when watchlisted, semi-transparent when not.
  * Shows filled bookmark if watchlisted, outline if not.
  */
 
@@ -26,7 +26,7 @@ export const BookmarkOverlay = memo(function BookmarkOverlay({ isWatchlisted, on
     <Pressable
       style={styles.container}
       onPress={handlePress}
-      hitSlop={6}
+      hitSlop={8}
       testID="bookmark-overlay"
       accessibilityLabel={isWatchlisted ? 'Remove from watchlist' : 'Add to watchlist'}
     >
@@ -45,10 +45,10 @@ export const BookmarkOverlay = memo(function BookmarkOverlay({ isWatchlisted, on
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-    top: 6,
-    right: 6,
+    top: 2,
+    right: 2,
     zIndex: 10,
-    // No background — matches TodayTix style
+    padding: 6,
     // Drop shadow for visibility on any poster
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
