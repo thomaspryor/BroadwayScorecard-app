@@ -63,6 +63,7 @@ export default function ToWatchScreen() {
   const { shows } = useShows();
 
   const [watchlistSort, setWatchlistSort] = useState<WatchlistSort>('added-desc');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [datePickingShowId, setDatePickingShowId] = useState<string | null>(null);
   const [pendingDate, setPendingDate] = useState<Date>(new Date());
   const [showSearchModal, setShowSearchModal] = useState(false);
@@ -274,6 +275,38 @@ export default function ToWatchScreen() {
     );
   };
 
+  const renderWatchlistListItem = (item: WatchlistEntry) => {
+    const show = showMap[item.show_id];
+    const title = show?.title || item.show_id;
+    const posterUrl = show?.images ? (getImageUrl(show.images.poster) || getImageUrl(show.images.thumbnail)) : null;
+
+    return (
+      <Pressable
+        key={item.id}
+        style={({ pressed }) => [styles.listRow, pressed && styles.pressed]}
+        onPress={() => show && router.push(`/show/${show.slug}`)}
+        onLongPress={() => {
+          Alert.alert('Remove from Watchlist', `Remove ${title}?`, [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Remove', style: 'destructive', onPress: () => handleRemove(item.show_id) },
+          ]);
+        }}
+      >
+        {posterUrl ? (
+          <Image source={{ uri: posterUrl }} style={styles.listPoster} contentFit="cover" transition={200} />
+        ) : (
+          <View style={[styles.listPoster, styles.cardPosterPlaceholder]}>
+            <Text style={styles.placeholderText}>{title.charAt(0)}</Text>
+          </View>
+        )}
+        <View style={styles.listInfo}>
+          <Text style={styles.listTitle} numberOfLines={1}>{title}</Text>
+          {show?.venue && <Text style={styles.listVenue} numberOfLines={1}>{show.venue}</Text>}
+        </View>
+      </Pressable>
+    );
+  };
+
   const allEmpty = upcomingWatchlist.length === 0 && sortedWatchlist.length === 0;
 
   return (
@@ -303,6 +336,28 @@ export default function ToWatchScreen() {
               <Path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
             </Svg>
           </Pressable>
+          <View style={styles.viewToggleContainer}>
+            <Pressable
+              testID="grid-view-toggle"
+              style={[styles.viewToggleButton, viewMode === 'grid' && styles.viewToggleActive]}
+              onPress={() => { haptics.tap(); setViewMode('grid'); }}
+              hitSlop={4}
+            >
+              <Svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={viewMode === 'grid' ? Colors.text.primary : Colors.text.muted} strokeWidth={2}>
+                <Path strokeLinecap="round" strokeLinejoin="round" d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z" />
+              </Svg>
+            </Pressable>
+            <Pressable
+              testID="list-view-toggle"
+              style={[styles.viewToggleButton, viewMode === 'list' && styles.viewToggleActive]}
+              onPress={() => { haptics.tap(); setViewMode('list'); }}
+              hitSlop={4}
+            >
+              <Svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={viewMode === 'list' ? Colors.text.primary : Colors.text.muted} strokeWidth={2}>
+                <Path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+              </Svg>
+            </Pressable>
+          </View>
         </View>
       </View>
 
@@ -340,20 +395,26 @@ export default function ToWatchScreen() {
                     <Text style={styles.sectionTitle}>Watchlist</Text>
                     <Text style={styles.sectionCount}>{sortedWatchlist.length} shows</Text>
                   </View>
-                  <View style={styles.posterGrid}>
-                    {sortedWatchlist.map(renderWatchlistGridItem)}
-                    <View style={styles.gridCard}>
-                      <Pressable
-                        style={({ pressed }) => [styles.addShowCard, pressed && styles.pressed]}
-                        onPress={() => setShowSearchModal(true)}
-                      >
-                        <Svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke={Colors.text.muted} strokeWidth={2}>
-                          <Path strokeLinecap="round" d="M12 5v14M5 12h14" />
-                        </Svg>
-                        <Text style={styles.addShowLabel}>Add Show</Text>
-                      </Pressable>
+                  {viewMode === 'grid' ? (
+                    <View style={styles.posterGrid}>
+                      {sortedWatchlist.map(renderWatchlistGridItem)}
+                      <View style={styles.gridCard}>
+                        <Pressable
+                          style={({ pressed }) => [styles.addShowCard, pressed && styles.pressed]}
+                          onPress={() => setShowSearchModal(true)}
+                        >
+                          <Svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke={Colors.text.muted} strokeWidth={2}>
+                            <Path strokeLinecap="round" d="M12 5v14M5 12h14" />
+                          </Svg>
+                          <Text style={styles.addShowLabel}>Add Show</Text>
+                        </Pressable>
+                      </View>
                     </View>
-                  </View>
+                  ) : (
+                    <View>
+                      {sortedWatchlist.map(renderWatchlistListItem)}
+                    </View>
+                  )}
                 </View>
               )}
               {/* Quick-add search at bottom */}
@@ -516,4 +577,29 @@ const styles = StyleSheet.create({
     borderColor: Colors.border.subtle, backgroundColor: Colors.surface.overlay,
   },
   quickAddText: { color: Colors.text.muted, fontSize: FontSize.sm },
+  viewToggleContainer: {
+    flexDirection: 'row', backgroundColor: Colors.surface.overlay,
+    borderRadius: 8, overflow: 'hidden',
+  },
+  viewToggleButton: {
+    padding: 6, alignItems: 'center', justifyContent: 'center',
+  },
+  viewToggleActive: {
+    backgroundColor: Colors.surface.raised,
+  },
+  listRow: {
+    flexDirection: 'row', alignItems: 'center', gap: Spacing.md,
+    paddingHorizontal: Spacing.lg, paddingVertical: Spacing.sm,
+  },
+  listPoster: {
+    width: 48, height: 64, borderRadius: BorderRadius.sm,
+    backgroundColor: Colors.surface.overlay,
+  },
+  listInfo: { flex: 1 },
+  listTitle: {
+    color: Colors.text.primary, fontSize: FontSize.md, fontWeight: '600',
+  },
+  listVenue: {
+    color: Colors.text.muted, fontSize: FontSize.sm, marginTop: 2,
+  },
 });
