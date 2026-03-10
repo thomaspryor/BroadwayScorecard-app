@@ -261,6 +261,7 @@ export default function RateModal() {
                   rating={currentRating}
                   onRatingChange={setCurrentRating}
                   size="lg"
+                  hideLabel
                 />
                 {currentRating === null && (
                   <Text style={styles.tapHint}>Tap a star to rate</Text>

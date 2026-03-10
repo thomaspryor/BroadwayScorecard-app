@@ -24,15 +24,15 @@ export function FormatPill({ type }: FormatPillProps) {
 
 const styles = StyleSheet.create({
   pill: {
-    paddingHorizontal: 10,
-    paddingVertical: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
     borderRadius: BorderRadius.pill,
     borderWidth: 1,
     alignSelf: 'flex-start',
   },
   label: {
-    fontSize: FontSize.xs,
+    fontSize: 10,
     fontWeight: '600',
-    letterSpacing: 0.5,
+    letterSpacing: 0.3,
   },
 });

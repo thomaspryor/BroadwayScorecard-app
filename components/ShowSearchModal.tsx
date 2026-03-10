@@ -5,7 +5,7 @@
  * Shows search input + results. Calls onSelect with the chosen show.
  */
 
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -46,27 +46,36 @@ interface ShowSearchModalProps {
 export function ShowSearchModal({ visible, title, onSelect, onClose, excludeIds }: ShowSearchModalProps) {
   const { shows } = useShows();
   const [query, setQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
   const inputRef = useRef<TextInput>(null);
+  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Reset query when modal opens
   useEffect(() => {
     if (visible) {
       setQuery('');
-      setTimeout(() => inputRef.current?.focus(), 100);
+      setDebouncedQuery('');
+      setTimeout(() => inputRef.current?.focus(), 50);
     }
   }, [visible]);
+
+  const handleQueryChange = useCallback((text: string) => {
+    setQuery(text);
+    if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    debounceTimer.current = setTimeout(() => setDebouncedQuery(text), 150);
+  }, []);
 
   const fuse = useMemo(() => new Fuse(shows, FUSE_OPTIONS), [shows]);
 
   const results = useMemo(() => {
-    const q = query.trim();
+    const q = debouncedQuery.trim();
     if (q.length < 2) return [];
     let items = fuse.search(q, { limit: 20 }).map(r => r.item);
     if (excludeIds?.size) {
       items = items.filter(s => !excludeIds.has(s.id));
     }
     return items;
-  }, [fuse, query, excludeIds]);
+  }, [fuse, debouncedQuery, excludeIds]);
 
   return (
     <Modal
@@ -97,7 +106,7 @@ export function ShowSearchModal({ visible, title, onSelect, onClose, excludeIds 
             placeholder="Search shows..."
             placeholderTextColor={Colors.text.muted}
             value={query}
-            onChangeText={setQuery}
+            onChangeText={handleQueryChange}
             returnKeyType="search"
             autoCorrect={false}
           />
@@ -134,6 +143,12 @@ export function ShowSearchModal({ visible, title, onSelect, onClose, excludeIds 
                   <View style={styles.resultInfo}>
                     <Text style={styles.resultTitle} numberOfLines={1}>{item.title}</Text>
                     {item.venue && <Text style={styles.resultVenue} numberOfLines={1}>{item.venue}</Text>}
+                    <Text style={styles.resultMeta} numberOfLines={1}>
+                      {item.status === 'open' ? 'Now Playing' : item.status === 'previews' ? 'In Previews' : item.status === 'closed' ? 'Closed' : item.status}
+                      {item.openingDate ? ` · ${item.openingDate.slice(0, 4)}` : ''}
+                      {item.closingDate && item.status === 'closed' ? `–${item.closingDate.slice(0, 4)}` : ''}
+                      {item.category === 'west-end' ? ' · London' : item.category === 'off-broadway' ? ' · Off-Bway' : ''}
+                    </Text>
                   </View>
                   <ScoreBadge score={item.compositeScore} size="small" />
                 </Pressable>
@@ -245,5 +260,9 @@ const styles = StyleSheet.create({
   resultVenue: {
     color: Colors.text.muted,
     fontSize: FontSize.xs,
+  },
+  resultMeta: {
+    color: Colors.text.muted,
+    fontSize: 10,
   },
 });

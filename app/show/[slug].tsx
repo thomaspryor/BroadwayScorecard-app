@@ -21,10 +21,13 @@ import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
 import { trackTicketTap, trackShowDetailViewed, trackShowShared, trackFullReviewTapped } from '@/lib/analytics';
 import Svg, { Path } from 'react-native-svg';
 import ShowPageRating from '@/components/user/ShowPageRating';
+import { BookmarkOverlay } from '@/components/BookmarkOverlay';
 import { recordShowView } from '@/lib/store-review';
 import { ShareCardWithRef, ShareCardHandle } from '@/components/ShareCard';
 import { ShowDetailSkeleton } from '@/components/Skeleton';
 import { useAuth } from '@/lib/auth-context';
+import { useWatchlist } from '@/hooks/useWatchlist';
+import { featureFlags } from '@/lib/feature-flags';
 
 export default function ShowDetailScreen() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
@@ -38,7 +41,8 @@ export default function ShowDetailScreen() {
   const shareCardRef = useRef<ShareCardHandle>(null);
 
   const show = useMemo(() => shows.find(s => s.slug === slug), [shows, slug]);
-  const { user } = useAuth();
+  const { user, isAuthenticated, showSignIn } = useAuth();
+  const { isWatchlisted, addToWatchlist, removeFromWatchlist } = useWatchlist(user?.id || null);
 
   // Related shows: same type, similar score, currently open
   const relatedShows = useMemo(() => {
@@ -128,6 +132,18 @@ export default function ShowDetailScreen() {
                   <Text style={styles.posterPlaceholderText}>{show.title.charAt(0)}</Text>
                 </View>
               )}
+              {featureFlags.userAccounts && (
+                <BookmarkOverlay
+                  isWatchlisted={isWatchlisted(show.id)}
+                  onToggle={async () => {
+                    if (!isAuthenticated) { showSignIn('watchlist'); return; }
+                    try {
+                      if (isWatchlisted(show.id)) await removeFromWatchlist(show.id);
+                      else await addToWatchlist(show.id);
+                    } catch {}
+                  }}
+                />
+              )}
             </View>
 
             <View style={styles.headerInfo}>
@@ -138,16 +154,17 @@ export default function ShowDetailScreen() {
                 <CategoryBadge category={show.category} />
               </View>
               <Text style={styles.title} numberOfLines={2}>{show.title}</Text>
-              <Text style={styles.meta} numberOfLines={2}>
-                {show.venue}
-                {show.runtime ? ` · ${show.runtime}` : ''}
-              </Text>
+              <Text style={styles.meta} numberOfLines={1}>{show.venue}</Text>
+              {show.runtime && <Text style={styles.meta} numberOfLines={1}>{show.runtime}</Text>}
               {show.openingDate && (
                 <Text style={styles.meta} numberOfLines={1}>
                   {show.status === 'closed' ? 'Opened' : show.status === 'previews' ? 'Opens' : 'Opened'}{' '}
                   {formatDate(show.openingDate)}
-                  {show.closingDate && show.status === 'closed' ? ` · Closed ${formatDate(show.closingDate)}` : ''}
-                  {show.closingDate && show.status !== 'closed' ? ` · Closes ${formatDate(show.closingDate)}` : ''}
+                </Text>
+              )}
+              {show.closingDate && (
+                <Text style={styles.meta} numberOfLines={1}>
+                  {show.status === 'closed' ? 'Closed' : 'Closes'} {formatDate(show.closingDate)}
                 </Text>
               )}
             </View>

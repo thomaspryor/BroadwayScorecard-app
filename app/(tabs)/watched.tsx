@@ -167,17 +167,18 @@ export default function WatchedScreen() {
 
   const sortLabel = diarySort === 'date-desc' ? 'Newest' : diarySort === 'date-asc' ? 'Oldest' : 'Top Rated';
 
-  // Grid data with spacers
-  type GridItem = UserReview | { __spacer: true; id: string };
+  // Grid data with add-show card inline + spacers to fill row
+  type GridItem = UserReview | { __spacer: true; id: string } | { __addCard: true; id: string };
   const gridData: GridItem[] = useMemo(() => {
     const cols = 4;
-    const remainder = sortedReviews.length % cols;
-    if (remainder === 0) return sortedReviews;
+    const items: GridItem[] = [...sortedReviews, { __addCard: true as const, id: 'add-card' }];
+    const remainder = items.length % cols;
+    if (remainder === 0) return items;
     const spacers = Array.from({ length: cols - remainder }, (_, i) => ({
       __spacer: true as const,
       id: `spacer-${i}`,
     }));
-    return [...sortedReviews, ...spacers];
+    return [...items, ...spacers];
   }, [sortedReviews]);
 
   const handleDeleteDiaryItem = useCallback((review: UserReview) => {
@@ -298,6 +299,7 @@ export default function WatchedScreen() {
   // ─── Grid view render ────────────────────────────────
   const renderDiaryGridItem = ({ item }: { item: GridItem }) => {
     if ('__spacer' in item) return <View style={styles.gridCardSpacer} />;
+    if ('__addCard' in item) return <AddShowCard label="Rate a show" onPress={() => setShowSearchModal(true)} />;
     const show = showMap[item.show_id];
     const title = show?.title || item.show_id;
     const posterUrl = show?.images ? (getImageUrl(show.images.poster) || getImageUrl(show.images.thumbnail)) : null;
@@ -343,7 +345,7 @@ export default function WatchedScreen() {
       {/* Controls */}
       <View style={styles.controlsRow}>
         <Text style={styles.statsText}>
-          <Text style={styles.statsNumber}>{showsSeen}</Text> seen
+          <Text style={styles.statsNumber}>{sortedReviews.length}</Text> {sortedReviews.length === 1 ? 'viewing' : 'viewings'}{showsSeen !== sortedReviews.length ? ` · ${showsSeen} shows` : ''}
         </Text>
         <View style={styles.controlsRight}>
           <Pressable style={styles.sortButton} onPress={cycleDiarySort}>
@@ -352,21 +354,26 @@ export default function WatchedScreen() {
               <Path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
             </Svg>
           </Pressable>
-          <Pressable
-            style={styles.viewToggle}
-            onPress={() => { haptics.tap(); setViewMode(prev => prev === 'list' ? 'grid' : 'list'); }}
-            hitSlop={8}
-          >
-            {viewMode === 'list' ? (
-              <Svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={Colors.text.muted} strokeWidth={2}>
+          <View style={styles.viewToggleContainer}>
+            <Pressable
+              style={[styles.viewToggleButton, viewMode === 'grid' && styles.viewToggleActive]}
+              onPress={() => { haptics.tap(); setViewMode('grid'); }}
+              hitSlop={4}
+            >
+              <Svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke={viewMode === 'grid' ? Colors.text.primary : Colors.text.muted} strokeWidth={2}>
                 <Path strokeLinecap="round" strokeLinejoin="round" d="M4 5h6v6H4zM14 5h6v6h-6zM4 15h6v6H4zM14 15h6v6h-6z" />
               </Svg>
-            ) : (
-              <Svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={Colors.text.muted} strokeWidth={2}>
+            </Pressable>
+            <Pressable
+              style={[styles.viewToggleButton, viewMode === 'list' && styles.viewToggleActive]}
+              onPress={() => { haptics.tap(); setViewMode('list'); }}
+              hitSlop={4}
+            >
+              <Svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke={viewMode === 'list' ? Colors.text.primary : Colors.text.muted} strokeWidth={2}>
                 <Path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
               </Svg>
-            )}
-          </Pressable>
+            </Pressable>
+          </View>
         </View>
       </View>
 
@@ -424,24 +431,18 @@ export default function WatchedScreen() {
         />
       ) : viewMode === 'grid' ? (
         <FlatList
+          key="grid"
           data={gridData}
-          keyExtractor={item => ('__spacer' in item ? item.id : item.id)}
+          keyExtractor={item => ('__spacer' in item ? item.id : '__addCard' in item ? item.id : item.id)}
           renderItem={renderDiaryGridItem}
           numColumns={4}
           columnWrapperStyle={styles.gridRow}
           contentContainerStyle={styles.gridContainer}
           showsVerticalScrollIndicator={false}
-          ListFooterComponent={
-            <View style={styles.gridFooterRow}>
-              <AddShowCard label="Rate a show" onPress={() => setShowSearchModal(true)} />
-              <View style={styles.gridCardSpacer} />
-              <View style={styles.gridCardSpacer} />
-              <View style={styles.gridCardSpacer} />
-            </View>
-          }
         />
       ) : (
         <FlatList
+          key="list"
           data={sortedReviews}
           keyExtractor={item => item.id}
           renderItem={renderDiaryItem}
@@ -506,9 +507,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.sm, paddingVertical: 6,
   },
   sortText: { color: Colors.text.secondary, fontSize: FontSize.xs, fontWeight: '500' },
-  viewToggle: {
-    backgroundColor: Colors.surface.overlay, borderRadius: 8,
+  viewToggleContainer: {
+    flexDirection: 'row', backgroundColor: Colors.surface.overlay, borderRadius: 8,
+    overflow: 'hidden',
+  },
+  viewToggleButton: {
     padding: 6, alignItems: 'center', justifyContent: 'center',
+  },
+  viewToggleActive: {
+    backgroundColor: 'rgba(255,255,255,0.1)',
   },
   // To Be Rated
   toBeRatedSection: {
@@ -552,7 +559,7 @@ const styles = StyleSheet.create({
   cardRating: { alignItems: 'center', gap: 2 },
   ratingText: { color: Colors.text.secondary, fontSize: FontSize.xs },
   // Grid view
-  gridContainer: { paddingHorizontal: Spacing.lg, paddingBottom: Spacing.xxl },
+  gridContainer: { paddingHorizontal: Spacing.lg, paddingBottom: Spacing.xxl, paddingTop: Spacing.md },
   gridRow: { gap: Spacing.sm, paddingBottom: Spacing.sm },
   gridFooterRow: { flexDirection: 'row', gap: Spacing.sm, paddingBottom: Spacing.sm },
   gridCard: { flex: 1, alignItems: 'center' },

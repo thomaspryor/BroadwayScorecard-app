@@ -354,6 +354,16 @@ export default function ToWatchScreen() {
                   </View>
                 </View>
               )}
+              {/* Quick-add search at bottom */}
+              <Pressable
+                style={({ pressed }) => [styles.quickAddBar, pressed && styles.pressed]}
+                onPress={() => setShowSearchModal(true)}
+              >
+                <Svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={Colors.text.muted} strokeWidth={2}>
+                  <Path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </Svg>
+                <Text style={styles.quickAddText}>Search shows to add...</Text>
+              </Pressable>
             </View>
           )}
           showsVerticalScrollIndicator={false}
@@ -496,4 +506,12 @@ const styles = StyleSheet.create({
   },
   datePickerTitle: { color: Colors.text.secondary, fontSize: FontSize.sm, fontWeight: '500' },
   datePickerDone: { color: Colors.brand, fontSize: FontSize.sm, fontWeight: '600' },
+  quickAddBar: {
+    flexDirection: 'row', alignItems: 'center', gap: Spacing.sm,
+    marginHorizontal: Spacing.lg, marginTop: Spacing.lg,
+    paddingHorizontal: Spacing.md, height: 44,
+    borderRadius: BorderRadius.md, borderWidth: 1,
+    borderColor: Colors.border.subtle, backgroundColor: Colors.surface.overlay,
+  },
+  quickAddText: { color: Colors.text.muted, fontSize: FontSize.sm },
 });

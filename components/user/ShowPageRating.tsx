@@ -262,6 +262,23 @@ export default function ShowPageRating({
           {latestReview ? (
             <View>
               <StarRating rating={latestReview.rating} onRatingChange={handleRatingChange} size="lg" readOnly hideLabel />
+              {/* Show saved date and review text ABOVE action buttons */}
+              {(latestReview.date_seen || latestReview.review_text) && (
+                <View style={styles.savedInfo}>
+                  {latestReview.date_seen && (
+                    <Text style={styles.savedDate}>
+                      Saw {new Date(latestReview.date_seen + 'T00:00:00').toLocaleDateString('en-US', {
+                        month: 'short', day: 'numeric', year: 'numeric',
+                      })}
+                    </Text>
+                  )}
+                  {latestReview.review_text && (
+                    <Text style={styles.savedReviewText} numberOfLines={2}>
+                      {latestReview.review_text}
+                    </Text>
+                  )}
+                </View>
+              )}
               <View style={styles.editActions}>
                 <Pressable style={styles.editButton} onPress={() => handleEdit(latestReview.id)} hitSlop={8} accessibilityRole="button" accessibilityLabel="Edit rating" testID="edit-rating">
                   <Svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke={Colors.text.muted} strokeWidth={2}>
@@ -295,23 +312,6 @@ export default function ShowPageRating({
                   <Text style={styles.newViewingText}>+ New Viewing</Text>
                 </Pressable>
               </View>
-              {/* Show saved date and review text */}
-              {(latestReview.date_seen || latestReview.review_text) && (
-                <View style={styles.savedInfo}>
-                  {latestReview.date_seen && (
-                    <Text style={styles.savedDate}>
-                      Saw {new Date(latestReview.date_seen + 'T00:00:00').toLocaleDateString('en-US', {
-                        month: 'short', day: 'numeric', year: 'numeric',
-                      })}
-                    </Text>
-                  )}
-                  {latestReview.review_text && (
-                    <Text style={styles.savedReviewText} numberOfLines={2}>
-                      {latestReview.review_text}
-                    </Text>
-                  )}
-                </View>
-              )}
             </View>
           ) : (
             <StarRating rating={null} onRatingChange={handleRatingChange} size="lg" />
@@ -367,18 +367,7 @@ export default function ShowPageRating({
             onToggle={handleToggleWatchlist}
             loading={watchlistLoading}
           />
-          <Pressable
-            style={styles.listButton}
-            onPress={handleListPress}
-            accessibilityRole="button"
-            accessibilityLabel="Add to list"
-            testID="add-to-list-button"
-          >
-            <Svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={Colors.text.muted} strokeWidth={2}>
-              <Path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
-            </Svg>
-            <Text style={styles.listButtonText}>List</Text>
-          </Pressable>
+          {/* Add date right below Watchlist button */}
           {isWatchlisted(showId) && (
             <View style={styles.watchlistDateCol}>
               <Pressable
@@ -410,6 +399,18 @@ export default function ShowPageRating({
               )}
             </View>
           )}
+          <Pressable
+            style={styles.listButton}
+            onPress={handleListPress}
+            accessibilityRole="button"
+            accessibilityLabel="Add to list"
+            testID="add-to-list-button"
+          >
+            <Svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={Colors.text.muted} strokeWidth={2}>
+              <Path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+            </Svg>
+            <Text style={styles.listButtonText}>List</Text>
+          </Pressable>
           {showWatchlistDatePicker && (
             <View style={styles.datePickerContainer}>
               <View style={styles.datePickerHeader}>
