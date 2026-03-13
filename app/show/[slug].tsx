@@ -18,7 +18,8 @@ import { getScoreColor, getScoreTier, getContrastTextColor } from '@/lib/score-u
 import { ShowDetail, MobileShowDetail, mapShowDetail } from '@/lib/types';
 import { ScoreBadge, StatusBadge, FormatPill, ProductionPill, CategoryBadge } from '@/components/show-cards';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
-import { trackTicketTap, trackShowDetailViewed, trackShowShared, trackFullReviewTapped } from '@/lib/analytics';
+import { trackTicketTap, trackTicketLinksVisible, trackTicketBrowserOpened, trackTicketBrowserDismissed, trackShowDetailViewed, trackShowShared, trackFullReviewTapped } from '@/lib/analytics';
+import { buildTicketUrl, buildTicketEventProps, isAffiliatePlatform, type TicketSource } from '@/lib/ticket-utils';
 import Svg, { Path } from 'react-native-svg';
 import ShowPageRating from '@/components/user/ShowPageRating';
 import { BookmarkOverlay } from '@/components/BookmarkOverlay';
@@ -68,6 +69,60 @@ export default function ShowDetailScreen() {
     // Try image share card first, falls back to text internally
     await shareCardRef.current?.share();
   };
+
+  /** Open a ticket link with full funnel tracking (tap → browser open → browser dismiss with duration) */
+  const openTicketLink = async (link: { platform: string; url: string }, position: number, source: TicketSource) => {
+    if (!show) return;
+    const { url: affiliateUrl, isAffiliate } = buildTicketUrl(link.url, link.platform, source);
+    const eventProps = buildTicketEventProps({
+      show,
+      platform: link.platform,
+      originalUrl: link.url,
+      affiliateUrl,
+      isAffiliate,
+      source,
+      linkPosition: position,
+    });
+
+    // 1. Track the tap
+    trackTicketTap(eventProps);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+    // 2. Open browser and track lifecycle
+    const openedAt = Date.now();
+    try {
+      const result = await WebBrowser.openBrowserAsync(affiliateUrl);
+      trackTicketBrowserOpened(eventProps);
+
+      // 3. Browser was dismissed — track with time-on-site
+      const timeOnSiteMs = Date.now() - openedAt;
+      trackTicketBrowserDismissed({
+        ...eventProps,
+        time_on_site_ms: timeOnSiteMs,
+        time_on_site_seconds: Math.round(timeOnSiteMs / 1000),
+      });
+    } catch {
+      // Browser failed to open — tap event still recorded
+    }
+  };
+
+  // Track ticket link impressions once per show load
+  const ticketImpressionTracked = useRef(false);
+  useEffect(() => {
+    if (!show || ticketImpressionTracked.current) return;
+    if (show.status === 'closed' || !show.ticketLinks?.length) return;
+    ticketImpressionTracked.current = true;
+    const platforms = show.ticketLinks.map(l => l.platform);
+    trackTicketLinksVisible({
+      show_id: show.id,
+      show_title: show.title,
+      show_slug: show.slug,
+      source: 'show_detail',
+      platforms,
+      affiliate_platforms: platforms.filter(isAffiliatePlatform),
+      ticket_link_count: show.ticketLinks.length,
+    });
+  }, [show]);
 
   useEffect(() => {
     if (!show) return;
@@ -222,10 +277,7 @@ export default function ShowDetailScreen() {
               <Pressable
                 key={i}
                 style={({ pressed }) => [styles.linkButton, pressed && styles.pressed]}
-                onPress={() => {
-                  trackTicketTap(show.id, show.title, link.platform, link.url);
-                  WebBrowser.openBrowserAsync(link.url);
-                }}
+                onPress={() => openTicketLink(link, i, 'show_detail')}
               >
                 <Text style={styles.linkButtonText}>{link.platform}</Text>
               </Pressable>

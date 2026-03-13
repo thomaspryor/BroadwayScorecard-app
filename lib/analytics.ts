@@ -67,20 +67,59 @@ export function trackEvent(event: string, properties: Record<string, string | nu
   }
 }
 
-// ─── Ticket tracking (P0) ──────────────────────────────
+// ─── Ticket funnel tracking (P0 — affiliate revenue) ───
 
-/** Track a ticket link tap — used for affiliate revenue attribution */
-export function trackTicketTap(showId: string, showTitle: string, platform: string, url: string) {
-  trackEvent('ticket_tapped', {
-    show_id: showId,
-    show_title: showTitle,
-    platform,
-    url,
-    source: 'show_detail',
+import type { TicketEventProperties, TicketSource } from './ticket-utils';
+
+/**
+ * Ticket links became visible on screen (impression).
+ * Fire once per show page load, not per scroll.
+ */
+export function trackTicketLinksVisible(props: {
+  show_id: string;
+  show_title: string;
+  show_slug: string;
+  source: TicketSource;
+  platforms: string[];
+  affiliate_platforms: string[];
+  ticket_link_count: number;
+}) {
+  trackEvent('ticket_links_visible', {
+    ...props,
+    platforms: props.platforms.join(','),
+    affiliate_platforms: props.affiliate_platforms.join(','),
+    has_affiliate: props.affiliate_platforms.length > 0,
   });
 }
 
-/** Track a sticky buy button tap */
+/**
+ * User tapped a ticket link — the primary conversion event.
+ * Contains full attribution context for affiliate revenue matching.
+ */
+export function trackTicketTap(props: TicketEventProperties) {
+  trackEvent('ticket_tapped', { ...props });
+}
+
+/**
+ * In-app browser opened successfully after ticket tap.
+ * Confirms the URL actually loaded (vs. a cancelled tap).
+ */
+export function trackTicketBrowserOpened(props: TicketEventProperties) {
+  trackEvent('ticket_browser_opened', { ...props });
+}
+
+/**
+ * User returned from the in-app browser (dismissed it).
+ * Includes time spent on the external site for engagement analysis.
+ */
+export function trackTicketBrowserDismissed(props: TicketEventProperties & {
+  time_on_site_ms: number;
+  time_on_site_seconds: number;
+}) {
+  trackEvent('ticket_browser_dismissed', { ...props });
+}
+
+/** Legacy wrapper — kept for any external callers */
 export function trackBuyButtonTap(showId: string, showTitle: string, platform: string, url: string) {
   trackEvent('buy_button_tapped', {
     show_id: showId,
