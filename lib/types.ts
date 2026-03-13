@@ -118,6 +118,7 @@ export interface MobileShowDetail {
       ss?: { s: number; c: number };
       mz?: { s: number; c: number; sr?: number | null };
       rd?: { s: number; c: number; tp?: number; sent?: string | null };
+      bc?: { s: number; c: number; sr?: number | null };
     };
   };
   hi?: string;   // hero image path
@@ -148,6 +149,7 @@ export interface ShowDetail {
       showScore: { score: number; count: number } | null;
       mezzanine: { score: number; count: number; starRating: number | null } | null;
       reddit: { score: number; count: number; totalPosts: number; sentiment: string | null } | null;
+      broadwayCom: { score: number; count: number; starRating: number | null } | null;
     };
   } | null;
   heroImage: string | null;
@@ -179,6 +181,7 @@ export function mapShowDetail(raw: MobileShowDetail): ShowDetail {
         showScore: raw.au.sources?.ss ? { score: raw.au.sources.ss.s, count: raw.au.sources.ss.c } : null,
         mezzanine: raw.au.sources?.mz ? { score: raw.au.sources.mz.s, count: raw.au.sources.mz.c, starRating: raw.au.sources.mz.sr ?? null } : null,
         reddit: raw.au.sources?.rd ? { score: raw.au.sources.rd.s, count: raw.au.sources.rd.c, totalPosts: raw.au.sources.rd.tp ?? 0, sentiment: raw.au.sources.rd.sent ?? null } : null,
+        broadwayCom: raw.au.sources?.bc ? { score: raw.au.sources.bc.s, count: raw.au.sources.bc.c, starRating: raw.au.sources.bc.sr ?? null } : null,
       },
     } : null,
     heroImage: raw.hi ?? null,
