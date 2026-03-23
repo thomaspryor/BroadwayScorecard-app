@@ -82,8 +82,12 @@ Show images served from web CDN: `https://broadwayscorecard.com/images/shows/{sh
 
 ---
 
+## Repo Layout
+- **Web:** `~/Broadwayscore/` → GitHub: `thomaspryor/Broadwayscore`
+- **iOS app:** `~/BroadwayScorecard-app/` → GitHub: `thomaspryor/BroadwayScorecard-app`
+
 ## Web Project Reference
-The source web project lives at: `/Users/tompryor/Broadwayscore/` (repo: `thomaspryor/Broadwayscore`)
+The source web project lives at: `~/Broadwayscore/` (repo: `thomaspryor/Broadwayscore`)
 - Types: `src/lib/engine.ts`, `src/lib/data-types.ts`
 - Scoring config: `src/config/scoring.ts`
 - Data loading: `src/lib/data-core.ts`
