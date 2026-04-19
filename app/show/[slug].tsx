@@ -15,7 +15,7 @@ import { useShows } from '@/lib/data-context';
 import { fetchShowDetail, fetchSocialPulse } from '@/lib/api';
 import { getImageUrl } from '@/lib/images';
 import { getScoreColor, getScoreTier, getContrastTextColor } from '@/lib/score-utils';
-import { ShowDetail, MobileShowDetail, mapShowDetail } from '@/lib/types';
+import { Show, ShowDetail, MobileShowDetail, mapShowDetail } from '@/lib/types';
 import { ScoreBadge, StatusBadge, FormatPill, ProductionPill, CategoryBadge } from '@/components/show-cards';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
 import { trackTicketTap, trackTicketLinksVisible, trackTicketBrowserOpened, trackTicketBrowserDismissed, trackShowDetailViewed, trackShowShared, trackFullReviewTapped } from '@/lib/analytics';
@@ -67,24 +67,24 @@ export default function ShowDetailScreen() {
       .sort((a, b) => (b.openingDate ?? '').localeCompare(a.openingDate ?? ''));
   }, [show, shows]);
 
-  // Related shows: same type, similar score, currently open
-  const relatedShows = useMemo(() => {
+  // Related shows: same type + category, sorted by score proximity
+  const relatedBase = useMemo(() => {
     if (!show) return [];
     return shows
       .filter(s =>
         s.id !== show.id &&
         s.type === show.type &&
         s.category === show.category &&
-        (s.status === 'open' || s.status === 'previews') &&
         s.compositeScore != null
       )
       .sort((a, b) => {
         const aDiff = Math.abs((a.compositeScore ?? 0) - (show.compositeScore ?? 0));
         const bDiff = Math.abs((b.compositeScore ?? 0) - (show.compositeScore ?? 0));
         return aDiff - bDiff;
-      })
-      .slice(0, 6);
+      });
   }, [show, shows]);
+  const relatedShowsOpen = useMemo(() => relatedBase.filter(s => s.status === 'open' || s.status === 'previews').slice(0, 6), [relatedBase]);
+  const relatedShowsClosed = useMemo(() => relatedBase.filter(s => s.status === 'closed').slice(0, 6), [relatedBase]);
 
   const handleShare = async () => {
     if (!show) return;
@@ -255,6 +255,11 @@ export default function ShowDetailScreen() {
               {show.closingDate && (
                 <Text style={styles.meta} numberOfLines={1}>
                   {show.status === 'closed' ? 'Closed' : 'Closes'} {formatDate(show.closingDate)}
+                </Text>
+              )}
+              {show.status === 'closed' && show.openingDate && show.closingDate && (
+                <Text style={styles.meta} numberOfLines={1}>
+                  Ran for {runLength(show.openingDate, show.closingDate)}
                 </Text>
               )}
             </View>
@@ -443,6 +448,76 @@ export default function ShowDetailScreen() {
                     </Text>
                   </View>
                 )}
+                {detail.audience.sources.broadwayCom && (
+                  <View style={styles.audienceSourceCard}>
+                    <View style={styles.audienceSourceHeader}>
+                      <Svg width={14} height={14} viewBox="0 0 24 24" fill="#60a5fa">
+                        <Path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z" />
+                      </Svg>
+                      <Text style={styles.audienceSourceLabel}>BROADWAY.COM</Text>
+                    </View>
+                    <Text style={styles.audienceSourceValue}>
+                      {detail.audience.sources.broadwayCom.starRating != null
+                        ? `${detail.audience.sources.broadwayCom.starRating}/5`
+                        : `${detail.audience.sources.broadwayCom.score}%`}
+                    </Text>
+                    <Text style={styles.audienceSourceMeta}>
+                      {detail.audience.sources.broadwayCom.count} reviews
+                    </Text>
+                  </View>
+                )}
+                {detail.audience.sources.theatr && (
+                  <View style={styles.audienceSourceCard}>
+                    <View style={styles.audienceSourceHeader}>
+                      <Svg width={14} height={14} viewBox="0 0 24 24" fill="#a78bfa">
+                        <Path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9 9-4.03 9-9c0-.46-.04-.92-.1-1.36-.98 1.37-2.58 2.26-4.4 2.26-2.98 0-5.4-2.42-5.4-5.4 0-1.81.89-3.42 2.26-4.4-.44-.06-.9-.1-1.36-.1z" />
+                      </Svg>
+                      <Text style={styles.audienceSourceLabel}>THEATR</Text>
+                    </View>
+                    <Text style={styles.audienceSourceValue}>
+                      {detail.audience.sources.theatr.score}%
+                    </Text>
+                    <Text style={styles.audienceSourceMeta}>
+                      {detail.audience.sources.theatr.count} reviews
+                    </Text>
+                  </View>
+                )}
+                {detail.audience.sources.seatplan && (
+                  <View style={styles.audienceSourceCard}>
+                    <View style={styles.audienceSourceHeader}>
+                      <Svg width={14} height={14} viewBox="0 0 24 24" fill="#34d399">
+                        <Path d="M7 4v2H5v12h2v2H3V4h4zm10 0h4v16h-4v-2h2V6h-2V4zM9 8h6v2H9V8zm0 4h6v2H9v-2z" />
+                      </Svg>
+                      <Text style={styles.audienceSourceLabel}>SEATPLAN</Text>
+                    </View>
+                    <Text style={styles.audienceSourceValue}>
+                      {detail.audience.sources.seatplan.starRating != null
+                        ? `${detail.audience.sources.seatplan.starRating}/5`
+                        : `${detail.audience.sources.seatplan.score}%`}
+                    </Text>
+                    <Text style={styles.audienceSourceMeta}>
+                      {detail.audience.sources.seatplan.count} reviews
+                    </Text>
+                  </View>
+                )}
+                {detail.audience.sources.londonBoxOffice && (
+                  <View style={styles.audienceSourceCard}>
+                    <View style={styles.audienceSourceHeader}>
+                      <Svg width={14} height={14} viewBox="0 0 24 24" fill="#f472b6">
+                        <Path d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-8 12.5v-9l6 4.5-6 4.5z" />
+                      </Svg>
+                      <Text style={styles.audienceSourceLabel}>LONDON BOX OFFICE</Text>
+                    </View>
+                    <Text style={styles.audienceSourceValue}>
+                      {detail.audience.sources.londonBoxOffice.starRating != null
+                        ? `${detail.audience.sources.londonBoxOffice.starRating}/5`
+                        : `${detail.audience.sources.londonBoxOffice.score}%`}
+                    </Text>
+                    <Text style={styles.audienceSourceMeta}>
+                      {detail.audience.sources.londonBoxOffice.count} reviews
+                    </Text>
+                  </View>
+                )}
               </View>
             )}
           </View>
@@ -521,6 +596,11 @@ export default function ShowDetailScreen() {
         )}
 
 
+        {/* Tony Awards */}
+        {detail?.tonyAwards && detail.tonyAwards.length > 0 && (
+          <TonyAwardsSection awards={detail.tonyAwards} />
+        )}
+
         {/* Video Reviews */}
         {detail?.videoReviews && detail.videoReviews.length > 0 && (
           <VideoReviewsSection reviews={detail.videoReviews} />
@@ -566,40 +646,23 @@ export default function ShowDetailScreen() {
           </View>
         )}
 
-        {/* Related Shows — with poster thumbnails */}
-        {relatedShows.length > 0 && (
+        {/* Open shows you might like */}
+        {relatedShowsOpen.length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Other Shows to See</Text>
-            {relatedShows.map(related => {
-              const relatedPoster = getImageUrl(related.images.poster) || getImageUrl(related.images.thumbnail);
-              return (
-                <Pressable
-                  key={related.id}
-                  style={({ pressed }) => [styles.relatedShowRow, pressed && styles.pressed]}
-                  onPress={() => router.push(`/show/${related.slug}`)}
-                >
-                  {relatedPoster ? (
-                    <Image
-                      source={{ uri: relatedPoster }}
-                      style={styles.relatedShowImage}
-                      contentFit="cover"
-                      transition={200}
-                    />
-                  ) : (
-                    <View style={[styles.relatedShowImage, styles.relatedShowPlaceholder]}>
-                      <Text style={styles.relatedShowPlaceholderText}>
-                        {related.title.charAt(0)}
-                      </Text>
-                    </View>
-                  )}
-                  <View style={styles.relatedShowInfo}>
-                    <Text style={styles.relatedShowTitle} numberOfLines={1}>{related.title}</Text>
-                    <Text style={styles.relatedShowVenue} numberOfLines={1}>{related.venue}</Text>
-                  </View>
-                  <ScoreBadge score={related.compositeScore} size="small" />
-                </Pressable>
-              );
-            })}
+            <Text style={styles.sectionTitle}>Open Shows You Might Like</Text>
+            {relatedShowsOpen.map(related => (
+              <RelatedShowRow key={related.id} show={related} onPress={() => router.push(`/show/${related.slug}`)} />
+            ))}
+          </View>
+        )}
+
+        {/* Closed shows you might like */}
+        {relatedShowsClosed.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Closed Shows You Might Like</Text>
+            {relatedShowsClosed.map(related => (
+              <RelatedShowRow key={related.id} show={related} onPress={() => router.push(`/show/${related.slug}`)} />
+            ))}
           </View>
         )}
 
@@ -787,6 +850,29 @@ function getOutletDomain(outlet: string): string | null {
   return OUTLET_DOMAINS[outlet] ?? null;
 }
 
+function RelatedShowRow({ show, onPress }: { show: Show; onPress: () => void }) {
+  const poster = getImageUrl(show.images.poster) || getImageUrl(show.images.thumbnail);
+  return (
+    <Pressable
+      style={({ pressed }) => [styles.relatedShowRow, pressed && styles.pressed]}
+      onPress={onPress}
+    >
+      {poster ? (
+        <Image source={{ uri: poster }} style={styles.relatedShowImage} contentFit="cover" transition={200} />
+      ) : (
+        <View style={[styles.relatedShowImage, styles.relatedShowPlaceholder]}>
+          <Text style={styles.relatedShowPlaceholderText}>{show.title.charAt(0)}</Text>
+        </View>
+      )}
+      <View style={styles.relatedShowInfo}>
+        <Text style={styles.relatedShowTitle} numberOfLines={1}>{show.title}</Text>
+        <Text style={styles.relatedShowVenue} numberOfLines={1}>{show.venue}</Text>
+      </View>
+      <ScoreBadge score={show.compositeScore} size="small" />
+    </Pressable>
+  );
+}
+
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
     <View style={styles.infoRow}>
@@ -794,6 +880,20 @@ function InfoRow({ label, value }: { label: string; value: string }) {
       <Text style={styles.infoValue}>{value}</Text>
     </View>
   );
+}
+
+function runLength(openingDate: string, closingDate: string): string {
+  try {
+    const open = new Date(openingDate + 'T12:00:00');
+    const close = new Date(closingDate + 'T12:00:00');
+    const days = Math.round((close.getTime() - open.getTime()) / (1000 * 60 * 60 * 24));
+    const months = Math.round(days / 30.44);
+    if (months < 2) return `${days} days`;
+    if (months < 12) return `${months} months`;
+    const years = Math.floor(months / 12);
+    const rem = months % 12;
+    return rem === 0 ? `${years} year${years > 1 ? 's' : ''}` : `${years}yr ${rem}mo`;
+  } catch { return ''; }
 }
 
 function formatDate(iso: string): string {
@@ -806,6 +906,50 @@ function formatDate(iso: string): string {
   } catch {
     return iso;
   }
+}
+
+// ---------- Tony Awards ----------
+
+function TonyAwardsSection({ awards }: { awards: ShowDetail['tonyAwards'] }) {
+  const wins = awards.filter(a => a.won);
+  const noms = awards.filter(a => !a.won);
+  return (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>
+        Tony Awards {wins.length > 0 ? `· ${wins.length} Win${wins.length > 1 ? 's' : ''}` : ''}
+      </Text>
+      {wins.length > 0 && (
+        <>
+          <Text style={styles.tonyGroupLabel}>WINS</Text>
+          {wins.map((a, i) => (
+            <View key={i} style={styles.tonyRow}>
+              <Text style={styles.tonyWinIcon}>🏆</Text>
+              <View style={styles.tonyInfo}>
+                <Text style={styles.tonyCategory}>{a.category}</Text>
+                {a.name && <Text style={styles.tonyName}>{a.name} · {a.year}</Text>}
+                {!a.name && <Text style={styles.tonyName}>{a.year}</Text>}
+              </View>
+            </View>
+          ))}
+        </>
+      )}
+      {noms.length > 0 && (
+        <>
+          <Text style={[styles.tonyGroupLabel, { marginTop: wins.length > 0 ? Spacing.md : 0 }]}>NOMINATIONS</Text>
+          {noms.map((a, i) => (
+            <View key={i} style={styles.tonyRow}>
+              <Text style={styles.tonyNomIcon}>☆</Text>
+              <View style={styles.tonyInfo}>
+                <Text style={styles.tonyCategory}>{a.category}</Text>
+                {a.name && <Text style={styles.tonyName}>{a.name} · {a.year}</Text>}
+                {!a.name && <Text style={styles.tonyName}>{a.year}</Text>}
+              </View>
+            </View>
+          ))}
+        </>
+      )}
+    </View>
+  );
 }
 
 // ---------- Social Scorecard ----------
@@ -1433,6 +1577,47 @@ const styles = StyleSheet.create({
   webLinkText: {
     color: Colors.brand,
     fontSize: FontSize.md,
+  },
+
+  // Tony Awards
+  tonyGroupLabel: {
+    color: Colors.text.muted,
+    fontSize: FontSize.xs,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    marginBottom: Spacing.sm,
+  },
+  tonyRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingVertical: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border.subtle,
+    gap: Spacing.sm,
+  },
+  tonyWinIcon: {
+    fontSize: 16,
+    width: 24,
+    textAlign: 'center',
+  },
+  tonyNomIcon: {
+    fontSize: 16,
+    width: 24,
+    textAlign: 'center',
+    color: Colors.text.muted,
+  },
+  tonyInfo: {
+    flex: 1,
+  },
+  tonyCategory: {
+    color: Colors.text.primary,
+    fontSize: FontSize.sm,
+    fontWeight: '600',
+  },
+  tonyName: {
+    color: Colors.text.muted,
+    fontSize: FontSize.xs,
+    marginTop: 2,
   },
 
   // Social Scorecard

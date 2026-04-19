@@ -82,6 +82,10 @@ export default function HomeScreen() {
     const nytPicks = marketShows.filter(s => isOpen(s) && s.tags.includes('nyt-pick')).sort(byScore).slice(0, 10);
     if (nytPicks.length >= 2) rows.push({ title: "New York Times Critic's Picks", shows: nytPicks });
 
+    // Tony Award Winners (open shows with tony-winner tag)
+    const tonyWinners = marketShows.filter(s => isOpen(s) && s.tags.includes('tony-winner')).sort(byScore).slice(0, 10);
+    if (tonyWinners.length >= 2) rows.push({ title: 'Tony Award Winners', shows: tonyWinners });
+
     // Best Musicals
     const musicals = marketShows.filter(s => isOpen(s) && s.type === 'musical' && s.compositeScore != null).sort(byScore).slice(0, 10);
     if (musicals.length >= 3) rows.push({ title: 'Best Musicals', shows: musicals });
@@ -90,13 +94,34 @@ export default function HomeScreen() {
     const plays = marketShows.filter(s => isOpen(s) && s.type === 'play' && s.compositeScore != null).sort(byScore).slice(0, 10);
     if (plays.length >= 3) rows.push({ title: 'Best Plays', shows: plays });
 
+    // Jukebox Musicals
+    const jukebox = marketShows.filter(s => isOpen(s) && s.tags.includes('jukebox')).sort(byScore).slice(0, 10);
+    if (jukebox.length >= 2) rows.push({ title: 'Jukebox Musicals', shows: jukebox });
+
+    // Perfect for Date Night (romantic tag, no kids-only age recommendations)
+    const dateNight = marketShows.filter(s => {
+      if (!isOpen(s)) return false;
+      const age = s.ageRecommendation?.toLowerCase() ?? '';
+      const isKidsOnly = age.includes('ages 5') || age.includes('ages 6') || age.includes('ages 7') || age.includes('ages 8');
+      return !isKidsOnly && s.tags.includes('romantic');
+    }).sort(byScore).slice(0, 10);
+    if (dateNight.length >= 2) rows.push({ title: 'Perfect for Date Night', shows: dateNight });
+
     // Great for Kids
     const kids = marketShows.filter(s => {
       if (!isOpen(s)) return false;
       const age = s.ageRecommendation?.toLowerCase() ?? '';
-      return age.includes('kids') || age.includes('ages 5') || age.includes('ages 6') || age.includes('ages 7') || age.includes('ages 8') || age.includes('all ages');
+      return age.includes('kids') || age.includes('ages 5') || age.includes('ages 6') || age.includes('ages 7') || age.includes('ages 8') || age.includes('all ages') || s.tags.includes('family');
     }).sort(byScore).slice(0, 10);
     if (kids.length >= 2) rows.push({ title: 'Great for Kids', shows: kids });
+
+    // Best Off-Broadway (NYC market only, separate from main Broadway filter)
+    if (market === 'nyc') {
+      const offBway = shows
+        .filter(s => s.category === 'off-broadway' && isOpen(s) && s.compositeScore != null)
+        .sort(byScore).slice(0, 10);
+      if (offBway.length >= 3) rows.push({ title: 'Best Off-Broadway', shows: offBway });
+    }
 
     // Upcoming / In Previews
     const previews = marketShows.filter(s => s.status === 'previews').sort((a, b) => (a.openingDate ?? '').localeCompare(b.openingDate ?? '')).slice(0, 10);
@@ -109,8 +134,22 @@ export default function HomeScreen() {
       },
     });
 
+    // Shows Starting Soon (upcoming, not yet in previews)
+    const startingSoon = marketShows
+      .filter(s => s.status === 'upcoming')
+      .sort((a, b) => (a.openingDate ?? '').localeCompare(b.openingDate ?? ''))
+      .slice(0, 10);
+    if (startingSoon.length >= 2) rows.push({
+      title: 'Starting Soon',
+      shows: startingSoon,
+      getSubtitle: (s) => {
+        const d = shortDate(s.openingDate ?? '');
+        return d ? `Opens ${d}` : undefined;
+      },
+    });
+
     return rows;
-  }, [marketShows]);
+  }, [market, marketShows, shows]);
 
   // Closing Soon — dedicated section with 30-day window and countdown badges
   const closingSoon = useMemo(() => {

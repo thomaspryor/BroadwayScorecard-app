@@ -119,8 +119,12 @@ export interface MobileShowDetail {
       mz?: { s: number; c: number; sr?: number | null };
       rd?: { s: number; c: number; tp?: number; sent?: string | null };
       bc?: { s: number; c: number; sr?: number | null };
+      th?: { s: number; c: number };                   // Theatr
+      sp?: { s: number; c: number; sr?: number | null }; // Seatplan
+      lb?: { s: number; c: number; sr?: number | null }; // London Box Office
     };
   };
+  tn?: { yr: number; cat: string; n: string | null; w?: true }[];  // Tony nominations
   hi?: string;   // hero image path
   ta?: string;   // theater address
   pd?: string;   // previews start date
@@ -177,8 +181,12 @@ export interface ShowDetail {
       mezzanine: { score: number; count: number; starRating: number | null } | null;
       reddit: { score: number; count: number; totalPosts: number; sentiment: string | null } | null;
       broadwayCom: { score: number; count: number; starRating: number | null } | null;
+      theatr: { score: number; count: number } | null;
+      seatplan: { score: number; count: number; starRating: number | null } | null;
+      londonBoxOffice: { score: number; count: number; starRating: number | null } | null;
     };
   } | null;
+  tonyAwards: { year: number; category: string; name: string | null; won: boolean }[];
   heroImage: string | null;
   theaterAddress: string | null;
   previewsStartDate: string | null;
@@ -236,8 +244,12 @@ export function mapShowDetail(raw: MobileShowDetail): ShowDetail {
         mezzanine: raw.au.sources?.mz ? { score: raw.au.sources.mz.s, count: raw.au.sources.mz.c, starRating: raw.au.sources.mz.sr ?? null } : null,
         reddit: raw.au.sources?.rd ? { score: raw.au.sources.rd.s, count: raw.au.sources.rd.c, totalPosts: raw.au.sources.rd.tp ?? 0, sentiment: raw.au.sources.rd.sent ?? null } : null,
         broadwayCom: raw.au.sources?.bc ? { score: raw.au.sources.bc.s, count: raw.au.sources.bc.c, starRating: raw.au.sources.bc.sr ?? null } : null,
+        theatr: raw.au.sources?.th ? { score: raw.au.sources.th.s, count: raw.au.sources.th.c } : null,
+        seatplan: raw.au.sources?.sp ? { score: raw.au.sources.sp.s, count: raw.au.sources.sp.c, starRating: raw.au.sources.sp.sr ?? null } : null,
+        londonBoxOffice: raw.au.sources?.lb ? { score: raw.au.sources.lb.s, count: raw.au.sources.lb.c, starRating: raw.au.sources.lb.sr ?? null } : null,
       },
     } : null,
+    tonyAwards: (raw.tn ?? []).map(t => ({ year: t.yr, category: t.cat, name: t.n ?? null, won: t.w === true })),
     heroImage: raw.hi ?? null,
     theaterAddress: raw.ta ?? null,
     previewsStartDate: raw.pd ?? null,
