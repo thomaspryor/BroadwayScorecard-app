@@ -125,6 +125,19 @@ export interface MobileShowDetail {
     };
   };
   tn?: { yr: number; cat: string; n: string | null; w?: true }[];  // Tony nominations
+  cn?: { t: string; rc: number };                                    // Critics' Take
+  sh?: { wk: string; days: { m: string | null; e: string | null }[] }; // Showtimes week
+  bo?: {                                                             // Box Office
+    tw: { g: number | null; c: number | null; a: number | null; gp: number | null; cp: number | null; ap: number | null } | null;
+    at: { g: number | null; p: number | null; a: number | null } | null;
+  };
+  lr?: {                                                             // Lottery/Rush
+    lo?: { p: number | null; t: string | null; loc: string | null; inst: string | null; url: string | null; pl: string | null };
+    ru?: { p: number | null; t: string | null; loc: string | null; inst: string | null; url: string | null; pl: string | null };
+    dr?: { p: number | null; t: string | null; loc: string | null; inst: string | null; url: string | null; pl: string | null };
+    sr?: { p: number | null; t: string | null; loc: string | null; inst: string | null; url: string | null; pl: string | null };
+    so?: { p: number | null; t: string | null; loc: string | null; inst: string | null; url: string | null; pl: string | null };
+  };
   hi?: string;   // hero image path
   ta?: string;   // theater address
   pd?: string;   // previews start date
@@ -187,6 +200,19 @@ export interface ShowDetail {
     };
   } | null;
   tonyAwards: { year: number; category: string; name: string | null; won: boolean }[];
+  criticsTake: { text: string; reviewCount: number } | null;
+  showtimes: { week: string; days: { matinee: string | null; evening: string | null }[] } | null;
+  boxOffice: {
+    thisWeek: { gross: number | null; capacity: number | null; avgTicket: number | null; grossPrev: number | null; capacityPrev: number | null; avgTicketPrev: number | null } | null;
+    allTime: { gross: number | null; performances: number | null; attendance: number | null } | null;
+  } | null;
+  lotteryRush: {
+    lottery: { price: number | null; time: string | null; location: string | null; instructions: string | null; url: string | null; platform: string | null } | null;
+    rush: { price: number | null; time: string | null; location: string | null; instructions: string | null; url: string | null; platform: string | null } | null;
+    digitalRush: { price: number | null; time: string | null; location: string | null; instructions: string | null; url: string | null; platform: string | null } | null;
+    studentRush: { price: number | null; time: string | null; location: string | null; instructions: string | null; url: string | null; platform: string | null } | null;
+    standingRoom: { price: number | null; time: string | null; location: string | null; instructions: string | null; url: string | null; platform: string | null } | null;
+  } | null;
   heroImage: string | null;
   theaterAddress: string | null;
   previewsStartDate: string | null;
@@ -250,6 +276,25 @@ export function mapShowDetail(raw: MobileShowDetail): ShowDetail {
       },
     } : null,
     tonyAwards: (raw.tn ?? []).map(t => ({ year: t.yr, category: t.cat, name: t.n ?? null, won: t.w === true })),
+    criticsTake: raw.cn ? { text: raw.cn.t, reviewCount: raw.cn.rc } : null,
+    showtimes: raw.sh ? {
+      week: raw.sh.wk,
+      days: raw.sh.days.map(d => ({ matinee: d.m ?? null, evening: d.e ?? null })),
+    } : null,
+    boxOffice: raw.bo ? {
+      thisWeek: raw.bo.tw ? {
+        gross: raw.bo.tw.g, capacity: raw.bo.tw.c, avgTicket: raw.bo.tw.a,
+        grossPrev: raw.bo.tw.gp, capacityPrev: raw.bo.tw.cp, avgTicketPrev: raw.bo.tw.ap,
+      } : null,
+      allTime: raw.bo.at ? { gross: raw.bo.at.g, performances: raw.bo.at.p, attendance: raw.bo.at.a } : null,
+    } : null,
+    lotteryRush: raw.lr ? {
+      lottery: raw.lr.lo ? { price: raw.lr.lo.p, time: raw.lr.lo.t, location: raw.lr.lo.loc, instructions: raw.lr.lo.inst, url: raw.lr.lo.url, platform: raw.lr.lo.pl } : null,
+      rush: raw.lr.ru ? { price: raw.lr.ru.p, time: raw.lr.ru.t, location: raw.lr.ru.loc, instructions: raw.lr.ru.inst, url: raw.lr.ru.url, platform: raw.lr.ru.pl } : null,
+      digitalRush: raw.lr.dr ? { price: raw.lr.dr.p, time: raw.lr.dr.t, location: raw.lr.dr.loc, instructions: raw.lr.dr.inst, url: raw.lr.dr.url, platform: raw.lr.dr.pl } : null,
+      studentRush: raw.lr.sr ? { price: raw.lr.sr.p, time: raw.lr.sr.t, location: raw.lr.sr.loc, instructions: raw.lr.sr.inst, url: raw.lr.sr.url, platform: raw.lr.sr.pl } : null,
+      standingRoom: raw.lr.so ? { price: raw.lr.so.p, time: raw.lr.so.t, location: raw.lr.so.loc, instructions: raw.lr.so.inst, url: raw.lr.so.url, platform: raw.lr.so.pl } : null,
+    } : null,
     heroImage: raw.hi ?? null,
     theaterAddress: raw.ta ?? null,
     previewsStartDate: raw.pd ?? null,

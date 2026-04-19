@@ -303,6 +303,14 @@ export default function ShowDetailScreen() {
             </View>
           )}
 
+          {/* Critics' Take consensus paragraph — right below breakdown */}
+          {detail?.criticsTake && (
+            <View style={styles.criticsTakeBox}>
+              <Text style={styles.criticsTakeLabel}>Critics' Take</Text>
+              <Text style={styles.criticsTakeText}>{detail.criticsTake.text}</Text>
+            </View>
+          )}
+
           {/* Link buttons: Official Site, Ticket platforms */}
           <View style={styles.linkButtons}>
             {show.officialUrl && (
@@ -521,6 +529,21 @@ export default function ShowDetailScreen() {
               </View>
             )}
           </View>
+        )}
+
+        {/* Showtimes */}
+        {detail?.showtimes && (
+          <ShowtimesSection data={detail.showtimes} />
+        )}
+
+        {/* Box Office Scorecard */}
+        {detail?.boxOffice && (
+          <BoxOfficeSection data={detail.boxOffice} />
+        )}
+
+        {/* Lottery / Rush */}
+        {detail?.lotteryRush && (
+          <LotteryRushSection data={detail.lotteryRush} />
         )}
 
         {/* Social Scorecard */}
@@ -924,6 +947,181 @@ function formatDate(iso: string): string {
   } catch {
     return iso;
   }
+}
+
+// ---------- Showtimes ----------
+
+const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+function to12Hour(t: string | null): string {
+  if (!t) return '—';
+  const [hStr, mStr] = t.split(':');
+  let h = parseInt(hStr, 10);
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  h = h % 12 || 12;
+  return mStr === '00' ? `${h} ${ampm}` : `${h}:${mStr} ${ampm}`;
+}
+
+function formatWeekRange(wkKey: string): string {
+  if (!wkKey || wkKey.length !== 8) return '';
+  const y = wkKey.slice(0, 4);
+  const m = wkKey.slice(4, 6);
+  const d = wkKey.slice(6, 8);
+  try {
+    const start = new Date(`${y}-${m}-${d}T12:00:00`);
+    const end = new Date(start.getTime() + 6 * 24 * 60 * 60 * 1000);
+    const fmt = (x: Date) => x.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    return `${fmt(start)} – ${fmt(end)}`;
+  } catch { return ''; }
+}
+
+function ShowtimesSection({ data }: { data: NonNullable<ShowDetail['showtimes']> }) {
+  const range = formatWeekRange(data.week);
+  return (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>Showtimes</Text>
+      {range && <Text style={styles.showtimesRange}>This Week ({range})</Text>}
+      <View style={styles.showtimesGrid}>
+        {data.days.slice(0, 7).map((day, i) => {
+          const hasShow = day.matinee || day.evening;
+          return (
+            <View key={i} style={styles.showtimesRow}>
+              <Text style={[styles.showtimesDay, !hasShow && styles.showtimesDayEmpty]}>{DAY_LABELS[i]}</Text>
+              <Text style={styles.showtimesTimes}>
+                {day.matinee && <Text>{to12Hour(day.matinee)}</Text>}
+                {day.matinee && day.evening && <Text style={styles.showtimesDot}>  ·  </Text>}
+                {day.evening && <Text>{to12Hour(day.evening)}</Text>}
+                {!hasShow && <Text style={styles.showtimesDayEmpty}>—</Text>}
+              </Text>
+            </View>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
+// ---------- Box Office Scorecard ----------
+
+function formatMoney(n: number | null): string {
+  if (n == null) return '—';
+  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `$${(n / 1_000).toFixed(0)}K`;
+  return `$${n}`;
+}
+
+function pctChange(curr: number | null, prev: number | null): { label: string; positive: boolean } | null {
+  if (curr == null || prev == null || prev === 0) return null;
+  const delta = ((curr - prev) / prev) * 100;
+  if (Math.abs(delta) < 0.5) return null;
+  return { label: `${delta > 0 ? '▲' : '▼'} ${Math.abs(delta).toFixed(0)}%`, positive: delta > 0 };
+}
+
+function BoxOfficeSection({ data }: { data: NonNullable<ShowDetail['boxOffice']> }) {
+  const tw = data.thisWeek;
+  const at = data.allTime;
+  if (!tw && !at) return null;
+
+  const grossDelta = tw ? pctChange(tw.gross, tw.grossPrev) : null;
+  const capDelta = tw ? pctChange(tw.capacity, tw.capacityPrev) : null;
+
+  return (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>Box Office Scorecard</Text>
+      {tw && (
+        <>
+          <Text style={styles.boSubheading}>This Week</Text>
+          <View style={styles.boRow}>
+            <View style={styles.boCell}>
+              <Text style={styles.boValue}>{formatMoney(tw.gross)}</Text>
+              <Text style={styles.boLabel}>Gross</Text>
+              {grossDelta && <Text style={[styles.boDelta, { color: grossDelta.positive ? Colors.score.green : Colors.score.red }]}>{grossDelta.label} WoW</Text>}
+            </View>
+            <View style={styles.boCell}>
+              <Text style={styles.boValue}>{tw.capacity != null ? `${Math.round(tw.capacity)}%` : '—'}</Text>
+              <Text style={styles.boLabel}>Capacity</Text>
+              {capDelta && <Text style={[styles.boDelta, { color: capDelta.positive ? Colors.score.green : Colors.score.red }]}>{capDelta.label} WoW</Text>}
+            </View>
+            <View style={styles.boCell}>
+              <Text style={styles.boValue}>{tw.avgTicket != null ? `$${Math.round(tw.avgTicket)}` : '—'}</Text>
+              <Text style={styles.boLabel}>Avg Ticket</Text>
+            </View>
+          </View>
+        </>
+      )}
+      {at && (
+        <>
+          <Text style={[styles.boSubheading, { marginTop: Spacing.md }]}>All Time</Text>
+          <View style={styles.boRow}>
+            <View style={styles.boCell}>
+              <Text style={styles.boValue}>{formatMoney(at.gross)}</Text>
+              <Text style={styles.boLabel}>Gross</Text>
+            </View>
+            <View style={styles.boCell}>
+              <Text style={styles.boValue}>{at.performances != null ? at.performances.toLocaleString() : '—'}</Text>
+              <Text style={styles.boLabel}>Performances</Text>
+            </View>
+            <View style={styles.boCell}>
+              <Text style={styles.boValue}>{at.attendance != null ? (at.attendance >= 1000 ? `${(at.attendance / 1000).toFixed(1)}K` : at.attendance.toString()) : '—'}</Text>
+              <Text style={styles.boLabel}>Attendance</Text>
+            </View>
+          </View>
+        </>
+      )}
+    </View>
+  );
+}
+
+// ---------- Lottery / Rush ----------
+
+const LR_TYPE_CONFIG: Record<string, { label: string; color: string }> = {
+  lottery: { label: 'Lottery', color: '#a78bfa' },
+  rush: { label: 'Rush', color: '#34d399' },
+  digitalRush: { label: 'Digital Rush', color: '#60a5fa' },
+  studentRush: { label: 'Student Rush', color: '#f472b6' },
+  standingRoom: { label: 'Standing Room', color: '#94a3b8' },
+};
+
+type LRWindow = NonNullable<NonNullable<ShowDetail['lotteryRush']>['lottery']>;
+
+function LRCard({ type, data }: { type: keyof typeof LR_TYPE_CONFIG; data: LRWindow }) {
+  const cfg = LR_TYPE_CONFIG[type];
+  const open = async () => {
+    if (data.url) await WebBrowser.openBrowserAsync(data.url);
+  };
+  const Wrapper: any = data.url ? Pressable : View;
+  return (
+    <Wrapper
+      style={({ pressed }: { pressed: boolean }) => [styles.lrCard, { borderColor: cfg.color + '40' }, pressed && styles.pressed]}
+      onPress={data.url ? open : undefined}
+    >
+      <View style={styles.lrHeader}>
+        <Text style={[styles.lrLabel, { color: cfg.color }]}>{cfg.label}</Text>
+        {data.price != null && <Text style={styles.lrPrice}>${data.price}</Text>}
+      </View>
+      {data.time && <Text style={styles.lrMeta}>{data.time}</Text>}
+      {data.location && <Text style={styles.lrMeta}>{data.location}</Text>}
+      {data.instructions && <Text style={styles.lrInst} numberOfLines={3}>{data.instructions}</Text>}
+      {data.platform && <Text style={styles.lrPlatform}>via {data.platform}{data.url ? ' →' : ''}</Text>}
+    </Wrapper>
+  );
+}
+
+function LotteryRushSection({ data }: { data: NonNullable<ShowDetail['lotteryRush']> }) {
+  const entries: [keyof typeof LR_TYPE_CONFIG, LRWindow][] = [];
+  if (data.lottery) entries.push(['lottery', data.lottery]);
+  if (data.rush) entries.push(['rush', data.rush]);
+  if (data.digitalRush) entries.push(['digitalRush', data.digitalRush]);
+  if (data.studentRush) entries.push(['studentRush', data.studentRush]);
+  if (data.standingRoom) entries.push(['standingRoom', data.standingRoom]);
+  if (entries.length === 0) return null;
+
+  return (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>Discount Tickets</Text>
+      {entries.map(([type, d]) => <LRCard key={type} type={type} data={d} />)}
+    </View>
+  );
 }
 
 // ---------- Tony Awards ----------
@@ -1607,6 +1805,144 @@ const styles = StyleSheet.create({
   webLinkText: {
     color: Colors.brand,
     fontSize: FontSize.md,
+  },
+
+  // Critics' Take
+  criticsTakeBox: {
+    marginTop: Spacing.md,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderLeftWidth: 3,
+    borderLeftColor: Colors.brand,
+    backgroundColor: Colors.surface.raised,
+    borderRadius: BorderRadius.sm,
+  },
+  criticsTakeLabel: {
+    color: Colors.text.muted,
+    fontSize: FontSize.xs,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+    marginBottom: 4,
+  },
+  criticsTakeText: {
+    color: Colors.text.secondary,
+    fontSize: FontSize.sm,
+    lineHeight: 20,
+  },
+
+  // Showtimes
+  showtimesRange: {
+    color: Colors.text.muted,
+    fontSize: FontSize.xs,
+    marginBottom: Spacing.sm,
+  },
+  showtimesGrid: {
+    backgroundColor: Colors.surface.raised,
+    borderRadius: BorderRadius.md,
+    padding: Spacing.md,
+  },
+  showtimesRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border.subtle,
+  },
+  showtimesDay: {
+    color: Colors.text.primary,
+    fontSize: FontSize.sm,
+    fontWeight: '700',
+    width: 44,
+  },
+  showtimesDayEmpty: {
+    color: Colors.text.muted,
+  },
+  showtimesTimes: {
+    color: Colors.text.secondary,
+    fontSize: FontSize.sm,
+    flex: 1,
+  },
+  showtimesDot: {
+    color: Colors.text.muted,
+  },
+
+  // Box Office
+  boSubheading: {
+    color: Colors.text.muted,
+    fontSize: FontSize.xs,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+    marginBottom: Spacing.sm,
+  },
+  boRow: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+  },
+  boCell: {
+    flex: 1,
+    backgroundColor: Colors.surface.raised,
+    borderRadius: BorderRadius.sm,
+    padding: Spacing.md,
+  },
+  boValue: {
+    color: Colors.text.primary,
+    fontSize: FontSize.lg,
+    fontWeight: '700',
+  },
+  boLabel: {
+    color: Colors.text.muted,
+    fontSize: FontSize.xs,
+    marginTop: 2,
+  },
+  boDelta: {
+    fontSize: 10,
+    fontWeight: '700',
+    marginTop: 4,
+  },
+
+  // Lottery/Rush
+  lrCard: {
+    borderWidth: 1,
+    borderRadius: BorderRadius.md,
+    padding: Spacing.md,
+    marginBottom: Spacing.sm,
+    backgroundColor: Colors.surface.raised,
+  },
+  lrHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  lrLabel: {
+    fontSize: FontSize.sm,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  lrPrice: {
+    color: Colors.text.primary,
+    fontSize: FontSize.lg,
+    fontWeight: '700',
+  },
+  lrMeta: {
+    color: Colors.text.secondary,
+    fontSize: FontSize.sm,
+    marginTop: 2,
+  },
+  lrInst: {
+    color: Colors.text.muted,
+    fontSize: FontSize.xs,
+    marginTop: 4,
+    lineHeight: 16,
+  },
+  lrPlatform: {
+    color: Colors.brand,
+    fontSize: FontSize.xs,
+    marginTop: 6,
+    fontWeight: '600',
   },
 
   // Tony Awards
