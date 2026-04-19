@@ -57,9 +57,13 @@ export default function HomeScreen() {
   }, [marketShows]);
 
   // Themed featured rows
-  const featuredRows = useMemo((): { title: string; shows: Show[] }[] => {
-    const rows: { title: string; shows: Show[] }[] = [];
+  const featuredRows = useMemo((): { title: string; shows: Show[]; getSubtitle?: (show: Show) => string | undefined }[] => {
+    const rows: { title: string; shows: Show[]; getSubtitle?: (show: Show) => string | undefined }[] = [];
     const now = new Date();
+    const shortDate = (d: string) => {
+      try { return new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); }
+      catch { return null; }
+    };
     const isOpen = (s: Show) => s.status === 'open' || s.status === 'previews';
     const byScore = (a: Show, b: Show) => (b.compositeScore ?? 0) - (a.compositeScore ?? 0);
 
@@ -96,7 +100,14 @@ export default function HomeScreen() {
 
     // Upcoming / In Previews
     const previews = marketShows.filter(s => s.status === 'previews').sort((a, b) => (a.openingDate ?? '').localeCompare(b.openingDate ?? '')).slice(0, 10);
-    if (previews.length >= 2) rows.push({ title: 'Coming Up', shows: previews });
+    if (previews.length >= 2) rows.push({
+      title: 'Coming Up',
+      shows: previews,
+      getSubtitle: (s) => {
+        const d = shortDate(s.openingDate ?? '');
+        return d ? `Opens ${d}` : undefined;
+      },
+    });
 
     return rows;
   }, [marketShows]);
@@ -203,7 +214,7 @@ export default function HomeScreen() {
             {featuredRows.map((row, i) => (
               <View key={i}>
                 <Text style={styles.sectionTitle}>{row.title}</Text>
-                <FeaturedCarousel shows={row.shows} watchlistSet={watchlistSet} onToggleWatchlist={toggleWatchlist} />
+                <FeaturedCarousel shows={row.shows} watchlistSet={watchlistSet} onToggleWatchlist={toggleWatchlist} getSubtitle={row.getSubtitle} />
               </View>
             ))}
 

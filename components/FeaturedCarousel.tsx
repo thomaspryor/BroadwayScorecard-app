@@ -17,9 +17,10 @@ interface FeaturedCarouselProps {
   shows: Show[];
   watchlistSet?: Set<string>;
   onToggleWatchlist?: (showId: string) => void;
+  getSubtitle?: (show: Show) => string | undefined;
 }
 
-const FeaturedCard = memo(function FeaturedCard({ show, cardWidth, isWatchlisted, onToggle }: { show: Show; cardWidth: number; isWatchlisted?: boolean; onToggle?: () => void }) {
+const FeaturedCard = memo(function FeaturedCard({ show, cardWidth, isWatchlisted, onToggle, subtitle }: { show: Show; cardWidth: number; isWatchlisted?: boolean; onToggle?: () => void; subtitle?: string }) {
   const router = useRouter();
   const posterUrl = getImageUrl(show.images.poster) || getImageUrl(show.images.thumbnail);
   const cardHeight = cardWidth * 1.5;
@@ -63,11 +64,14 @@ const FeaturedCard = memo(function FeaturedCard({ show, cardWidth, isWatchlisted
       <Text style={styles.cardTitle} numberOfLines={2}>
         {show.title}
       </Text>
+      {subtitle ? (
+        <Text style={styles.cardSubtitle} numberOfLines={1}>{subtitle}</Text>
+      ) : null}
     </Pressable>
   );
 });
 
-export function FeaturedCarousel({ shows, watchlistSet, onToggleWatchlist }: FeaturedCarouselProps) {
+export function FeaturedCarousel({ shows, watchlistSet, onToggleWatchlist, getSubtitle }: FeaturedCarouselProps) {
   const { width } = useWindowDimensions();
   if (shows.length === 0) return null;
 
@@ -86,6 +90,7 @@ export function FeaturedCarousel({ shows, watchlistSet, onToggleWatchlist }: Fea
             cardWidth={cardWidth}
             isWatchlisted={watchlistSet?.has(item.id)}
             onToggle={onToggleWatchlist ? () => onToggleWatchlist(item.id) : undefined}
+            subtitle={getSubtitle?.(item)}
           />
         )}
         showsHorizontalScrollIndicator={false}
@@ -139,5 +144,10 @@ const styles = StyleSheet.create({
     fontSize: FontSize.sm,
     fontWeight: '600',
     marginTop: Spacing.xs,
+  },
+  cardSubtitle: {
+    color: Colors.text.muted,
+    fontSize: FontSize.xs,
+    marginTop: 2,
   },
 });

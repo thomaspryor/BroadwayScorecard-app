@@ -125,6 +125,33 @@ export interface MobileShowDetail {
   ta?: string;   // theater address
   pd?: string;   // previews start date
   ca?: { n: string; r: string }[];  // cast
+  sg?: {         // seating sections
+    n: string;   // name (e.g. "Orchestra Center G-L")
+    v: string;   // verdict (sweet-spot/solid/avoid)
+    vl: string;  // verdictLabel (Our pick/Solid/Avoid)
+    iv: boolean; // isValuePick
+    ra: string | null; // rationale
+    dp: number;  // dataPoints
+    rr: string | null; // rowRange
+  }[];
+  vs?: {         // venue scores
+    sl: number | null;  // sightlines
+    so: number | null;  // sound
+    co: number | null;  // comfort
+    am: number | null;  // ambiance
+    fa: number | null;  // facilities
+  };
+  vr?: {         // video reviews
+    ch: string | null;  // channel/creator name
+    hd: string | null;  // @handle
+    pl: string | null;  // platform
+    u: string;          // video URL
+    s: number | null;   // score 0-100
+    bk: string | null;  // bucket (Rave/Positive/Mixed/Negative)
+    q: string | null;   // key quote
+    th: string | null;  // thumbnail URL
+    pd: string | null;  // publishedAt
+  }[];
 }
 
 /** Expanded per-show detail for components */
@@ -156,6 +183,33 @@ export interface ShowDetail {
   theaterAddress: string | null;
   previewsStartDate: string | null;
   cast: { name: string; role: string }[];
+  seatingSections: {
+    name: string;
+    verdict: string;
+    verdictLabel: string;
+    isValuePick: boolean;
+    rationale: string | null;
+    dataPoints: number;
+    rowRange: string | null;
+  }[];
+  venueScores: {
+    sightlines: number | null;
+    sound: number | null;
+    comfort: number | null;
+    ambiance: number | null;
+    facilities: number | null;
+  } | null;
+  videoReviews: {
+    channelName: string | null;
+    handle: string | null;
+    platform: string | null;
+    url: string;
+    score: number | null;
+    bucket: string | null;
+    keyQuote: string | null;
+    thumbnail: string | null;
+    publishedAt: string | null;
+  }[];
 }
 
 /** Convert abbreviated detail to expanded form */
@@ -188,6 +242,33 @@ export function mapShowDetail(raw: MobileShowDetail): ShowDetail {
     theaterAddress: raw.ta ?? null,
     previewsStartDate: raw.pd ?? null,
     cast: (raw.ca ?? []).map(c => ({ name: c.n, role: c.r })),
+    seatingSections: (raw.sg ?? []).map(s => ({
+      name: s.n,
+      verdict: s.v,
+      verdictLabel: s.vl,
+      isValuePick: s.iv,
+      rationale: s.ra,
+      dataPoints: s.dp,
+      rowRange: s.rr,
+    })),
+    venueScores: raw.vs ? {
+      sightlines: raw.vs.sl,
+      sound: raw.vs.so,
+      comfort: raw.vs.co,
+      ambiance: raw.vs.am,
+      facilities: raw.vs.fa,
+    } : null,
+    videoReviews: (raw.vr ?? []).map(v => ({
+      channelName: v.ch,
+      handle: v.hd,
+      platform: v.pl,
+      url: v.u,
+      score: v.s,
+      bucket: v.bk,
+      keyQuote: v.q,
+      thumbnail: v.th,
+      publishedAt: v.pd,
+    })),
   };
 }
 

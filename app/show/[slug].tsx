@@ -12,7 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, Stack, useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { useShows } from '@/lib/data-context';
-import { fetchShowDetail } from '@/lib/api';
+import { fetchShowDetail, fetchSocialPulse } from '@/lib/api';
 import { getImageUrl } from '@/lib/images';
 import { getScoreColor, getScoreTier, getContrastTextColor } from '@/lib/score-utils';
 import { ShowDetail, MobileShowDetail, mapShowDetail } from '@/lib/types';
@@ -30,6 +30,19 @@ import { useAuth } from '@/lib/auth-context';
 import { useWatchlist } from '@/hooks/useWatchlist';
 import { featureFlags } from '@/lib/feature-flags';
 
+interface SocialPulsePayload {
+  _v: number;
+  t: 'Buzzing' | 'Rising' | 'Steady' | 'Troubled' | 'BuildingBaseline' | 'Hidden';
+  v: number;
+  p: number;
+  wow: number | null;
+  pl: { x: number; tt: number; ig: number; r?: number };
+  xv?: number;
+  q: Array<{ t: string; p: string; a: string | null; u: string | null }>;
+  u: string;
+  r?: string;
+}
+
 export default function ShowDetailScreen() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
   const { shows } = useShows();
@@ -39,6 +52,7 @@ export default function ShowDetailScreen() {
   const [detailLoading, setDetailLoading] = useState(true);
   const [showAllReviews, setShowAllReviews] = useState(false);
   const [showAllCast, setShowAllCast] = useState(false);
+  const [socialPulse, setSocialPulse] = useState<SocialPulsePayload | null>(null);
   const shareCardRef = useRef<ShareCardHandle>(null);
 
   const show = useMemo(() => shows.find(s => s.slug === slug), [shows, slug]);
@@ -149,6 +163,19 @@ export default function ShowDetailScreen() {
     })();
     return () => { cancelled = true; };
   }, [show]);
+
+  // Fetch social pulse data
+  useEffect(() => {
+    if (!show) return;
+    let cancelled = false;
+    fetchSocialPulse(show.id).then(raw => {
+      if (!cancelled && raw) {
+        const sp = raw as SocialPulsePayload;
+        if (sp.t !== 'Hidden') setSocialPulse(sp);
+      }
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [show?.id]);
 
   // Track show detail view (once per show load — keyed on id, not object ref)
   useEffect(() => {
@@ -421,6 +448,11 @@ export default function ShowDetailScreen() {
           </View>
         )}
 
+        {/* Social Scorecard */}
+        {socialPulse && (
+          <SocialScorecardSection sp={socialPulse} />
+        )}
+
         {/* Quick facts */}
         <View style={styles.infoSection}>
           {show.runtime && <InfoRow label="Runtime" value={show.runtime} />}
@@ -431,6 +463,16 @@ export default function ShowDetailScreen() {
             <InfoRow label="Theater" value={`${show.venue} · ${detail.theaterAddress}`} />
           )}
         </View>
+
+        {/* Seating Guidance */}
+        {detail?.seatingSections && detail.seatingSections.length > 0 && (
+          <SeatingGuidanceSection sections={detail.seatingSections} />
+        )}
+
+        {/* Theater Scorecard */}
+        {detail?.venueScores && (
+          <TheaterScorecardSection scores={detail.venueScores} venueName={show.venue} />
+        )}
 
         {/* Synopsis */}
         {show.synopsis && (
@@ -478,6 +520,11 @@ export default function ShowDetailScreen() {
           </View>
         )}
 
+
+        {/* Video Reviews */}
+        {detail?.videoReviews && detail.videoReviews.length > 0 && (
+          <VideoReviewsSection reviews={detail.videoReviews} />
+        )}
 
         {/* Other Productions of the same show */}
         {otherProductions.length > 0 && (
@@ -759,6 +806,174 @@ function formatDate(iso: string): string {
   } catch {
     return iso;
   }
+}
+
+// ---------- Social Scorecard ----------
+
+const SOCIAL_TIER_CONFIG = {
+  Buzzing: { label: 'BUZZING', color: '#f97316', subtitle: 'Trending hot right now' },
+  Rising: { label: 'RISING', color: '#10b981', subtitle: 'Picking up momentum' },
+  Steady: { label: 'STEADY', color: '#3b82f6', subtitle: 'Consistent buzz' },
+  Troubled: { label: 'TROUBLED', color: '#ef4444', subtitle: 'Negative chatter outweighs positive' },
+  BuildingBaseline: { label: 'BUILDING', color: '#8b5cf6', subtitle: 'Gathering early buzz' },
+  Hidden: null,
+} as const;
+
+function SocialScorecardSection({ sp }: { sp: SocialPulsePayload }) {
+  const config = SOCIAL_TIER_CONFIG[sp.t];
+  if (!config) return null;
+  const totalMentions = sp.v;
+  const platforms = [
+    { label: 'X / Twitter', count: sp.xv ?? sp.pl.x },
+    { label: 'TikTok', count: sp.pl.tt },
+    { label: 'Instagram', count: sp.pl.ig },
+    ...(sp.pl.r != null ? [{ label: 'Reddit', count: sp.pl.r }] : []),
+  ].filter(p => p.count > 0);
+  const quotes = sp.q.slice(0, 2);
+
+  return (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>Social Scorecard</Text>
+      {/* Tier badge row */}
+      <View style={[styles.socialTierRow, { borderColor: config.color + '40', backgroundColor: config.color + '14' }]}>
+        <View style={[styles.socialTierBadge, { backgroundColor: config.color }]}>
+          <Text style={styles.socialTierLabel}>{config.label}</Text>
+        </View>
+        <View style={styles.socialTierInfo}>
+          <Text style={[styles.socialTierSubtitle, { color: config.color }]}>{config.subtitle}</Text>
+          <Text style={styles.socialMentions}>{totalMentions.toLocaleString()} mentions · {sp.p}% positive</Text>
+          {sp.r && <Text style={styles.socialRank}>{sp.r}</Text>}
+        </View>
+      </View>
+      {/* Platform breakdown */}
+      {platforms.length > 0 && (
+        <View style={styles.socialPlatforms}>
+          {platforms.map((p, i) => (
+            <View key={i} style={styles.socialPlatformChip}>
+              <Text style={styles.socialPlatformLabel}>{p.label}</Text>
+              <Text style={styles.socialPlatformCount}>{p.count.toLocaleString()}</Text>
+            </View>
+          ))}
+        </View>
+      )}
+      {/* Sample quotes */}
+      {quotes.map((q, i) => (
+        <View key={i} style={styles.socialQuote}>
+          <Text style={styles.socialQuoteText} numberOfLines={2}>{'\u201C'}{q.t}{'\u201D'}</Text>
+          {q.a && <Text style={styles.socialQuoteAuthor}>— {q.a} on {q.p}</Text>}
+        </View>
+      ))}
+    </View>
+  );
+}
+
+// ---------- Seating Guidance ----------
+
+const VERDICT_CONFIG: Record<string, { label: string; color: string }> = {
+  'sweet-spot': { label: 'Best Seats', color: '#10b981' },
+  'solid': { label: 'Good Seats', color: '#3b82f6' },
+  'avoid': { label: 'Risky', color: '#ef4444' },
+};
+
+function SeatingGuidanceSection({ sections }: { sections: ShowDetail['seatingSections'] }) {
+  return (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>Seating Guide</Text>
+      {sections.map((s, i) => {
+        const cfg = VERDICT_CONFIG[s.verdict] ?? { label: s.verdictLabel, color: Colors.text.muted };
+        return (
+          <View key={i} style={[styles.seatRow, s.isValuePick && styles.seatRowValuePick]}>
+            <View style={styles.seatRowLeft}>
+              <Text style={styles.seatName} numberOfLines={1}>{s.name}</Text>
+              {s.rowRange && <Text style={styles.seatMeta}>Rows {s.rowRange}</Text>}
+              {s.rationale && <Text style={styles.seatRationale} numberOfLines={2}>{s.rationale}</Text>}
+            </View>
+            <View style={[styles.seatVerdict, { backgroundColor: cfg.color + '20' }]}>
+              <Text style={[styles.seatVerdictText, { color: cfg.color }]}>{cfg.label}</Text>
+              {s.isValuePick && <Text style={[styles.seatValuePick, { color: cfg.color }]}>Value Pick</Text>}
+            </View>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+// ---------- Theater Scorecard ----------
+
+const VENUE_DIMENSIONS = [
+  { key: 'sightlines' as const, label: 'Sightlines' },
+  { key: 'sound' as const, label: 'Sound' },
+  { key: 'comfort' as const, label: 'Comfort' },
+  { key: 'ambiance' as const, label: 'Ambiance' },
+  { key: 'facilities' as const, label: 'Facilities' },
+];
+
+function TheaterScorecardSection({ scores, venueName }: { scores: ShowDetail['venueScores']; venueName: string }) {
+  if (!scores) return null;
+  const dims = VENUE_DIMENSIONS.filter(d => scores[d.key] != null);
+  if (dims.length === 0) return null;
+
+  return (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>Theater Scorecard</Text>
+      <Text style={styles.venueScorecardName}>{venueName}</Text>
+      {dims.map(d => {
+        const score = scores[d.key] as number;
+        const color = score >= 75 ? '#10b981' : score >= 55 ? '#f59e0b' : '#ef4444';
+        return (
+          <View key={d.key} style={styles.venueDimRow}>
+            <Text style={styles.venueDimLabel}>{d.label}</Text>
+            <View style={styles.venueDimBarBg}>
+              <View style={[styles.venueDimBarFill, { width: `${score}%` as any, backgroundColor: color }]} />
+            </View>
+            <Text style={[styles.venueDimScore, { color }]}>{score}</Text>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+// ---------- Video Reviews ----------
+
+function VideoReviewsSection({ reviews }: { reviews: ShowDetail['videoReviews'] }) {
+  return (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>Video Reviews ({reviews.length})</Text>
+      {reviews.map((v, i) => {
+        const bucketColor = v.bucket === 'Rave' || v.bucket === 'Positive' ? '#10b981'
+          : v.bucket === 'Mixed' ? '#f59e0b' : '#ef4444';
+        return (
+          <Pressable
+            key={i}
+            style={({ pressed }) => [styles.videoReviewRow, pressed && styles.pressed]}
+            onPress={() => WebBrowser.openBrowserAsync(v.url)}
+          >
+            {v.thumbnail ? (
+              <Image source={{ uri: v.thumbnail }} style={styles.videoThumb} contentFit="cover" transition={200} />
+            ) : (
+              <View style={[styles.videoThumb, styles.videoThumbPlaceholder]}>
+                <Text style={styles.videoThumbPlaceholderText}>▶</Text>
+              </View>
+            )}
+            <View style={styles.videoInfo}>
+              <Text style={styles.videoCreator} numberOfLines={1}>
+                {v.channelName || v.handle || 'Video Review'}
+              </Text>
+              {v.platform && <Text style={styles.videoPlatform}>{v.platform}</Text>}
+              {v.keyQuote && <Text style={styles.videoQuote} numberOfLines={2}>{'\u201C'}{v.keyQuote}{'\u201D'}</Text>}
+            </View>
+            {v.bucket && (
+              <View style={[styles.videoBucket, { backgroundColor: bucketColor + '20' }]}>
+                <Text style={[styles.videoBucketText, { color: bucketColor }]}>{v.bucket}</Text>
+              </View>
+            )}
+          </Pressable>
+        );
+      })}
+    </View>
+  );
 }
 
 // ===========================================
@@ -1218,5 +1433,227 @@ const styles = StyleSheet.create({
   webLinkText: {
     color: Colors.brand,
     fontSize: FontSize.md,
+  },
+
+  // Social Scorecard
+  socialTierRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    marginBottom: Spacing.sm,
+  },
+  socialTierBadge: {
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  socialTierLabel: {
+    color: '#ffffff',
+    fontSize: FontSize.xs,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  socialTierInfo: {
+    flex: 1,
+  },
+  socialTierSubtitle: {
+    fontSize: FontSize.sm,
+    fontWeight: '600',
+  },
+  socialMentions: {
+    color: Colors.text.secondary,
+    fontSize: FontSize.xs,
+    marginTop: 2,
+  },
+  socialRank: {
+    color: Colors.text.muted,
+    fontSize: FontSize.xs,
+    marginTop: 1,
+  },
+  socialPlatforms: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.sm,
+    marginBottom: Spacing.sm,
+  },
+  socialPlatformChip: {
+    backgroundColor: Colors.surface.raised,
+    borderRadius: 6,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  socialPlatformLabel: {
+    color: Colors.text.secondary,
+    fontSize: FontSize.xs,
+  },
+  socialPlatformCount: {
+    color: Colors.text.primary,
+    fontSize: FontSize.xs,
+    fontWeight: '600',
+  },
+  socialQuote: {
+    backgroundColor: Colors.surface.raised,
+    borderRadius: BorderRadius.sm,
+    padding: Spacing.md,
+    marginBottom: Spacing.sm,
+  },
+  socialQuoteText: {
+    color: Colors.text.secondary,
+    fontSize: FontSize.sm,
+    fontStyle: 'italic',
+    lineHeight: 18,
+  },
+  socialQuoteAuthor: {
+    color: Colors.text.muted,
+    fontSize: FontSize.xs,
+    marginTop: 4,
+  },
+
+  // Seating Guidance
+  seatRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingVertical: Spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border.subtle,
+    gap: Spacing.md,
+  },
+  seatRowValuePick: {
+    backgroundColor: Colors.surface.raised,
+    borderRadius: BorderRadius.sm,
+    paddingHorizontal: Spacing.sm,
+    borderBottomWidth: 0,
+    marginBottom: Spacing.sm,
+  },
+  seatRowLeft: {
+    flex: 1,
+  },
+  seatName: {
+    color: Colors.text.primary,
+    fontSize: FontSize.md,
+    fontWeight: '600',
+  },
+  seatMeta: {
+    color: Colors.text.muted,
+    fontSize: FontSize.xs,
+    marginTop: 2,
+  },
+  seatRationale: {
+    color: Colors.text.secondary,
+    fontSize: FontSize.sm,
+    marginTop: 4,
+    lineHeight: 18,
+  },
+  seatVerdict: {
+    borderRadius: 6,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 4,
+    alignItems: 'center',
+    minWidth: 80,
+  },
+  seatVerdictText: {
+    fontSize: FontSize.xs,
+    fontWeight: '700',
+  },
+  seatValuePick: {
+    fontSize: 10,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+
+  // Theater Scorecard
+  venueScorecardName: {
+    color: Colors.text.secondary,
+    fontSize: FontSize.sm,
+    marginBottom: Spacing.md,
+  },
+  venueDimRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: Spacing.sm,
+    gap: Spacing.md,
+  },
+  venueDimLabel: {
+    color: Colors.text.secondary,
+    fontSize: FontSize.sm,
+    width: 80,
+  },
+  venueDimBarBg: {
+    flex: 1,
+    height: 6,
+    backgroundColor: Colors.surface.raised,
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  venueDimBarFill: {
+    height: '100%',
+    borderRadius: 3,
+  },
+  venueDimScore: {
+    fontSize: FontSize.sm,
+    fontWeight: '700',
+    width: 28,
+    textAlign: 'right',
+  },
+
+  // Video Reviews
+  videoReviewRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingVertical: Spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border.subtle,
+    gap: Spacing.md,
+  },
+  videoThumb: {
+    width: 80,
+    height: 52,
+    borderRadius: BorderRadius.sm,
+    backgroundColor: Colors.surface.raised,
+  },
+  videoThumbPlaceholder: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  videoThumbPlaceholderText: {
+    color: Colors.text.muted,
+    fontSize: FontSize.lg,
+  },
+  videoInfo: {
+    flex: 1,
+  },
+  videoCreator: {
+    color: Colors.text.primary,
+    fontSize: FontSize.sm,
+    fontWeight: '600',
+  },
+  videoPlatform: {
+    color: Colors.text.muted,
+    fontSize: FontSize.xs,
+    marginTop: 2,
+    textTransform: 'capitalize',
+  },
+  videoQuote: {
+    color: Colors.text.secondary,
+    fontSize: FontSize.xs,
+    marginTop: 4,
+    fontStyle: 'italic',
+    lineHeight: 16,
+  },
+  videoBucket: {
+    borderRadius: 6,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 4,
+    alignSelf: 'flex-start',
+  },
+  videoBucketText: {
+    fontSize: FontSize.xs,
+    fontWeight: '700',
   },
 });

@@ -57,3 +57,18 @@ export async function fetchShowDetail(showId: string): Promise<object | null> {
     return getCachedDetail(showId);
   }
 }
+
+/**
+ * Fetch social pulse data for a show from the CDN.
+ * Returns null on 404 or network failure (many shows have no social data).
+ */
+export async function fetchSocialPulse(showId: string): Promise<object | null> {
+  try {
+    const url = `${CDN_BASE}/shows/${encodeURIComponent(showId)}.social.json`;
+    const response = await fetch(url, { headers: { 'Cache-Control': 'no-cache' } });
+    if (!response.ok) return null;
+    return response.json();
+  } catch {
+    return null;
+  }
+}
