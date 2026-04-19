@@ -23,6 +23,8 @@ import { buildTicketUrl, buildTicketEventProps, isAffiliatePlatform, type Ticket
 import Svg, { Path } from 'react-native-svg';
 import ShowPageRating from '@/components/user/ShowPageRating';
 import { BookmarkOverlay } from '@/components/BookmarkOverlay';
+import { IconSymbol } from '@/components/ui/icon-symbol';
+import { ceremonyToYear } from '@/lib/tony-utils';
 import { recordShowView } from '@/lib/store-review';
 import { ShareCardWithRef, ShareCardHandle } from '@/components/ShareCard';
 import { ShowDetailSkeleton } from '@/components/Skeleton';
@@ -306,7 +308,12 @@ export default function ShowDetailScreen() {
 
           {/* Critics' Take consensus paragraph — right below breakdown */}
           {detail?.criticsTake && (
-            <View style={styles.criticsTakeBox}>
+            <View
+              style={[
+                styles.criticsTakeBox,
+                { borderLeftColor: getScoreTier(displayScore)?.color ?? Colors.brand },
+              ]}
+            >
               <Text style={styles.criticsTakeLabel}>Critics&apos; Take</Text>
               <Text style={styles.criticsTakeText}>{detail.criticsTake.text}</Text>
             </View>
@@ -1173,8 +1180,6 @@ function LotteryRushSection({ data }: { data: NonNullable<ShowDetail['lotteryRus
 // ---------- Tony Awards ----------
 
 function TonyAwardsSection({ awards }: { awards: ShowDetail['tonyAwards'] }) {
-  // CDN stores ceremony number (70 = 70th ceremony = 2016). First Tonys were 1947 (ceremony 1).
-  const ceremonyToYear = (n: number) => 1946 + n;
   const wins = awards.filter(a => a.won);
   const noms = awards.filter(a => !a.won);
   return (
@@ -1187,7 +1192,9 @@ function TonyAwardsSection({ awards }: { awards: ShowDetail['tonyAwards'] }) {
           <Text style={styles.tonyGroupLabel}>WINS</Text>
           {wins.map((a, i) => (
             <View key={i} style={styles.tonyRow}>
-              <Text style={styles.tonyWinIcon}>🏆</Text>
+              <View style={styles.tonyIconSlot}>
+                <IconSymbol name="trophy.fill" size={16} color="#FFD700" />
+              </View>
               <View style={styles.tonyInfo}>
                 <Text style={styles.tonyCategory}>{a.category}</Text>
                 {a.name && <Text style={styles.tonyName}>{a.name} · {ceremonyToYear(a.year)}</Text>}
@@ -1202,7 +1209,9 @@ function TonyAwardsSection({ awards }: { awards: ShowDetail['tonyAwards'] }) {
           <Text style={[styles.tonyGroupLabel, { marginTop: wins.length > 0 ? Spacing.md : 0 }]}>NOMINATIONS</Text>
           {noms.map((a, i) => (
             <View key={i} style={styles.tonyRow}>
-              <Text style={styles.tonyNomIcon}>☆</Text>
+              <View style={styles.tonyIconSlot}>
+                <IconSymbol name="star" size={14} color={Colors.text.muted} />
+              </View>
               <View style={styles.tonyInfo}>
                 <Text style={styles.tonyCategory}>{a.category}</Text>
                 {a.name && <Text style={styles.tonyName}>{a.name} · {ceremonyToYear(a.year)}</Text>}
@@ -1237,7 +1246,16 @@ function SocialScorecardSection({ sp }: { sp: SocialPulsePayload }) {
     { label: 'Instagram', count: sp.pl.ig },
     ...(sp.pl.r != null ? [{ label: 'Reddit', count: sp.pl.r }] : []),
   ].filter(p => p.count > 0);
-  const quotes = sp.q.slice(0, 2);
+  const quotes = (sp.q ?? [])
+    .filter(q => {
+      const text = (q.t ?? '').trim();
+      if (text.length < 15) return false;
+      // Drop entries that are pure URLs or mostly link-shortener noise
+      const stripped = text.replace(/https?:\/\/\S+/g, '').trim();
+      if (stripped.length < 10) return false;
+      return true;
+    })
+    .slice(0, 2);
 
   return (
     <View style={styles.section}>
@@ -1265,9 +1283,9 @@ function SocialScorecardSection({ sp }: { sp: SocialPulsePayload }) {
         </View>
       )}
       {/* Sample quotes */}
-      {quotes.map((q, i) => (
+      {quotes.length > 0 && quotes.map((q, i) => (
         <View key={i} style={styles.socialQuote}>
-          <Text style={styles.socialQuoteText} numberOfLines={2}>{'\u201C'}{q.t}{'\u201D'}</Text>
+          <Text style={styles.socialQuoteText} numberOfLines={2}>{'\u201C'}{q.t.trim()}{'\u201D'}</Text>
           {q.a && <Text style={styles.socialQuoteAuthor}>— {q.a} on {q.p}</Text>}
         </View>
       ))}
@@ -1784,18 +1802,20 @@ const styles = StyleSheet.create({
   pressed: {
     opacity: 0.7,
   },
-  // Show all button (reviews, cast)
+  // Show all button (reviews, cast) — filled pill
   showAllButton: {
-    paddingVertical: Spacing.md,
-    alignItems: 'center',
-    marginTop: Spacing.sm,
-    backgroundColor: Colors.surface.raised,
-    borderRadius: BorderRadius.md,
+    alignSelf: 'center',
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.lg,
+    marginTop: Spacing.md,
+    backgroundColor: Colors.brand,
+    borderRadius: 999,
   },
   showAllText: {
-    color: Colors.brand,
+    color: '#0a0a0a',
     fontSize: FontSize.sm,
-    fontWeight: '600',
+    fontWeight: '700',
+    letterSpacing: 0.2,
   },
   // Related shows
   relatedShowRow: {
@@ -2034,16 +2054,11 @@ const styles = StyleSheet.create({
     borderBottomColor: Colors.border.subtle,
     gap: Spacing.sm,
   },
-  tonyWinIcon: {
-    fontSize: 16,
+  tonyIconSlot: {
     width: 24,
-    textAlign: 'center',
-  },
-  tonyNomIcon: {
-    fontSize: 16,
-    width: 24,
-    textAlign: 'center',
-    color: Colors.text.muted,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: 2,
   },
   tonyInfo: {
     flex: 1,
