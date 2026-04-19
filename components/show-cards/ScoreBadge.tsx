@@ -188,8 +188,10 @@ const styles = StyleSheet.create({
     fontVariant: ['tabular-nums'],
   },
   tierLabel: {
-    fontWeight: '600',
+    fontWeight: '700',
     marginBottom: 3,
     textAlign: 'center',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
 });
