@@ -2,12 +2,36 @@
 
 **Context:** v1.0 (build 48) was rejected 2026-03-10 on iPad Air 11-inch (M3) under Guideline 4.2.2 (Design: Minimum Functionality). Reviewer text: "the app only includes links, images, or content aggregated from the Internet with limited or no native functionality... does not sufficiently differ from a web browsing experience."
 
-**Why it got rejected:** At submission, `features: ""` was set in `app.json` — the `userAccounts` feature flag was OFF. My Shows, watchlist, ratings, and lists tabs all showed empty sign-in CTAs. The reviewer saw a browse/search experience against our own CDN data — close to what Apple considers a web wrapper.
+**Why it got rejected:** At submission, `features: ""` was set in `app.json` — the `userAccounts` feature flag was OFF. My Shows, watchlist, ratings, and lists tabs were entirely hidden from the tab bar. The reviewer saw 2 tabs (Home + Browse) — browse-only, looking like a web wrapper.
 
 **What's different now:**
-- `userAccounts` flag is ON → watchlist, diary, ratings, lists, and sharing all visible without sign-in prompts blocking them
+- `userAccounts` flag is ON → 5 tabs visible (Home, Watched, To Watch, Lists, Browse)
+- Apple Sign-In + Google Sign-In + **NEW: Email/password sign-in** wired through the SignInSheet
+- **NEW: Demo reviewer account pre-seeded** with 5 rated shows, 3 watchlist entries, and 1 custom list (see credentials below)
+- Supabase-synced diary, watchlist, and lists
+- Rating system with haptic-feedback star input (0.5-star precision via gesture)
 - Sentry crash reporting live; push notifications registered on launch
-- Tons of native-only features added since March (see below)
+- New native features added since March (non-auth-gated): Tony Awards carousel, NYT Critic's Picks carousel, Theater Seating Guide (interactive), Video Reviews, Social Scorecard, Other Productions section, share-as-image
+
+---
+
+## 🔑 Demo account for App Review
+
+```
+Email:    reviewer@broadwayscorecard.com
+Password: BwayReview2026!
+```
+
+This account is pre-seeded with sample data so the reviewer immediately sees the native personal features in action — no empty states, no waiting for data to save and re-load.
+
+**Reviewer flow (30 seconds):**
+1. On app launch, tap any rating star on a show, OR tap the **Watched / To Watch / Lists** tab
+2. The Sign In sheet appears with three options: Google, Apple, or **"Sign in with email"** (text link below the provider buttons)
+3. Tap **"Sign in with email"** → enter the credentials above
+4. You land in a signed-in state with:
+   - **Watched tab:** 5 rated shows (Death of a Salesman 5★, Titanique 4.5★, CATS: The Jellicle Ball 4.5★, Giant 4★, Chess 3.5★)
+   - **To Watch tab:** 3 watchlist entries (Proof, Every Brilliant Thing, Two Strangers)
+   - **Lists tab:** 1 custom list "Must See This Season" with 3 ranked shows
 
 ---
 
@@ -18,24 +42,35 @@
 
 ## App Review Notes (paste into ASC Version → App Review Information → Notes)
 
-> Broadway Scorecard is a native iOS app built with React Native. It is NOT a web view wrapper and does not embed a browser.
+> Broadway Scorecard is a native iOS app built with React Native (Expo SDK 54). It is NOT a web view wrapper and does not embed a browser. All screens render in native React Native components (FlatList, Pressable, react-native-reanimated).
 >
-> **Native interactivity (not available in a browser):**
-> - **Personal diary & ratings** — users rate shows with a haptic-feedback star rating (0.5-star precision via gesture), adding personal reviews with mood, rewatchability, and notes. Data syncs to their account via Supabase.
-> - **Watchlist** — tap the bookmark icon to save shows to "To Watch"; rated shows auto-move to "Watched." Grid + list view toggle.
-> - **Custom Lists** — users can create and organize shows into personal lists.
-> - **Native search** — fuzzy search with Fuse.js across 700+ shows, haptic-feedback filter pills, market picker (Broadway / Off-Broadway / West End).
-> - **Score cards as shareable images** — tap share to generate a native image and open iOS share sheet.
-> - **Push notifications** — opt-in alerts for new openings, rating prompts.
-> - **Apple Sign-In + Google Sign-In** — native authentication via expo-apple-authentication.
-> - **Sentry crash reporting** — native SDK for production stability.
-> - **Theater seating guide, Social Scorecard, Video Reviews, Tony Awards carousel, NYT Critic's Picks carousel** — all native horizontal carousels with haptic scroll.
+> **🔑 DEMO ACCOUNT (pre-seeded for your convenience):**
+> - Email: reviewer@broadwayscorecard.com
+> - Password: BwayReview2026!
 >
-> **Data source:** Show data is fetched as JSON from our CDN and rendered entirely in native React Native components (FlatList, Pressable, SwiftUI-compatible Animated views). There is no WebView in the app.
+> **HOW TO EXPLORE THE PERSONAL FEATURES (4 steps):**
+> 1. Tap any show's star icon, or tap the Watched / To Watch / Lists tab
+> 2. On the Sign In sheet, tap "Sign in with email" (text link below the Google/Apple buttons)
+> 3. Enter the demo credentials above
+> 4. You'll immediately see 5 rated shows in Watched, 3 shows in To Watch, and a custom ranked list in Lists
 >
-> **Account required?** No — browsing, searching, market switching, and share cards all work without sign-in. Sign-in unlocks personal diary, watchlist, and lists.
+> **WHAT YOU CAN DO AS THE DEMO USER:**
+> - **Watched tab:** 5 pre-rated shows with reviews, sortable by date or rating, grid/list toggle, swipe to delete
+> - **To Watch tab:** 3 saved shows — tap bookmark to remove, or tap a show to rate it (which moves it to Watched)
+> - **Lists tab:** 1 list "Must See This Season" — tap to see 3 ranked entries; add or reorder shows
+> - **Any show detail page:** Tap stars to rate (haptic feedback + 0.5-star gesture precision), tap bookmark to watchlist, tap share to generate a native score card image
 >
-> **Demo account:** Not needed. Create a new account via Apple Sign-In on the device to explore the personal features.
+> **NATIVE FEATURES VISIBLE WITHOUT SIGN-IN (first-launch experience):**
+> - **Home tab:** Featured Carousel, Closing Soon countdown badges, Top Shows, Best Musicals, Best Plays, Tony Winners, NYT Critic's Picks carousel, Other Productions shelf
+> - **Browse tab:** Fuzzy search across 700+ shows (Fuse.js), native filter pills with haptic feedback, market picker toggle (Broadway / Off-Broadway / West End), critic ↔ audience score toggle
+> - **Show detail:** Score breakdown bars, review excerpts, ticket CTAs, Theater Seating Guide (interactive visualization), Video Reviews carousel (native playback), Social Scorecard (Reddit/social sentiment), Cast & Creative, Other Productions of same title
+> - **Share:** Tap share on any show to generate a native score card image and open the iOS share sheet (no sign-in required)
+>
+> **Data source:** Show data is fetched as JSON from our CDN at broadwayscorecard.com/data and rendered entirely in native components. User data (ratings, watchlist, lists) is stored in Supabase. No WebView in the app.
+>
+> **Technical stack:** Expo SDK 54, React Native 0.81, React 19, Supabase Auth, Sentry for crash reporting, expo-notifications for push, expo-apple-authentication + @react-native-google-signin/google-signin for auth, react-native-reanimated for animations, expo-haptics for feedback.
+>
+> **Previous rejection context:** The 2026-03-10 rejection under 4.2.2 was accurate for that submission — a feature flag was disabling the account-based tabs. That flag is now enabled and this build includes the full native experience plus ~15 new features added since then.
 >
 > Support: tom@broadwayscorecard.com
 
@@ -45,23 +80,37 @@
 
 > Hello App Review Team,
 >
-> Thank you for the feedback on Broadway Scorecard. We've addressed the Guideline 4.2.2 concern with this resubmission.
+> Thank you for the feedback on Broadway Scorecard. We understood the concern and this resubmission addresses Guideline 4.2.2 directly.
 >
-> The previous build had a feature flag that disabled our account-based native features (diary, watchlist, lists, ratings). That flag is now enabled. In this build you will see the full native experience:
+> **Native features in this build — immediately visible without any sign-in:**
+> - Native fuzzy search across 700+ shows (Fuse.js), with haptic filter pills and a market picker (Broadway / Off-Broadway / West End)
+> - Home tab shelves: Featured Carousel, Closing Soon with countdown badges, Tony Winners, NYT Critic's Picks carousel, Other Productions
+> - Theater Seating Guide (interactive visualization on each show)
+> - Video Reviews carousel (native video playback)
+> - Social Scorecard (Reddit/social sentiment aggregation)
+> - Native share sheet with generated score card images
+> - Push notifications for show openings (opt-in)
 >
-> 1. **Native star rating with haptic feedback and half-star gesture precision** — users rate shows they've seen; ratings sync to their account and populate a personal Diary tab.
-> 2. **Watchlist** — a persistent bookmark that lives in a "To Watch" tab with grid/list toggle. Moves to "Watched" when rated.
-> 3. **Custom Lists** — users create personal lists like "Must See This Season" and add shows via a native sheet.
-> 4. **Share score cards** — tap share on any show to generate a native image and open the iOS system share sheet.
-> 5. **Push notifications** — opt-in alerts for show openings and rating prompts (expo-notifications).
-> 6. **Apple Sign-In** — native authentication via expo-apple-authentication.
-> 7. **Additional native features since v1.0 submission:** Tony Awards carousel, NYT Critic's Picks carousel, Theater Seating Guide, Social Scorecard, Video Reviews carousel, home screen date subtitles, market picker (Broadway / Off-Broadway / West End).
+> **Personal features — after sign-in (see demo account below):**
+> Haptic-feedback star rating with 0.5-star gesture precision, personal diary (Watched tab), watchlist (To Watch tab with grid/list toggle), custom ranked lists (Lists tab), per-show ratings with notes — all synced to the user's account via Supabase.
 >
-> The app is built with React Native (Expo SDK 54). All screens render in native components — FlatList for lists, Pressable/Haptics for interactions, react-native-reanimated for animations. There is no WebView in the app; show data is fetched as JSON from our CDN and rendered natively.
+> **🔑 Demo account** (pre-seeded with 5 rated shows, 3 watchlist entries, 1 ranked custom list):
+> - Email: reviewer@broadwayscorecard.com
+> - Password: BwayReview2026!
 >
-> Browsing and search work without an account. Sign-in is optional and unlocks the personal features above. To explore the personal features, sign in with Apple on the review device.
+> **4-step reviewer flow:**
+> 1. On any show, tap a star icon, OR tap the Watched / To Watch / Lists tab
+> 2. On the Sign In sheet, tap "Sign in with email" (link below the Google/Apple buttons)
+> 3. Enter the credentials above
+> 4. Explore the pre-seeded personal features — tap a rating to change it, tap bookmark to add/remove from watchlist, tap the list to reorder
 >
-> Please let us know if you need any additional information.
+> **The previous rejection was accurate for that submission.** A feature flag in our app config (`userAccounts`) was disabled, which hid three entire tabs (Watched, To Watch, Lists) from the tab bar. That flag is now enabled, we added email/password sign-in specifically to make App Review smoother, and this build includes many new native features added since March.
+>
+> **Stack:** Expo SDK 54, React Native 0.81, React 19. All screens render in native components (FlatList, Pressable, react-native-reanimated Animated views, expo-haptics). There is no WebView in the app. Show data is fetched as JSON from our CDN and rendered natively. Crash reporting via Sentry.
+>
+> [SCREEN_RECORDING_URL_HERE if you decide to attach one — replace or remove this line]
+>
+> We appreciate your re-review. Please let us know if you would like any additional information.
 >
 > Best regards,
 > Thomas Pryor
@@ -69,38 +118,47 @@
 
 ---
 
-## Recommended version bump
-Currently: `version: "1.0.0"` in app.json. EAS auto-increments the build number, so resubmission at 1.0.0/build 50+ will work. However, given the scope of new features since March, bumping to **1.1.0** makes the change history clearer and gives reviewers a visual cue this is substantially different. Either works for Apple's gate.
+## Version bump
+
+**Recommendation: bump to 1.1.0.** The scope of changes since v1.0 (email sign-in, ~15 new features, feature flag flip) warrants it and gives the reviewer a visible "this is different" signal. Edit `~/BroadwayScorecard-app/app.json` → `"version": "1.1.0"` before the build.
 
 ---
 
-## Ready-to-run commands (when agreement signed)
+## Ready-to-run commands
 
 ```bash
-# 1. Verify agreement cleared
-node -e "$(cat <<'EOF'
-const crypto=require('crypto'),fs=require('fs'),https=require('https');
-const h=Buffer.from('{"alg":"ES256","kid":"7MPPJ2254M","typ":"JWT"}').toString('base64url');
-const p=Buffer.from(JSON.stringify({iss:'2d03cc88-e016-4fb7-8d89-a70a4a912875',iat:Math.floor(Date.now()/1000),exp:Math.floor(Date.now()/1000)+1200,aud:'appstoreconnect-v1'})).toString('base64url');
-const k=crypto.createPrivateKey(fs.readFileSync(process.env.HOME+'/.keys/AuthKey_7MPPJ2254M.p8'));
-const s=crypto.sign(null,Buffer.from(h+'.'+p),{key:k,dsaEncoding:'ieee-p1363'}).toString('base64url');
-https.get({hostname:'api.appstoreconnect.apple.com',path:'/v1/apps/6760090370?fields[apps]=name',headers:{Authorization:'Bearer '+h+'.'+p+'.'+s}},r=>{let d='';r.on('data',c=>d+=c);r.on('end',()=>console.log('Status:',r.statusCode,d.slice(0,200)))});
-EOF
-)"
+# 1. Verify agreement cleared (already done — API returned 200 ✅)
 
-# 2. (Optional) bump version
+# 2. Bump version
 # Edit ~/BroadwayScorecard-app/app.json → "version": "1.1.0"
 
-# 3. Build + auto-submit to TestFlight
+# 3. (Re-run seed script if needed to reset demo account state)
+SUPABASE_SERVICE_ROLE_KEY='<fetch from Supabase dashboard or GH secrets>' \
+  node ~/BroadwayScorecard-app/scripts/seed-reviewer-account.js
+
+# 4. Build + auto-submit to TestFlight
 cd ~/BroadwayScorecard-app
 eas build --platform ios --profile production --non-interactive --auto-submit
 
-# 4. Once TestFlight processes (~15 min), submit to App Review via ASC UI:
-#    - Add build to "iOS App Version 1.0" (or 1.1.0 if bumped)
+# 5. Once TestFlight processes (~15 min), submit to App Review via ASC UI:
+#    - Add build to "iOS App Version 1.1.0"
 #    - Paste App Review Notes (above)
 #    - Submit for Review
 #    - Reply in Resolution Center with text above
 
-# 5. Monitor status via API:
+# 6. Monitor status via API:
 cd ~/Broadwayscore && node scripts/asc-review-status.js
 ```
+
+---
+
+## (Optional) Screen recording
+
+A 60-second screen recording of the demo-account sign-in + rating flow materially strengthens the case. See `screen-recording-script.md` in this directory for the scene-by-scene script.
+
+Workflow:
+1. On your iPhone, open Control Center → long-press Screen Recording → turn on Microphone (if you want narration) or leave off
+2. Tap Record, open Broadway Scorecard, run through the script
+3. Stop recording; open the video in Photos
+4. Share → YouTube → Upload as **Unlisted**
+5. Replace `[SCREEN_RECORDING_URL_HERE]` in the Resolution Center reply above with the YouTube URL
