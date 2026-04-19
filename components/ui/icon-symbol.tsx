@@ -23,6 +23,9 @@ const MAPPING = {
   'gearshape.fill': 'settings',
   'trophy.fill': 'emoji-events',
   'star': 'star-border',
+  'star.fill': 'star',
+  'bookmark.fill': 'bookmark',
+  'list.bullet': 'format-list-bulleted',
 } as IconMapping;
 
 /**
