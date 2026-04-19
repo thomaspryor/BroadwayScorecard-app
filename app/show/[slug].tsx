@@ -242,16 +242,17 @@ export default function ShowDetailScreen() {
                 <ProductionPill isRevival={show.isRevival} />
                 <StatusBadge status={show.status} />
                 <CategoryBadge category={show.category} />
+                {show.openingDate && (
+                  <View style={styles.dateChip}>
+                    <Text style={styles.dateChipText} numberOfLines={1}>
+                      {show.status === 'previews' ? 'Opens' : 'Opened'} {formatDateShort(show.openingDate)}
+                    </Text>
+                  </View>
+                )}
               </View>
               <Text style={styles.title} numberOfLines={2}>{show.title}</Text>
               <Text style={styles.meta} numberOfLines={1}>{show.venue}</Text>
               {show.runtime && <Text style={styles.meta} numberOfLines={1}>{show.runtime}</Text>}
-              {show.openingDate && (
-                <Text style={styles.meta} numberOfLines={1}>
-                  {show.status === 'closed' ? 'Opened' : show.status === 'previews' ? 'Opens' : 'Opened'}{' '}
-                  {formatDate(show.openingDate)}
-                </Text>
-              )}
               {show.closingDate && (
                 <Text style={styles.meta} numberOfLines={1}>
                   {show.status === 'closed' ? 'Closed' : 'Closes'} {formatDate(show.closingDate)}
@@ -340,40 +341,6 @@ export default function ShowDetailScreen() {
 
           />
         </View>
-
-        {/* Critic Reviews List — collapsed by default */}
-        {detail?.reviews && detail.reviews.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>
-              Critic Reviews ({detail.reviews.length})
-            </Text>
-            {(showAllReviews ? detail.reviews : detail.reviews.slice(0, 3)).map((review, i) => (
-              <ReviewRow key={i} review={review} showId={show.id} />
-            ))}
-            {!showAllReviews && detail.reviews.length > 3 && (
-              <Pressable
-                style={({ pressed }) => [styles.showAllButton, pressed && styles.pressed]}
-                onPress={() => setShowAllReviews(true)}
-              >
-                <Text style={styles.showAllText}>
-                  Show all {detail.reviews.length} reviews
-                </Text>
-              </Pressable>
-            )}
-          </View>
-        )}
-
-        {/* Loading skeleton for detail */}
-        {detailLoading && (
-          <ShowDetailSkeleton />
-        )}
-
-        {/* Offline notice when detail fetch failed */}
-        {!detailLoading && !detail && (
-          <View style={styles.detailLoading}>
-            <Text style={styles.detailLoadingText}>Reviews unavailable offline</Text>
-          </View>
-        )}
 
         {/* Audience Scorecard — grade badge header + horizontal source cards */}
         {detail?.audience && show.audienceGrade && (
@@ -532,6 +499,40 @@ export default function ShowDetailScreen() {
                 )}
               </ScrollView>
             )}
+          </View>
+        )}
+
+        {/* Critic Reviews List — collapsed by default */}
+        {detail?.reviews && detail.reviews.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>
+              Critic Reviews ({detail.reviews.length})
+            </Text>
+            {(showAllReviews ? detail.reviews : detail.reviews.slice(0, 3)).map((review, i) => (
+              <ReviewRow key={i} review={review} showId={show.id} />
+            ))}
+            {!showAllReviews && detail.reviews.length > 3 && (
+              <Pressable
+                style={({ pressed }) => [styles.showAllButton, pressed && styles.pressed]}
+                onPress={() => setShowAllReviews(true)}
+              >
+                <Text style={styles.showAllText}>
+                  Show all {detail.reviews.length} reviews
+                </Text>
+              </Pressable>
+            )}
+          </View>
+        )}
+
+        {/* Loading skeleton for detail */}
+        {detailLoading && (
+          <ShowDetailSkeleton />
+        )}
+
+        {/* Offline notice when detail fetch failed */}
+        {!detailLoading && !detail && (
+          <View style={styles.detailLoading}>
+            <Text style={styles.detailLoadingText}>Reviews unavailable offline</Text>
           </View>
         )}
 
@@ -953,6 +954,20 @@ function formatDate(iso: string): string {
   }
 }
 
+function formatDateShort(iso: string): string {
+  try {
+    const d = new Date(iso + 'T12:00:00');
+    const sameYear = d.getFullYear() === new Date().getFullYear();
+    return d.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      ...(sameYear ? {} : { year: 'numeric' }),
+    });
+  } catch {
+    return iso;
+  }
+}
+
 // ---------- Showtimes ----------
 
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -979,19 +994,45 @@ function formatWeekRange(wkKey: string): string {
   } catch { return ''; }
 }
 
+function getWeekContext(wkKey: string): { todayIndex: number; isPastWeek: boolean } {
+  if (!wkKey || wkKey.length !== 8) return { todayIndex: -1, isPastWeek: false };
+  try {
+    const y = parseInt(wkKey.slice(0, 4), 10);
+    const m = parseInt(wkKey.slice(4, 6), 10);
+    const d = parseInt(wkKey.slice(6, 8), 10);
+    const weekStart = new Date(y, m - 1, d);
+    weekStart.setHours(0, 0, 0, 0);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const diffDays = Math.round((today.getTime() - weekStart.getTime()) / (24 * 60 * 60 * 1000));
+    return {
+      todayIndex: diffDays >= 0 && diffDays < 7 ? diffDays : -1,
+      isPastWeek: diffDays >= 7,
+    };
+  } catch { return { todayIndex: -1, isPastWeek: false }; }
+}
+
 function ShowtimesSection({ data }: { data: NonNullable<ShowDetail['showtimes']> }) {
   const range = formatWeekRange(data.week);
+  const { todayIndex, isPastWeek } = getWeekContext(data.week);
+  const rangeLabel = isPastWeek ? 'Last Week' : 'This Week';
   return (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>Showtimes</Text>
-      {range && <Text style={styles.showtimesRange}>This Week ({range})</Text>}
+      {range && <Text style={styles.showtimesRange}>{rangeLabel} ({range})</Text>}
       <View style={styles.showtimesGrid}>
         {data.days.slice(0, 7).map((day, i) => {
           const hasShow = day.matinee || day.evening;
+          const isToday = i === todayIndex;
+          const isPast = todayIndex >= 0 && i < todayIndex;
           return (
-            <View key={i} style={styles.showtimesRow}>
-              <Text style={[styles.showtimesDay, !hasShow && styles.showtimesDayEmpty]}>{DAY_LABELS[i]}</Text>
-              <Text style={styles.showtimesTimes}>
+            <View key={i} style={[styles.showtimesRow, isPast && styles.showtimesRowPast]}>
+              <Text style={[
+                styles.showtimesDay,
+                !hasShow && styles.showtimesDayEmpty,
+                isToday && styles.showtimesDayToday,
+              ]}>{DAY_LABELS[i]}{isToday ? ' • TODAY' : ''}</Text>
+              <Text style={[styles.showtimesTimes, isToday && styles.showtimesTimesToday]}>
                 {day.matinee && <Text>{to12Hour(day.matinee)}</Text>}
                 {day.matinee && day.evening && <Text style={styles.showtimesDot}>  ·  </Text>}
                 {day.evening && <Text>{to12Hour(day.evening)}</Text>}
@@ -1478,6 +1519,20 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: Spacing.xs,
     marginBottom: 4,
+    alignItems: 'center',
+  },
+  dateChip: {
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 3,
+    borderRadius: BorderRadius.pill,
+    backgroundColor: Colors.surface.overlay,
+    borderWidth: 1,
+    borderColor: Colors.border.subtle,
+  },
+  dateChipText: {
+    fontSize: FontSize.xs,
+    fontWeight: '600',
+    color: Colors.text.secondary,
   },
 
   // Breakdown bar
@@ -1857,19 +1912,29 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: Colors.border.subtle,
   },
+  showtimesRowPast: {
+    opacity: 0.4,
+  },
   showtimesDay: {
     color: Colors.text.primary,
     fontSize: FontSize.sm,
     fontWeight: '700',
-    width: 44,
+    width: 100,
   },
   showtimesDayEmpty: {
     color: Colors.text.muted,
+  },
+  showtimesDayToday: {
+    color: Colors.score.teal,
   },
   showtimesTimes: {
     color: Colors.text.secondary,
     fontSize: FontSize.sm,
     flex: 1,
+  },
+  showtimesTimesToday: {
+    color: Colors.score.teal,
+    fontWeight: '700',
   },
   showtimesDot: {
     color: Colors.text.muted,
