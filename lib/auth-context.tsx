@@ -51,6 +51,7 @@ interface AuthContextValue {
   isAuthenticated: boolean;
   signInWithApple: () => Promise<void>;
   signInWithGoogle: () => Promise<void>;
+  signInWithEmail: (email: string, password: string) => Promise<{ error?: string } | void>;
   signOut: () => Promise<void>;
   /** Show sign-in sheet with context */
   showSignIn: (context?: SignInContext) => void;
@@ -67,7 +68,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [sheetContext, setSheetContext] = useState<SignInContext>('generic');
   const [signInLoading, setSignInLoading] = useState(false);
-  const [signInProvider, setSignInProvider] = useState<'google' | 'apple' | null>(null);
+  const [signInProvider, setSignInProvider] = useState<'google' | 'apple' | 'email' | null>(null);
 
   // ─── Initialize auth state ───────────────────────────────
   useEffect(() => {
@@ -260,6 +261,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  // ─── Email/Password Sign In ──────────────────────────────
+  // Shipped in production primarily to give App Review reviewers
+  // a bulletproof demo-account path that doesn't depend on their
+  // device's Apple ID or Google account.
+  const signInWithEmail = useCallback(
+    async (email: string, password: string): Promise<{ error?: string } | void> => {
+      const client = getSupabaseClient();
+      if (!client) {
+        return { error: 'Unable to connect to the server. Please try again.' };
+      }
+      try {
+        setSignInLoading(true);
+        setSignInProvider('email');
+        trackSignInStarted('email');
+        const { error } = await client.auth.signInWithPassword({ email, password });
+        if (error) {
+          setSignInLoading(false);
+          setSignInProvider(null);
+          return { error: error.message || 'Invalid email or password' };
+        }
+        // onAuthStateChange handles the rest
+      } catch (e) {
+        setSignInLoading(false);
+        setSignInProvider(null);
+        console.error('[Auth] Email sign-in failed:', e);
+        return { error: e instanceof Error ? e.message : 'Sign-in failed. Please try again.' };
+      }
+    },
+    [],
+  );
+
   // ─── Dev Sign In (simulator testing only) ───────────────
   const devSignIn = useCallback(async () => {
     if (!__DEV__) return;
@@ -335,6 +367,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [signInWithApple, signInWithGoogle],
   );
 
+  const handleSheetEmailSignIn = useCallback(
+    async (email: string, password: string) => {
+      const result = await signInWithEmail(email, password);
+      if (result && 'error' in result && !result.error) {
+        // Success — close the sheet
+        setSheetOpen(false);
+      }
+      return result;
+    },
+    [signInWithEmail],
+  );
+
   return (
     <AuthContext.Provider
       value={{
@@ -344,6 +388,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isAuthenticated: !!user,
         signInWithApple,
         signInWithGoogle,
+        signInWithEmail,
         signOut,
         showSignIn,
         devSignIn,
@@ -354,6 +399,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         visible={sheetOpen}
         onClose={() => setSheetOpen(false)}
         onSignIn={handleSheetSignIn}
+        onEmailSignIn={handleSheetEmailSignIn}
         onDevSignIn={__DEV__ ? devSignIn : undefined}
         context={sheetContext}
         loading={signInLoading}
@@ -370,6 +416,7 @@ const DEFAULT_AUTH: AuthContextValue = {
   isAuthenticated: false,
   signInWithApple: async () => {},
   signInWithGoogle: async () => {},
+  signInWithEmail: async () => {},
   signOut: async () => {},
   showSignIn: () => {},
   devSignIn: async () => {},

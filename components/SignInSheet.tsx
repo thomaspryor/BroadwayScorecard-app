@@ -4,11 +4,25 @@
  * Context-aware headlines: adapts message based on what triggered it
  * (rating, watchlist, or generic sign-in).
  *
+ * Offers Google + Apple as primary providers and an Email fallback for
+ * App Review and users who prefer password-based sign-in.
+ *
  * Uses RN Modal with iOS pageSheet presentation for native bottom sheet feel.
  */
 
-import React from 'react';
-import { View, Text, Modal, Pressable, StyleSheet, ActivityIndicator, Platform } from 'react-native';
+import React, { useState } from 'react';
+import {
+  View,
+  Text,
+  Modal,
+  Pressable,
+  StyleSheet,
+  ActivityIndicator,
+  Platform,
+  TextInput,
+  KeyboardAvoidingView,
+  ScrollView,
+} from 'react-native';
 import * as Haptics from 'expo-haptics';
 import Svg, { Path } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -20,10 +34,11 @@ interface SignInSheetProps {
   visible: boolean;
   onClose: () => void;
   onSignIn: (provider: 'google' | 'apple') => void;
+  onEmailSignIn?: (email: string, password: string) => Promise<{ error?: string } | void>;
   onDevSignIn?: () => void;
   context?: SignInContext;
   loading?: boolean;
-  loadingProvider?: 'google' | 'apple' | null;
+  loadingProvider?: 'google' | 'apple' | 'email' | null;
 }
 
 const HEADLINES: Record<SignInContext, string> = {
@@ -44,12 +59,17 @@ export default function SignInSheet({
   visible,
   onClose,
   onSignIn,
+  onEmailSignIn,
   onDevSignIn,
   context = 'generic',
   loading = false,
   loadingProvider = null,
 }: SignInSheetProps) {
   const insets = useSafeAreaInsets();
+  const [showEmailForm, setShowEmailForm] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [emailError, setEmailError] = useState<string | null>(null);
 
   const handlePress = (provider: 'google' | 'apple') => {
     if (Platform.OS === 'ios') {
@@ -58,87 +78,181 @@ export default function SignInSheet({
     onSignIn(provider);
   };
 
+  const handleEmailSubmit = async () => {
+    if (!onEmailSignIn) return;
+    if (!email.trim() || !password) {
+      setEmailError('Email and password required');
+      return;
+    }
+    setEmailError(null);
+    if (Platform.OS === 'ios') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    }
+    const result = await onEmailSignIn(email.trim(), password);
+    if (result && 'error' in result && result.error) {
+      setEmailError(result.error);
+    }
+  };
+
+  const handleClose = () => {
+    // Reset email form state on close
+    setShowEmailForm(false);
+    setEmail('');
+    setPassword('');
+    setEmailError(null);
+    onClose();
+  };
+
   return (
     <Modal
       visible={visible}
-      onRequestClose={onClose}
+      onRequestClose={handleClose}
       animationType="slide"
       presentationStyle="pageSheet"
       transparent={false}
     >
-      <View style={[styles.container, { paddingBottom: Math.max(insets.bottom, Spacing.xl) }]}>
-        {/* Handle indicator */}
-        <View style={styles.handleRow}>
-          <View style={styles.handle} />
-        </View>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={styles.flex}
+      >
+        <ScrollView
+          contentContainerStyle={[styles.container, { paddingBottom: Math.max(insets.bottom, Spacing.xl) }]}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Handle indicator */}
+          <View style={styles.handleRow}>
+            <View style={styles.handle} />
+          </View>
 
-        {/* Close button */}
-        <Pressable style={styles.closeButton} onPress={onClose} hitSlop={12}>
-          <Text style={styles.closeText}>Cancel</Text>
-        </Pressable>
-
-        {/* Logo */}
-        <View style={styles.logoRow}>
-          <Text style={styles.logoText}>
-            Broadway <Text style={styles.logoAccent}>Scorecard</Text>
-          </Text>
-        </View>
-
-        {/* Headline */}
-        <Text style={styles.headline}>{HEADLINES[context]}</Text>
-        <Text style={styles.subtext}>{SUBTEXTS[context]}</Text>
-
-        {/* Sign-in buttons */}
-        <View style={styles.buttonsContainer}>
-          {/* Google */}
+          {/* Close / Back button */}
           <Pressable
-            style={({ pressed }) => [styles.googleButton, pressed && styles.buttonPressed]}
-            onPress={() => handlePress('google')}
-            disabled={loading}
+            style={styles.closeButton}
+            onPress={showEmailForm ? () => setShowEmailForm(false) : handleClose}
+            hitSlop={12}
           >
-            {loadingProvider === 'google' ? (
-              <ActivityIndicator size="small" color="#333" />
-            ) : (
-              <>
-                <GoogleLogo />
-                <Text style={styles.googleText}>Continue with Google</Text>
-              </>
-            )}
+            <Text style={styles.closeText}>{showEmailForm ? 'Back' : 'Cancel'}</Text>
           </Pressable>
 
-          {/* Apple */}
-          <Pressable
-            style={({ pressed }) => [styles.appleButton, pressed && styles.buttonPressed]}
-            onPress={() => handlePress('apple')}
-            disabled={loading}
-          >
-            {loadingProvider === 'apple' ? (
-              <ActivityIndicator size="small" color="#fff" />
-            ) : (
-              <>
-                <AppleLogo />
-                <Text style={styles.appleText}>Continue with Apple</Text>
-              </>
-            )}
-          </Pressable>
+          {/* Logo */}
+          <View style={styles.logoRow}>
+            <Text style={styles.logoText}>
+              Broadway <Text style={styles.logoAccent}>Scorecard</Text>
+            </Text>
+          </View>
 
-          {/* Dev-only sign-in for simulator testing */}
-          {__DEV__ && onDevSignIn && (
-            <Pressable
-              style={({ pressed }) => [styles.devButton, pressed && styles.buttonPressed]}
-              onPress={onDevSignIn}
-              disabled={loading}
-            >
-              <Text style={styles.devText}>Dev Sign In (Simulator)</Text>
-            </Pressable>
+          {/* Headline */}
+          <Text style={styles.headline}>{HEADLINES[context]}</Text>
+          <Text style={styles.subtext}>{SUBTEXTS[context]}</Text>
+
+          {showEmailForm ? (
+            /* Email form */
+            <View style={styles.buttonsContainer}>
+              <TextInput
+                style={styles.textInput}
+                placeholder="Email"
+                placeholderTextColor={Colors.text.muted}
+                value={email}
+                onChangeText={setEmail}
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="email-address"
+                textContentType="emailAddress"
+                autoComplete="email"
+                returnKeyType="next"
+                editable={!loading}
+              />
+              <TextInput
+                style={styles.textInput}
+                placeholder="Password"
+                placeholderTextColor={Colors.text.muted}
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry
+                textContentType="password"
+                autoComplete="password"
+                returnKeyType="go"
+                onSubmitEditing={handleEmailSubmit}
+                editable={!loading}
+              />
+              {emailError && <Text style={styles.errorText}>{emailError}</Text>}
+              <Pressable
+                style={({ pressed }) => [styles.submitButton, pressed && styles.buttonPressed]}
+                onPress={handleEmailSubmit}
+                disabled={loading}
+              >
+                {loadingProvider === 'email' ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={styles.submitText}>Sign In</Text>
+                )}
+              </Pressable>
+            </View>
+          ) : (
+            /* Provider buttons */
+            <View style={styles.buttonsContainer}>
+              {/* Google */}
+              <Pressable
+                style={({ pressed }) => [styles.googleButton, pressed && styles.buttonPressed]}
+                onPress={() => handlePress('google')}
+                disabled={loading}
+              >
+                {loadingProvider === 'google' ? (
+                  <ActivityIndicator size="small" color="#333" />
+                ) : (
+                  <>
+                    <GoogleLogo />
+                    <Text style={styles.googleText}>Continue with Google</Text>
+                  </>
+                )}
+              </Pressable>
+
+              {/* Apple */}
+              <Pressable
+                style={({ pressed }) => [styles.appleButton, pressed && styles.buttonPressed]}
+                onPress={() => handlePress('apple')}
+                disabled={loading}
+              >
+                {loadingProvider === 'apple' ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <>
+                    <AppleLogo />
+                    <Text style={styles.appleText}>Continue with Apple</Text>
+                  </>
+                )}
+              </Pressable>
+
+              {/* Email sign-in (secondary, for App Review + password users) */}
+              {onEmailSignIn && (
+                <Pressable
+                  style={({ pressed }) => [styles.emailLinkButton, pressed && styles.buttonPressed]}
+                  onPress={() => setShowEmailForm(true)}
+                  disabled={loading}
+                >
+                  <Text style={styles.emailLinkText}>Sign in with email</Text>
+                </Pressable>
+              )}
+
+              {/* Dev-only sign-in for simulator testing */}
+              {__DEV__ && onDevSignIn && (
+                <Pressable
+                  style={({ pressed }) => [styles.devButton, pressed && styles.buttonPressed]}
+                  onPress={onDevSignIn}
+                  disabled={loading}
+                >
+                  <Text style={styles.devText}>Dev Sign In (Simulator)</Text>
+                </Pressable>
+              )}
+            </View>
           )}
-        </View>
 
-        {/* Footer */}
-        <Text style={styles.footer}>
-          By signing in, you agree to our Terms of Service and Privacy Policy.
-        </Text>
-      </View>
+          {/* Footer */}
+          <Text style={styles.footer}>
+            By signing in, you agree to our Terms of Service and Privacy Policy.
+          </Text>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -179,8 +293,9 @@ function AppleLogo() {
 // ─── Styles ────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
+  flex: { flex: 1, backgroundColor: Colors.surface.default },
   container: {
-    flex: 1,
+    flexGrow: 1,
     backgroundColor: Colors.surface.default,
     paddingHorizontal: Spacing.xl,
     justifyContent: 'center',
@@ -266,6 +381,47 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: FontSize.md,
     fontWeight: '600',
+  },
+  emailLinkButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+  },
+  emailLinkText: {
+    color: Colors.text.secondary,
+    fontSize: FontSize.sm,
+    fontWeight: '500',
+    textDecorationLine: 'underline',
+  },
+  textInput: {
+    backgroundColor: Colors.surface.overlay,
+    borderRadius: BorderRadius.md,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 14,
+    color: Colors.text.primary,
+    fontSize: FontSize.md,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  submitButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    backgroundColor: Colors.brand,
+    borderRadius: BorderRadius.md,
+    marginTop: Spacing.sm,
+  },
+  submitText: {
+    color: '#fff',
+    fontSize: FontSize.md,
+    fontWeight: '600',
+  },
+  errorText: {
+    color: '#ef4444',
+    fontSize: FontSize.sm,
+    textAlign: 'center',
+    marginTop: Spacing.xs,
   },
   devButton: {
     flexDirection: 'row',
