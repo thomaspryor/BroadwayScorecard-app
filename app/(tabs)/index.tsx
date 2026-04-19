@@ -74,6 +74,10 @@ export default function HomeScreen() {
     ).sort(byScore).slice(0, 10);
     if (recent.length >= 3) rows.push({ title: 'Top Recent Shows', shows: recent });
 
+    // NYT Critic's Picks
+    const nytPicks = marketShows.filter(s => isOpen(s) && s.tags.includes('nyt-pick')).sort(byScore).slice(0, 10);
+    if (nytPicks.length >= 2) rows.push({ title: "New York Times Critic's Picks", shows: nytPicks });
+
     // Best Musicals
     const musicals = marketShows.filter(s => isOpen(s) && s.type === 'musical' && s.compositeScore != null).sort(byScore).slice(0, 10);
     if (musicals.length >= 3) rows.push({ title: 'Best Musicals', shows: musicals });

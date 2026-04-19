@@ -45,6 +45,14 @@ export default function ShowDetailScreen() {
   const { user, isAuthenticated, showSignIn } = useAuth();
   const { isWatchlisted, addToWatchlist, removeFromWatchlist } = useWatchlist(user?.id || null);
 
+  // Other Productions: same title, different ID (any status)
+  const otherProductions = useMemo(() => {
+    if (!show) return [];
+    return shows
+      .filter(s => s.id !== show.id && s.title === show.title)
+      .sort((a, b) => (b.openingDate ?? '').localeCompare(a.openingDate ?? ''));
+  }, [show, shows]);
+
   // Related shows: same type, similar score, currently open
   const relatedShows = useMemo(() => {
     if (!show) return [];
@@ -470,6 +478,46 @@ export default function ShowDetailScreen() {
           </View>
         )}
 
+
+        {/* Other Productions of the same show */}
+        {otherProductions.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Other Productions of {show.title}</Text>
+            {otherProductions.map(prod => {
+              const prodPoster = getImageUrl(prod.images.poster) || getImageUrl(prod.images.thumbnail);
+              const marketLabel = prod.category === 'west-end' ? 'West End'
+                : prod.category === 'off-broadway' ? 'Off-Broadway'
+                : 'Broadway';
+              const openYear = prod.openingDate ? new Date(prod.openingDate + 'T12:00:00').getFullYear() : null;
+              const closeYear = prod.closingDate ? new Date(prod.closingDate + 'T12:00:00').getFullYear() : null;
+              const yearRange = openYear
+                ? (closeYear && closeYear !== openYear ? `${openYear}–${String(closeYear).slice(-2)}` : String(openYear))
+                : null;
+              const subtitle = [marketLabel, yearRange].filter(Boolean).join(' · ');
+              const subtitleColor = prod.status === 'open' || prod.status === 'previews' ? Colors.score.teal : Colors.text.muted;
+              return (
+                <Pressable
+                  key={prod.id}
+                  style={({ pressed }) => [styles.relatedShowRow, pressed && styles.pressed]}
+                  onPress={() => router.push(`/show/${prod.slug}`)}
+                >
+                  {prodPoster ? (
+                    <Image source={{ uri: prodPoster }} style={styles.relatedShowImage} contentFit="cover" transition={200} />
+                  ) : (
+                    <View style={[styles.relatedShowImage, styles.relatedShowPlaceholder]}>
+                      <Text style={styles.relatedShowPlaceholderText}>{prod.title.charAt(0)}</Text>
+                    </View>
+                  )}
+                  <View style={styles.relatedShowInfo}>
+                    <Text style={styles.relatedShowTitle} numberOfLines={1}>{prod.title}</Text>
+                    <Text style={[styles.relatedShowVenue, { color: subtitleColor }]} numberOfLines={1}>{subtitle}</Text>
+                  </View>
+                  <ScoreBadge score={prod.compositeScore} size="small" />
+                </Pressable>
+              );
+            })}
+          </View>
+        )}
 
         {/* Related Shows — with poster thumbnails */}
         {relatedShows.length > 0 && (
