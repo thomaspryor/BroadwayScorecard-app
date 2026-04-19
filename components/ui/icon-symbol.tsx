@@ -21,6 +21,8 @@ const MAPPING = {
   'square.grid.2x2': 'grid-view',
   'magnifyingglass': 'search',
   'gearshape.fill': 'settings',
+  'trophy.fill': 'emoji-events',
+  'star': 'star-border',
 } as IconMapping;
 
 /**

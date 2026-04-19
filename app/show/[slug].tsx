@@ -1210,7 +1210,7 @@ function TonyAwardsSection({ awards }: { awards: ShowDetail['tonyAwards'] }) {
           {noms.map((a, i) => (
             <View key={i} style={styles.tonyRow}>
               <View style={styles.tonyIconSlot}>
-                <IconSymbol name="star" size={14} color={Colors.text.muted} />
+                <IconSymbol name="star" size={16} color={Colors.text.muted} />
               </View>
               <View style={styles.tonyInfo}>
                 <Text style={styles.tonyCategory}>{a.category}</Text>
@@ -1249,8 +1249,8 @@ function SocialScorecardSection({ sp }: { sp: SocialPulsePayload }) {
   const quotes = (sp.q ?? [])
     .filter(q => {
       const text = (q.t ?? '').trim();
-      if (text.length < 15) return false;
-      // Drop entries that are pure URLs or mostly link-shortener noise
+      // Drop entries that are pure URLs or mostly link-shortener noise — keep
+      // short reactions like "Masterpiece!" that theatergoers actually post.
       const stripped = text.replace(/https?:\/\/\S+/g, '').trim();
       if (stripped.length < 10) return false;
       return true;
