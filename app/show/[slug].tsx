@@ -297,9 +297,9 @@ export default function ShowDetailScreen() {
           </View>
 
           {/* Score Breakdown Bar — right under score row */}
-          {detail?.breakdown && hasEnoughReviews && (
+          {detail?.reviews && detail.reviews.length > 0 && hasEnoughReviews && (
             <View style={styles.breakdownSection}>
-              <BreakdownBar breakdown={detail.breakdown} />
+              <BreakdownBar reviews={detail.reviews} />
             </View>
           )}
 
@@ -370,7 +370,7 @@ export default function ShowDetailScreen() {
         {/* Audience Scorecard — grade badge header + horizontal source cards */}
         {detail?.audience && show.audienceGrade && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Audience Scorecard</Text>
+            <Text style={styles.sectionTitle}>Audience Grade</Text>
             {/* Grade badge header card */}
             <View style={[styles.audienceHeader, { borderColor: show.audienceGrade.color + '40' }]}>
               <View style={[styles.audienceGradeBadge, { backgroundColor: show.audienceGrade.color }]}>
@@ -432,40 +432,6 @@ export default function ShowDetailScreen() {
                     </Text>
                   </View>
                 )}
-                {detail.audience.sources.reddit && (
-                  <View style={styles.audienceSourceCard}>
-                    <View style={styles.audienceSourceHeader}>
-                      <Svg width={14} height={14} viewBox="0 0 24 24" fill="#fb923c">
-                        <Path d="M12 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0zm5.01 4.744c.688 0 1.25.561 1.25 1.249a1.25 1.25 0 0 1-2.498.056l-2.597-.547-.8 3.747c1.824.07 3.48.632 4.674 1.488.308-.309.73-.491 1.207-.491.968 0 1.754.786 1.754 1.754 0 .716-.435 1.333-1.01 1.614a3.111 3.111 0 0 1 .042.52c0 2.694-3.13 4.87-7.004 4.87-3.874 0-7.004-2.176-7.004-4.87 0-.183.015-.366.043-.534A1.748 1.748 0 0 1 4.028 12c0-.968.786-1.754 1.754-1.754.463 0 .898.196 1.207.49 1.207-.883 2.878-1.43 4.744-1.487l.885-4.182a.342.342 0 0 1 .14-.197.35.35 0 0 1 .238-.042l2.906.617a1.214 1.214 0 0 1 1.108-.701zM9.25 12C8.561 12 8 12.562 8 13.25c0 .687.561 1.248 1.25 1.248.687 0 1.248-.561 1.248-1.249 0-.688-.561-1.249-1.249-1.249zm5.5 0c-.687 0-1.248.561-1.248 1.25 0 .687.561 1.248 1.249 1.248.688 0 1.249-.561 1.249-1.249 0-.687-.562-1.249-1.25-1.249zm-5.466 3.99a.327.327 0 0 0-.231.094.33.33 0 0 0 0 .463c.842.842 2.484.913 2.961.913.477 0 2.105-.056 2.961-.913a.361.361 0 0 0 .029-.463.33.33 0 0 0-.464 0c-.547.533-1.684.73-2.512.73-.828 0-1.979-.196-2.512-.73a.326.326 0 0 0-.232-.095z" />
-                      </Svg>
-                      <Text style={styles.audienceSourceLabel}>REDDIT</Text>
-                    </View>
-                    <Text style={styles.audienceSourceValue}>
-                      {detail.audience.sources.reddit.score}%
-                    </Text>
-                    <Text style={styles.audienceSourceMeta}>
-                      {detail.audience.sources.reddit.totalPosts} posts
-                    </Text>
-                  </View>
-                )}
-                {detail.audience.sources.broadwayCom && (
-                  <View style={styles.audienceSourceCard}>
-                    <View style={styles.audienceSourceHeader}>
-                      <Svg width={14} height={14} viewBox="0 0 24 24" fill="#60a5fa">
-                        <Path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z" />
-                      </Svg>
-                      <Text style={styles.audienceSourceLabel}>BROADWAY.COM</Text>
-                    </View>
-                    <Text style={styles.audienceSourceValue}>
-                      {detail.audience.sources.broadwayCom.starRating != null
-                        ? `${detail.audience.sources.broadwayCom.starRating}/5`
-                        : `${detail.audience.sources.broadwayCom.score}%`}
-                    </Text>
-                    <Text style={styles.audienceSourceMeta}>
-                      {detail.audience.sources.broadwayCom.count} reviews
-                    </Text>
-                  </View>
-                )}
                 {detail.audience.sources.theatr && (
                   <View style={styles.audienceSourceCard}>
                     <View style={styles.audienceSourceHeader}>
@@ -478,7 +444,41 @@ export default function ShowDetailScreen() {
                       {detail.audience.sources.theatr.score}%
                     </Text>
                     <Text style={styles.audienceSourceMeta}>
-                      {detail.audience.sources.theatr.count} reviews
+                      {detail.audience.sources.theatr.count} votes
+                    </Text>
+                  </View>
+                )}
+                {detail.audience.sources.broadwayCom && (
+                  <View style={styles.audienceSourceCard}>
+                    <View style={styles.audienceSourceHeader}>
+                      <Svg width={14} height={14} viewBox="0 0 24 24" fill="#60a5fa">
+                        <Path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z" />
+                      </Svg>
+                      <Text style={styles.audienceSourceLabel}>BWAY.COM</Text>
+                    </View>
+                    <Text style={styles.audienceSourceValue}>
+                      {detail.audience.sources.broadwayCom.starRating != null
+                        ? `${detail.audience.sources.broadwayCom.starRating}/5`
+                        : `${detail.audience.sources.broadwayCom.score}%`}
+                    </Text>
+                    <Text style={styles.audienceSourceMeta}>
+                      {detail.audience.sources.broadwayCom.count} reviews
+                    </Text>
+                  </View>
+                )}
+                {detail.audience.sources.reddit && (
+                  <View style={styles.audienceSourceCard}>
+                    <View style={styles.audienceSourceHeader}>
+                      <Svg width={14} height={14} viewBox="0 0 24 24" fill="#fb923c">
+                        <Path d="M12 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0zm5.01 4.744c.688 0 1.25.561 1.25 1.249a1.25 1.25 0 0 1-2.498.056l-2.597-.547-.8 3.747c1.824.07 3.48.632 4.674 1.488.308-.309.73-.491 1.207-.491.968 0 1.754.786 1.754 1.754 0 .716-.435 1.333-1.01 1.614a3.111 3.111 0 0 1 .042.52c0 2.694-3.13 4.87-7.004 4.87-3.874 0-7.004-2.176-7.004-4.87 0-.183.015-.366.043-.534A1.748 1.748 0 0 1 4.028 12c0-.968.786-1.754 1.754-1.754.463 0 .898.196 1.207.49 1.207-.883 2.878-1.43 4.744-1.487l.885-4.182a.342.342 0 0 1 .14-.197.35.35 0 0 1 .238-.042l2.906.617a1.214 1.214 0 0 1 1.108-.701zM9.25 12C8.561 12 8 12.562 8 13.25c0 .687.561 1.248 1.25 1.248.687 0 1.248-.561 1.248-1.249 0-.688-.561-1.249-1.249-1.249zm5.5 0c-.687 0-1.248.561-1.248 1.25 0 .687.561 1.248 1.249 1.248.688 0 1.249-.561 1.249-1.249 0-.687-.562-1.249-1.25-1.249zm-5.466 3.99a.327.327 0 0 0-.231.094.33.33 0 0 0 0 .463c.842.842 2.484.913 2.961.913.477 0 2.105-.056 2.961-.913a.361.361 0 0 0 .029-.463.33.33 0 0 0-.464 0c-.547.533-1.684.73-2.512.73-.828 0-1.979-.196-2.512-.73a.326.326 0 0 0-.232-.095z" />
+                      </Svg>
+                      <Text style={styles.audienceSourceLabel}>REDDIT</Text>
+                    </View>
+                    <Text style={styles.audienceSourceValue}>
+                      {detail.audience.sources.reddit.score}%
+                    </Text>
+                    <Text style={styles.audienceSourceMeta}>
+                      {detail.audience.sources.reddit.totalPosts} mentions
                     </Text>
                   </View>
                 )}
@@ -701,46 +701,59 @@ export default function ShowDetailScreen() {
 // SUB-COMPONENTS
 // ===========================================
 
-function BreakdownBar({ breakdown }: { breakdown: { positive: number; mixed: number; negative: number } }) {
-  const total = breakdown.positive + breakdown.mixed + breakdown.negative;
+function BreakdownBar({ reviews }: { reviews: ShowDetail['reviews'] }) {
+  const counts = { Rave: 0, Positive: 0, Mixed: 0, Negative: 0 };
+  for (const r of reviews) {
+    if (r.bucket === 'Rave') counts.Rave++;
+    else if (r.bucket === 'Positive') counts.Positive++;
+    else if (r.bucket === 'Mixed') counts.Mixed++;
+    else if (r.bucket === 'Negative') counts.Negative++;
+  }
+  const total = counts.Rave + counts.Positive + counts.Mixed + counts.Negative;
   if (total === 0) return null;
 
-  const pctPositive = (breakdown.positive / total) * 100;
-  const pctMixed = (breakdown.mixed / total) * 100;
-  const pctNegative = (breakdown.negative / total) * 100;
+  const raveColor = '#FFD700';  // gold
+  const positiveColor = Colors.score.green;
+  const mixedColor = Colors.score.amber;
+  const negativeColor = Colors.score.red;
+
+  const seg = (count: number, color: string) => count > 0 ? (
+    <View style={[styles.breakdownSegment, { flex: count, backgroundColor: color }]} />
+  ) : null;
 
   return (
     <View style={styles.breakdownContainer}>
       <View style={styles.breakdownBar}>
-        {pctPositive > 0 && (
-          <View style={[styles.breakdownSegment, { flex: pctPositive, backgroundColor: Colors.score.green }]} />
-        )}
-        {pctMixed > 0 && (
-          <View style={[styles.breakdownSegment, { flex: pctMixed, backgroundColor: Colors.score.amber }]} />
-        )}
-        {pctNegative > 0 && (
-          <View style={[styles.breakdownSegment, { flex: pctNegative, backgroundColor: Colors.score.red }]} />
-        )}
+        {seg(counts.Rave, raveColor)}
+        {seg(counts.Positive, positiveColor)}
+        {seg(counts.Mixed, mixedColor)}
+        {seg(counts.Negative, negativeColor)}
       </View>
       <View style={styles.breakdownLabels}>
-        <View style={styles.breakdownLabelRow}>
-          <View style={[styles.breakdownDot, { backgroundColor: Colors.score.green }]} />
-          <Text style={styles.breakdownLabelText}>
-            {breakdown.positive} Positive
-          </Text>
-        </View>
-        <View style={styles.breakdownLabelRow}>
-          <View style={[styles.breakdownDot, { backgroundColor: Colors.score.amber }]} />
-          <Text style={styles.breakdownLabelText}>
-            {breakdown.mixed} Mixed
-          </Text>
-        </View>
-        <View style={styles.breakdownLabelRow}>
-          <View style={[styles.breakdownDot, { backgroundColor: Colors.score.red }]} />
-          <Text style={styles.breakdownLabelText}>
-            {breakdown.negative} Negative
-          </Text>
-        </View>
+        {counts.Rave > 0 && (
+          <View style={styles.breakdownLabelRow}>
+            <View style={[styles.breakdownDot, { backgroundColor: raveColor }]} />
+            <Text style={styles.breakdownLabelText}>{counts.Rave} Rave</Text>
+          </View>
+        )}
+        {counts.Positive > 0 && (
+          <View style={styles.breakdownLabelRow}>
+            <View style={[styles.breakdownDot, { backgroundColor: positiveColor }]} />
+            <Text style={styles.breakdownLabelText}>{counts.Positive} Positive</Text>
+          </View>
+        )}
+        {counts.Mixed > 0 && (
+          <View style={styles.breakdownLabelRow}>
+            <View style={[styles.breakdownDot, { backgroundColor: mixedColor }]} />
+            <Text style={styles.breakdownLabelText}>{counts.Mixed} Mixed</Text>
+          </View>
+        )}
+        {counts.Negative > 0 && (
+          <View style={styles.breakdownLabelRow}>
+            <View style={[styles.breakdownDot, { backgroundColor: negativeColor }]} />
+            <Text style={styles.breakdownLabelText}>{counts.Negative} Negative</Text>
+          </View>
+        )}
       </View>
     </View>
   );
@@ -773,6 +786,11 @@ function ReviewRow({ review, showId }: { review: ShowDetail['reviews'][0]; showI
           <Image source={{ uri: logoUrl }} style={styles.outletLogo} contentFit="cover" />
         )}
         <Text style={styles.reviewOutlet} numberOfLines={1}>{review.outlet}</Text>
+        {review.designation === 'Critics_Pick' && (
+          <View style={styles.criticsPickBadge}>
+            <Text style={styles.criticsPickText}>★ Critics Pick</Text>
+          </View>
+        )}
         {formattedDate && (
           <Text style={styles.reviewDate}>{formattedDate}</Text>
         )}
@@ -977,7 +995,7 @@ function SocialScorecardSection({ sp }: { sp: SocialPulsePayload }) {
 
   return (
     <View style={styles.section}>
-      <Text style={styles.sectionTitle}>Social Scorecard</Text>
+      <Text style={styles.sectionTitle}>Socials Scorecard</Text>
       {/* Tier badge row */}
       <View style={[styles.socialTierRow, { borderColor: config.color + '40', backgroundColor: config.color + '14' }]}>
         <View style={[styles.socialTierBadge, { backgroundColor: config.color }]}>
@@ -1022,7 +1040,7 @@ const VERDICT_CONFIG: Record<string, { label: string; color: string }> = {
 function SeatingGuidanceSection({ sections }: { sections: ShowDetail['seatingSections'] }) {
   return (
     <View style={styles.section}>
-      <Text style={styles.sectionTitle}>Seating Guide</Text>
+      <Text style={styles.sectionTitle}>Seating Scorecard</Text>
       {sections.map((s, i) => {
         const cfg = VERDICT_CONFIG[s.verdict] ?? { label: s.verdictLabel, color: Colors.text.muted };
         return (
@@ -1324,6 +1342,18 @@ const styles = StyleSheet.create({
   reviewDate: {
     color: Colors.text.muted,
     fontSize: FontSize.xs,
+  },
+  criticsPickBadge: {
+    backgroundColor: '#facc15' + '22',
+    borderRadius: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  criticsPickText: {
+    color: '#facc15',
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.3,
   },
   reviewContent: {
     marginLeft: 48, // align with text past score badge (36 + 12 gap)
