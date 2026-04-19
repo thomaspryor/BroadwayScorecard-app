@@ -258,7 +258,7 @@ export default function BrowseScreen() {
             )}
             {searchResults && (
             <Text style={styles.count}>
-              {searchResults.length} result{searchResults.length !== 1 ? 's' : ''} for "{searchQuery.trim()}"
+              {searchResults.length} result{searchResults.length !== 1 ? 's' : ''} for &ldquo;{searchQuery.trim()}&rdquo;
             </Text>
             )}
 
