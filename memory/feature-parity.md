@@ -41,6 +41,11 @@ Last audited: 2026-04-19
 | Add-to-list from show page | `components/user/AddToListSheet.tsx`, `ShowPageRating.tsx` | 2026-03 |
 | NYT Critic's Picks carousel | `app/(tabs)/index.tsx` | 2026-04 |
 | Other Productions shelf | `app/show/[slug].tsx` | 2026-04 |
+| Social Scorecard | `app/show/[slug].tsx`, `lib/api.ts` | 2026-04 |
+| Seating Guidance | `app/show/[slug].tsx`, CDN show detail | 2026-04 |
+| Theater Scorecard | `app/show/[slug].tsx`, CDN show detail | 2026-04 |
+| Video Reviews | `app/show/[slug].tsx`, CDN show detail | 2026-04 |
+| Home carousel date subtitles (Coming Up) | `app/(tabs)/index.tsx`, `components/FeaturedCarousel.tsx` | 2026-04 |
 
 ## Web-Only (Not Planned for App)
 
