@@ -306,7 +306,7 @@ export default function ShowDetailScreen() {
           {/* Critics' Take consensus paragraph — right below breakdown */}
           {detail?.criticsTake && (
             <View style={styles.criticsTakeBox}>
-              <Text style={styles.criticsTakeLabel}>Critics' Take</Text>
+              <Text style={styles.criticsTakeLabel}>Critics&apos; Take</Text>
               <Text style={styles.criticsTakeText}>{detail.criticsTake.text}</Text>
             </View>
           )}
@@ -399,7 +399,11 @@ export default function ShowDetailScreen() {
             </View>
             {/* Horizontal source cards with logos (matching website) */}
             {detail.audience.sources && (
-              <View style={styles.audienceSourceCards}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.audienceSourceCards}
+              >
                 {detail.audience.sources.showScore && (
                   <Pressable
                     style={styles.audienceSourceCard}
@@ -412,7 +416,7 @@ export default function ShowDetailScreen() {
                       <Svg width={14} height={14} viewBox="0 0 24 24" fill="#facc15">
                         <Path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
                       </Svg>
-                      <Text style={styles.audienceSourceLabel}>SHOW SCORE</Text>
+                      <Text style={styles.audienceSourceLabel} numberOfLines={1}>SHOW SCORE</Text>
                     </View>
                     <Text style={styles.audienceSourceValue}>
                       {detail.audience.sources.showScore.score}%
@@ -428,7 +432,7 @@ export default function ShowDetailScreen() {
                       <Svg width={14} height={14} viewBox="0 0 24 24" fill="#c084fc">
                         <Path d="M20 2H4c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM8 20H4v-4h4v4zm0-6H4v-4h4v4zm6 6h-4v-4h4v4zm0-6h-4v-4h4v4zm6 6h-4v-4h4v4zm0-6h-4v-4h4v4z" />
                       </Svg>
-                      <Text style={styles.audienceSourceLabel}>MEZZANINE</Text>
+                      <Text style={styles.audienceSourceLabel} numberOfLines={1}>MEZZANINE</Text>
                     </View>
                     <Text style={styles.audienceSourceValue}>
                       {detail.audience.sources.mezzanine.starRating != null
@@ -446,7 +450,7 @@ export default function ShowDetailScreen() {
                       <Svg width={14} height={14} viewBox="0 0 24 24" fill="#a78bfa">
                         <Path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9 9-4.03 9-9c0-.46-.04-.92-.1-1.36-.98 1.37-2.58 2.26-4.4 2.26-2.98 0-5.4-2.42-5.4-5.4 0-1.81.89-3.42 2.26-4.4-.44-.06-.9-.1-1.36-.1z" />
                       </Svg>
-                      <Text style={styles.audienceSourceLabel}>THEATR</Text>
+                      <Text style={styles.audienceSourceLabel} numberOfLines={1}>THEATR</Text>
                     </View>
                     <Text style={styles.audienceSourceValue}>
                       {detail.audience.sources.theatr.score}%
@@ -462,7 +466,7 @@ export default function ShowDetailScreen() {
                       <Svg width={14} height={14} viewBox="0 0 24 24" fill="#60a5fa">
                         <Path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z" />
                       </Svg>
-                      <Text style={styles.audienceSourceLabel}>BWAY.COM</Text>
+                      <Text style={styles.audienceSourceLabel} numberOfLines={1}>BWAY.COM</Text>
                     </View>
                     <Text style={styles.audienceSourceValue}>
                       {detail.audience.sources.broadwayCom.starRating != null
@@ -480,7 +484,7 @@ export default function ShowDetailScreen() {
                       <Svg width={14} height={14} viewBox="0 0 24 24" fill="#fb923c">
                         <Path d="M12 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0zm5.01 4.744c.688 0 1.25.561 1.25 1.249a1.25 1.25 0 0 1-2.498.056l-2.597-.547-.8 3.747c1.824.07 3.48.632 4.674 1.488.308-.309.73-.491 1.207-.491.968 0 1.754.786 1.754 1.754 0 .716-.435 1.333-1.01 1.614a3.111 3.111 0 0 1 .042.52c0 2.694-3.13 4.87-7.004 4.87-3.874 0-7.004-2.176-7.004-4.87 0-.183.015-.366.043-.534A1.748 1.748 0 0 1 4.028 12c0-.968.786-1.754 1.754-1.754.463 0 .898.196 1.207.49 1.207-.883 2.878-1.43 4.744-1.487l.885-4.182a.342.342 0 0 1 .14-.197.35.35 0 0 1 .238-.042l2.906.617a1.214 1.214 0 0 1 1.108-.701zM9.25 12C8.561 12 8 12.562 8 13.25c0 .687.561 1.248 1.25 1.248.687 0 1.248-.561 1.248-1.249 0-.688-.561-1.249-1.249-1.249zm5.5 0c-.687 0-1.248.561-1.248 1.25 0 .687.561 1.248 1.249 1.248.688 0 1.249-.561 1.249-1.249 0-.687-.562-1.249-1.25-1.249zm-5.466 3.99a.327.327 0 0 0-.231.094.33.33 0 0 0 0 .463c.842.842 2.484.913 2.961.913.477 0 2.105-.056 2.961-.913a.361.361 0 0 0 .029-.463.33.33 0 0 0-.464 0c-.547.533-1.684.73-2.512.73-.828 0-1.979-.196-2.512-.73a.326.326 0 0 0-.232-.095z" />
                       </Svg>
-                      <Text style={styles.audienceSourceLabel}>REDDIT</Text>
+                      <Text style={styles.audienceSourceLabel} numberOfLines={1}>REDDIT</Text>
                     </View>
                     <Text style={styles.audienceSourceValue}>
                       {detail.audience.sources.reddit.score}%
@@ -496,7 +500,7 @@ export default function ShowDetailScreen() {
                       <Svg width={14} height={14} viewBox="0 0 24 24" fill="#34d399">
                         <Path d="M7 4v2H5v12h2v2H3V4h4zm10 0h4v16h-4v-2h2V6h-2V4zM9 8h6v2H9V8zm0 4h6v2H9v-2z" />
                       </Svg>
-                      <Text style={styles.audienceSourceLabel}>SEATPLAN</Text>
+                      <Text style={styles.audienceSourceLabel} numberOfLines={1}>SEATPLAN</Text>
                     </View>
                     <Text style={styles.audienceSourceValue}>
                       {detail.audience.sources.seatplan.starRating != null
@@ -514,7 +518,7 @@ export default function ShowDetailScreen() {
                       <Svg width={14} height={14} viewBox="0 0 24 24" fill="#f472b6">
                         <Path d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-8 12.5v-9l6 4.5-6 4.5z" />
                       </Svg>
-                      <Text style={styles.audienceSourceLabel}>LONDON BOX OFFICE</Text>
+                      <Text style={styles.audienceSourceLabel} numberOfLines={1}>LONDON BO</Text>
                     </View>
                     <Text style={styles.audienceSourceValue}>
                       {detail.audience.sources.londonBoxOffice.starRating != null
@@ -526,7 +530,7 @@ export default function ShowDetailScreen() {
                     </Text>
                   </View>
                 )}
-              </View>
+              </ScrollView>
             )}
           </View>
         )}
@@ -1013,7 +1017,8 @@ function formatMoney(n: number | null): string {
 function pctChange(curr: number | null, prev: number | null): { label: string; positive: boolean } | null {
   if (curr == null || prev == null || prev === 0) return null;
   const delta = ((curr - prev) / prev) * 100;
-  if (Math.abs(delta) < 0.5) return null;
+  // Suppress normal weekly noise (holiday weeks, schedule shifts) — only show meaningful swings
+  if (Math.abs(delta) < 10) return null;
   return { label: `${delta > 0 ? '▲' : '▼'} ${Math.abs(delta).toFixed(0)}%`, positive: delta > 0 };
 }
 
@@ -1118,7 +1123,7 @@ function LotteryRushSection({ data }: { data: NonNullable<ShowDetail['lotteryRus
 
   return (
     <View style={styles.section}>
-      <Text style={styles.sectionTitle}>Discount Tickets</Text>
+      <Text style={styles.sectionTitle}>Same-Day Tickets</Text>
       {entries.map(([type, d]) => <LRCard key={type} type={type} data={d} />)}
     </View>
   );
@@ -1282,14 +1287,16 @@ function TheaterScorecardSection({ scores, venueName }: { scores: ShowDetail['ve
       <Text style={styles.venueScorecardName}>{venueName}</Text>
       {dims.map(d => {
         const score = scores[d.key] as number;
-        const color = score >= 75 ? '#10b981' : score >= 55 ? '#f59e0b' : '#ef4444';
+        // Venue dimensions are on a 1-5 scale
+        const pct = Math.max(0, Math.min(100, (score / 5) * 100));
+        const color = score >= 4 ? '#10b981' : score >= 3 ? '#f59e0b' : '#ef4444';
         return (
           <View key={d.key} style={styles.venueDimRow}>
             <Text style={styles.venueDimLabel}>{d.label}</Text>
             <View style={styles.venueDimBarBg}>
-              <View style={[styles.venueDimBarFill, { width: `${score}%` as any, backgroundColor: color }]} />
+              <View style={[styles.venueDimBarFill, { width: `${pct}%` as any, backgroundColor: color }]} />
             </View>
-            <Text style={[styles.venueDimScore, { color }]}>{score}</Text>
+            <Text style={[styles.venueDimScore, { color }]}>{score} / 5</Text>
           </View>
         );
       })}
@@ -1627,12 +1634,11 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   audienceSourceCards: {
-    flexDirection: 'row',
+    paddingVertical: Spacing.sm,
     gap: Spacing.sm,
-    marginTop: Spacing.sm,
   },
   audienceSourceCard: {
-    flex: 1,
+    width: 110,
     backgroundColor: Colors.surface.raised,
     borderRadius: BorderRadius.md,
     padding: Spacing.md,
@@ -1646,9 +1652,9 @@ const styles = StyleSheet.create({
   },
   audienceSourceLabel: {
     color: Colors.text.muted,
-    fontSize: 9,
+    fontSize: 10,
     fontWeight: '700',
-    letterSpacing: 0.5,
+    letterSpacing: 0.3,
   },
   audienceSourceValue: {
     color: Colors.text.primary,
