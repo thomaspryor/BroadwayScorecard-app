@@ -1127,6 +1127,8 @@ function LotteryRushSection({ data }: { data: NonNullable<ShowDetail['lotteryRus
 // ---------- Tony Awards ----------
 
 function TonyAwardsSection({ awards }: { awards: ShowDetail['tonyAwards'] }) {
+  // CDN stores ceremony number (70 = 70th ceremony = 2016). First Tonys were 1947 (ceremony 1).
+  const ceremonyToYear = (n: number) => 1946 + n;
   const wins = awards.filter(a => a.won);
   const noms = awards.filter(a => !a.won);
   return (
@@ -1142,8 +1144,8 @@ function TonyAwardsSection({ awards }: { awards: ShowDetail['tonyAwards'] }) {
               <Text style={styles.tonyWinIcon}>🏆</Text>
               <View style={styles.tonyInfo}>
                 <Text style={styles.tonyCategory}>{a.category}</Text>
-                {a.name && <Text style={styles.tonyName}>{a.name} · {a.year}</Text>}
-                {!a.name && <Text style={styles.tonyName}>{a.year}</Text>}
+                {a.name && <Text style={styles.tonyName}>{a.name} · {ceremonyToYear(a.year)}</Text>}
+                {!a.name && <Text style={styles.tonyName}>{ceremonyToYear(a.year)}</Text>}
               </View>
             </View>
           ))}
@@ -1157,8 +1159,8 @@ function TonyAwardsSection({ awards }: { awards: ShowDetail['tonyAwards'] }) {
               <Text style={styles.tonyNomIcon}>☆</Text>
               <View style={styles.tonyInfo}>
                 <Text style={styles.tonyCategory}>{a.category}</Text>
-                {a.name && <Text style={styles.tonyName}>{a.name} · {a.year}</Text>}
-                {!a.name && <Text style={styles.tonyName}>{a.year}</Text>}
+                {a.name && <Text style={styles.tonyName}>{a.name} · {ceremonyToYear(a.year)}</Text>}
+                {!a.name && <Text style={styles.tonyName}>{ceremonyToYear(a.year)}</Text>}
               </View>
             </View>
           ))}
