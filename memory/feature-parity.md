@@ -1,6 +1,6 @@
 # Feature Parity Tracker: Web → iOS App
 
-Last audited: 2026-03-07
+Last audited: 2026-04-19
 
 ## How This Works
 - **Web sessions**: After shipping a user-facing feature, add a row to "Needs App Implementation" (see web `/wrap-up` Phase 2.5).
@@ -14,6 +14,7 @@ Last audited: 2026-03-07
 | Feature | Pri | Flagged | Notes |
 |---|---|---|---|
 | Mezzanine import | P1 | 2026-03-07 | Web: `MezzanineImport.tsx`. Import diary from Mezzanine JSON. File picker + fuzzy match. |
+| Fantasy Broadway | P2 | 2026-04-19 | Web: `/fantasy/`. Multiple leagues, share links, draft page. Probably web-only for now. |
 | Lotteries directory | P2 | 2026-03-07 | Web: `app/lotteries/`. List of lottery-eligible shows with links. |
 | Rush tickets directory | P2 | 2026-03-07 | Web: `app/rush/`. List of rush-eligible shows with links. |
 
@@ -38,6 +39,8 @@ Last audited: 2026-03-07
 | Rating Modal | `app/rate/[showId].tsx` | 2026-03 |
 | User Lists (CRUD, ranked/unranked, reorder) | `components/user/ListsTab.tsx`, `hooks/useUserLists.ts` | 2026-03 |
 | Add-to-list from show page | `components/user/AddToListSheet.tsx`, `ShowPageRating.tsx` | 2026-03 |
+| NYT Critic's Picks carousel | `app/(tabs)/index.tsx` | 2026-04 |
+| Other Productions shelf | `app/show/[slug].tsx` | 2026-04 |
 
 ## Web-Only (Not Planned for App)
 
