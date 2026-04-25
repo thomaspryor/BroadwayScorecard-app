@@ -202,6 +202,25 @@ export function buildTicketEventProps(opts: {
   };
 }
 
+// ─── Open-strategy helper ───────────────────────────────────
+//
+// Centralizes the affiliate-vs-non-affiliate decision so it's testable
+// without React Native mocks. The actual side-effecting open call still
+// lives in app/show/[slug].tsx.
+
+export type TicketOpenStrategy = 'native-handoff' | 'in-app-browser';
+
+/**
+ * Affiliate links use the native-handoff path so iOS Universal Links can
+ * route to the partner's installed app (preserving irclickid attribution).
+ * Non-affiliate links use the in-app browser for better UX — there's no
+ * native app to hand off to and SFSafariViewController keeps the user in
+ * our app.
+ */
+export function chooseTicketOpenStrategy(isAffiliate: boolean): TicketOpenStrategy {
+  return isAffiliate ? 'native-handoff' : 'in-app-browser';
+}
+
 // ─── Platform helpers ────────────────────────────────────────
 
 /** Check if a platform has an active affiliate program */
