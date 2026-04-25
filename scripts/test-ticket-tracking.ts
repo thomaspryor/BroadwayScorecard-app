@@ -8,6 +8,7 @@ import {
   buildTicketEventProps,
   isAffiliatePlatform,
   getAffiliatePlatforms,
+  chooseTicketOpenStrategy,
   type TicketSource,
   type TicketEventProperties,
 } from '../lib/ticket-utils';
@@ -123,6 +124,46 @@ console.log('\n=== buildTicketUrl ===');
     'https://todaytix.pxf.io/c/6999278/3855163/20944?u=',
     'Empty URL produces empty ?u=',
   );
+}
+
+// ─── Test chooseTicketOpenStrategy ──────────────────────
+
+console.log('\n=== chooseTicketOpenStrategy ===');
+
+assertEqual(
+  chooseTicketOpenStrategy(true),
+  'native-handoff',
+  'Affiliate → native-handoff (so iOS can hand off to TodayTix/etc native app)',
+);
+assertEqual(
+  chooseTicketOpenStrategy(false),
+  'in-app-browser',
+  'Non-affiliate → in-app-browser (Telecharge, official sites — keep user in our app)',
+);
+
+// Cross-check: every enabled affiliate platform produces native-handoff,
+// every disabled/unknown platform produces in-app-browser. Catches a future
+// regression where buildTicketUrl returns isAffiliate=true but the strategy
+// helper doesn't agree.
+{
+  const enabledPlatforms = ['TodayTix', 'Ticketmaster', 'StubHub', 'Vivid Seats', 'SeatPlan'];
+  const disabledPlatforms = ['SeatGeek', 'Telecharge', '', 'UnknownPlatform'];
+  for (const platform of enabledPlatforms) {
+    const r = buildTicketUrl('https://example.com/show', platform, 'show_detail');
+    assertEqual(
+      chooseTicketOpenStrategy(r.isAffiliate),
+      'native-handoff',
+      `${platform}: buildTicketUrl→isAffiliate aligns with strategy=native-handoff`,
+    );
+  }
+  for (const platform of disabledPlatforms) {
+    const r = buildTicketUrl('https://example.com/show', platform, 'show_detail');
+    assertEqual(
+      chooseTicketOpenStrategy(r.isAffiliate),
+      'in-app-browser',
+      `${platform}: buildTicketUrl→isAffiliate aligns with strategy=in-app-browser`,
+    );
+  }
 }
 
 // ─── Test isAffiliatePlatform ──────────────────────────

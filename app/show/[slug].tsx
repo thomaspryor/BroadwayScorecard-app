@@ -19,7 +19,8 @@ import { Show, ShowDetail, MobileShowDetail, mapShowDetail } from '@/lib/types';
 import { ScoreBadge, StatusBadge, FormatPill, ProductionPill, CategoryBadge } from '@/components/show-cards';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
 import { trackTicketTap, trackTicketLinksVisible, trackTicketBrowserOpened, trackTicketBrowserDismissed, trackShowDetailViewed, trackShowShared, trackFullReviewTapped } from '@/lib/analytics';
-import { buildTicketUrl, buildTicketEventProps, isAffiliatePlatform, type TicketSource } from '@/lib/ticket-utils';
+import { buildTicketUrl, buildTicketEventProps, isAffiliatePlatform, chooseTicketOpenStrategy, type TicketSource } from '@/lib/ticket-utils';
+import { addSentryBreadcrumb, captureException } from '@/lib/sentry';
 import Svg, { Path } from 'react-native-svg';
 import ShowPageRating from '@/components/user/ShowPageRating';
 import { BookmarkOverlay } from '@/components/BookmarkOverlay';
@@ -125,22 +126,39 @@ export default function ShowDetailScreen() {
     trackTicketTap(eventProps);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
-    // 2. Open the URL — affiliate vs non-affiliate path
-    if (isAffiliate) {
-      // Native app handoff via Universal Link. No dismiss callback exists, so we
-      // skip ticket_browser_dismissed; conversion data from Impact is the
-      // authoritative downstream signal anyway.
+    // 2. Open the URL — affiliate vs non-affiliate path.
+    //
+    // PostHog funnel note: ticket_browser_dismissed fires only on the
+    // non-affiliate path. Any tap → opened → dismissed funnel will appear
+    // to drop ~100% of TodayTix/Ticketmaster/StubHub/Vivid Seats/SeatPlan
+    // traffic at the dismissed stage. Don't rebuild that funnel — use
+    // Impact conversion data for affiliates instead. (See ship-check
+    // 2026-04-25, P1.3 in commit history.)
+    const strategy = chooseTicketOpenStrategy(isAffiliate);
+    if (strategy === 'native-handoff') {
+      // Native app handoff via Universal Link. No dismiss callback exists,
+      // so we skip ticket_browser_dismissed for affiliate clicks.
       try {
         await Linking.openURL(affiliateUrl);
         trackTicketBrowserOpened(eventProps);
-      } catch {
-        // openURL failed (malformed URL, no handler) — tap event still recorded.
-        // Fall back to in-app browser so the user isn't stranded.
+      } catch (err) {
+        // openURL failed (malformed URL, no handler). Log it — silent
+        // failure here would mean dead ticket buttons with no signal.
+        addSentryBreadcrumb('ticket-link', 'Linking.openURL failed, falling back to WebBrowser', {
+          platform: link.platform,
+          source,
+        });
         try {
           await WebBrowser.openBrowserAsync(affiliateUrl);
           trackTicketBrowserOpened(eventProps);
-        } catch {
-          // Both paths failed — only the tap event survives.
+        } catch (fallbackErr) {
+          // Both paths failed — capture as exception. Tap event still recorded.
+          captureException(fallbackErr instanceof Error ? fallbackErr : new Error(String(fallbackErr)), {
+            context: 'ticket-link-open-failed',
+            platform: link.platform,
+            source,
+            linking_error: err instanceof Error ? err.message : String(err),
+          });
         }
       }
       return;
