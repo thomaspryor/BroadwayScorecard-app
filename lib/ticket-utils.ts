@@ -6,33 +6,85 @@
  */
 
 // ─── Affiliate configuration ─────────────────────────────────
-// TODO: Replace placeholder values once TodayTix affiliate approval comes through.
-// The config shape supports any platform — just add a new entry.
+// Mirrors web src/lib/affiliate-utils.ts. Keep both files in sync when adding,
+// disabling, or changing ad IDs — drift causes attribution to silently regress.
+
+type AffiliateType = 'utm' | 'impact' | 'partnerize';
 
 export interface AffiliateConfig {
-  /** URL query params to append */
-  params: Record<string, string>;
-  /** Whether this affiliate program is active */
+  type: AffiliateType;
   enabled: boolean;
+  // UTM-based (simple param append)
+  params?: Record<string, string>;
+  // Impact — deep link format: https://{domain}/c/{publisherId}/{campaignId}/{programId}?u={encodedUrl}
+  impactDomain?: string;
+  impactPublisherId?: string;
+  impactCampaignId?: string;
+  impactProgramId?: string;
+  // Partnerize (StubHub) — wraps URL via Partnerize redirect
+  partnerizeDomain?: string;
+  partnerizeCampaignRef?: string;
 }
 
 const AFFILIATE_CONFIG: Record<string, AffiliateConfig> = {
   TodayTix: {
-    params: {
-      // Placeholder — replace with actual TodayTix affiliate params
-      utm_source: 'broadwayscorecard',
-      utm_medium: 'affiliate',
-      utm_campaign: 'app',
-    },
-    enabled: false, // Flip to true once approved
+    type: 'impact',
+    impactDomain: 'todaytix.pxf.io',
+    impactPublisherId: '6999278',
+    impactCampaignId: '3855163', // Universal App/Web Link — captures in-app purchases
+    impactProgramId: '20944',
+    enabled: true,
+  },
+  Ticketmaster: {
+    type: 'impact',
+    impactDomain: 'ticketmaster.evyy.net',
+    impactPublisherId: '6999278',
+    impactCampaignId: '264167',
+    impactProgramId: '4272',
+    enabled: true,
+  },
+  StubHub: {
+    type: 'partnerize',
+    partnerizeDomain: 'stubhub.prf.hn',
+    partnerizeCampaignRef: '1011l5DmFu',
+    enabled: true,
+  },
+  SeatGeek: {
+    type: 'impact',
+    impactDomain: '',
+    impactPublisherId: '',
+    impactCampaignId: '',
+    impactProgramId: '',
+    enabled: false,
+  },
+  'Vivid Seats': {
+    type: 'impact',
+    impactDomain: 'vivid-seats.pxf.io',
+    impactPublisherId: '6999278',
+    impactCampaignId: '952533',
+    impactProgramId: '12730',
+    enabled: true,
+  },
+  SeatPlan: {
+    type: 'impact',
+    impactDomain: 'seatplan.sjv.io',
+    impactPublisherId: '6999278',
+    impactCampaignId: '2219054',
+    impactProgramId: '28679',
+    enabled: true,
   },
 };
 
 // ─── URL decoration ──────────────────────────────────────────
 
 /**
- * Build a ticket URL with affiliate params if applicable.
+ * Build a ticket URL with affiliate wrapping if applicable.
  * Returns the original URL unchanged if no affiliate config exists or is disabled.
+ *
+ * Impact URLs use the Universal App/Web Link format which honors iOS Universal
+ * Links: if the partner app is installed, the OS hands the click off to the
+ * native app while preserving the irclickid attribution. Otherwise it opens in
+ * Safari and the user buys on web — both paths credit us.
  */
 export function buildTicketUrl(
   url: string,
@@ -45,18 +97,38 @@ export function buildTicketUrl(
   }
 
   try {
-    const parsed = new URL(url);
-    // Append affiliate params (don't overwrite existing ones)
-    for (const [key, value] of Object.entries(config.params)) {
-      if (!parsed.searchParams.has(key)) {
-        parsed.searchParams.set(key, value);
-      }
+    if (
+      config.type === 'impact' &&
+      config.impactDomain &&
+      config.impactPublisherId &&
+      config.impactCampaignId &&
+      config.impactProgramId
+    ) {
+      const encodedUrl = encodeURIComponent(url);
+      const affiliateUrl = `https://${config.impactDomain}/c/${config.impactPublisherId}/${config.impactCampaignId}/${config.impactProgramId}?u=${encodedUrl}`;
+      return { url: affiliateUrl, isAffiliate: true };
     }
-    // Add source tracking so we know which surface drove the click
-    parsed.searchParams.set('utm_content', source);
-    return { url: parsed.toString(), isAffiliate: true };
+
+    if (config.type === 'partnerize' && config.partnerizeCampaignRef) {
+      const domain = config.partnerizeDomain || 'prf.hn';
+      const encodedUrl = encodeURIComponent(url);
+      const affiliateUrl = `https://${domain}/click/camref:${config.partnerizeCampaignRef}/destination:${encodedUrl}`;
+      return { url: affiliateUrl, isAffiliate: true };
+    }
+
+    if (config.type === 'utm' && config.params) {
+      const parsed = new URL(url);
+      for (const [key, value] of Object.entries(config.params)) {
+        if (!parsed.searchParams.has(key)) {
+          parsed.searchParams.set(key, value);
+        }
+      }
+      parsed.searchParams.set('utm_content', source);
+      return { url: parsed.toString(), isAffiliate: true };
+    }
+
+    return { url, isAffiliate: false };
   } catch {
-    // Invalid URL — return as-is
     return { url, isAffiliate: false };
   }
 }

@@ -49,11 +49,44 @@ console.log('\n=== buildTicketUrl ===');
   assertEqual(result.isAffiliate, false, 'Non-affiliate isAffiliate=false');
 }
 
-// Test 2: TodayTix (disabled) returns URL unchanged
+// Test 2: TodayTix wraps URL via Impact Universal App/Web Link
 {
-  const result = buildTicketUrl('https://www.todaytix.com/nyc/shows/123', 'TodayTix', 'show_detail');
-  assertEqual(result.isAffiliate, false, 'TodayTix disabled → isAffiliate=false');
-  assertEqual(result.url, 'https://www.todaytix.com/nyc/shows/123', 'TodayTix disabled → URL unchanged');
+  const original = 'https://www.todaytix.com/nyc/shows/123';
+  const result = buildTicketUrl(original, 'TodayTix', 'show_detail');
+  assertEqual(result.isAffiliate, true, 'TodayTix enabled → isAffiliate=true');
+  assert(
+    result.url.startsWith('https://todaytix.pxf.io/c/6999278/3855163/20944?u='),
+    'TodayTix wrapped via Impact ad 3855163',
+  );
+  assert(
+    result.url.includes(encodeURIComponent(original)),
+    'TodayTix preserves destination URL via ?u=',
+  );
+}
+
+// Test 2b: Ticketmaster wraps via Impact ad 264167
+{
+  const result = buildTicketUrl('https://www.ticketmaster.com/event/abc', 'Ticketmaster', 'show_detail');
+  assertEqual(result.isAffiliate, true, 'Ticketmaster enabled → isAffiliate=true');
+  assert(
+    result.url.startsWith('https://ticketmaster.evyy.net/c/6999278/264167/4272?u='),
+    'Ticketmaster wrapped via Impact ad 264167',
+  );
+}
+
+// Test 2c: StubHub wraps via Partnerize
+{
+  const original = 'https://www.stubhub.com/event/xyz';
+  const result = buildTicketUrl(original, 'StubHub', 'show_detail');
+  assertEqual(result.isAffiliate, true, 'StubHub enabled → isAffiliate=true');
+  assert(
+    result.url.startsWith('https://stubhub.prf.hn/click/camref:1011l5DmFu/destination:'),
+    'StubHub wrapped via Partnerize',
+  );
+  assert(
+    result.url.includes(encodeURIComponent(original)),
+    'StubHub preserves destination URL',
+  );
 }
 
 // Test 3: Unknown platform returns URL unchanged
@@ -63,11 +96,16 @@ console.log('\n=== buildTicketUrl ===');
   assertEqual(result.url, 'https://example.com', 'Unknown platform URL unchanged');
 }
 
-// Test 4: Invalid URL handled gracefully
+// Test 4: Invalid URL — Impact wrapping doesn't validate destination,
+// so it still wraps. The invalid string ends up encoded inside ?u=.
+// This matches web behavior in src/lib/affiliate-utils.ts.
 {
   const result = buildTicketUrl('not-a-url', 'TodayTix', 'show_detail');
-  assertEqual(result.url, 'not-a-url', 'Invalid URL returned as-is');
-  assertEqual(result.isAffiliate, false, 'Invalid URL isAffiliate=false');
+  assertEqual(result.isAffiliate, true, 'Invalid URL still wraps (Impact does not validate)');
+  assert(
+    result.url.includes(encodeURIComponent('not-a-url')),
+    'Invalid URL embedded as ?u= payload',
+  );
 }
 
 // Test 5: URL with existing params preserved
@@ -76,18 +114,27 @@ console.log('\n=== buildTicketUrl ===');
   assert(result.url.includes('foo=bar'), 'Existing params preserved');
 }
 
-// Test 6: Empty URL handled
+// Test 6: Empty URL — wraps with empty ?u= (parity with web).
 {
   const result = buildTicketUrl('', 'TodayTix', 'show_detail');
-  assertEqual(result.isAffiliate, false, 'Empty URL → isAffiliate=false');
+  assertEqual(result.isAffiliate, true, 'Empty URL wraps (Impact does not validate)');
+  assertEqual(
+    result.url,
+    'https://todaytix.pxf.io/c/6999278/3855163/20944?u=',
+    'Empty URL produces empty ?u=',
+  );
 }
 
 // ─── Test isAffiliatePlatform ──────────────────────────
 
 console.log('\n=== isAffiliatePlatform ===');
 
-// TodayTix is configured but disabled
-assertEqual(isAffiliatePlatform('TodayTix'), false, 'TodayTix disabled → false');
+assertEqual(isAffiliatePlatform('TodayTix'), true, 'TodayTix enabled → true');
+assertEqual(isAffiliatePlatform('Ticketmaster'), true, 'Ticketmaster enabled → true');
+assertEqual(isAffiliatePlatform('StubHub'), true, 'StubHub enabled → true');
+assertEqual(isAffiliatePlatform('Vivid Seats'), true, 'Vivid Seats enabled → true');
+assertEqual(isAffiliatePlatform('SeatPlan'), true, 'SeatPlan enabled → true');
+assertEqual(isAffiliatePlatform('SeatGeek'), false, 'SeatGeek configured but disabled → false');
 assertEqual(isAffiliatePlatform('Telecharge'), false, 'Telecharge not configured → false');
 assertEqual(isAffiliatePlatform(''), false, 'Empty string → false');
 
@@ -96,8 +143,12 @@ assertEqual(isAffiliatePlatform(''), false, 'Empty string → false');
 console.log('\n=== getAffiliatePlatforms ===');
 
 {
-  const platforms = getAffiliatePlatforms();
-  assertEqual(platforms.length, 0, 'No active affiliates (all disabled)');
+  const platforms = getAffiliatePlatforms().sort();
+  assertEqual(
+    platforms,
+    ['SeatPlan', 'StubHub', 'Ticketmaster', 'TodayTix', 'Vivid Seats'],
+    'Active affiliates list (5 enabled)',
+  );
 }
 
 // ─── Test buildTicketEventProps ──────────────────────────
