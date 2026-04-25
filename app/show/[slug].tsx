@@ -5,7 +5,7 @@
  */
 
 import React, { useMemo, useEffect, useState, useRef } from 'react';
-import { View, Text, ScrollView, StyleSheet, Pressable, Share, Platform } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Pressable, Share, Platform, Linking } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -94,7 +94,20 @@ export default function ShowDetailScreen() {
     await shareCardRef.current?.share();
   };
 
-  /** Open a ticket link with full funnel tracking (tap → browser open → browser dismiss with duration) */
+  /**
+   * Open a ticket link.
+   *
+   * Affiliate links use Linking.openURL so iOS hands off to the partner's native
+   * app via Universal Link when installed (TodayTix, Ticketmaster, etc.). This
+   * is what unlocks Impact's "Universal App/Web Link" attribution — the in-app
+   * SFSafariViewController used by WebBrowser.openBrowserAsync silently swallows
+   * Universal Links and forces the user into a web view, which only credits us
+   * for web purchases. With Linking.openURL: app installed → native app + full
+   * attribution; app missing → Safari + irclickid stamping (Impact still credits).
+   *
+   * Non-affiliate links (Telecharge, official sites) still use the in-app
+   * browser since native handoff isn't a factor and the in-app UX is better.
+   */
   const openTicketLink = async (link: { platform: string; url: string }, position: number, source: TicketSource) => {
     if (!show) return;
     const { url: affiliateUrl, isAffiliate } = buildTicketUrl(link.url, link.platform, source);
@@ -112,13 +125,33 @@ export default function ShowDetailScreen() {
     trackTicketTap(eventProps);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
-    // 2. Open browser and track lifecycle
+    // 2. Open the URL — affiliate vs non-affiliate path
+    if (isAffiliate) {
+      // Native app handoff via Universal Link. No dismiss callback exists, so we
+      // skip ticket_browser_dismissed; conversion data from Impact is the
+      // authoritative downstream signal anyway.
+      try {
+        await Linking.openURL(affiliateUrl);
+        trackTicketBrowserOpened(eventProps);
+      } catch {
+        // openURL failed (malformed URL, no handler) — tap event still recorded.
+        // Fall back to in-app browser so the user isn't stranded.
+        try {
+          await WebBrowser.openBrowserAsync(affiliateUrl);
+          trackTicketBrowserOpened(eventProps);
+        } catch {
+          // Both paths failed — only the tap event survives.
+        }
+      }
+      return;
+    }
+
+    // Non-affiliate: in-app browser with full lifecycle tracking
     const openedAt = Date.now();
     try {
-      const result = await WebBrowser.openBrowserAsync(affiliateUrl);
+      await WebBrowser.openBrowserAsync(affiliateUrl);
       trackTicketBrowserOpened(eventProps);
 
-      // 3. Browser was dismissed — track with time-on-site
       const timeOnSiteMs = Date.now() - openedAt;
       trackTicketBrowserDismissed({
         ...eventProps,
