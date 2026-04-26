@@ -1,8 +1,10 @@
 /**
  * To Watch tab — watchlist of shows to see.
  *
- * Sections: Upcoming (with planned dates), regular Watchlist (no dates).
- * Grid/list view toggle, sort options: added-desc, alphabetical, closing-soon.
+ * Hero stat strip (Saved / Booked / Closing soon) + inline search pill.
+ * Upcoming section: horizontal scroll row of poster cards with date pills.
+ * Watchlist: 3-col grid of poster tiles, red "Closes" badge if at risk.
+ * List view alternative for compact scanning. Date picker for planned dates.
  */
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -10,17 +12,19 @@ import {
   View,
   Text,
   FlatList,
+  ScrollView,
   Pressable,
   StyleSheet,
   Alert,
   Platform,
+  useWindowDimensions,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
-import Svg, { Path } from 'react-native-svg';
+import Svg, { Path, Circle } from 'react-native-svg';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useAuth } from '@/lib/auth-context';
 import { useUserReviews } from '@/hooks/useUserReviews';
@@ -33,9 +37,16 @@ import type { Show } from '@/lib/types';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
 import { Skeleton } from '@/components/Skeleton';
 import { ShowSearchModal } from '@/components/ShowSearchModal';
+import { StatHero } from '@/components/my-shows/StatHero';
+import { UpcomingPoster } from '@/components/my-shows/UpcomingPoster';
+import { WatchlistGridPoster } from '@/components/my-shows/WatchlistGridPoster';
+import { isClosingWithinDays } from '@/lib/show-utils';
 import * as haptics from '@/lib/haptics';
 
 type WatchlistSort = 'added-desc' | 'alphabetical' | 'closing-soon';
+
+const GRID_COLS = 3;
+const GRID_GAP = Spacing.xs;
 
 function EmptyState({ emoji, title, subtitle, actionLabel, onAction }: {
   emoji: string; title: string; subtitle: string; actionLabel?: string; onAction?: () => void;
@@ -57,6 +68,7 @@ function EmptyState({ emoji, title, subtitle, actionLabel, onAction }: {
 export default function ToWatchScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { width: windowWidth } = useWindowDimensions();
   const { user, isAuthenticated, loading: authLoading, showSignIn } = useAuth();
   const { reviews, getAllReviews } = useUserReviews(user?.id || null);
   const { watchlist, getWatchlist, addToWatchlist, removeFromWatchlist, updatePlannedDate, loading: watchlistLoading } = useWatchlist(user?.id || null);
@@ -94,8 +106,6 @@ export default function ToWatchScreen() {
   const today = new Date().toISOString().split('T')[0];
   const reviewedShowIds = useMemo(() => new Set(reviews.map(r => r.show_id)), [reviews]);
 
-  // Split: upcoming (future planned dates), regular (no date or no planned date)
-  // Exclude "to be rated" items (past date, no review) — those go to Watched tab
   const { upcomingWatchlist, regularWatchlist } = useMemo(() => {
     const upcoming: WatchlistEntry[] = [];
     const regular: WatchlistEntry[] = [];
@@ -134,7 +144,30 @@ export default function ToWatchScreen() {
     }
   }, [regularWatchlist, watchlistSort, showMap]);
 
-  const totalCount = upcomingWatchlist.length + regularWatchlist.length;
+  // Hero stats
+  const heroItems = useMemo(() => {
+    const total = upcomingWatchlist.length + regularWatchlist.length;
+    const booked = upcomingWatchlist.length;
+    const closingSoon =
+      upcomingWatchlist.filter(w => isClosingWithinDays(showMap[w.show_id], 30)).length +
+      regularWatchlist.filter(w => isClosingWithinDays(showMap[w.show_id], 30)).length;
+    return [
+      { value: String(total), label: 'SAVED' },
+      { value: String(booked), label: 'BOOKED' },
+      {
+        value: String(closingSoon),
+        label: 'CLOSING',
+        accent: closingSoon > 0,
+      },
+    ];
+  }, [upcomingWatchlist, regularWatchlist, showMap]);
+
+  // Card width — same derivation as Watched, ensures parity across screens
+  const cardWidth = useMemo(() => {
+    const pagePadding = Spacing.lg * 2;
+    const totalGaps = GRID_GAP * (GRID_COLS - 1);
+    return Math.floor((windowWidth - pagePadding - totalGaps) / GRID_COLS);
+  }, [windowWidth]);
 
   const handleRemove = useCallback(async (showId: string) => {
     try {
@@ -146,14 +179,12 @@ export default function ToWatchScreen() {
 
   const handleDateChange = useCallback((_event: unknown, selectedDate?: Date) => {
     if (Platform.OS === 'android') {
-      // Android: picker dismisses on selection, save immediately
       setDatePickingShowId(null);
       if (selectedDate && datePickingShowId) {
         const isoDate = selectedDate.toISOString().split('T')[0];
         updatePlannedDate(datePickingShowId, isoDate);
       }
     } else if (selectedDate) {
-      // iOS inline: just store the selection, save on "Done" tap
       setPendingDate(selectedDate);
     }
   }, [datePickingShowId, updatePlannedDate]);
@@ -168,6 +199,14 @@ export default function ToWatchScreen() {
   }, []);
 
   const sortLabel = watchlistSort === 'added-desc' ? 'Recent' : watchlistSort === 'alphabetical' ? 'A-Z' : 'Closing Soon';
+
+  const confirmRemove = useCallback((entry: WatchlistEntry) => {
+    const title = showMap[entry.show_id]?.title || entry.show_id;
+    Alert.alert('Remove from Watchlist', `Remove ${title}?`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Remove', style: 'destructive', onPress: () => handleRemove(entry.show_id) },
+    ]);
+  }, [showMap, handleRemove]);
 
   if (!featureFlags.userAccounts) return null;
 
@@ -211,70 +250,6 @@ export default function ToWatchScreen() {
     );
   }
 
-  const renderUpcomingItem = (item: WatchlistEntry) => {
-    const show = showMap[item.show_id];
-    const title = show?.title || item.show_id;
-    const posterUrl = show?.images ? (getImageUrl(show.images.poster) || getImageUrl(show.images.thumbnail)) : null;
-    const daysUntil = item.planned_date
-      ? Math.ceil((new Date(item.planned_date + 'T00:00:00').getTime() - Date.now()) / (1000 * 60 * 60 * 24))
-      : null;
-
-    return (
-      <Pressable
-        key={item.id}
-        style={({ pressed }) => [styles.gridCard, pressed && styles.pressed]}
-        onPress={() => show && router.push(`/show/${show.slug}`)}
-        onLongPress={() => { setPendingDate(new Date()); setDatePickingShowId(item.show_id); }}
-      >
-        {posterUrl ? (
-          <Image source={{ uri: posterUrl }} style={styles.gridPoster} contentFit="cover" transition={200} />
-        ) : (
-          <View style={[styles.gridPoster, styles.cardPosterPlaceholder]}>
-            <Text style={styles.placeholderText}>{title.charAt(0)}</Text>
-          </View>
-        )}
-        {item.planned_date && (
-          <Text style={styles.posterDate}>
-            {new Date(item.planned_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-            {daysUntil !== null && daysUntil >= 0 && daysUntil <= 7 && (
-              daysUntil === 0 ? ' · Today!' : daysUntil === 1 ? ' · Tomorrow' : ` · ${daysUntil}d`
-            )}
-          </Text>
-        )}
-        <Text style={styles.gridTitle} numberOfLines={2}>{title}</Text>
-      </Pressable>
-    );
-  };
-
-  const renderWatchlistGridItem = (item: WatchlistEntry) => {
-    const show = showMap[item.show_id];
-    const title = show?.title || item.show_id;
-    const posterUrl = show?.images ? (getImageUrl(show.images.poster) || getImageUrl(show.images.thumbnail)) : null;
-
-    return (
-      <Pressable
-        key={item.id}
-        style={({ pressed }) => [styles.gridCard, pressed && styles.pressed]}
-        onPress={() => show && router.push(`/show/${show.slug}`)}
-        onLongPress={() => {
-          Alert.alert('Remove from Watchlist', `Remove ${title}?`, [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Remove', style: 'destructive', onPress: () => handleRemove(item.show_id) },
-          ]);
-        }}
-      >
-        {posterUrl ? (
-          <Image source={{ uri: posterUrl }} style={styles.gridPoster} contentFit="cover" transition={200} />
-        ) : (
-          <View style={[styles.gridPoster, styles.cardPosterPlaceholder]}>
-            <Text style={styles.placeholderText}>{title.charAt(0)}</Text>
-          </View>
-        )}
-        <Text style={styles.gridTitle} numberOfLines={2}>{title}</Text>
-      </Pressable>
-    );
-  };
-
   const renderWatchlistListItem = (item: WatchlistEntry) => {
     const show = showMap[item.show_id];
     const title = show?.title || item.show_id;
@@ -285,12 +260,7 @@ export default function ToWatchScreen() {
         key={item.id}
         style={({ pressed }) => [styles.listRow, pressed && styles.pressed]}
         onPress={() => show && router.push(`/show/${show.slug}`)}
-        onLongPress={() => {
-          Alert.alert('Remove from Watchlist', `Remove ${title}?`, [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Remove', style: 'destructive', onPress: () => handleRemove(item.show_id) },
-          ]);
-        }}
+        onLongPress={() => confirmRemove(item)}
       >
         {posterUrl ? (
           <Image source={{ uri: posterUrl }} style={styles.listPoster} contentFit="cover" transition={200} />
@@ -307,134 +277,166 @@ export default function ToWatchScreen() {
     );
   };
 
+  // Build 3-col grid rows for watchlist
+  const gridRows = useMemo(() => {
+    const rows: WatchlistEntry[][] = [];
+    for (let i = 0; i < sortedWatchlist.length; i += GRID_COLS) {
+      rows.push(sortedWatchlist.slice(i, i + GRID_COLS));
+    }
+    return rows;
+  }, [sortedWatchlist]);
+
   const allEmpty = upcomingWatchlist.length === 0 && sortedWatchlist.length === 0;
 
   return (
     <GestureHandlerRootView style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.headerRow}>
         <Text style={styles.pageTitle}>To Watch</Text>
-        <Pressable
-          style={({ pressed }) => [styles.addButton, pressed && styles.pressed]}
-          onPress={() => setShowSearchModal(true)}
-          hitSlop={8}
-          accessibilityLabel="Add to watchlist"
-        >
-          <Svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={Colors.text.secondary} strokeWidth={2.5}>
-            <Path strokeLinecap="round" d="M12 5v14M5 12h14" />
-          </Svg>
-        </Pressable>
-      </View>
-
-      <View style={styles.controlsRow}>
-        <Text style={styles.statsText}>
-          <Text style={styles.statsNumber}>{totalCount}</Text> shows
-        </Text>
-        <View style={styles.controlsRight}>
-          <Pressable style={styles.sortButton} onPress={cycleSort}>
-            <Text style={styles.sortText}>{sortLabel}</Text>
-            <Svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke={Colors.text.muted} strokeWidth={2}>
-              <Path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-            </Svg>
-          </Pressable>
-          <View style={styles.viewToggleContainer}>
-            <Pressable
-              testID="grid-view-toggle"
-              style={[styles.viewToggleButton, viewMode === 'grid' && styles.viewToggleActive]}
-              onPress={() => { haptics.tap(); setViewMode('grid'); }}
-              hitSlop={4}
-            >
-              <Svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={viewMode === 'grid' ? Colors.text.primary : Colors.text.muted} strokeWidth={2}>
-                <Path strokeLinecap="round" strokeLinejoin="round" d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z" />
-              </Svg>
-            </Pressable>
-            <Pressable
-              testID="list-view-toggle"
-              style={[styles.viewToggleButton, viewMode === 'list' && styles.viewToggleActive]}
-              onPress={() => { haptics.tap(); setViewMode('list'); }}
-              hitSlop={4}
-            >
-              <Svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={viewMode === 'list' ? Colors.text.primary : Colors.text.muted} strokeWidth={2}>
-                <Path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
-              </Svg>
-            </Pressable>
-          </View>
-        </View>
       </View>
 
       {allEmpty ? (
-        <EmptyState
-          emoji="🎟️"
-          title="Your watchlist is empty"
-          subtitle="Save shows you want to see and set reminders for when you're going."
-          actionLabel="Browse Shows"
-          onAction={() => router.push('/(tabs)/browse')}
-        />
+        <>
+          <StatHero items={heroItems} />
+          <Pressable
+            style={({ pressed }) => [styles.searchPill, pressed && styles.pressed]}
+            onPress={() => setShowSearchModal(true)}
+            accessibilityRole="search"
+            accessibilityLabel="Search to add a show"
+          >
+            <Svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={Colors.text.muted} strokeWidth={2}>
+              <Circle cx="11" cy="11" r="7" />
+              <Path strokeLinecap="round" d="M21 21l-4.35-4.35" />
+            </Svg>
+            <Text style={styles.searchPillText}>Search to add a show…</Text>
+          </Pressable>
+          <EmptyState
+            emoji="🎟️"
+            title="Your watchlist is empty"
+            subtitle="Save shows you want to see and set reminders for when you're going."
+            actionLabel="Browse Shows"
+            onAction={() => router.push('/(tabs)/browse')}
+          />
+        </>
       ) : (
-        <FlatList
-          data={['content']}
-          keyExtractor={() => 'content'}
-          renderItem={() => (
-            <View>
-              {/* Upcoming section */}
-              {upcomingWatchlist.length > 0 && (
-                <View>
-                  <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionTitle}>Upcoming</Text>
-                    <Text style={styles.sectionCount}>{upcomingWatchlist.length} shows</Text>
-                  </View>
-                  <View style={styles.posterGrid}>
-                    {upcomingWatchlist.map(renderUpcomingItem)}
-                  </View>
-                </View>
-              )}
-
-              {/* Regular watchlist */}
-              {sortedWatchlist.length > 0 && (
-                <View>
-                  <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionTitle}>Watchlist</Text>
-                    <Text style={styles.sectionCount}>{sortedWatchlist.length} shows</Text>
-                  </View>
-                  {viewMode === 'grid' ? (
-                    <View style={styles.posterGrid}>
-                      {sortedWatchlist.map(renderWatchlistGridItem)}
-                      <View style={styles.gridCard}>
-                        <Pressable
-                          style={({ pressed }) => [styles.addShowCard, pressed && styles.pressed]}
-                          onPress={() => setShowSearchModal(true)}
-                        >
-                          <Svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke={Colors.text.muted} strokeWidth={2}>
-                            <Path strokeLinecap="round" d="M12 5v14M5 12h14" />
-                          </Svg>
-                          <Text style={styles.addShowLabel}>Add Show</Text>
-                        </Pressable>
-                      </View>
-                    </View>
-                  ) : (
-                    <View>
-                      {sortedWatchlist.map(renderWatchlistListItem)}
-                    </View>
-                  )}
-                </View>
-              )}
-              {/* Quick-add search at bottom */}
-              <Pressable
-                style={({ pressed }) => [styles.quickAddBar, pressed && styles.pressed]}
-                onPress={() => setShowSearchModal(true)}
-              >
-                <Svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={Colors.text.muted} strokeWidth={2}>
-                  <Path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </Svg>
-                <Text style={styles.quickAddText}>Search shows to add...</Text>
-              </Pressable>
-            </View>
-          )}
+        <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingBottom: Spacing.xxl }}
-        />
+        >
+          <StatHero items={heroItems} />
+
+          <Pressable
+            style={({ pressed }) => [styles.searchPill, pressed && styles.pressed]}
+            onPress={() => setShowSearchModal(true)}
+            accessibilityRole="search"
+            accessibilityLabel="Search to add a show"
+          >
+            <Svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={Colors.text.muted} strokeWidth={2}>
+              <Circle cx="11" cy="11" r="7" />
+              <Path strokeLinecap="round" d="M21 21l-4.35-4.35" />
+            </Svg>
+            <Text style={styles.searchPillText}>Search to add a show…</Text>
+          </Pressable>
+
+          {upcomingWatchlist.length > 0 ? (
+            <View style={{ marginTop: Spacing.sm }}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Upcoming</Text>
+                <Text style={styles.sectionCount}>{upcomingWatchlist.length}</Text>
+              </View>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.horizontalRow}
+              >
+                {upcomingWatchlist.map(item => (
+                  <UpcomingPoster
+                    key={item.id}
+                    watchlistEntry={item}
+                    show={showMap[item.show_id]}
+                    width={cardWidth}
+                    onPress={() => {
+                      haptics.tap();
+                      const slug = showMap[item.show_id]?.slug;
+                      if (slug) router.push(`/show/${slug}`);
+                    }}
+                  />
+                ))}
+              </ScrollView>
+            </View>
+          ) : null}
+
+          {sortedWatchlist.length > 0 ? (
+            <View style={{ marginTop: Spacing.lg }}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Watchlist</Text>
+                <View style={styles.sectionRight}>
+                  <Pressable style={styles.sortButton} onPress={cycleSort}>
+                    <Text style={styles.sortText}>{sortLabel}</Text>
+                    <Svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke={Colors.text.muted} strokeWidth={2}>
+                      <Path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                    </Svg>
+                  </Pressable>
+                  <View style={styles.viewToggleContainer}>
+                    <Pressable
+                      testID="grid-view-toggle"
+                      style={[styles.viewToggleButton, viewMode === 'grid' && styles.viewToggleActive]}
+                      onPress={() => { haptics.tap(); setViewMode('grid'); }}
+                      hitSlop={4}
+                    >
+                      <Svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke={viewMode === 'grid' ? Colors.text.primary : Colors.text.muted} strokeWidth={2}>
+                        <Path strokeLinecap="round" strokeLinejoin="round" d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z" />
+                      </Svg>
+                    </Pressable>
+                    <Pressable
+                      testID="list-view-toggle"
+                      style={[styles.viewToggleButton, viewMode === 'list' && styles.viewToggleActive]}
+                      onPress={() => { haptics.tap(); setViewMode('list'); }}
+                      hitSlop={4}
+                    >
+                      <Svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke={viewMode === 'list' ? Colors.text.primary : Colors.text.muted} strokeWidth={2}>
+                        <Path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+                      </Svg>
+                    </Pressable>
+                  </View>
+                </View>
+              </View>
+
+              {viewMode === 'grid' ? (
+                <View style={styles.gridContainer}>
+                  {gridRows.map((row, rowIdx) => (
+                    <View key={rowIdx} style={styles.gridRow}>
+                      {row.map(item => (
+                        <WatchlistGridPoster
+                          key={item.id}
+                          watchlistEntry={item}
+                          show={showMap[item.show_id]}
+                          width={cardWidth}
+                          onPress={() => {
+                            haptics.tap();
+                            const slug = showMap[item.show_id]?.slug;
+                            if (slug) router.push(`/show/${slug}`);
+                          }}
+                          onLongPress={() => confirmRemove(item)}
+                        />
+                      ))}
+                      {/* spacers for incomplete final row */}
+                      {row.length < GRID_COLS &&
+                        Array.from({ length: GRID_COLS - row.length }, (_, i) => (
+                          <View key={`spacer-${i}`} style={{ width: cardWidth }} />
+                        ))}
+                    </View>
+                  ))}
+                </View>
+              ) : (
+                <View>
+                  {sortedWatchlist.map(renderWatchlistListItem)}
+                </View>
+              )}
+            </View>
+          ) : null}
+        </ScrollView>
       )}
 
-      {/* Date picker */}
       {datePickingShowId && (
         <View style={styles.datePickerOverlay}>
           <View style={styles.datePickerCard}>
@@ -462,7 +464,6 @@ export default function ToWatchScreen() {
         </View>
       )}
 
-      {/* Search modal — select show → auto-add to watchlist */}
       <ShowSearchModal
         visible={showSearchModal}
         title="Add to Watchlist"
@@ -490,52 +491,78 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg, paddingTop: Spacing.xl, paddingBottom: Spacing.sm,
   },
   pageTitle: { fontSize: FontSize.xxl, fontWeight: '700', color: Colors.text.primary },
-  addButton: {
-    width: 38, height: 38, borderRadius: 10,
-    backgroundColor: Colors.surface.overlay, alignItems: 'center', justifyContent: 'center',
-  },
   pressed: { opacity: 0.7 },
-  controlsRow: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: Spacing.lg, paddingBottom: Spacing.sm,
+
+  searchPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    backgroundColor: Colors.surface.overlay,
+    borderRadius: BorderRadius.md,
+    marginHorizontal: Spacing.lg,
+    marginBottom: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 12,
   },
-  statsText: { color: Colors.text.secondary, fontSize: FontSize.sm },
-  statsNumber: { color: Colors.text.primary, fontWeight: '700' },
-  controlsRight: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
+  searchPillText: {
+    color: Colors.text.muted,
+    fontSize: FontSize.sm,
+  },
+
+  sectionHeader: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingHorizontal: Spacing.lg, paddingVertical: Spacing.sm,
+  },
+  sectionTitle: { color: Colors.text.primary, fontSize: FontSize.lg, fontWeight: '700' },
+  sectionCount: { color: Colors.text.muted, fontSize: FontSize.xs },
+  sectionRight: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
+
+  horizontalRow: {
+    paddingHorizontal: Spacing.lg,
+    gap: Spacing.sm,
+  },
+
+  gridContainer: {
+    paddingHorizontal: Spacing.lg,
+  },
+  gridRow: {
+    flexDirection: 'row',
+    gap: GRID_GAP,
+    marginBottom: Spacing.md,
+  },
+
   sortButton: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     backgroundColor: Colors.surface.overlay, borderRadius: 8,
     paddingHorizontal: Spacing.sm, paddingVertical: 6,
   },
   sortText: { color: Colors.text.secondary, fontSize: FontSize.xs, fontWeight: '500' },
-  sectionHeader: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+  viewToggleContainer: {
+    flexDirection: 'row', backgroundColor: Colors.surface.overlay,
+    borderRadius: 8, overflow: 'hidden',
+  },
+  viewToggleButton: {
+    padding: 6, alignItems: 'center', justifyContent: 'center',
+  },
+  viewToggleActive: {
+    backgroundColor: Colors.surface.raised,
+  },
+
+  // List view
+  listRow: {
+    flexDirection: 'row', alignItems: 'center', gap: Spacing.md,
     paddingHorizontal: Spacing.lg, paddingVertical: Spacing.sm,
   },
-  sectionTitle: { color: Colors.text.primary, fontSize: FontSize.lg, fontWeight: '600' },
-  sectionCount: { color: Colors.text.muted, fontSize: FontSize.xs },
-  posterGrid: {
-    flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm,
-    paddingHorizontal: Spacing.lg,
-  },
-  gridCard: { width: '23%', alignItems: 'center' },
-  gridPoster: {
-    width: '100%', aspectRatio: 2 / 3, borderRadius: BorderRadius.md,
+  listPoster: {
+    width: 48, height: 64, borderRadius: BorderRadius.sm,
     backgroundColor: Colors.surface.overlay,
   },
   cardPosterPlaceholder: { alignItems: 'center', justifyContent: 'center' },
   placeholderText: { color: Colors.text.muted, fontSize: 18, fontWeight: '600' },
-  posterDate: { color: Colors.text.secondary, fontSize: 11, fontWeight: '500', textAlign: 'center', marginTop: 4 },
-  gridTitle: {
-    color: Colors.text.secondary, fontSize: 11, fontWeight: '500',
-    textAlign: 'center', lineHeight: 14, marginTop: 2,
-  },
-  addShowCard: {
-    width: '100%', aspectRatio: 2 / 3, borderRadius: BorderRadius.md,
-    borderWidth: 2, borderStyle: 'dashed', borderColor: Colors.surface.overlay,
-    alignItems: 'center', justifyContent: 'center', gap: 4,
-  },
-  addShowLabel: { color: Colors.text.muted, fontSize: 10, fontWeight: '500' },
+  listInfo: { flex: 1 },
+  listTitle: { color: Colors.text.primary, fontSize: FontSize.md, fontWeight: '600' },
+  listVenue: { color: Colors.text.muted, fontSize: FontSize.sm, marginTop: 2 },
+
   // Empty / CTA
   emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: Spacing.xxl },
   emptyEmoji: { fontSize: 48, marginBottom: Spacing.md },
@@ -555,6 +582,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.xxl, paddingVertical: Spacing.md,
   },
   ctaButtonText: { color: '#0d0d1a', fontSize: FontSize.md, fontWeight: '700' },
+
+  // Date picker
   datePickerOverlay: {
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
     backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center',
@@ -569,37 +598,4 @@ const styles = StyleSheet.create({
   },
   datePickerTitle: { color: Colors.text.secondary, fontSize: FontSize.sm, fontWeight: '500' },
   datePickerDone: { color: Colors.brand, fontSize: FontSize.sm, fontWeight: '600' },
-  quickAddBar: {
-    flexDirection: 'row', alignItems: 'center', gap: Spacing.sm,
-    marginHorizontal: Spacing.lg, marginTop: Spacing.lg,
-    paddingHorizontal: Spacing.md, height: 44,
-    borderRadius: BorderRadius.md, borderWidth: 1,
-    borderColor: Colors.border.subtle, backgroundColor: Colors.surface.overlay,
-  },
-  quickAddText: { color: Colors.text.muted, fontSize: FontSize.sm },
-  viewToggleContainer: {
-    flexDirection: 'row', backgroundColor: Colors.surface.overlay,
-    borderRadius: 8, overflow: 'hidden',
-  },
-  viewToggleButton: {
-    padding: 6, alignItems: 'center', justifyContent: 'center',
-  },
-  viewToggleActive: {
-    backgroundColor: Colors.surface.raised,
-  },
-  listRow: {
-    flexDirection: 'row', alignItems: 'center', gap: Spacing.md,
-    paddingHorizontal: Spacing.lg, paddingVertical: Spacing.sm,
-  },
-  listPoster: {
-    width: 48, height: 64, borderRadius: BorderRadius.sm,
-    backgroundColor: Colors.surface.overlay,
-  },
-  listInfo: { flex: 1 },
-  listTitle: {
-    color: Colors.text.primary, fontSize: FontSize.md, fontWeight: '600',
-  },
-  listVenue: {
-    color: Colors.text.muted, fontSize: FontSize.sm, marginTop: 2,
-  },
 });
