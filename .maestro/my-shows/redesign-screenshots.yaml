@@ -62,7 +62,18 @@ appId: com.broadwayscorecard.app
 # Re-navigate to Watched (now authed)
 - openLink: broadwayscorecard:///watched
 - waitForAnimationToEnd
-- takeScreenshot: ~/Documents/claude-outputs/bwsc-my-shows-mocks/ios-after-pass1/maestro-01-watched
+- takeScreenshot: ~/Documents/claude-outputs/bwsc-my-shows-mocks/ios-after-pass1/maestro-01-watched-grid
+
+# Switch to list view via accessibility label
+- tapOn:
+    id: "list-view-toggle"
+- waitForAnimationToEnd
+- takeScreenshot: ~/Documents/claude-outputs/bwsc-my-shows-mocks/ios-after-pass1/maestro-01b-watched-list
+
+# Switch back to grid for downstream tabs
+- tapOn:
+    id: "grid-view-toggle"
+- waitForAnimationToEnd
 
 # Navigate to To Watch
 - openLink: broadwayscorecard:///to-watch
@@ -73,3 +84,12 @@ appId: com.broadwayscorecard.app
 - openLink: broadwayscorecard:///lists
 - waitForAnimationToEnd
 - takeScreenshot: ~/Documents/claude-outputs/bwsc-my-shows-mocks/ios-after-pass1/maestro-03-lists
+
+# Open the ranked list (West End Adventures) to verify detail layout
+- tapOn:
+    text: "Open list: West End.*"
+- extendedWaitUntil:
+    visible: "← Lists"
+    timeout: 5000
+- waitForAnimationToEnd
+- takeScreenshot: ~/Documents/claude-outputs/bwsc-my-shows-mocks/ios-after-pass1/maestro-04-list-detail
