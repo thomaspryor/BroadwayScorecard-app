@@ -1,0 +1,75 @@
+# Take after-screenshots of redesigned Watched / To Watch / Lists tabs
+# Pre-req: app already installed, EXPO_PUBLIC_DEV_AUTO_SIGNIN=1 in .env.local
+# Skips onboarding (handled by dev flag), does dev sign-in, screenshots each tab.
+
+appId: com.broadwayscorecard.app
+---
+- launchApp:
+    clearState: false
+
+# Wait for app to be ready (might be home tab or onboarding)
+- extendedWaitUntil:
+    visible:
+      text: "Broadway Scorecard"
+    timeout: 30000
+
+# Try to skip onboarding if it's there (no-op if already past it)
+- runFlow:
+    when:
+      visible: "Skip"
+    commands:
+      - tapOn: "Skip"
+      - tapOn: "Skip"
+      - tapOn: "Skip"
+
+# Navigate to Watched (will show sign-in CTA if not authed)
+- openLink: broadwayscorecard:///watched
+- waitForAnimationToEnd:
+    timeout: 5000
+
+# If unauthed, do email sign-in with the dev-test account
+- runFlow:
+    when:
+      visible: "Sign In to Get Started"
+    commands:
+      - tapOn: "Sign In to Get Started"
+      - extendedWaitUntil:
+          visible: "Sign in with email"
+          timeout: 10000
+      - tapOn: "Sign in with email"
+      - extendedWaitUntil:
+          visible:
+            text: "Email"
+          timeout: 5000
+      - tapOn:
+          text: "Email"
+      - inputText: "dev-test@broadwayscorecard.com"
+      - tapOn:
+          text: "Password"
+      - inputText: "dev-test-local-only-2024"
+      - hideKeyboard
+      - tapOn:
+          text: "^Sign In$"
+      - extendedWaitUntil:
+          notVisible: "Sign In to Get Started"
+          timeout: 25000
+      - runFlow:
+          when:
+            visible: "Save Password"
+          commands:
+            - tapOn: "Not Now"
+
+# Re-navigate to Watched (now authed)
+- openLink: broadwayscorecard:///watched
+- waitForAnimationToEnd
+- takeScreenshot: ~/Documents/claude-outputs/bwsc-my-shows-mocks/ios-after-pass1/maestro-01-watched
+
+# Navigate to To Watch
+- openLink: broadwayscorecard:///to-watch
+- waitForAnimationToEnd
+- takeScreenshot: ~/Documents/claude-outputs/bwsc-my-shows-mocks/ios-after-pass1/maestro-02-to-watch
+
+# Navigate to Lists
+- openLink: broadwayscorecard:///lists
+- waitForAnimationToEnd
+- takeScreenshot: ~/Documents/claude-outputs/bwsc-my-shows-mocks/ios-after-pass1/maestro-03-lists
