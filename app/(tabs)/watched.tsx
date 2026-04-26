@@ -125,7 +125,6 @@ export default function WatchedScreen() {
     const avg = reviews.length
       ? reviews.reduce((s, r) => s + r.rating, 0) / reviews.length
       : 0;
-    const fiveStars = reviews.filter(r => r.rating >= 4.5).length;
     return [
       { value: String(reviews.length), label: 'VIEWINGS' },
       { value: String(showsSeen), label: 'SHOWS' },
@@ -133,7 +132,6 @@ export default function WatchedScreen() {
         value: avg ? avg.toFixed(1) : '—',
         label: 'AVG ★',
         accent: avg > 0,
-        sublabel: fiveStars > 0 ? `${fiveStars} five-star${fiveStars === 1 ? '' : 's'}` : undefined,
       },
     ];
   }, [reviews, showsSeen]);
@@ -336,6 +334,9 @@ export default function WatchedScreen() {
               style={[styles.viewToggleButton, viewMode === 'grid' && styles.viewToggleActive]}
               onPress={() => { haptics.tap(); setViewMode('grid'); }}
               hitSlop={4}
+              accessibilityLabel="Grid view"
+              accessibilityRole="button"
+              testID="grid-view-toggle"
             >
               <Svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke={viewMode === 'grid' ? Colors.text.primary : Colors.text.muted} strokeWidth={2}>
                 <Path strokeLinecap="round" strokeLinejoin="round" d="M4 5h6v6H4zM14 5h6v6h-6zM4 15h6v6H4zM14 15h6v6h-6z" />
@@ -345,6 +346,9 @@ export default function WatchedScreen() {
               style={[styles.viewToggleButton, viewMode === 'list' && styles.viewToggleActive]}
               onPress={() => { haptics.tap(); setViewMode('list'); }}
               hitSlop={4}
+              accessibilityLabel="List view"
+              accessibilityRole="button"
+              testID="list-view-toggle"
             >
               <Svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke={viewMode === 'list' ? Colors.text.primary : Colors.text.muted} strokeWidth={2}>
                 <Path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
@@ -481,7 +485,7 @@ const styles = StyleSheet.create({
   // Controls
   controlsRow: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: Spacing.lg, paddingBottom: Spacing.sm, paddingTop: Spacing.sm,
+    paddingHorizontal: Spacing.lg, paddingBottom: Spacing.xl, paddingTop: Spacing.md,
   },
   controlsHint: { color: Colors.text.muted, fontSize: FontSize.xs },
   controlsRight: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
@@ -523,9 +527,11 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
   },
 
-  // Grid
-  gridContent: { paddingHorizontal: Spacing.lg, paddingBottom: Spacing.xxl },
-  gridRow: { gap: GRID_GAP, marginBottom: Spacing.md },
+  // Grid — gridContent has NO horizontal padding so the StatHero / search pill
+  // (which carry their own marginHorizontal) render at consistent width with
+  // the list view's SectionList. The card rows add their own paddingHorizontal.
+  gridContent: { paddingBottom: Spacing.xxl },
+  gridRow: { gap: GRID_GAP, marginBottom: Spacing.md, paddingHorizontal: Spacing.lg },
 
   // Swipe
   swipeDelete: {

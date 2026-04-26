@@ -82,9 +82,6 @@ export default function ListsScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <View style={styles.headerRow}>
-        <Text style={styles.pageTitle}>My Lists</Text>
-      </View>
       {user && <ListsTab userId={user.id} showMap={showMap} />}
     </View>
   );

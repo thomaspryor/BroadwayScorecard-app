@@ -246,6 +246,9 @@ export default function ListsTab({ userId, showMap, createTrigger }: ListsTabPro
           contentContainerStyle={styles.listContent}
           ListHeaderComponent={
             <>
+              <View style={styles.indexTitleRow}>
+                <Text style={styles.indexTitle}>My Lists</Text>
+              </View>
               <StatHero items={heroItems} />
               <Pressable
                 style={({ pressed }) => [styles.createTile, pressed && styles.pressed]}
@@ -273,16 +276,21 @@ export default function ListsTab({ userId, showMap, createTrigger }: ListsTabPro
               <Pressable
                 style={({ pressed }) => [styles.listCard, pressed && styles.pressed]}
                 onPress={() => { haptics.tap(); setActiveListId(list.id); }}
+                testID={`list-card-${list.id}`}
+                accessibilityRole="button"
+                accessibilityLabel={`Open list: ${list.name}`}
               >
                 <ListMosaic posterUrls={previewUrls} size={80} />
                 <View style={styles.listCardInfo}>
-                  <View style={styles.listCardHeader}>
-                    <Text style={styles.listCardName} numberOfLines={1}>{list.name}</Text>
-                    {list.is_ranked && <Text style={styles.rankedBadge}># RANKED</Text>}
+                  <Text style={styles.listCardName} numberOfLines={1}>{list.name}</Text>
+                  <View style={styles.listCardMetaRow}>
+                    <Text style={styles.listCardCount}>
+                      {list.item_count || 0} {(list.item_count || 0) === 1 ? 'show' : 'shows'}
+                    </Text>
+                    {list.is_ranked ? (
+                      <Text style={styles.rankedBadge}># RANKED</Text>
+                    ) : null}
                   </View>
-                  <Text style={styles.listCardCount}>
-                    {list.item_count || 0} {(list.item_count || 0) === 1 ? 'show' : 'shows'}
-                  </Text>
                   {list.description ? (
                     <Text style={styles.listCardDesc} numberOfLines={1}>{list.description}</Text>
                   ) : null}
@@ -733,25 +741,34 @@ const styles = StyleSheet.create({
   },
   pressed: { opacity: 0.7 },
   listContent: {
-    paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.md,
     paddingBottom: 100,
+  },
+  indexTitleRow: {
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.xl,
+    paddingBottom: Spacing.sm,
+  },
+  indexTitle: {
+    fontSize: FontSize.xxl,
+    fontWeight: '700',
+    color: Colors.text.primary,
   },
   // ─── List card (index) ──────────
   listCard: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.md,
-    paddingVertical: Spacing.lg,
-    minHeight: 90,
+    paddingVertical: Spacing.xl,
+    paddingHorizontal: Spacing.lg,
+    minHeight: 112,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border.subtle,
   },
   listCardInfo: {
     flex: 1,
-    gap: 2,
+    gap: 4,
   },
-  listCardHeader: {
+  listCardMetaRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.sm,
@@ -786,6 +803,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: Spacing.sm,
+    marginHorizontal: Spacing.lg,
     marginBottom: Spacing.md,
     paddingVertical: Spacing.lg,
     borderRadius: BorderRadius.md,
@@ -811,7 +829,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.md,
+    paddingTop: Spacing.lg,
     paddingBottom: Spacing.sm,
   },
   backText: {

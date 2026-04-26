@@ -510,7 +510,7 @@ const styles = StyleSheet.create({
 
   sectionHeader: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: Spacing.lg, paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.lg, paddingTop: Spacing.md, paddingBottom: Spacing.xl,
   },
   sectionTitle: { color: Colors.text.primary, fontSize: FontSize.lg, fontWeight: '700' },
   sectionCount: { color: Colors.text.muted, fontSize: FontSize.xs },

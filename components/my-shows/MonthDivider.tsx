@@ -26,14 +26,14 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
   },
   text: {
-    color: Colors.text.muted,
-    fontSize: 11,
+    color: Colors.brand,
+    fontSize: 12,
     fontWeight: '700',
-    letterSpacing: 0.8,
+    letterSpacing: 1.0,
   },
   line: {
     flex: 1,
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: Colors.border.subtle,
+    height: 1,
+    backgroundColor: 'rgba(212, 165, 116, 0.25)',
   },
 });
