@@ -182,6 +182,18 @@ export default function WatchedScreen() {
     return Math.floor((windowWidth - pagePadding - totalGaps) / GRID_COLS);
   }, [windowWidth]);
 
+  // Grid data with trailing spacers to fill incomplete final row
+  type GridItem = UserReview | { __spacer: true; id: string };
+  const gridData: GridItem[] = useMemo(() => {
+    const remainder = sortedReviews.length % GRID_COLS;
+    if (remainder === 0) return sortedReviews;
+    const spacers = Array.from({ length: GRID_COLS - remainder }, (_, i) => ({
+      __spacer: true as const,
+      id: `spacer-${i}`,
+    }));
+    return [...sortedReviews, ...spacers];
+  }, [sortedReviews]);
+
   // Sort cycling
   const cycleDiarySort = useCallback(() => {
     haptics.tap();
@@ -344,18 +356,7 @@ export default function WatchedScreen() {
     </>
   );
 
-  // ─── Grid item ───────────────────────────────────────
-  type GridItem = UserReview | { __spacer: true; id: string };
-  const gridData: GridItem[] = useMemo(() => {
-    const remainder = sortedReviews.length % GRID_COLS;
-    if (remainder === 0) return sortedReviews;
-    const spacers = Array.from({ length: GRID_COLS - remainder }, (_, i) => ({
-      __spacer: true as const,
-      id: `spacer-${i}`,
-    }));
-    return [...sortedReviews, ...spacers];
-  }, [sortedReviews]);
-
+  // ─── Grid item render ────────────────────────────────
   const renderGridItem = ({ item }: { item: GridItem }) => {
     if ('__spacer' in item) return <View style={{ width: cardWidth }} />;
     return (

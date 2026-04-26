@@ -11,7 +11,6 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
-  FlatList,
   ScrollView,
   Pressable,
   StyleSheet,
@@ -169,6 +168,15 @@ export default function ToWatchScreen() {
     return Math.floor((windowWidth - pagePadding - totalGaps) / GRID_COLS);
   }, [windowWidth]);
 
+  // Build 3-col grid rows for the watchlist grid view
+  const gridRows = useMemo(() => {
+    const rows: WatchlistEntry[][] = [];
+    for (let i = 0; i < sortedWatchlist.length; i += GRID_COLS) {
+      rows.push(sortedWatchlist.slice(i, i + GRID_COLS));
+    }
+    return rows;
+  }, [sortedWatchlist]);
+
   const handleRemove = useCallback(async (showId: string) => {
     try {
       await removeFromWatchlist(showId);
@@ -276,15 +284,6 @@ export default function ToWatchScreen() {
       </Pressable>
     );
   };
-
-  // Build 3-col grid rows for watchlist
-  const gridRows = useMemo(() => {
-    const rows: WatchlistEntry[][] = [];
-    for (let i = 0; i < sortedWatchlist.length; i += GRID_COLS) {
-      rows.push(sortedWatchlist.slice(i, i + GRID_COLS));
-    }
-    return rows;
-  }, [sortedWatchlist]);
 
   const allEmpty = upcomingWatchlist.length === 0 && sortedWatchlist.length === 0;
 
