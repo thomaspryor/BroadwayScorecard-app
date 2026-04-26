@@ -83,7 +83,14 @@ function RootLayout() {
       loadFeatureFlagOverrides(),
       hasSeenOnboarding(),
     ])
-      .then(([, seen]) => setShowOnboarding(!seen))
+      .then(([, seen]) => {
+        // Dev simulator: skip onboarding when auto-sign-in is on
+        if (__DEV__ && process.env.EXPO_PUBLIC_DEV_AUTO_SIGNIN === '1') {
+          setShowOnboarding(false);
+          return;
+        }
+        setShowOnboarding(!seen);
+      })
       .catch(() => setShowOnboarding(false));
 
     // Check for OTA updates in background (non-blocking)
