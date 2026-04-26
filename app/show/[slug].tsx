@@ -23,7 +23,6 @@ import { buildTicketUrl, buildTicketEventProps, isAffiliatePlatform, chooseTicke
 import { addSentryBreadcrumb, captureException } from '@/lib/sentry';
 import Svg, { Path } from 'react-native-svg';
 import ShowPageRating from '@/components/user/ShowPageRating';
-import ShowPageWatchlistAndList from '@/components/user/ShowPageWatchlistAndList';
 import { BookmarkOverlay } from '@/components/BookmarkOverlay';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { ceremonyToYear } from '@/lib/tony-utils';
@@ -371,47 +370,34 @@ export default function ShowDetailScreen() {
             </View>
           )}
 
-          {/* Full-width separator — mirrors web `-mx-5 border-t border-white/10` */}
-          <View style={styles.sectionSeparator} />
+          {/* Link buttons: Official Site, Ticket platforms */}
+          <View style={styles.linkButtons}>
+            {show.officialUrl && (
+              <Pressable
+                style={({ pressed }) => [styles.linkButton, pressed && styles.pressed]}
+                onPress={() => WebBrowser.openBrowserAsync(show.officialUrl!)}
+              >
+                <Text style={styles.linkButtonText}>Official Site</Text>
+              </Pressable>
+            )}
+            {show.status !== 'closed' && show.ticketLinks?.map((link, i) => (
+              <Pressable
+                key={i}
+                style={({ pressed }) => [styles.linkButton, pressed && styles.pressed]}
+                onPress={() => openTicketLink(link, i, 'show_detail')}
+              >
+                <Text style={styles.linkButtonText}>{link.platform}</Text>
+              </Pressable>
+            ))}
+          </View>
 
-          {/* User rating section (feature-flagged) */}
+          {/* User rating + watchlist (feature-flagged) — inside header card */}
           <ShowPageRating
             showId={show.id}
             showTitle={show.title}
             closingDate={show.closingDate}
+
           />
-
-          {/* Full-width separator */}
-          <View style={styles.sectionSeparator} />
-
-          {/* Action row: Official Site + ticket platforms (horizontal scroll) + Watchlist + List */}
-          <View style={styles.actionRow}>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              style={styles.actionRowScroll}
-              contentContainerStyle={styles.actionRowScrollContent}
-            >
-              {show.officialUrl && (
-                <Pressable
-                  style={({ pressed }) => [styles.linkButton, pressed && styles.pressed]}
-                  onPress={() => WebBrowser.openBrowserAsync(show.officialUrl!)}
-                >
-                  <Text style={styles.linkButtonText}>Official Site</Text>
-                </Pressable>
-              )}
-              {show.status !== 'closed' && show.ticketLinks?.map((link, i) => (
-                <Pressable
-                  key={i}
-                  style={({ pressed }) => [styles.linkButton, pressed && styles.pressed]}
-                  onPress={() => openTicketLink(link, i, 'show_detail')}
-                >
-                  <Text style={styles.linkButtonText}>{link.platform}</Text>
-                </Pressable>
-              ))}
-            </ScrollView>
-            <ShowPageWatchlistAndList showId={show.id} />
-          </View>
         </View>
 
         {/* Audience Scorecard — grade badge header + horizontal source cards */}
@@ -1559,6 +1545,15 @@ const styles = StyleSheet.create({
     fontSize: FontSize.xs,
     fontWeight: '600',
   },
+  linkButtons: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.sm,
+    marginTop: Spacing.lg,
+    paddingTop: Spacing.lg,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border.subtle,
+  },
   linkButton: {
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
@@ -1571,26 +1566,6 @@ const styles = StyleSheet.create({
     color: Colors.text.primary,
     fontSize: FontSize.sm,
     fontWeight: '500',
-  },
-  sectionSeparator: {
-    height: 1,
-    backgroundColor: Colors.border.default,
-    marginHorizontal: -Spacing.lg,
-    marginVertical: Spacing.lg,
-  },
-  actionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-  },
-  actionRowScroll: {
-    flex: 1,
-  },
-  actionRowScrollContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-    paddingRight: Spacing.sm,
   },
   breakdownSection: {
     marginTop: Spacing.lg,
