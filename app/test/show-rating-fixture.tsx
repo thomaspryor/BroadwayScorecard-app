@@ -1,5 +1,5 @@
 /**
- * Test fixture for ShowPageRating — renders with local state (no auth, no Supabase).
+ * Test fixture for RatingCard / ShowPageRating layout — local state only.
  *
  * DEV ONLY — returns null in production builds.
  *
@@ -8,23 +8,24 @@
  *   /test/show-rating-fixture?state=existing
  *   /test/show-rating-fixture?state=multi
  *
- * Mirrors the web project's /test/show-rating-fixture?state=... pattern.
+ * Renders the same `RatingCard` used by `ShowPageRating` so visual changes
+ * automatically propagate. Empty state mirrors the connected component's
+ * empty state (interactive lg StarRating).
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
-import { Colors, Spacing, FontSize } from '@/constants/theme';
+import Svg, { Path } from 'react-native-svg';
+import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
 import StarRating from '@/components/user/StarRating';
-import ReviewPanel from '@/components/user/ReviewPanel';
+import RatingCard from '@/components/user/RatingCard';
 import WatchlistButton from '@/components/user/WatchlistButton';
 import type { UserReview } from '@/lib/user-types';
 
 type FixtureState = 'empty' | 'existing' | 'multi';
 
-// ─── Seed data ──────────────────────────────────────────
 const SHOW_ID = 'hamilton-2024';
-const SHOW_TITLE = 'Hamilton';
 
 const SEED_REVIEWS: Record<FixtureState, UserReview[]> = {
   empty: [],
@@ -47,7 +48,7 @@ const SEED_REVIEWS: Record<FixtureState, UserReview[]> = {
       user_id: 'fixture-user',
       show_id: SHOW_ID,
       rating: 5,
-      review_text: 'Even better the third time',
+      review_text: 'Even better the third time — Lin-Manuel was on as Hamilton.',
       date_seen: '2025-06-10',
       visibility: 'private',
       created_at: '2025-06-10T20:00:00Z',
@@ -58,7 +59,7 @@ const SEED_REVIEWS: Record<FixtureState, UserReview[]> = {
       user_id: 'fixture-user',
       show_id: SHOW_ID,
       rating: 4.5,
-      review_text: 'Noticed new details this time',
+      review_text: 'Noticed new details this time around.',
       date_seen: '2025-03-20',
       visibility: 'private',
       created_at: '2025-03-20T20:00:00Z',
@@ -69,7 +70,7 @@ const SEED_REVIEWS: Record<FixtureState, UserReview[]> = {
       user_id: 'fixture-user',
       show_id: SHOW_ID,
       rating: 4,
-      review_text: 'Great show',
+      review_text: null,
       date_seen: '2025-01-15',
       visibility: 'private',
       created_at: '2025-01-15T20:00:00Z',
@@ -83,97 +84,51 @@ export default function ShowRatingFixtureScreen() {
   const fixtureState: FixtureState =
     stateParam === 'existing' || stateParam === 'multi' ? stateParam : 'empty';
 
-  // ─── Local state (replaces Supabase) ────────────────
   const [reviews, setReviews] = useState<UserReview[]>(SEED_REVIEWS[fixtureState]);
   const [isWatchlisted, setIsWatchlisted] = useState(fixtureState !== 'empty');
-  const [showPanel, setShowPanel] = useState(false);
-  const [currentRating, setCurrentRating] = useState<number | null>(null);
-  const [editingReview, setEditingReview] = useState<UserReview | null>(null);
-  const [saving, setSaving] = useState(false);
   const [watchlistLoading, setWatchlistLoading] = useState(false);
 
-  // Reset state when deep link changes fixture state (component is reused)
+  // Reset state when deep link changes (component is reused)
   const [prevFixtureState, setPrevFixtureState] = useState(fixtureState);
   if (fixtureState !== prevFixtureState) {
     setPrevFixtureState(fixtureState);
     setReviews(SEED_REVIEWS[fixtureState]);
     setIsWatchlisted(fixtureState !== 'empty');
-    setShowPanel(false);
-    setCurrentRating(null);
-    setEditingReview(null);
-    setSaving(false);
     setWatchlistLoading(false);
   }
 
-  const latestReview =
-    reviews.length > 0
-      ? reviews.reduce((a, b) => (new Date(b.created_at) > new Date(a.created_at) ? b : a))
-      : null;
-  const viewCount = reviews.length;
-
-  // ─── Handlers (local state, no network) ─────────────
-  const handleRatingChange = useCallback((rating: number) => {
-    setCurrentRating(rating);
-    setShowPanel(true);
-    setEditingReview(null);
-  }, []);
-
-  const handleSave = useCallback(
-    async (data: { rating: number; reviewText: string | null; dateSeen: string | null }) => {
-      setSaving(true);
-      // Simulate network delay
-      await new Promise(r => setTimeout(r, 300));
-
-      if (editingReview) {
-        // Update existing
-        setReviews(prev =>
-          prev.map(r =>
-            r.id === editingReview.id
-              ? { ...r, rating: data.rating, review_text: data.reviewText, date_seen: data.dateSeen, updated_at: new Date().toISOString() }
-              : r,
-          ),
-        );
-      } else {
-        // Insert new
-        const newReview: UserReview = {
-          id: `fixture-review-${Date.now()}`,
-          user_id: 'fixture-user',
-          show_id: SHOW_ID,
-          rating: data.rating,
-          review_text: data.reviewText,
-          date_seen: data.dateSeen,
-          visibility: 'private',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        };
-        setReviews(prev => [newReview, ...prev]);
-      }
-
-      setShowPanel(false);
-      setEditingReview(null);
-      setCurrentRating(null);
-      setSaving(false);
-    },
-    [editingReview],
-  );
-
-  const handleCancel = useCallback(() => {
-    setShowPanel(false);
-    setEditingReview(null);
-    if (!latestReview) setCurrentRating(null);
-  }, [latestReview]);
-
-  const handleEdit = useCallback((review: UserReview) => {
-    setEditingReview(review);
-    setCurrentRating(review.rating);
-    setShowPanel(true);
+  const handleEdit = useCallback((reviewId: string) => {
+    // Fixture: just log; real component routes to /rate/[showId]
+    console.log('[fixture] edit', reviewId);
   }, []);
 
   const handleDelete = useCallback((reviewId: string) => {
     setReviews(prev => prev.filter(r => r.id !== reviewId));
-    setShowPanel(false);
-    setEditingReview(null);
-    setCurrentRating(null);
+  }, []);
+
+  const handleAddViewing = useCallback(() => {
+    console.log('[fixture] add viewing');
+  }, []);
+
+  const handleSeeAll = useCallback(() => {
+    console.log('[fixture] see all');
+  }, []);
+
+  const handleEmptyRating = useCallback((rating: number) => {
+    // Fixture: insert a quick review locally
+    const newReview: UserReview = {
+      id: `fixture-${Date.now()}`,
+      user_id: 'fixture-user',
+      show_id: SHOW_ID,
+      rating,
+      review_text: null,
+      date_seen: null,
+      visibility: 'private',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    setReviews([newReview]);
+    setIsWatchlisted(true);
   }, []);
 
   const handleToggleWatchlist = useCallback(async () => {
@@ -183,106 +138,44 @@ export default function ShowRatingFixtureScreen() {
     setWatchlistLoading(false);
   }, []);
 
-  // ─── Render ─────────────────────────────────────────
   // Production guard — after all hooks (React rules)
   if (!__DEV__) return null;
+
+  const hasRating = reviews.length > 0;
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Text style={styles.fixtureLabel}>TEST FIXTURE — state: {fixtureState}</Text>
 
-      <View style={styles.ratingSection}>
-        <View style={styles.topRow}>
-          <View style={styles.leftCol}>
-            {/* Section label */}
-            <View style={styles.labelRow}>
-              <Text style={styles.sectionLabel}>YOUR RATING</Text>
-              {viewCount > 1 && (
-                <View style={styles.seenBadge} accessibilityLabel={`Seen ${viewCount} times`}>
-                  <Text style={styles.seenText}>Seen {viewCount} times</Text>
-                </View>
-              )}
-            </View>
-
-            {/* Stars + action buttons */}
-            {latestReview && !showPanel ? (
-              <View style={styles.existingRow}>
-                <StarRating rating={latestReview.rating} onRatingChange={handleRatingChange} size="lg" readOnly />
-                <Pressable onPress={() => handleEdit(latestReview)} hitSlop={8} accessibilityRole="button" accessibilityLabel="Edit rating">
-                  <Text style={styles.actionIcon}>✏️</Text>
-                </Pressable>
-                <Pressable onPress={() => handleDelete(latestReview.id)} hitSlop={8} accessibilityRole="button" accessibilityLabel="Delete rating">
-                  <Text style={styles.actionIcon}>🗑️</Text>
-                </Pressable>
-                <Pressable
-                  onPress={() => {
-                    setEditingReview(null);
-                    setCurrentRating(null);
-                    setShowPanel(false);
-                    handleRatingChange(latestReview.rating);
-                  }}
-                  accessibilityRole="button"
-                  accessibilityLabel="New viewing"
-                >
-                  <Text style={styles.newViewingText}>+ New Viewing</Text>
-                </Pressable>
-              </View>
-            ) : (
-              <StarRating rating={currentRating} onRatingChange={handleRatingChange} size="lg" />
-            )}
-
-            {/* Previous viewings */}
-            {viewCount > 1 && !showPanel && (
-              <View style={styles.previousViewings}>
-                {reviews
-                  .filter(r => r.id !== latestReview?.id)
-                  .slice(0, 3)
-                  .map(review => (
-                    <View key={review.id} style={styles.viewingRow}>
-                      <Pressable style={styles.viewingRowContent} onPress={() => handleEdit(review)} accessibilityRole="button" accessibilityLabel="Edit this viewing">
-                        <StarRating rating={review.rating} onRatingChange={() => {}} size="sm" readOnly hideLabel />
-                        {review.date_seen && (
-                          <Text style={styles.viewingDate}>
-                            {new Date(review.date_seen + 'T00:00:00').toLocaleDateString('en-US', {
-                              month: 'short',
-                              day: 'numeric',
-                              year: 'numeric',
-                            })}
-                          </Text>
-                        )}
-                      </Pressable>
-                      <Pressable onPress={() => handleDelete(review.id)} hitSlop={8} accessibilityRole="button" accessibilityLabel="Delete this viewing">
-                        <Text style={styles.actionIcon}>🗑️</Text>
-                      </Pressable>
-                    </View>
-                  ))}
-              </View>
-            )}
-          </View>
-
-          {/* Watchlist button */}
-          <View style={styles.rightCol}>
-            <WatchlistButton
-              isWatchlisted={isWatchlisted}
-              onToggle={handleToggleWatchlist}
-              loading={watchlistLoading}
-            />
-          </View>
-        </View>
-
-        {/* Expandable review panel */}
-        {showPanel && currentRating !== null && (
-          <ReviewPanel
-            rating={currentRating}
-            existingReviewText={editingReview?.review_text}
-            existingDateSeen={editingReview?.date_seen}
-            showTitle={SHOW_TITLE}
-            latestDate={null}
-            onSave={handleSave}
-            onCancel={handleCancel}
-            saving={saving}
+      <View style={styles.section}>
+        {hasRating ? (
+          <RatingCard
+            ratings={reviews}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+            onAddViewing={handleAddViewing}
+            onSeeAll={handleSeeAll}
           />
+        ) : (
+          <View style={styles.emptyState}>
+            <Text style={styles.sectionLabel}>YOUR RATING</Text>
+            <StarRating rating={null} onRatingChange={handleEmptyRating} size="lg" />
+          </View>
         )}
+
+        <View style={styles.controlsRow}>
+          <WatchlistButton
+            isWatchlisted={isWatchlisted}
+            onToggle={handleToggleWatchlist}
+            loading={watchlistLoading}
+          />
+          <Pressable style={styles.listButton} accessibilityLabel="Add to list">
+            <Svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke={Colors.text.muted} strokeWidth={2}>
+              <Path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+            </Svg>
+            <Text style={styles.listButtonText}>List</Text>
+          </Pressable>
+        </View>
       </View>
     </ScrollView>
   );
@@ -296,6 +189,7 @@ const styles = StyleSheet.create({
   content: {
     padding: Spacing.lg,
     paddingTop: Spacing.xxl,
+    gap: Spacing.md,
   },
   fixtureLabel: {
     color: '#f59e0b',
@@ -305,27 +199,12 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.xl,
     textAlign: 'center',
   },
-  ratingSection: {
-    paddingTop: Spacing.xl,
-    borderTopWidth: 1,
-    borderTopColor: Colors.border.subtle,
-  },
-  topRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  section: {
     gap: Spacing.md,
   },
-  leftCol: {
-    flex: 1,
-  },
-  rightCol: {
-    paddingTop: Spacing.xl,
-  },
-  labelRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  emptyState: {
+    paddingTop: Spacing.sm,
     gap: Spacing.sm,
-    marginBottom: Spacing.sm,
   },
   sectionLabel: {
     color: Colors.text.muted,
@@ -333,47 +212,24 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: 1,
   },
-  seenBadge: {
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 2,
-    borderRadius: 4,
+  controlsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.sm,
   },
-  seenText: {
-    color: Colors.text.muted,
-    fontSize: 10,
+  listButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    minHeight: 36,
+    paddingHorizontal: Spacing.md,
+    borderRadius: BorderRadius.sm,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+  },
+  listButtonText: {
+    color: Colors.text.secondary,
+    fontSize: FontSize.xs,
     fontWeight: '500',
-  },
-  existingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-    flexWrap: 'wrap',
-  },
-  actionIcon: {
-    fontSize: 14,
-  },
-  newViewingText: {
-    color: Colors.text.muted,
-    fontSize: FontSize.xs,
-  },
-  previousViewings: {
-    marginTop: Spacing.sm,
-    gap: Spacing.xs,
-  },
-  viewingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-  },
-  viewingRowContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-    flex: 1,
-  },
-  viewingDate: {
-    color: Colors.text.muted,
-    fontSize: FontSize.xs,
   },
 });

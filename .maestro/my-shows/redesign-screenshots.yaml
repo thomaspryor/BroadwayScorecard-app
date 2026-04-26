@@ -93,3 +93,19 @@ appId: com.broadwayscorecard.app
     timeout: 5000
 - waitForAnimationToEnd
 - takeScreenshot: ~/Documents/claude-outputs/bwsc-my-shows-mocks/ios-after-pass1/maestro-04-list-detail
+
+# ─── Show Page Rating Card (new) ────────────────────────────
+# Visit the dev fixture in 3 states to capture the redesigned RatingCard.
+# Fixture renders the actual RatingCard component (no auth/Supabase needed).
+
+- openLink: broadwayscorecard:///test/show-rating-fixture?state=empty
+- waitForAnimationToEnd
+- takeScreenshot: ~/Documents/claude-outputs/bwsc-my-shows-mocks/ios-after-pass1/maestro-05-rating-empty
+
+- openLink: broadwayscorecard:///test/show-rating-fixture?state=existing
+- waitForAnimationToEnd
+- takeScreenshot: ~/Documents/claude-outputs/bwsc-my-shows-mocks/ios-after-pass1/maestro-06-rating-existing
+
+- openLink: broadwayscorecard:///test/show-rating-fixture?state=multi
+- waitForAnimationToEnd
+- takeScreenshot: ~/Documents/claude-outputs/bwsc-my-shows-mocks/ios-after-pass1/maestro-07-rating-multi

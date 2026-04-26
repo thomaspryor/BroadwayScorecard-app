@@ -1,10 +1,8 @@
 /**
- * ShowPageRating — rating section on show detail page.
+ * ShowPageRating — connected rating section on show detail page.
  *
- * Displays existing ratings as read-only, with action buttons that open
- * the Rating Modal for editing. Star taps also navigate to the modal.
- *
- * Watchlist functionality remains inline.
+ * Wraps presentational `RatingCard` with auth + Supabase wiring.
+ * Watchlist + List controls live below the card.
  */
 
 import React, { useState, useCallback, useRef, useEffect } from 'react';
@@ -23,6 +21,7 @@ import * as haptics from '@/lib/haptics';
 import StarRating from './StarRating';
 import WatchlistButton from './WatchlistButton';
 import AddToListSheet from './AddToListSheet';
+import RatingCard from './RatingCard';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
 
 interface ShowPageRatingProps {
@@ -35,8 +34,6 @@ interface ShowPageRatingProps {
 export default function ShowPageRating({
   showId,
   showTitle,
-  previewDate,
-  closingDate,
 }: ShowPageRatingProps) {
   const { user, isAuthenticated, showSignIn } = useAuth();
   const { reviews, getReviewsForShow, deleteReview, invalidateCache } = useUserReviews(user?.id || null);
@@ -53,13 +50,11 @@ export default function ShowPageRating({
   const router = useRouter();
 
   const hasExecutedPending = useRef(false);
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [watchlistLoading, setWatchlistLoading] = useState(false);
   const [showWatchlistDatePicker, setShowWatchlistDatePicker] = useState(false);
   const [pendingWatchlistDate, setPendingWatchlistDate] = useState<Date>(new Date());
   const [showListSheet, setShowListSheet] = useState(false);
 
-  // Load data when authenticated
   useEffect(() => {
     if (isAuthenticated && user) {
       getReviewsForShow(showId);
@@ -67,7 +62,6 @@ export default function ShowPageRating({
     }
   }, [isAuthenticated, user, showId, getReviewsForShow, getWatchlist]);
 
-  // Refresh when returning from rate modal (focus regained)
   useFocusEffect(
     useCallback(() => {
       if (isAuthenticated && user) {
@@ -77,13 +71,8 @@ export default function ShowPageRating({
     }, [isAuthenticated, user, showId, getReviewsForShow, getWatchlist]),
   );
 
-  // Derive state
   const showReviews = reviews.filter(r => r.show_id === showId);
-  const latestReview =
-    showReviews.length > 0
-      ? showReviews.reduce((a, b) => (new Date(b.created_at) > new Date(a.created_at) ? b : a))
-      : null;
-  const viewCount = showReviews.length;
+  const hasRating = showReviews.length > 0;
   const watchlistEntry = watchlist.find(w => w.show_id === showId);
 
   // ─── Execute pending action after auth ───────────────────
@@ -98,7 +87,6 @@ export default function ShowPageRating({
       await clearPendingAction();
 
       if (pending.type === 'rating' && pending.rating) {
-        // Navigate to rating modal with the pending rating pre-filled
         router.push({
           pathname: '/rate/[showId]',
           params: { showId, showTitle, initialRating: String(pending.rating) },
@@ -135,7 +123,6 @@ export default function ShowPageRating({
         showSignIn('rating');
         return;
       }
-      // Navigate to rating modal with the tapped rating pre-filled
       router.push({
         pathname: '/rate/[showId]',
         params: { showId, showTitle, initialRating: String(rating) },
@@ -168,7 +155,6 @@ export default function ShowPageRating({
         await invalidateCache();
         haptics.action();
         showToast('Rating deleted.', 'info');
-        setConfirmDeleteId(null);
         await getReviewsForShow(showId);
       } catch (e) {
         const detail = e instanceof Error ? e.message : 'Unknown error';
@@ -220,10 +206,14 @@ export default function ShowPageRating({
     setShowListSheet(true);
   }, [isAuthenticated, showId, pathname, showSignIn]);
 
+  const handleAllRatings = useCallback(() => {
+    haptics.tap();
+    router.push('/(tabs)/watched');
+  }, [router]);
+
   const handleWatchlistDateChange = useCallback(
     (_event: DateTimePickerEvent, selectedDate?: Date) => {
       if (Platform.OS !== 'ios') {
-        // Android: picker dismisses on selection, save immediately
         setShowWatchlistDatePicker(false);
         if (selectedDate) {
           const iso = selectedDate.toISOString().split('T')[0];
@@ -232,7 +222,6 @@ export default function ShowPageRating({
           });
         }
       } else if (selectedDate) {
-        // iOS inline: store selection, save on "Done" tap
         setPendingWatchlistDate(selectedDate);
       }
     },
@@ -241,203 +230,106 @@ export default function ShowPageRating({
 
   // ─── Render ──────────────────────────────────────────────
 
-  // Feature flag check — in render, after all hooks (React rules)
   if (!featureFlags.userAccounts) return null;
 
   return (
     <View style={styles.container}>
-      <View style={styles.topRow}>
-        <View style={styles.leftCol}>
-          {/* Section label */}
-          <View style={styles.labelRow}>
-            <Text style={styles.sectionLabel}>MY RATING & REVIEW</Text>
-            {viewCount > 1 && (
-              <View style={styles.seenBadge} accessibilityLabel={`Seen ${viewCount} times`} testID="seen-badge">
-                <Text style={styles.seenText}>Seen {viewCount} times</Text>
-              </View>
-            )}
-          </View>
-
-          {/* Stars — read-only display when review exists, interactive when no review */}
-          {latestReview ? (
-            <View>
-              <StarRating rating={latestReview.rating} onRatingChange={handleRatingChange} size="lg" readOnly hideLabel />
-              {/* Show saved date and review text ABOVE action buttons */}
-              {(latestReview.date_seen || latestReview.review_text) && (
-                <View style={styles.savedInfo}>
-                  {latestReview.date_seen && (
-                    <Text style={styles.savedDate}>
-                      Saw {new Date(latestReview.date_seen + 'T00:00:00').toLocaleDateString('en-US', {
-                        month: 'short', day: 'numeric', year: 'numeric',
-                      })}
-                    </Text>
-                  )}
-                  {latestReview.review_text && (
-                    <Text style={styles.savedReviewText} numberOfLines={2}>
-                      {latestReview.review_text}
-                    </Text>
-                  )}
-                </View>
-              )}
-              <View style={styles.editActions}>
-                <Pressable style={styles.editButton} onPress={() => handleEdit(latestReview.id)} hitSlop={8} accessibilityRole="button" accessibilityLabel="Edit rating" testID="edit-rating">
-                  <Svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke={Colors.text.muted} strokeWidth={2}>
-                    <Path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                  </Svg>
-                  <Text style={styles.editButtonText}>Edit</Text>
-                </Pressable>
-                {confirmDeleteId === latestReview.id ? (
-                  <View style={styles.confirmRow}>
-                    <Pressable onPress={() => handleDelete(latestReview.id)} hitSlop={8}>
-                      <Text style={styles.deleteConfirmText}>Delete?</Text>
-                    </Pressable>
-                    <Pressable onPress={() => setConfirmDeleteId(null)} hitSlop={8}>
-                      <Text style={styles.deleteCancelText}>Cancel</Text>
-                    </Pressable>
-                  </View>
-                ) : (
-                  <Pressable style={styles.editButton} onPress={() => setConfirmDeleteId(latestReview.id)} hitSlop={8} accessibilityRole="button" accessibilityLabel="Delete rating">
-                    <Svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke={Colors.text.muted} strokeWidth={2}>
-                      <Path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </Svg>
-                  </Pressable>
-                )}
-                <Pressable
-                  style={styles.editButton}
-                  onPress={handleNewViewing}
-                  accessibilityRole="button"
-                  accessibilityLabel="New viewing"
-                  testID="new-viewing"
-                >
-                  <Text style={styles.newViewingText}>+ New Viewing</Text>
-                </Pressable>
-              </View>
-            </View>
-          ) : (
-            <StarRating rating={null} onRatingChange={handleRatingChange} size="lg" />
-          )}
-
-          {/* Previous viewings */}
-          {viewCount > 1 && (
-            <View style={styles.previousViewings}>
-              {showReviews
-                .filter(r => r.id !== latestReview?.id)
-                .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-                .slice(0, 3)
-                .map(review => (
-                <View key={review.id} style={styles.viewingRow}>
-                  <Pressable style={styles.viewingRowContent} onPress={() => handleEdit(review.id)} accessibilityRole="button" accessibilityLabel="Edit this viewing" testID={`viewing-${review.id}`}>
-                    <StarRating rating={review.rating} onRatingChange={() => {}} size="sm" readOnly hideLabel />
-                    {review.date_seen && (
-                      <Text style={styles.viewingDate}>
-                        {new Date(review.date_seen + 'T00:00:00').toLocaleDateString('en-US', {
-                          month: 'short',
-                          day: 'numeric',
-                          year: 'numeric',
-                        })}
-                      </Text>
-                    )}
-                  </Pressable>
-                  {confirmDeleteId === review.id ? (
-                    <View style={styles.confirmRow}>
-                      <Pressable onPress={() => handleDelete(review.id)} hitSlop={8}>
-                        <Text style={styles.deleteConfirmText}>Delete?</Text>
-                      </Pressable>
-                      <Pressable onPress={() => setConfirmDeleteId(null)} hitSlop={8}>
-                        <Text style={styles.deleteCancelText}>No</Text>
-                      </Pressable>
-                    </View>
-                  ) : (
-                    <Pressable onPress={() => setConfirmDeleteId(review.id)} hitSlop={8} style={styles.viewingDeleteButton} accessibilityRole="button" accessibilityLabel="Delete this viewing">
-                      <Svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke={Colors.text.muted} strokeWidth={2}>
-                        <Path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </Svg>
-                    </Pressable>
-                  )}
-                </View>
-              ))}
-            </View>
-          )}
+      {hasRating ? (
+        <RatingCard
+          ratings={showReviews}
+          onEdit={handleEdit}
+          onDelete={handleDelete}
+          onAddViewing={handleNewViewing}
+          onSeeAll={handleAllRatings}
+        />
+      ) : (
+        <View style={styles.emptyState}>
+          <Text style={styles.sectionLabel}>YOUR RATING</Text>
+          <StarRating rating={null} onRatingChange={handleRatingChange} size="lg" />
         </View>
+      )}
 
-        {/* Watchlist button + planned date */}
-        <View style={styles.rightCol}>
+      {/* Watchlist + List controls — always shown */}
+      <View style={styles.controlsRow}>
+        <View style={styles.controlsLeft}>
           <WatchlistButton
             isWatchlisted={isWatchlisted(showId)}
             onToggle={handleToggleWatchlist}
             loading={watchlistLoading}
           />
-          {/* Add date right below Watchlist button */}
           {isWatchlisted(showId) && (
-            <View style={styles.watchlistDateCol}>
-              <Pressable
-                style={styles.watchlistDateButton}
-                onPress={() => {
-                  setPendingWatchlistDate(
-                    watchlistEntry?.planned_date ? new Date(watchlistEntry.planned_date + 'T00:00:00') : new Date()
-                  );
-                  setShowWatchlistDatePicker(true);
-                }}
-                hitSlop={8}
-              >
-                <Svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke={Colors.text.muted} strokeWidth={2}>
-                  <Path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </Svg>
-                <Text style={styles.watchlistDateText}>
-                  {watchlistEntry?.planned_date
-                    ? new Date(watchlistEntry.planned_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-                    : 'Add date'}
-                </Text>
-              </Pressable>
+            <Pressable
+              style={styles.dateChip}
+              onPress={() => {
+                setPendingWatchlistDate(
+                  watchlistEntry?.planned_date ? new Date(watchlistEntry.planned_date + 'T00:00:00') : new Date(),
+                );
+                setShowWatchlistDatePicker(true);
+              }}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Set planned date"
+            >
+              <Svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke={Colors.text.muted} strokeWidth={2}>
+                <Path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </Svg>
+              <Text style={styles.dateChipText}>
+                {watchlistEntry?.planned_date
+                  ? new Date(watchlistEntry.planned_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                  : 'Add date'}
+              </Text>
               {watchlistEntry?.planned_date && (
                 <Pressable
                   onPress={() => updatePlannedDate(showId, null).catch(() => showToast('Failed to clear date.', 'error'))}
                   hitSlop={8}
+                  style={styles.dateChipClear}
                 >
-                  <Text style={styles.watchlistClearDate}>Clear</Text>
+                  <Text style={styles.dateChipClearText}>×</Text>
                 </Pressable>
               )}
-            </View>
-          )}
-          <Pressable
-            style={styles.listButton}
-            onPress={handleListPress}
-            accessibilityRole="button"
-            accessibilityLabel="Add to list"
-            testID="add-to-list-button"
-          >
-            <Svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={Colors.text.muted} strokeWidth={2}>
-              <Path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
-            </Svg>
-            <Text style={styles.listButtonText}>List</Text>
-          </Pressable>
-          {showWatchlistDatePicker && (
-            <View style={styles.datePickerContainer}>
-              <View style={styles.datePickerHeader}>
-                <Text style={styles.datePickerTitle}>When are you going?</Text>
-                <Pressable onPress={() => {
-                  const iso = pendingWatchlistDate.toISOString().split('T')[0];
-                  updatePlannedDate(showId, iso).catch(() => {
-                    showToast('Failed to save date.', 'error');
-                  });
-                  setShowWatchlistDatePicker(false);
-                }} hitSlop={8}>
-                  <Text style={styles.datePickerDone}>Done</Text>
-                </Pressable>
-              </View>
-              <DateTimePicker
-                value={pendingWatchlistDate}
-                mode="date"
-                display={Platform.OS === 'ios' ? 'inline' : 'default'}
-                onChange={handleWatchlistDateChange}
-                minimumDate={new Date()}
-                themeVariant="dark"
-                style={{ alignSelf: 'center' }}
-              />
-            </View>
+            </Pressable>
           )}
         </View>
+        <Pressable
+          style={({ pressed }) => [styles.listButton, pressed && styles.pressed]}
+          onPress={handleListPress}
+          accessibilityRole="button"
+          accessibilityLabel="Add to list"
+          testID="add-to-list-button"
+        >
+          <Svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke={Colors.text.muted} strokeWidth={2}>
+            <Path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+          </Svg>
+          <Text style={styles.listButtonText}>List</Text>
+        </Pressable>
       </View>
+
+      {showWatchlistDatePicker && (
+        <View style={styles.datePickerContainer}>
+          <View style={styles.datePickerHeader}>
+            <Text style={styles.datePickerTitle}>When are you going?</Text>
+            <Pressable onPress={() => {
+              const iso = pendingWatchlistDate.toISOString().split('T')[0];
+              updatePlannedDate(showId, iso).catch(() => {
+                showToast('Failed to save date.', 'error');
+              });
+              setShowWatchlistDatePicker(false);
+            }} hitSlop={8}>
+              <Text style={styles.datePickerDone}>Done</Text>
+            </Pressable>
+          </View>
+          <DateTimePicker
+            value={pendingWatchlistDate}
+            mode="date"
+            display={Platform.OS === 'ios' ? 'inline' : 'default'}
+            onChange={handleWatchlistDateChange}
+            minimumDate={new Date()}
+            themeVariant="dark"
+            style={{ alignSelf: 'center' }}
+          />
+        </View>
+      )}
+
       {isAuthenticated && user && (
         <AddToListSheet
           showId={showId}
@@ -453,28 +345,14 @@ export default function ShowPageRating({
 const styles = StyleSheet.create({
   container: {
     marginTop: Spacing.xl,
-    paddingTop: Spacing.xl,
-    borderTopWidth: 1,
-    borderTopColor: Colors.border.subtle,
-  },
-  topRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
     gap: Spacing.md,
   },
-  leftCol: {
-    flex: 1,
-  },
-  rightCol: {
-    paddingTop: Spacing.xl,
-    flexShrink: 0,
-    alignItems: 'center',
-  },
-  labelRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  pressed: { opacity: 0.6 },
+
+  // ─── Empty state (no ratings yet) ───────────────────────
+  emptyState: {
+    paddingTop: Spacing.sm,
     gap: Spacing.sm,
-    marginBottom: Spacing.sm,
   },
   sectionLabel: {
     color: Colors.text.muted,
@@ -482,132 +360,66 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: 1,
   },
-  seenBadge: {
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 2,
-    borderRadius: BorderRadius.sm,
-  },
-  seenText: {
-    color: Colors.text.muted,
-    fontSize: 10,
-    fontWeight: '500',
-  },
-  editActions: {
+
+  // ─── Watchlist + List controls row ──────────────────────
+  controlsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.lg,
-    marginTop: Spacing.sm,
+    justifyContent: 'space-between',
+    gap: Spacing.sm,
   },
-  editButton: {
+  controlsLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    flexShrink: 1,
+  },
+  dateChip: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    minHeight: 44,
-    paddingHorizontal: Spacing.xs,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 6,
+    borderRadius: BorderRadius.sm,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
   },
-  editButtonText: {
-    color: Colors.text.muted,
+  dateChipText: {
+    color: Colors.text.secondary,
     fontSize: FontSize.xs,
   },
-  newViewingText: {
-    color: Colors.text.muted,
-    fontSize: FontSize.xs,
-  },
-  confirmRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-  },
-  deleteConfirmText: {
-    color: '#ef4444',
-    fontSize: FontSize.xs,
-    fontWeight: '600',
-  },
-  deleteCancelText: {
-    color: Colors.text.muted,
-    fontSize: FontSize.xs,
-  },
-  previousViewings: {
-    marginTop: Spacing.sm,
-    gap: 6,
-  },
-  viewingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-  },
-  viewingRowContent: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-  },
-  viewingDeleteButton: {
-    padding: Spacing.sm,
-    minWidth: 44,
-    minHeight: 44,
+  dateChipClear: {
+    marginLeft: 4,
+    width: 18,
+    height: 18,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  viewingDate: {
+  dateChipClearText: {
     color: Colors.text.muted,
-    fontSize: FontSize.xs,
+    fontSize: 14,
+    lineHeight: 14,
   },
   listButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
     gap: 4,
-    marginTop: Spacing.sm,
-    minHeight: 44,
-    paddingHorizontal: Spacing.sm,
+    minHeight: 36,
+    paddingHorizontal: Spacing.md,
+    borderRadius: BorderRadius.sm,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
   },
   listButtonText: {
-    color: Colors.text.muted,
+    color: Colors.text.secondary,
     fontSize: FontSize.xs,
     fontWeight: '500',
   },
-  watchlistDateCol: {
-    alignItems: 'center',
-    marginTop: 2,
-  },
-  watchlistDateButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    minHeight: 32,
-    paddingHorizontal: Spacing.sm,
-  },
-  watchlistDateText: {
-    color: Colors.text.muted,
-    fontSize: FontSize.xs,
-  },
-  watchlistClearDate: {
-    color: Colors.text.muted,
-    fontSize: FontSize.xs,
-    minHeight: 44,
-    textAlignVertical: 'center',
-    paddingVertical: Spacing.sm,
-  },
-  savedInfo: {
-    marginTop: Spacing.md,
-    gap: 4,
-  },
-  savedDate: {
-    color: Colors.text.muted,
-    fontSize: FontSize.sm,
-  },
-  savedReviewText: {
-    color: Colors.text.secondary,
-    fontSize: FontSize.sm,
-    fontStyle: 'italic',
-  },
+
+  // ─── Date picker ────────────────────────────────────────
   datePickerContainer: {
-    marginTop: Spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: Colors.border.subtle,
-    paddingTop: Spacing.md,
+    marginTop: Spacing.sm,
+    backgroundColor: Colors.surface.raised,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.md,
   },
   datePickerHeader: {
     flexDirection: 'row',

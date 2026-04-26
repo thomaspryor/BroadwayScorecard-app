@@ -1,0 +1,28 @@
+# Capture redesigned RatingCard in 3 fixture states.
+# Fixture is dev-only and uses local state (no auth/Supabase needed).
+
+appId: com.broadwayscorecard.app
+---
+- launchApp:
+    clearState: false
+
+- openLink: broadwayscorecard:///test/show-rating-fixture?state=empty
+- waitForAnimationToEnd
+- extendedWaitUntil:
+    visible: "TEST FIXTURE"
+    timeout: 10000
+- takeScreenshot: ~/Documents/claude-outputs/bwsc-my-shows-mocks/ios-after-pass1/maestro-05-rating-empty
+
+- openLink: broadwayscorecard:///test/show-rating-fixture?state=existing
+- waitForAnimationToEnd
+- extendedWaitUntil:
+    visible: "YOUR RATING"
+    timeout: 10000
+- takeScreenshot: ~/Documents/claude-outputs/bwsc-my-shows-mocks/ios-after-pass1/maestro-06-rating-existing
+
+- openLink: broadwayscorecard:///test/show-rating-fixture?state=multi
+- waitForAnimationToEnd
+- extendedWaitUntil:
+    visible: "YOUR RATINGS"
+    timeout: 10000
+- takeScreenshot: ~/Documents/claude-outputs/bwsc-my-shows-mocks/ios-after-pass1/maestro-07-rating-multi
