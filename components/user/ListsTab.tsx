@@ -250,18 +250,20 @@ export default function ListsTab({ userId, showMap, createTrigger }: ListsTabPro
                 <Text style={styles.indexTitle}>My Lists</Text>
               </View>
               <StatHero items={heroItems} />
-              <Pressable
-                style={({ pressed }) => [styles.createTile, pressed && styles.pressed]}
-                onPress={() => { haptics.tap(); setShowModal('create'); }}
-                accessibilityRole="button"
-                accessibilityLabel="Create a new list"
-              >
-                <Svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke={Colors.brand} strokeWidth={2.5}>
-                  <Path strokeLinecap="round" d="M12 5v14M5 12h14" />
-                </Svg>
-                <Text style={styles.createTileText}>New List</Text>
-              </Pressable>
             </>
+          }
+          ListFooterComponent={
+            <Pressable
+              style={({ pressed }) => [styles.createTile, pressed && styles.pressed]}
+              onPress={() => { haptics.tap(); setShowModal('create'); }}
+              accessibilityRole="button"
+              accessibilityLabel="Create a new list"
+            >
+              <Svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke={Colors.brand} strokeWidth={2.5}>
+                <Path strokeLinecap="round" d="M12 5v14M5 12h14" />
+              </Svg>
+              <Text style={styles.createTileText}>New List</Text>
+            </Pressable>
           }
           renderItem={({ item: list }) => {
             const previewUrls = (list.preview_show_ids || [])
@@ -804,7 +806,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: Spacing.sm,
     marginHorizontal: Spacing.lg,
-    marginBottom: Spacing.md,
+    marginTop: Spacing.lg,
     paddingVertical: Spacing.lg,
     borderRadius: BorderRadius.md,
     borderWidth: 2,
