@@ -35,6 +35,8 @@ import * as haptics from '@/lib/haptics';
 import { trackListCreated, trackListDeleted, trackShowAddedToList, trackShowRemovedFromList, trackListReordered } from '@/lib/analytics';
 import type { UserList, ListItem } from '@/lib/user-types';
 import type { Show } from '@/lib/types';
+import { StatHero } from '@/components/my-shows/StatHero';
+import { ListMosaic } from '@/components/my-shows/ListMosaic';
 
 const POSITION_GAP = 1000;
 const MAX_NAME = 100;
@@ -223,57 +225,74 @@ export default function ListsTab({ userId, showMap, createTrigger }: ListsTabPro
       );
     }
 
+    const heroItems = [
+      { value: String(lists.length), label: 'LISTS' },
+      {
+        value: String(lists.reduce((s, l) => s + (l.item_count || 0), 0)),
+        label: 'ITEMS',
+      },
+      {
+        value: String(lists.filter(l => l.is_ranked).length),
+        label: 'RANKED',
+        accent: lists.some(l => l.is_ranked),
+      },
+    ];
+
     return (
       <View style={{ flex: 1 }}>
         <FlatList
           data={lists}
           keyExtractor={l => l.id}
           contentContainerStyle={styles.listContent}
-          renderItem={({ item: list }) => (
-            <Pressable
-              style={styles.listCard}
-              onPress={() => { haptics.tap(); setActiveListId(list.id); }}
-            >
-              <View style={styles.listCardInfo}>
-                <View style={styles.listCardHeader}>
-                  <Text style={styles.listCardName} numberOfLines={1}>{list.name}</Text>
-                  {list.is_ranked && <Text style={styles.rankedBadge}>#</Text>}
-                </View>
-                <Text style={styles.listCardCount}>
-                  {list.item_count || 0} {(list.item_count || 0) === 1 ? 'show' : 'shows'}
-                </Text>
-              </View>
-              {/* Poster previews */}
-              <View style={styles.previewRow}>
-                {(list.preview_show_ids || []).slice(0, 4).map(sid => {
-                  const show = showMap[sid];
-                  return show ? (
-                    <Image
-                      key={sid}
-                      source={{ uri: getImageUrl(show.images?.poster) || getImageUrl(show.images?.thumbnail) || undefined }}
-                      style={styles.previewPoster}
-                      contentFit="cover"
-                    />
-                  ) : (
-                    <View key={sid} style={[styles.previewPoster, styles.previewPlaceholder]}>
-                      <Text style={styles.previewPlaceholderText}>🎭</Text>
-                    </View>
-                  );
-                })}
-              </View>
-              <Svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke={Colors.text.muted} strokeWidth={2}>
-                <Path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-              </Svg>
-            </Pressable>
-          )}
-          ListFooterComponent={
-            <Pressable
-              style={styles.createButton}
-              onPress={() => { haptics.tap(); setShowModal('create'); }}
-            >
-              <Text style={styles.createButtonText}>+ Create a list</Text>
-            </Pressable>
+          ListHeaderComponent={
+            <>
+              <StatHero items={heroItems} />
+              <Pressable
+                style={({ pressed }) => [styles.createTile, pressed && styles.pressed]}
+                onPress={() => { haptics.tap(); setShowModal('create'); }}
+                accessibilityRole="button"
+                accessibilityLabel="Create a new list"
+              >
+                <Svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke={Colors.brand} strokeWidth={2.5}>
+                  <Path strokeLinecap="round" d="M12 5v14M5 12h14" />
+                </Svg>
+                <Text style={styles.createTileText}>New List</Text>
+              </Pressable>
+            </>
           }
+          renderItem={({ item: list }) => {
+            const previewUrls = (list.preview_show_ids || [])
+              .slice(0, 4)
+              .map(sid => {
+                const s = showMap[sid];
+                return s
+                  ? getImageUrl(s.images?.poster) || getImageUrl(s.images?.thumbnail) || null
+                  : null;
+              });
+            return (
+              <Pressable
+                style={({ pressed }) => [styles.listCard, pressed && styles.pressed]}
+                onPress={() => { haptics.tap(); setActiveListId(list.id); }}
+              >
+                <ListMosaic posterUrls={previewUrls} size={80} />
+                <View style={styles.listCardInfo}>
+                  <View style={styles.listCardHeader}>
+                    <Text style={styles.listCardName} numberOfLines={1}>{list.name}</Text>
+                    {list.is_ranked && <Text style={styles.rankedBadge}># RANKED</Text>}
+                  </View>
+                  <Text style={styles.listCardCount}>
+                    {list.item_count || 0} {(list.item_count || 0) === 1 ? 'show' : 'shows'}
+                  </Text>
+                  {list.description ? (
+                    <Text style={styles.listCardDesc} numberOfLines={1}>{list.description}</Text>
+                  ) : null}
+                </View>
+                <Svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke={Colors.text.muted} strokeWidth={2}>
+                  <Path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                </Svg>
+              </Pressable>
+            );
+          }}
         />
         <ListModal
           visible={showModal === 'create'}
@@ -313,6 +332,23 @@ export default function ListsTab({ userId, showMap, createTrigger }: ListsTabPro
           <Text style={styles.moreButton}>•••</Text>
         </Pressable>
       </View>
+
+      {(() => {
+        const previewUrls = (activeList?.preview_show_ids || [])
+          .slice(0, 4)
+          .map(sid => {
+            const s = showMap[sid];
+            return s
+              ? getImageUrl(s.images?.poster) || getImageUrl(s.images?.thumbnail) || null
+              : null;
+          });
+        if (previewUrls.length === 0) return null;
+        return (
+          <View style={styles.detailMosaicWrap}>
+            <ListMosaic posterUrls={previewUrls} size={140} layout="strip" />
+          </View>
+        );
+      })()}
 
       <View style={styles.detailTitleRow}>
         <Text style={styles.detailTitle}>{activeList?.name}</Text>
@@ -740,36 +776,34 @@ const styles = StyleSheet.create({
     color: Colors.text.muted,
     fontSize: FontSize.xs,
   },
-  previewRow: {
+  listCardDesc: {
+    color: Colors.text.muted,
+    fontSize: FontSize.xs,
+    marginTop: 2,
+  },
+  createTile: {
     flexDirection: 'row',
-    gap: 3,
-  },
-  previewPoster: {
-    width: 40,
-    height: 54,
-    borderRadius: 4,
-  },
-  previewPlaceholder: {
-    backgroundColor: Colors.surface.overlay,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  previewPlaceholderText: {
-    fontSize: 14,
-  },
-  createButton: {
-    marginTop: Spacing.lg,
-    paddingVertical: Spacing.md,
+    gap: Spacing.sm,
+    marginBottom: Spacing.md,
+    paddingVertical: Spacing.lg,
     borderRadius: BorderRadius.md,
-    borderWidth: 1,
-    borderColor: Colors.border.subtle,
+    borderWidth: 2,
     borderStyle: 'dashed',
-    alignItems: 'center',
+    borderColor: Colors.brand,
+    backgroundColor: 'rgba(212, 165, 116, 0.06)',
   },
-  createButtonText: {
-    color: Colors.text.muted,
-    fontSize: FontSize.sm,
-    fontWeight: '600',
+  createTileText: {
+    color: Colors.brand,
+    fontSize: FontSize.md,
+    fontWeight: '700',
+  },
+  detailMosaicWrap: {
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.sm,
+    paddingBottom: Spacing.md,
+    alignItems: 'center',
   },
   // ─── Detail view ────────────────
   detailHeader: {
