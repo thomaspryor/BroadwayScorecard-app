@@ -468,14 +468,14 @@ export default function ShowHeroRedesignNative({
 function DateLine({ show }: { show: Show }) {
   if (show.status === 'closed' && show.openingDate && show.closingDate) {
     return (
-      <Text style={styles.metaLine} numberOfLines={1}>
+      <Text style={styles.metaLine}>
         {formatDate(show.openingDate)} → {formatDate(show.closingDate)}
       </Text>
     );
   }
   if (show.status === 'previews' || show.status === 'upcoming') {
     if (show.openingDate) {
-      return <Text style={styles.metaLine} numberOfLines={1}>Opens {formatDate(show.openingDate)}</Text>;
+      return <Text style={styles.metaLine}>Opens {formatDate(show.openingDate)}</Text>;
     }
     return null;
   }
@@ -484,7 +484,7 @@ function DateLine({ show }: { show: Show }) {
     const parts: string[] = [];
     if (show.openingDate) parts.push(`Opened ${formatDate(show.openingDate)}`);
     if (show.closingDate) parts.push(`Closes ${formatDate(show.closingDate)}`);
-    return <Text style={styles.metaLine} numberOfLines={1}>{parts.join(' · ')}</Text>;
+    return <Text style={styles.metaLine}>{parts.join(' · ')}</Text>;
   }
   return null;
 }
