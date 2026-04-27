@@ -23,6 +23,7 @@ import { buildTicketUrl, buildTicketEventProps, isAffiliatePlatform, chooseTicke
 import { addSentryBreadcrumb, captureException } from '@/lib/sentry';
 import Svg, { Path } from 'react-native-svg';
 import ShowPageRating from '@/components/user/ShowPageRating';
+import ShowHeroRedesignNative from '@/components/show-page/ShowHeroRedesignNative';
 import { BookmarkOverlay } from '@/components/BookmarkOverlay';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { ceremonyToYear } from '@/lib/tony-utils';
@@ -258,8 +259,18 @@ export default function ShowDetailScreen() {
       <Stack.Screen options={{ title: show.title }} />
       <View style={styles.container}>
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
-        {/* Header card — matches website: poster + info, score below */}
-        <View style={styles.headerCard}>
+        {featureFlags.showPageRedesign && (
+          <ShowHeroRedesignNative
+            show={show}
+            detail={detail}
+            posterUrl={posterUrl}
+            hasEnoughReviews={hasEnoughReviews}
+            displayScore={displayScore}
+            onTicketPress={(link, i, src) => openTicketLink(link, i, src as TicketSource)}
+          />
+        )}
+        {/* Legacy hero — only renders when redesign flag is off. */}
+        <View style={[styles.headerCard, featureFlags.showPageRedesign && styles.hidden]}>
           {/* Top row: Poster + Title/Meta */}
           <View style={styles.headerTopRow}>
             <View>
@@ -1488,6 +1499,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border.subtle,
   },
+  hidden: { display: 'none' },
   headerTopRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',

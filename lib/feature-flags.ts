@@ -63,7 +63,7 @@ export async function clearFeatureFlagOverride(): Promise<void> {
   overrideFlags = null;
 }
 
-/** Convenience: check userAccounts flag */
+/** Convenience: check feature flags. Mirrors web — keep both projects in sync. */
 export const featureFlags = {
   get userAccounts(): boolean {
     const enabled = isFeatureEnabled('userAccounts');
@@ -71,5 +71,10 @@ export const featureFlags = {
       console.warn('[FeatureFlags] userAccounts is OFF. Set "features": "userAccounts" in app.json extra.');
     }
     return enabled;
+  },
+  /** Broadway Radar–inspired show page hero (mirrors web showPageRedesign).
+   *  Demo / dev only until rolled out on web. */
+  get showPageRedesign(): boolean {
+    return isFeatureEnabled('showPageRedesign');
   },
 };
