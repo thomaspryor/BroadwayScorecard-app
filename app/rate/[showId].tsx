@@ -214,24 +214,14 @@ export default function RateModal() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={0}
       >
-        {/* Header */}
+        {/* Header — Save moved to bottom sticky CTA, right side becomes a
+            symmetry placeholder so the title stays centered. */}
         <View style={[styles.header, { paddingTop: Math.max(insets.top, Spacing.md) }]}>
           <Pressable onPress={handleCancel} hitSlop={12} style={styles.headerButton}>
             <Text style={styles.cancelText}>Cancel</Text>
           </Pressable>
           <Text style={styles.headerTitle} numberOfLines={1}>{showTitle}</Text>
-          <Pressable
-            onPress={handleSave}
-            disabled={!canSave}
-            hitSlop={12}
-            style={styles.headerButton}
-          >
-            {saving ? (
-              <ActivityIndicator size="small" color={Colors.score.gold} />
-            ) : (
-              <Text style={[styles.saveText, !canSave && styles.saveDisabled]}>Save</Text>
-            )}
-          </Pressable>
+          <View style={styles.headerButton} />
         </View>
 
         <ScrollView
@@ -323,23 +313,26 @@ export default function RateModal() {
                 )}
               </View>
 
-              {/* Private Notes */}
+              {/* Private Notes — wrapped in a surface-overlay bordered box so it
+                  matches the Critics' Take treatment in ShowHeroRedesignNative. */}
               <View style={styles.field}>
                 <Text style={styles.fieldLabel}>
                   Private Notes <Text style={styles.optional}>(optional)</Text>
                 </Text>
-                <TextInput
-                  style={styles.textInput}
-                  value={reviewText}
-                  onChangeText={setReviewText}
-                  placeholder="What did you think?"
-                  placeholderTextColor={Colors.text.muted}
-                  multiline
-                  numberOfLines={4}
-                  maxLength={MAX_CHARS + 100}
-                  textAlignVertical="top"
-                  accessibilityLabel="Private notes"
-                />
+                <View style={styles.notesBox}>
+                  <TextInput
+                    style={styles.textInput}
+                    value={reviewText}
+                    onChangeText={setReviewText}
+                    placeholder="What did you think?"
+                    placeholderTextColor={Colors.text.muted}
+                    multiline
+                    numberOfLines={4}
+                    maxLength={MAX_CHARS + 100}
+                    textAlignVertical="top"
+                    accessibilityLabel="Private notes"
+                  />
+                </View>
                 <Text
                   style={[
                     styles.charCount,
@@ -366,6 +359,34 @@ export default function RateModal() {
             </>
           )}
         </ScrollView>
+
+        {/* Sticky Save CTA — brand-gold pill at the bottom (matches the new
+            ShowHeroRedesign primary tickets CTA pattern). Replaces the small
+            text "Save" link that used to live in the header — easier to reach
+            on tall iPhones, more visible action target. */}
+        {!loadingReview && (
+          <View style={[styles.footer, { paddingBottom: insets.bottom + Spacing.md }]}>
+            <Pressable
+              onPress={handleSave}
+              disabled={!canSave}
+              accessibilityRole="button"
+              accessibilityLabel={params.reviewId ? 'Update rating' : 'Save rating'}
+              style={({ pressed }) => [
+                styles.saveBtn,
+                !canSave && styles.saveBtnDisabled,
+                pressed && canSave && styles.saveBtnPressed,
+              ]}
+            >
+              {saving ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Text style={styles.saveBtnText}>
+                  {params.reviewId ? 'Update rating' : 'Save rating'}
+                </Text>
+              )}
+            </Pressable>
+          </View>
+        )}
       </KeyboardAvoidingView>
     </>
   );
@@ -510,11 +531,13 @@ const styles = StyleSheet.create({
     fontSize: FontSize.sm,
     fontWeight: '600',
   },
-  textInput: {
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+  notesBox: {
+    backgroundColor: Colors.surface.overlay,
     borderWidth: 1,
-    borderColor: Colors.border.default,
-    borderRadius: BorderRadius.sm,
+    borderColor: Colors.border.subtle,
+    borderRadius: BorderRadius.md,
+  },
+  textInput: {
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
     color: Colors.text.primary,
@@ -556,5 +579,29 @@ const styles = StyleSheet.create({
   errorDismissText: {
     color: Colors.text.primary,
     fontSize: FontSize.sm,
+  },
+  // Bottom sticky Save CTA — matches new hero's brand-gold tickets CTA
+  footer: {
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.md,
+    backgroundColor: Colors.surface.default,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border.subtle,
+  },
+  saveBtn: {
+    height: 48,
+    borderRadius: BorderRadius.md,
+    backgroundColor: Colors.brand,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  saveBtnPressed: { opacity: 0.85 },
+  saveBtnDisabled: {
+    backgroundColor: Colors.surface.raised,
+  },
+  saveBtnText: {
+    color: '#FFFFFF',
+    fontSize: FontSize.md,
+    fontWeight: '700',
   },
 });
