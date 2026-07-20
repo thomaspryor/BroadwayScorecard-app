@@ -22,10 +22,14 @@ appId: com.broadwayscorecard.app
 - tapOn:
     text: "Browse"
 
-# Wait for browse page data to load
+# Wait for browse page data to load. This is the first flow to run
+# alphabetically in the suite, so it eats the cold-start network/JS-init
+# penalty other flows don't — 30s timeout was observed failing by ~3s on a
+# real CI run (2026-07-20, run 29758666103); other tabs flows load the same
+# data near-instantly once warm.
 - extendedWaitUntil:
     visible: "Now Playing"
-    timeout: 30000
+    timeout: 45000
 
 # Tap the bookmark overlay on the first show card
 # Uses testID since iOS collapses nested Pressable accessibility labels
