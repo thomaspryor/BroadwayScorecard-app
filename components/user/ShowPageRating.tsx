@@ -490,7 +490,7 @@ const styles = StyleSheet.create({
   },
   seenText: {
     color: Colors.text.muted,
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: '500',
   },
   editActions: {
@@ -576,7 +576,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    minHeight: 32,
+    minHeight: 44,
     paddingHorizontal: Spacing.sm,
   },
   watchlistDateText: {

@@ -159,7 +159,7 @@ const styles = StyleSheet.create({
   },
   countdownText: {
     color: '#ffffff',
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
   },
   cardInfo: {

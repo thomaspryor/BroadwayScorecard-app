@@ -490,7 +490,7 @@ const styles = StyleSheet.create({
   },
   pageTitle: { fontSize: FontSize.xxl, fontWeight: '700', color: Colors.text.primary },
   addButton: {
-    width: 38, height: 38, borderRadius: 10,
+    width: 44, height: 44, borderRadius: 12,
     backgroundColor: Colors.surface.overlay, alignItems: 'center', justifyContent: 'center',
   },
   pressed: { opacity: 0.7 },
@@ -504,6 +504,7 @@ const styles = StyleSheet.create({
   sortButton: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     backgroundColor: Colors.surface.overlay, borderRadius: 8,
+    minHeight: 44,
     paddingHorizontal: Spacing.sm, paddingVertical: 6,
   },
   sortText: { color: Colors.text.secondary, fontSize: FontSize.xs, fontWeight: '500' },
@@ -524,17 +525,17 @@ const styles = StyleSheet.create({
   },
   cardPosterPlaceholder: { alignItems: 'center', justifyContent: 'center' },
   placeholderText: { color: Colors.text.muted, fontSize: 18, fontWeight: '600' },
-  posterDate: { color: Colors.text.secondary, fontSize: 11, fontWeight: '500', textAlign: 'center', marginTop: 4 },
+  posterDate: { color: Colors.text.secondary, fontSize: 12, fontWeight: '500', textAlign: 'center', marginTop: 4 },
   gridTitle: {
-    color: Colors.text.secondary, fontSize: 11, fontWeight: '500',
-    textAlign: 'center', lineHeight: 14, marginTop: 2,
+    color: Colors.text.secondary, fontSize: 12, fontWeight: '500',
+    textAlign: 'center', lineHeight: 15, marginTop: 2,
   },
   addShowCard: {
     width: '100%', aspectRatio: 2 / 3, borderRadius: BorderRadius.md,
     borderWidth: 2, borderStyle: 'dashed', borderColor: Colors.surface.overlay,
     alignItems: 'center', justifyContent: 'center', gap: 4,
   },
-  addShowLabel: { color: Colors.text.muted, fontSize: 10, fontWeight: '500' },
+  addShowLabel: { color: Colors.text.muted, fontSize: 12, fontWeight: '500' },
   // Empty / CTA
   emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: Spacing.xxl },
   emptyEmoji: { fontSize: 48, marginBottom: Spacing.md },
@@ -581,7 +582,7 @@ const styles = StyleSheet.create({
     borderRadius: 8, overflow: 'hidden',
   },
   viewToggleButton: {
-    padding: 6, alignItems: 'center', justifyContent: 'center',
+    minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center',
   },
   viewToggleActive: {
     backgroundColor: Colors.surface.raised,

@@ -999,6 +999,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
   },
   tab: {
+    minHeight: 44,
+    justifyContent: 'center',
     paddingVertical: Spacing.md,
     paddingHorizontal: Spacing.md,
     borderBottomWidth: 2,
@@ -1030,11 +1032,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
+    minHeight: 44,
     paddingVertical: Spacing.sm,
     paddingHorizontal: Spacing.sm,
   },
   viewToggle: {
-    padding: Spacing.sm,
+    minWidth: 44,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   sortText: {
     color: Colors.text.muted,
@@ -1111,7 +1117,7 @@ const styles = StyleSheet.create({
   },
   closingSoonText: {
     color: '#f59e0b',
-    fontSize: 9,
+    fontSize: 12,
     fontWeight: '700',
     textTransform: 'uppercase',
   },
@@ -1203,7 +1209,7 @@ const styles = StyleSheet.create({
   },
   gridDateText: {
     color: '#fcd34d',
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '500',
     textAlign: 'center',
     marginTop: 1,
@@ -1291,12 +1297,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    minHeight: 32,
+    minHeight: 44,
     paddingHorizontal: 6,
   },
   watchlistDateLabel: {
     color: Colors.text.muted,
-    fontSize: 11,
+    fontSize: 12,
   },
   watchlistDateSet: {
     color: '#fcd34d',
@@ -1306,12 +1312,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    minHeight: 28,
+    minHeight: 44,
     paddingHorizontal: 6,
   },
   watchlistRateLabel: {
     color: Colors.text.muted,
-    fontSize: 11,
+    fontSize: 12,
   },
   datePickerOverlay: {
     position: 'absolute',

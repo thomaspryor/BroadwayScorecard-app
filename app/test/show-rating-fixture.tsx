@@ -341,7 +341,7 @@ const styles = StyleSheet.create({
   },
   seenText: {
     color: Colors.text.muted,
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: '500',
   },
   existingRow: {

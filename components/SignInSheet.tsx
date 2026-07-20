@@ -444,7 +444,7 @@ const styles = StyleSheet.create({
   },
   footer: {
     color: Colors.text.muted,
-    fontSize: 11,
+    fontSize: 12,
     textAlign: 'center',
     marginTop: Spacing.xl,
     lineHeight: 16,

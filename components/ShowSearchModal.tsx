@@ -272,6 +272,6 @@ const styles = StyleSheet.create({
   },
   resultMeta: {
     color: Colors.text.muted,
-    fontSize: 10,
+    fontSize: 12,
   },
 });

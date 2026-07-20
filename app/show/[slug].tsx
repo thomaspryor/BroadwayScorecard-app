@@ -1683,7 +1683,7 @@ const styles = StyleSheet.create({
   },
   criticsPickText: {
     color: '#facc15',
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: '700',
     letterSpacing: 0.3,
   },
@@ -1777,7 +1777,7 @@ const styles = StyleSheet.create({
   },
   audienceSourceLabel: {
     color: Colors.text.muted,
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: '700',
     letterSpacing: 0.3,
   },
@@ -1788,7 +1788,7 @@ const styles = StyleSheet.create({
   },
   audienceSourceMeta: {
     color: Colors.text.muted,
-    fontSize: 9,
+    fontSize: 12,
     marginTop: 2,
   },
 
@@ -2042,7 +2042,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   boDelta: {
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: '700',
     marginTop: 4,
   },
@@ -2253,7 +2253,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   seatValuePick: {
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: '600',
     marginTop: 2,
   },
