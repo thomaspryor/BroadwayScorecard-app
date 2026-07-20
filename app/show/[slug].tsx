@@ -15,7 +15,7 @@ import { useShows } from '@/lib/data-context';
 import { fetchShowDetail, fetchSocialPulse } from '@/lib/api';
 import { getImageUrl } from '@/lib/images';
 import { nowMs } from '@/lib/date-utils';
-import { getScoreColor, getScoreTier, getContrastTextColor } from '@/lib/score-utils';
+import { getScoreColor, getScoreTier, getContrastTextColor, getMarketMinReviews } from '@/lib/score-utils';
 import { Show, ShowDetail, MobileShowDetail, mapShowDetail } from '@/lib/types';
 import { ScoreBadge, StatusBadge, FormatPill, ProductionPill, CategoryBadge } from '@/components/show-cards';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
@@ -251,7 +251,7 @@ export default function ShowDetailScreen() {
   const posterUrl = getImageUrl(show.images.poster) || getImageUrl(show.images.thumbnail);
 
   // Minimum 3 reviews to show a score (1-2 reviews is not a meaningful composite)
-  const hasEnoughReviews = (show.criticScore?.reviewCount ?? 0) >= 3;
+  const hasEnoughReviews = (show.criticScore?.reviewCount ?? 0) >= getMarketMinReviews(show.category);
   const displayScore = hasEnoughReviews ? show.compositeScore : null;
 
   return (
@@ -322,7 +322,7 @@ export default function ShowDetailScreen() {
 
           {/* Score row: badge + sentiment + review count */}
           <View style={styles.scoreRow}>
-            <ScoreBadge score={displayScore} size="large" animated />
+            <ScoreBadge score={displayScore} category={show.category} size="large" animated />
             <View style={styles.scoreMeta}>
               {hasEnoughReviews && show.criticScore ? (
                 <>
@@ -363,7 +363,7 @@ export default function ShowDetailScreen() {
             <View
               style={[
                 styles.criticsTakeBox,
-                { borderLeftColor: getScoreTier(displayScore)?.color ?? Colors.brand },
+                { borderLeftColor: getScoreTier(displayScore, show.category)?.color ?? Colors.brand },
               ]}
             >
               <Text style={styles.criticsTakeLabel}>Critics&apos; Take</Text>

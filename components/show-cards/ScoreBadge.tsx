@@ -20,6 +20,8 @@ import { Colors, BorderRadius, FontSize } from '@/constants/theme';
 
 interface ScoreBadgeProps {
   score: number | null | undefined;
+  /** Market category — WE/Off-WE have a higher Critical Gold threshold. */
+  category?: string;
   size?: 'small' | 'medium' | 'large';
   showLabel?: boolean;
   animated?: boolean;
@@ -76,8 +78,8 @@ function Crown() {
   );
 }
 
-export function ScoreBadge({ score, size = 'medium', showLabel = false, animated = false }: ScoreBadgeProps) {
-  const tier = getScoreTier(score);
+export function ScoreBadge({ score, category, size = 'medium', showLabel = false, animated = false }: ScoreBadgeProps) {
+  const tier = getScoreTier(score, category);
   const dim = SIZES[size];
 
   if (!tier || score == null) {

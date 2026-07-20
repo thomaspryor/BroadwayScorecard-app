@@ -47,7 +47,7 @@ const SCORE_TIERS = {
     range: '65-74',
   },
   skippable: {
-    label: 'Skippable',
+    label: 'Mixed',
     color: '#d97706',
     textColor: '#1a1a1a',
     shadowColor: '#d97706',
@@ -55,7 +55,7 @@ const SCORE_TIERS = {
     range: '55-64',
   },
   stayAway: {
-    label: 'Stay Away',
+    label: 'Critical Miss',
     color: '#ef4444',
     textColor: '#ffffff',
     shadowColor: '#ef4444',
@@ -64,18 +64,52 @@ const SCORE_TIERS = {
   },
 } as const;
 
-export function getScoreTier(score: number | null | undefined): ScoreTier | null {
+// Market-aware Critical Gold threshold — mirrors web src/config/score-buckets.ts.
+// WE star ratings (5-point scale) cluster at 80/100, so WE Gold requires 85+.
+const MARKET_GOLD_THRESHOLD: Record<string, number> = {
+  'west-end': 85,
+  'off-west-end': 85,
+};
+const DEFAULT_GOLD_THRESHOLD = 83;
+
+/** Critical Gold minimum score for a given market (mirrors web getGoldThreshold). */
+export function getGoldThreshold(category?: string): number {
+  return MARKET_GOLD_THRESHOLD[category || ''] ?? DEFAULT_GOLD_THRESHOLD;
+}
+
+/** Whether a score qualifies as Critical Gold. Math.round matches the displayed value. */
+export function isCriticalGold(score: number | null | undefined, category?: string): boolean {
+  if (score == null) return false;
+  return Math.round(score) >= getGoldThreshold(category);
+}
+
+/**
+ * Minimum reviews before a composite score is shown — mirrors web
+ * getMarketMinReviews (Broadway/West End = 5, Off-Broadway/Off-WE/Regional = 3).
+ */
+export function getMarketMinReviews(category?: string): number {
+  switch (category) {
+    case 'off-broadway':
+    case 'off-west-end':
+    case 'regional':
+      return 3;
+    default:
+      return 5;
+  }
+}
+
+export function getScoreTier(score: number | null | undefined, category?: string): ScoreTier | null {
   if (score == null) return null;
   const rounded = Math.round(score);
-  if (rounded >= 83) return SCORE_TIERS.mustSee;
+  if (rounded >= getGoldThreshold(category)) return SCORE_TIERS.mustSee;
   if (rounded >= 75) return SCORE_TIERS.recommended;
   if (rounded >= 65) return SCORE_TIERS.worthSeeing;
   if (rounded >= 55) return SCORE_TIERS.skippable;
   return SCORE_TIERS.stayAway;
 }
 
-export function getScoreColor(score: number | null | undefined): string {
-  const tier = getScoreTier(score);
+export function getScoreColor(score: number | null | undefined, category?: string): string {
+  const tier = getScoreTier(score, category);
   return tier?.color ?? Colors.score.none;
 }
 
