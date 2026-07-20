@@ -100,6 +100,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else {
         setLoading(false);
       }
+    }).catch((e) => {
+      // getSession() can reject (e.g. Keychain/SecureStore read failure) —
+      // without this, loading never resolves and the app hangs indefinitely.
+      console.error('[Auth] getSession failed:', e);
+      setLoading(false);
     });
 
     // Listen for auth state changes
