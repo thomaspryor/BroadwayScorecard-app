@@ -1,5 +1,8 @@
-# Tab Smoke Test — Search
-# Verifies: search tab loads, input accepts text
+# Tab Smoke Test — Search (via Browse)
+# The NativeTabs redesign dropped the standalone Search tab; Browse now has
+# role="search" and search lives inline in the Browse tab (TextInput at the
+# top of app/(tabs)/browse.tsx), not a separate flow. Verifies: navigating to
+# Browse, tapping the inline search field, and typing a query returns results.
 
 appId: com.broadwayscorecard.app
 ---
@@ -10,18 +13,23 @@ appId: com.broadwayscorecard.app
     visible: "Broadway Scorecard"
     timeout: 30000
 
-# Navigate to Search tab (iOS labels tabs as "Search, tab, 4 of 5")
+# Navigate to Browse tab. NativeTabs renders this as an icon-only floating
+# pill (role="search", no visible label) but still exposes accessibilityText
+# "Browse" — confirmed via `maestro hierarchy` against a local simulator build.
 - tapOn:
-    text: "Search, tab.*"
+    text: "Browse"
 
-# Header visible — wait for navigation
+# Wait for browse page data to load
 - extendedWaitUntil:
-    visible: "Search"
+    visible: "Now Playing"
     timeout: 30000
 
-# Search input with placeholder
-- assertVisible: "Search shows, theaters, creative team..."
-
-# Type a search query
-- tapOn: "Search shows, theaters, creative team..."
+# Search input is inline at the top of the Browse tab
+- assertVisible: "Search shows..."
+- tapOn: "Search shows..."
 - inputText: "Hamilton"
+
+# Results counter confirms the search actually ran
+- extendedWaitUntil:
+    visible: "\\d+ results? for .*"
+    timeout: 15000

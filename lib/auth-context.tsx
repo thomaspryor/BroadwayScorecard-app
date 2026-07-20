@@ -84,7 +84,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser({ id: session.user.id, email: session.user.email || '' });
         loadProfile(session.user.id);
         setLoading(false);
-      } else if (__DEV__ && process.env.EXPO_PUBLIC_DEV_AUTO_SIGNIN === '1') {
+      } else if (process.env.EXPO_PUBLIC_DEV_AUTO_SIGNIN === '1') {
         // Auto-sign-in with dev test account for simulator testing
         console.log('[Auth] Dev auto-sign-in triggered');
         try {

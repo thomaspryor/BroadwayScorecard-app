@@ -16,9 +16,11 @@ appId: com.broadwayscorecard.app
     visible: "Broadway Scorecard"
     timeout: 30000
 
-# Navigate to Browse tab (iOS labels tabs as "Browse, tab, 2 of 5")
+# Navigate to Browse tab. NativeTabs renders this as an icon-only floating
+# pill (role="search", no visible label) but still exposes accessibilityText
+# "Browse" — confirmed via `maestro hierarchy` against a local simulator build.
 - tapOn:
-    text: "Browse, tab.*"
+    text: "Browse"
 
 # Wait for browse page data to load
 - extendedWaitUntil:
