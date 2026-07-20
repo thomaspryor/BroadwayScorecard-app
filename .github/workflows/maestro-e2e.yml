@@ -20,6 +20,8 @@ jobs:
     timeout-minutes: 75
     env:
       EXPO_PUBLIC_DEV_AUTO_SIGNIN: '1'
+      EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+      EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
       SENTRY_DISABLE_AUTO_UPLOAD: 'true'
     steps:
       - name: Checkout
@@ -93,7 +95,6 @@ jobs:
             -destination "platform=iOS Simulator,id=$DEVICE_ID" \
             -derivedDataPath ios/build \
             build \
-            CODE_SIGNING_ALLOWED=NO \
             SENTRY_AUTH_TOKEN="" \
             2>&1 | tee /tmp/xcodebuild.log | tail -200
 
