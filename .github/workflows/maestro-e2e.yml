@@ -16,7 +16,7 @@ on:
 jobs:
   e2e:
     name: Maestro E2E (${{ inputs.suite }})
-    runs-on: macos-15
+    runs-on: macos-26
     timeout-minutes: 75
     env:
       EXPO_PUBLIC_DEV_AUTO_SIGNIN: '1'
@@ -24,6 +24,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Select Xcode 26.5
+        run: sudo xcode-select -s /Applications/Xcode_26.5.app/Contents/Developer
 
       - name: Setup Node
         uses: actions/setup-node@v4
