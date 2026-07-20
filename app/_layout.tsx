@@ -3,7 +3,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { DarkTheme, ThemeProvider } from '@react-navigation/native';
+import { DarkTheme, ThemeProvider } from 'expo-router';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
@@ -74,10 +74,13 @@ function RootLayout() {
     startAutoFlush();
     flushQueue().catch(() => {});
 
-    // Init PostHog synchronously (constructor), load flags + onboarding async
-    const client = initPostHog();
-    if (client) setPhClient(client);
-    setPhReady(true);
+    // Init PostHog just off the sync effect path — analytics can start a tick
+    // late, and this keeps the effect body free of synchronous setState.
+    queueMicrotask(() => {
+      const client = initPostHog();
+      if (client) setPhClient(client);
+      setPhReady(true);
+    });
 
     Promise.all([
       loadFeatureFlagOverrides(),

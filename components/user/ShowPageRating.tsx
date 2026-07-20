@@ -10,7 +10,7 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { View, Text, Pressable, StyleSheet, Platform } from 'react-native';
 import { usePathname, useRouter } from 'expo-router';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect } from 'expo-router';
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import Svg, { Path } from 'react-native-svg';
 import { useAuth } from '@/lib/auth-context';

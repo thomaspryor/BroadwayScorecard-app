@@ -548,14 +548,18 @@ function ListModal({
   const [isRanked, setIsRanked] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
+  // Render-phase reset when the sheet opens (React-sanctioned pattern) —
+  // keeps setState out of an effect for the React Compiler.
+  const [prevVisible, setPrevVisible] = useState(visible);
+  if (visible !== prevVisible) {
+    setPrevVisible(visible);
     if (visible) {
       setName(initialName || '');
       setDescription(initialDescription || '');
       setShowDesc(!!initialDescription);
       setIsRanked(initialRanked ?? false);
     }
-  }, [visible, initialName, initialDescription, initialRanked]);
+  }
 
   const canSave = name.trim().length > 0;
 

@@ -19,7 +19,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect } from 'expo-router';
 import Svg, { Path } from 'react-native-svg';
 import ReanimatedSwipeable from 'react-native-gesture-handler/ReanimatedSwipeable';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -31,6 +31,7 @@ import { useUserLists } from '@/hooks/useUserLists';
 import ListsTab from '@/components/user/ListsTab';
 import { useShows } from '@/lib/data-context';
 import { getImageUrl } from '@/lib/images';
+import { daysUntilDate, isClosingSoonDate } from '@/lib/date-utils';
 import { featureFlags } from '@/lib/feature-flags';
 import StarRating from '@/components/user/StarRating';
 import MiniStars from '@/components/user/MiniStars';
@@ -415,9 +416,7 @@ export default function MyShowsScreen() {
     const show = showMap[item.show_id];
     const title = show?.title || item.show_id;
     const posterUrl = show?.images ? (getImageUrl(show.images.poster) || getImageUrl(show.images.thumbnail)) : null;
-    const daysUntil = item.planned_date
-      ? Math.ceil((new Date(item.planned_date + 'T00:00:00').getTime() - Date.now()) / (1000 * 60 * 60 * 24))
-      : null;
+    const daysUntil = item.planned_date ? daysUntilDate(item.planned_date) : null;
     // Show "Rate" button if planned date is today or past
     const canRate = daysUntil !== null && daysUntil <= 0;
 
@@ -798,9 +797,7 @@ function SwipeableWatchlistItem({
   const title = show?.title || item.show_id;
   const posterUrl = show?.images ? (getImageUrl(show.images.poster) || getImageUrl(show.images.thumbnail)) : null;
   const isClosingSoon = show?.closingDate && (() => {
-    const closing = new Date(show.closingDate!);
-    const fourWeeks = 28 * 24 * 60 * 60 * 1000;
-    return closing.getTime() - Date.now() < fourWeeks && closing > new Date();
+    return isClosingSoonDate(show.closingDate!);
   })();
 
   return (

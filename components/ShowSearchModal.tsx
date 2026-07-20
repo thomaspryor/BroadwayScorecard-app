@@ -50,12 +50,21 @@ export function ShowSearchModal({ visible, title, onSelect, onClose, excludeIds 
   const inputRef = useRef<TextInput>(null);
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Reset query when modal opens
-  useEffect(() => {
+  // Reset query when modal opens — render-phase reset (React-sanctioned pattern)
+  // keeps setState out of the effect for the React Compiler.
+  const [prevVisible, setPrevVisible] = useState(visible);
+  if (visible !== prevVisible) {
+    setPrevVisible(visible);
     if (visible) {
       setQuery('');
       setDebouncedQuery('');
-      setTimeout(() => inputRef.current?.focus(), 50);
+    }
+  }
+
+  useEffect(() => {
+    if (visible) {
+      const t = setTimeout(() => inputRef.current?.focus(), 50);
+      return () => clearTimeout(t);
     }
   }, [visible]);
 

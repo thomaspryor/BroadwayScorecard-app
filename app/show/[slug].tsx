@@ -14,6 +14,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { useShows } from '@/lib/data-context';
 import { fetchShowDetail, fetchSocialPulse } from '@/lib/api';
 import { getImageUrl } from '@/lib/images';
+import { nowMs } from '@/lib/date-utils';
 import { getScoreColor, getScoreTier, getContrastTextColor } from '@/lib/score-utils';
 import { Show, ShowDetail, MobileShowDetail, mapShowDetail } from '@/lib/types';
 import { ScoreBadge, StatusBadge, FormatPill, ProductionPill, CategoryBadge } from '@/components/show-cards';
@@ -165,12 +166,12 @@ export default function ShowDetailScreen() {
     }
 
     // Non-affiliate: in-app browser with full lifecycle tracking
-    const openedAt = Date.now();
+    const openedAt = nowMs();
     try {
       await WebBrowser.openBrowserAsync(affiliateUrl);
       trackTicketBrowserOpened(eventProps);
 
-      const timeOnSiteMs = Date.now() - openedAt;
+      const timeOnSiteMs = nowMs() - openedAt;
       trackTicketBrowserDismissed({
         ...eventProps,
         time_on_site_ms: timeOnSiteMs,

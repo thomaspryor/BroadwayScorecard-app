@@ -84,13 +84,6 @@ export function Onboarding({ onDone }: OnboardingProps) {
     [],
   );
 
-  // Auto-dismiss onboarding after successful sign-in
-  useEffect(() => {
-    if (isAuthenticated && signInTriggered.current) {
-      handleDone();
-    }
-  }, [isAuthenticated]);
-
   const handleScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const page = Math.round(e.nativeEvent.contentOffset.x / width);
     if (page !== currentPage) {
@@ -113,11 +106,18 @@ export function Onboarding({ onDone }: OnboardingProps) {
     await handleDone();
   };
 
-  const handleDone = async () => {
+  async function handleDone() {
     if (Platform.OS === 'ios') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     await markOnboardingSeen();
     onDone();
-  };
+  }
+
+  // Auto-dismiss onboarding after successful sign-in
+  useEffect(() => {
+    if (isAuthenticated && signInTriggered.current) {
+      handleDone();
+    }
+  }, [isAuthenticated]);
 
   const handleSignIn = () => {
     if (Platform.OS === 'ios') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);

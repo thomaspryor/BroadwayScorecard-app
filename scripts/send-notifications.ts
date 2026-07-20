@@ -153,7 +153,11 @@ async function cleanupStaleTokens(client: SupabaseClient): Promise<void> {
   const unique = [...new Set(staleTokens.filter(Boolean))];
   console.log(`Cleaning up ${unique.length} stale tokens...`);
   for (const token of unique) {
-    await client.from('push_tokens').delete().eq('token', token).catch(() => {});
+    try {
+      await client.from('push_tokens').delete().eq('token', token);
+    } catch {
+      // best-effort cleanup — a failed delete just leaves a stale token for next run
+    }
   }
 }
 

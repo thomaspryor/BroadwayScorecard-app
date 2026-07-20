@@ -8,7 +8,7 @@ import React, { useEffect, useMemo, useCallback } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect } from 'expo-router';
 import Svg, { Path } from 'react-native-svg';
 import { useAuth } from '@/lib/auth-context';
 import { useUserLists } from '@/hooks/useUserLists';

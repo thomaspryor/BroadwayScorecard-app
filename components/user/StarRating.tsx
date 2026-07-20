@@ -53,10 +53,10 @@ function Star({
 
   const handlePress = () => {
     if (readOnly) return;
-    scale.value = withSequence(
+    scale.set(withSequence(
       withTiming(1.2, { duration: 80 }),
       withTiming(1, { duration: 120 }),
-    );
+    ));
     onPress(index);
   };
 

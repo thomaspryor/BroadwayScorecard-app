@@ -82,13 +82,13 @@ export default function RateModal() {
 
   // Fetch existing review data when editing
   useEffect(() => {
-    if (!reviewId || !user) {
-      setLoadingReview(false);
-      populatingRef.current = false;
-      return;
-    }
-    populatingRef.current = true;
     (async () => {
+      if (!reviewId || !user) {
+        populatingRef.current = false;
+        setLoadingReview(false);
+        return;
+      }
+      populatingRef.current = true;
       try {
         const showReviews = await getReviewsForShow(showId);
         const existing = showReviews.find(r => r.id === reviewId);

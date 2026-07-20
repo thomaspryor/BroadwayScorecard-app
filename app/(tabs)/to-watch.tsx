@@ -19,7 +19,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect } from 'expo-router';
 import Svg, { Path } from 'react-native-svg';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useAuth } from '@/lib/auth-context';
@@ -27,6 +27,7 @@ import { useUserReviews } from '@/hooks/useUserReviews';
 import { useWatchlist } from '@/hooks/useWatchlist';
 import { useShows } from '@/lib/data-context';
 import { getImageUrl } from '@/lib/images';
+import { daysUntilDate } from '@/lib/date-utils';
 import { featureFlags } from '@/lib/feature-flags';
 import type { WatchlistEntry } from '@/lib/user-types';
 import type { Show } from '@/lib/types';
@@ -215,9 +216,7 @@ export default function ToWatchScreen() {
     const show = showMap[item.show_id];
     const title = show?.title || item.show_id;
     const posterUrl = show?.images ? (getImageUrl(show.images.poster) || getImageUrl(show.images.thumbnail)) : null;
-    const daysUntil = item.planned_date
-      ? Math.ceil((new Date(item.planned_date + 'T00:00:00').getTime() - Date.now()) / (1000 * 60 * 60 * 24))
-      : null;
+    const daysUntil = item.planned_date ? daysUntilDate(item.planned_date) : null;
 
     return (
       <Pressable

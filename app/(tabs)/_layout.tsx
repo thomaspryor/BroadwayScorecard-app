@@ -3,13 +3,15 @@
  * Watched/To Watch/Lists hidden when userAccounts feature flag is off.
  * Search is integrated into Browse. Settings/Profile via profile icon on Home.
  * Legacy tabs (my-shows, search, settings) kept as hidden routes for backward compat.
+ *
+ * Uses NativeTabs (SwiftUI tab bar): Liquid Glass + active-tab capsule on iOS 26+,
+ * minimizes on scroll-down. Icons are SF-symbol-only — Android needs `src`/VectorIcon
+ * icons added before any Android release.
  */
 
-import { Tabs } from 'expo-router';
+import { NativeTabs } from 'expo-router/unstable-native-tabs';
 import React from 'react';
 
-import { HapticTab } from '@/components/haptic-tab';
-import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { featureFlags } from '@/lib/feature-flags';
 
@@ -17,70 +19,35 @@ export default function TabLayout() {
   const showUserTabs = featureFlags.userAccounts;
 
   return (
-    <Tabs
-      screenOptions={{
-        tabBarActiveTintColor: Colors.tabBar.active,
-        tabBarInactiveTintColor: Colors.tabBar.inactive,
-        tabBarStyle: {
-          backgroundColor: Colors.tabBar.background,
-          borderTopColor: Colors.tabBar.border,
-        },
-        headerShown: false,
-        tabBarButton: HapticTab,
-      }}
+    <NativeTabs
+      tintColor={Colors.tabBar.active}
+      minimizeBehavior="onScrollDown"
+      disableTransparentOnScrollEdge
     >
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: 'Home',
-          tabBarIcon: ({ color }) => (
-            <IconSymbol size={28} name="house.fill" color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="watched"
-        options={{
-          title: 'Watched',
-          tabBarIcon: ({ color }) => (
-            <IconSymbol size={28} name="star.fill" color={color} />
-          ),
-          href: showUserTabs ? ('/(tabs)/watched' as any) : null,
-        }}
-      />
-      <Tabs.Screen
-        name="to-watch"
-        options={{
-          title: 'To Watch',
-          tabBarIcon: ({ color }) => (
-            <IconSymbol size={28} name="bookmark.fill" color={color} />
-          ),
-          href: showUserTabs ? ('/(tabs)/to-watch' as any) : null,
-        }}
-      />
-      <Tabs.Screen
-        name="lists"
-        options={{
-          title: 'Lists',
-          tabBarIcon: ({ color }) => (
-            <IconSymbol size={28} name="list.bullet" color={color} />
-          ),
-          href: showUserTabs ? ('/(tabs)/lists' as any) : null,
-        }}
-      />
-      <Tabs.Screen
-        name="browse"
-        options={{
-          title: 'Browse',
-          tabBarIcon: ({ color }) => (
-            <IconSymbol size={28} name="square.grid.2x2" color={color} />
-          ),
-        }}
-      />
+      <NativeTabs.Trigger name="index">
+        <NativeTabs.Trigger.Icon sf={{ default: 'house', selected: 'house.fill' }} />
+        <NativeTabs.Trigger.Label>Home</NativeTabs.Trigger.Label>
+      </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="watched" hidden={!showUserTabs}>
+        <NativeTabs.Trigger.Icon sf={{ default: 'star', selected: 'star.fill' }} />
+        <NativeTabs.Trigger.Label>Watched</NativeTabs.Trigger.Label>
+      </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="to-watch" hidden={!showUserTabs}>
+        <NativeTabs.Trigger.Icon sf={{ default: 'bookmark', selected: 'bookmark.fill' }} />
+        <NativeTabs.Trigger.Label>To Watch</NativeTabs.Trigger.Label>
+      </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="lists" hidden={!showUserTabs}>
+        <NativeTabs.Trigger.Icon sf="list.bullet" />
+        <NativeTabs.Trigger.Label>Lists</NativeTabs.Trigger.Label>
+      </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="browse" role="search">
+        <NativeTabs.Trigger.Icon sf={{ default: 'square.grid.2x2', selected: 'square.grid.2x2.fill' }} />
+        <NativeTabs.Trigger.Label>Browse</NativeTabs.Trigger.Label>
+      </NativeTabs.Trigger>
       {/* Hidden legacy routes — kept for deep links / backward compat */}
-      <Tabs.Screen name="my-shows" options={{ href: null }} />
-      <Tabs.Screen name="search" options={{ href: null }} />
-      <Tabs.Screen name="settings" options={{ href: null }} />
-    </Tabs>
+      <NativeTabs.Trigger name="my-shows" hidden />
+      <NativeTabs.Trigger name="search" hidden />
+      <NativeTabs.Trigger name="settings" hidden />
+    </NativeTabs>
   );
 }
