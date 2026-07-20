@@ -12,6 +12,12 @@
         "simulator": true
       }
     },
+    "sim-prod": {
+      "extends": "production",
+      "ios": {
+        "simulator": true
+      }
+    },
     "production": {
       "channel": "production",
       "ios": {
