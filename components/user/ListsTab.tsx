@@ -548,11 +548,13 @@ function ListModal({
   const [isRanked, setIsRanked] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  // Render-phase reset when the sheet opens (React-sanctioned pattern) —
-  // keeps setState out of an effect for the React Compiler.
-  const [prevVisible, setPrevVisible] = useState(visible);
-  if (visible !== prevVisible) {
-    setPrevVisible(visible);
+  // Render-phase reset (React-sanctioned pattern) — keeps setState out of an
+  // effect for the React Compiler. Resets on open AND when the edited list's
+  // identity changes while the sheet stays open (matches the old effect's deps).
+  const resetKey = `${visible}|${initialName ?? ''}|${initialDescription ?? ''}|${initialRanked ?? false}`;
+  const [prevResetKey, setPrevResetKey] = useState(resetKey);
+  if (resetKey !== prevResetKey) {
+    setPrevResetKey(resetKey);
     if (visible) {
       setName(initialName || '');
       setDescription(initialDescription || '');

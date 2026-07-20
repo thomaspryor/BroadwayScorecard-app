@@ -56,7 +56,7 @@ const FeaturedCard = memo(function FeaturedCard({ show, cardWidth, isWatchlisted
 
         {/* Score badge — bottom-right, overlapping the image edge */}
         <View style={styles.scoreOverlay}>
-          <ScoreBadge score={show.compositeScore} size="small" />
+          <ScoreBadge score={show.compositeScore} category={show.category} size="small" />
         </View>
       </View>
 

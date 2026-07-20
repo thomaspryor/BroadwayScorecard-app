@@ -250,7 +250,7 @@ export default function ShowDetailScreen() {
 
   const posterUrl = getImageUrl(show.images.poster) || getImageUrl(show.images.thumbnail);
 
-  // Minimum 3 reviews to show a score (1-2 reviews is not a meaningful composite)
+  // Market-aware minimum reviews before showing a composite (mirrors the website's gate)
   const hasEnoughReviews = (show.criticScore?.reviewCount ?? 0) >= getMarketMinReviews(show.category);
   const displayScore = hasEnoughReviews ? show.compositeScore : null;
 
@@ -326,7 +326,7 @@ export default function ShowDetailScreen() {
             <View style={styles.scoreMeta}>
               {hasEnoughReviews && show.criticScore ? (
                 <>
-                  <Text style={[styles.sentimentLabel, { color: getScoreColor(displayScore) }]}>
+                  <Text style={[styles.sentimentLabel, { color: getScoreColor(displayScore, show.category) }]}>
                     {show.criticScore.label}
                   </Text>
                   <Text style={styles.reviewCountText}>
@@ -568,7 +568,7 @@ export default function ShowDetailScreen() {
               Critic Reviews ({detail.reviews.length})
             </Text>
             {(showAllReviews ? detail.reviews : detail.reviews.slice(0, 3)).map((review, i) => (
-              <ReviewRow key={i} review={review} showId={show.id} />
+              <ReviewRow key={i} review={review} showId={show.id} category={show.category} />
             ))}
             {!showAllReviews && detail.reviews.length > 3 && (
               <Pressable
@@ -726,7 +726,7 @@ export default function ShowDetailScreen() {
                     <Text style={styles.relatedShowTitle} numberOfLines={1}>{prod.title}</Text>
                     <Text style={[styles.relatedShowVenue, { color: subtitleColor }]} numberOfLines={1}>{subtitle}</Text>
                   </View>
-                  <ScoreBadge score={prod.compositeScore} size="small" />
+                  <ScoreBadge score={prod.compositeScore} category={prod.category} size="small" />
                 </Pressable>
               );
             })}
@@ -846,9 +846,9 @@ function BreakdownBar({ reviews }: { reviews: ShowDetail['reviews'] }) {
   );
 }
 
-function ReviewRow({ review, showId }: { review: ShowDetail['reviews'][0]; showId: string }) {
-  const scoreColor = getScoreColor(review.score);
-  const scoreTextColor = getScoreTier(review.score)?.textColor ?? '#ffffff';
+function ReviewRow({ review, showId, category }: { review: ShowDetail['reviews'][0]; showId: string; category?: string }) {
+  const scoreColor = getScoreColor(review.score, category);
+  const scoreTextColor = getScoreTier(review.score, category)?.textColor ?? '#ffffff';
 
   const formattedDate = review.publishDate ? (() => {
     try {
@@ -973,7 +973,7 @@ function RelatedShowRow({ show, onPress }: { show: Show; onPress: () => void }) 
         <Text style={styles.relatedShowTitle} numberOfLines={1}>{show.title}</Text>
         <Text style={styles.relatedShowVenue} numberOfLines={1}>{show.venue}</Text>
       </View>
-      <ScoreBadge score={show.compositeScore} size="small" />
+      <ScoreBadge score={show.compositeScore} category={show.category} size="small" />
     </Pressable>
   );
 }

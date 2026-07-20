@@ -14,7 +14,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 let ViewShot: any;
 try { ViewShot = require('react-native-view-shot').default; } catch { ViewShot = View; }
 import Svg, { Path } from 'react-native-svg';
-import { getScoreTier, getScoreColor, getContrastTextColor } from '@/lib/score-utils';
+import { getScoreTier, getScoreColor, getContrastTextColor, getMarketMinReviews } from '@/lib/score-utils';
 import { getImageUrl } from '@/lib/images';
 import { Colors, FontSize, BorderRadius, Spacing } from '@/constants/theme';
 import { trackShowShared } from '@/lib/analytics';
@@ -26,6 +26,7 @@ interface ShareCardProps {
     title: string;
     venue?: string;
     type?: string;
+    category?: string;
     compositeScore?: number | null;
     criticScore?: { reviewCount?: number; label?: string } | null;
     audienceGrade?: { grade: string; color: string } | null;
@@ -69,10 +70,10 @@ export function ShareCard({ show, onShared }: ShareCardProps) {
 
   const posterUrl = getImageUrl(show.images.poster) || getImageUrl(show.images.thumbnail);
   const score = show.compositeScore != null ? Math.round(show.compositeScore) : null;
-  const tier = getScoreTier(score);
+  const tier = getScoreTier(score, show.category);
   const isGold = tier?.glow ?? false;
   const reviewCount = show.criticScore?.reviewCount ?? 0;
-  const hasScore = score != null && reviewCount >= 3;
+  const hasScore = score != null && reviewCount >= getMarketMinReviews(show.category);
 
   return (
     <>
@@ -220,10 +221,10 @@ export const ShareCardWithRef = React.forwardRef<ShareCardHandle, ShareCardProps
 
     const posterUrl = getImageUrl(props.show.images.poster) || getImageUrl(props.show.images.thumbnail);
     const score = props.show.compositeScore != null ? Math.round(props.show.compositeScore) : null;
-    const tier = getScoreTier(score);
+    const tier = getScoreTier(score, props.show.category);
     const isGold = tier?.glow ?? false;
     const reviewCount = props.show.criticScore?.reviewCount ?? 0;
-    const hasScore = score != null && reviewCount >= 3;
+    const hasScore = score != null && reviewCount >= getMarketMinReviews(props.show.category);
 
     return (
       <ViewShot

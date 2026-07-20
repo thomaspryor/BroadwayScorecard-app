@@ -474,7 +474,7 @@ export default function MyShowsScreen() {
         <Text style={styles.pageTitle}>My Shows</Text>
         <Pressable
           style={({ pressed }) => [styles.addButton, pressed && styles.pressed]}
-          onPress={() => router.push('/(tabs)/search')}
+          onPress={() => router.push('/search')}
           hitSlop={8}
           accessibilityLabel={activeTab === 'diary' ? 'Rate a show' : 'Add to watchlist'}
         >
@@ -650,7 +650,7 @@ export default function MyShowsScreen() {
             contentContainerStyle={styles.gridContent}
             columnWrapperStyle={styles.gridRow}
             windowSize={5}
-            ListFooterComponent={<AddShowCard context="diary" onPress={() => router.push('/(tabs)/search')} />}
+            ListFooterComponent={<AddShowCard context="diary" onPress={() => router.push('/search')} />}
           />
         ) : (
           <FlatList
@@ -661,7 +661,7 @@ export default function MyShowsScreen() {
             contentContainerStyle={styles.listContent}
             windowSize={5}
             removeClippedSubviews
-            ListFooterComponent={<AddShowCard context="diary" onPress={() => router.push('/(tabs)/search')} />}
+            ListFooterComponent={<AddShowCard context="diary" onPress={() => router.push('/search')} />}
           />
         )
       )}
@@ -686,7 +686,7 @@ export default function MyShowsScreen() {
             contentContainerStyle={styles.gridContent}
             columnWrapperStyle={styles.gridRow}
             windowSize={5}
-            ListFooterComponent={<AddShowCard context="watchlist" onPress={() => router.push('/(tabs)/search')} />}
+            ListFooterComponent={<AddShowCard context="watchlist" onPress={() => router.push('/search')} />}
           />
         ) : (
           <FlatList
@@ -714,7 +714,7 @@ export default function MyShowsScreen() {
             contentContainerStyle={styles.listContent}
             windowSize={5}
             removeClippedSubviews={false}
-            ListFooterComponent={<AddShowCard context="watchlist" onPress={() => router.push('/(tabs)/search')} />}
+            ListFooterComponent={<AddShowCard context="watchlist" onPress={() => router.push('/search')} />}
           />
         )
       )}

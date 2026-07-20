@@ -152,7 +152,7 @@ export const ShowCard = memo(function ShowCard({ show, scoreMode = 'critics', hi
         </View>
       ) : (
         <View style={styles.scoreColumn}>
-          <ScoreBadge score={show.compositeScore} size="medium" showLabel />
+          <ScoreBadge score={show.compositeScore} category={show.category} size="medium" showLabel />
           {show.audienceGrade && (
             <AudienceChip
               grade={show.audienceGrade.grade}

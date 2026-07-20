@@ -159,7 +159,7 @@ export function ShowSearchModal({ visible, title, onSelect, onClose, excludeIds 
                       {item.category === 'west-end' ? ' · London' : item.category === 'off-broadway' ? ' · Off-Bway' : ''}
                     </Text>
                   </View>
-                  <ScoreBadge score={item.compositeScore} size="small" />
+                  <ScoreBadge score={item.compositeScore} category={item.category} size="small" />
                 </Pressable>
               );
             }}

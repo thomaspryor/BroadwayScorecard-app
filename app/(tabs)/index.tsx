@@ -185,7 +185,7 @@ export default function HomeScreen() {
   ), [watchlistSet, toggleWatchlist]);
 
   const handleProfilePress = useCallback(() => {
-    router.push('/(tabs)/settings');
+    router.push('/settings');
   }, [router]);
 
   const onRefresh = useCallback(async () => {

@@ -84,7 +84,7 @@ export function ClosingSoon({ shows }: ClosingSoonProps) {
               <View style={styles.cardInfo}>
                 <Text style={styles.cardTitle} numberOfLines={2}>{show.title}</Text>
                 <View style={styles.scoreRow}>
-                  <ScoreBadge score={show.compositeScore} size="small" />
+                  <ScoreBadge score={show.compositeScore} category={show.category} size="small" />
                   {show.closingDate && (
                     <Text style={[styles.closingDate, { color: urgencyColor }]}>
                       {new Date(show.closingDate + 'T12:00:00').toLocaleDateString('en-US', {
