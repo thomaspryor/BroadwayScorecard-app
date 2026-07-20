@@ -19,6 +19,7 @@ All show data comes from the web project's public API or pre-built JSON. Never f
 Before EVERY commit touching `app/`, `components/`, `lib/`, or config:
 1. `npx tsc --noEmit` — zero TypeScript errors
 2. `npx expo lint` — no new warnings
+2b. `npm run lint:design` — 12pt font floor (owner decision 2026-07-12; sweep 2026-07-20)
 3. `npx expo export --platform ios` — must succeed (catches import/runtime errors)
 4. For UI: test on iOS Simulator (use dev auth bypass: `EXPO_PUBLIC_DEV_AUTO_SIGNIN=1`)
 5. **Before shipping UI changes: run `/review`** — the single source of truth for QA. Catches visual regressions, data bugs, and UX issues.
