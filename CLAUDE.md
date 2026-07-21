@@ -103,3 +103,6 @@ The source web project lives at: `~/Broadwayscore/` (repo: `thomaspryor/Broadway
 
 ## File Hygiene
 CLAUDE.md (**limit: 100 lines**). Keep it concise. Detailed notes → `memory/{topic}.md`.
+
+## Design Proposals (MANDATORY — owner escalated twice 2026-07-20)
+**HTML/CSS mockups of app UI are BANNED — even "token-accurate" ones.** The design system IS the code (`constants/theme.ts` + components). A design proposal means: implement the variant in a worktree → render in the simulator → `simctl io screenshot` → present REAL before/after captures. When direction isn't obvious, build **2-3 rendered variants**, not one recommendation. JS-only changes iterate via dev-client + Metro from the worktree (verify the installed sim app is actually a dev client — production builds silently ignore the dev-client deep link). Full recipe + gotchas: web repo memory `feedback_ios_design_conservative_real_tokens.md`.
