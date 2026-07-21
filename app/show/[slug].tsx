@@ -360,14 +360,21 @@ export default function ShowDetailScreen() {
 
           {/* Critics' Take consensus paragraph — right below breakdown */}
           {detail?.criticsTake && (
-            <View
-              style={[
-                styles.criticsTakeBox,
-                { borderLeftColor: getScoreTier(displayScore, show.category)?.color ?? Colors.brand },
-              ]}
-            >
-              <Text style={styles.criticsTakeLabel}>Critics&apos; Take</Text>
-              <Text style={styles.criticsTakeText}>{detail.criticsTake.text}</Text>
+            <View style={styles.criticsTakeBox}>
+              <View style={styles.criticsTakeHeader}>
+                <Svg width={18} height={18} viewBox="0 0 24 24" fill={Colors.brand} opacity={0.7}>
+                  <Path d="M14.017 21v-7.391c0-5.704 3.731-9.57 8.983-10.609l.995 2.151c-2.432.917-3.995 3.638-3.995 5.849h4v10h-9.983zm-14.017 0v-7.391c0-5.704 3.748-9.57 9-10.609l.996 2.151c-2.433.917-3.996 3.638-3.996 5.849h3.983v10h-9.983z" />
+                </Svg>
+                <View style={styles.criticsTakeHeaderText}>
+                  <Text style={styles.criticsTakeLabel}>Critics&apos; Take</Text>
+                  <Text style={styles.criticsTakeText}>{detail.criticsTake.text}</Text>
+                </View>
+              </View>
+              <View style={styles.criticsTakeFooter}>
+                <Text style={styles.criticsTakeFooterText}>
+                  Based on {detail.criticsTake.reviewCount} {detail.criticsTake.reviewCount === 1 ? 'review' : 'reviews'}
+                </Text>
+              </View>
             </View>
           )}
 
@@ -1197,7 +1204,11 @@ function LRCard({ type, data }: { type: keyof typeof LR_TYPE_CONFIG; data: LRWin
   const Wrapper: any = data.url ? Pressable : View;
   return (
     <Wrapper
-      style={({ pressed }: { pressed: boolean }) => [styles.lrCard, { borderColor: cfg.color + '40' }, pressed && styles.pressed]}
+      style={({ pressed }: { pressed: boolean }) => [
+        styles.lrCard,
+        { backgroundColor: cfg.color + '26', borderColor: cfg.color + '40' },
+        pressed && styles.pressed,
+      ]}
       onPress={data.url ? open : undefined}
     >
       <View style={styles.lrHeader}>
@@ -1225,6 +1236,7 @@ function LotteryRushSection({ data }: { data: NonNullable<ShowDetail['lotteryRus
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>Same-Day Tickets</Text>
       {entries.map(([type, d]) => <LRCard key={type} type={type} data={d} />)}
+      <Text style={styles.lrDisclosure}>Some links may earn us a commission at no extra cost to you.</Text>
     </View>
   );
 }
@@ -1613,10 +1625,8 @@ const styles = StyleSheet.create({
     height: 12,
     borderRadius: 6,
     overflow: 'hidden',
-    gap: 2,
   },
   breakdownSegment: {
-    borderRadius: 6,
   },
   breakdownLabels: {
     flexDirection: 'row',
@@ -1945,12 +1955,17 @@ const styles = StyleSheet.create({
   // Critics' Take
   criticsTakeBox: {
     marginTop: Spacing.md,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderLeftWidth: 3,
-    borderLeftColor: Colors.brand,
+    padding: Spacing.md,
     backgroundColor: Colors.surface.raised,
-    borderRadius: BorderRadius.sm,
+    borderRadius: BorderRadius.md,
+  },
+  criticsTakeHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: Spacing.sm,
+  },
+  criticsTakeHeaderText: {
+    flex: 1,
   },
   criticsTakeLabel: {
     color: Colors.text.muted,
@@ -1964,6 +1979,18 @@ const styles = StyleSheet.create({
     color: Colors.text.secondary,
     fontSize: FontSize.sm,
     lineHeight: 20,
+  },
+  criticsTakeFooter: {
+    marginTop: Spacing.sm,
+    paddingTop: Spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border.subtle,
+  },
+  criticsTakeFooterText: {
+    color: Colors.text.muted,
+    fontSize: 10,
+    letterSpacing: 0.3,
+    textTransform: 'uppercase',
   },
 
   // Showtimes
@@ -2088,6 +2115,11 @@ const styles = StyleSheet.create({
     fontSize: FontSize.xs,
     marginTop: 6,
     fontWeight: '600',
+  },
+  lrDisclosure: {
+    color: Colors.text.muted,
+    fontSize: 10,
+    marginTop: Spacing.xs,
   },
 
   // Tony Awards
