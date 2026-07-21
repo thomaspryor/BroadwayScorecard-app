@@ -104,6 +104,9 @@ The source web project lives at: `~/Broadwayscore/` (repo: `thomaspryor/Broadway
 ## File Hygiene
 CLAUDE.md (**limit: 100 lines**). Keep it concise. Detailed notes → `memory/{topic}.md`.
 
-## Design Proposals (MANDATORY — owner escalated twice 2026-07-20)
-**HTML/CSS mockups of app UI are BANNED — even "token-accurate" ones.** The design system IS the code (`constants/theme.ts` + components). A design proposal means: implement the variant in a worktree → render in the simulator → `simctl io screenshot` → present REAL before/after captures. When direction isn't obvious, build **2-3 rendered variants**, not one recommendation. JS-only changes iterate via dev-client + Metro from the worktree (verify the installed sim app is actually a dev client — production builds silently ignore the dev-client deep link). Full recipe + gotchas: web repo memory `feedback_ios_design_conservative_real_tokens.md`.
-**Venue:** deliver design proposals into the owner's **Claude Design** project via the `DesignSync` tool (grouped cards per screen) — artifacts are a fallback link only, not the primary deliverable (owner escalated 2026-07-21). Embed sim captures from original PNGs at ≥900px, JPEG q90+/PNG — never re-compress or upscale.
+## Design Proposals (principles — owner feedback 2026-07-20/21)
+1. **Fidelity honesty.** Anything presented to the owner as "the proposed design" must be rendered by the real product (variant in a worktree → simulator → `simctl io screenshot`) or composited onto real captures. Rough sketches are allowed for private exploration only, must be labeled as sketches, and are never the deliverable — two incidents of HTML re-creations shown as designs were rejected as fake.
+2. **Venue: confirm, don't assume.** Ask once per project where the owner reviews design work. Current preference on record (2026-07-21, NOT yet validated — confirm after the first Claude Design delivery and update this line): Claude Design project via the `DesignSync` tool, grouped cards per screen; artifact link as fallback. Never silently default to artifacts.
+3. **Options where real.** Render 2-3 variants when direction is genuinely contested; one when it's obvious. Don't manufacture options for compliance.
+4. **Verify before showing.** Open the deliverable yourself first: every image sharp (embed from original PNGs, ≥900px, no re-compress/upscale), every section populated, no placeholders.
+Pipeline gotchas + full recipe: web repo memory `feedback_ios_design_conservative_real_tokens.md` (dev-client vs production build trap, Maestro launchApp/point-taps).
