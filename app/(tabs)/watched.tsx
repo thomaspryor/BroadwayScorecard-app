@@ -41,6 +41,16 @@ import * as haptics from '@/lib/haptics';
 type DiarySort = 'date-desc' | 'date-asc' | 'rating-desc';
 type ViewMode = 'list' | 'grid';
 
+/**
+ * DESIGN PROPOSAL — diary screen (workspace #256, unmerged).
+ * List view: month-header grouping + date chip per row (instead of a plain date line).
+ * Grid view: top-right date badge + a "x2" badge for shows with multiple viewings.
+ * These are additive to the existing list/grid toggle — set to false to see the
+ * shipped baseline for each mode.
+ */
+const DIARY_LIST_MONTH_HEADERS = true;
+const DIARY_GRID_DATE_BADGES = true;
+
 // ─── Swipe delete action ─────────────────────────────
 function SwipeDeleteAction({ onDelete, drag }: { onDelete: () => void; drag: SharedValue<number> }) {
   const animatedStyle = useAnimatedStyle(() => ({
@@ -145,6 +155,13 @@ export default function WatchedScreen() {
     }
   }, [reviews, diarySort]);
 
+  // How many times each show has been reviewed — powers the ×2 grid badge (DESIGN PROPOSAL, workspace #256)
+  const viewingCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const r of reviews) counts[r.show_id] = (counts[r.show_id] || 0) + 1;
+    return counts;
+  }, [reviews]);
+
   // To Be Rated — shows from watchlist where planned_date has passed but not yet rated
   const today = new Date().toISOString().split('T')[0];
   const reviewedShowIds = useMemo(() => new Set(reviews.map(r => r.show_id)), [reviews]);
@@ -180,6 +197,30 @@ export default function WatchedScreen() {
     }));
     return [...items, ...spacers];
   }, [sortedReviews]);
+
+  // Month-header grouping — inserts a header pseudo-item before the first
+  // review of each new calendar month (only meaningful for date-sorted lists).
+  type ListItem = UserReview | { __monthHeader: true; id: string; label: string };
+  const monthHeaderedReviews: ListItem[] = useMemo(() => {
+    if (!DIARY_LIST_MONTH_HEADERS || diarySort === 'rating-desc') return sortedReviews;
+    const out: ListItem[] = [];
+    let lastKey = '';
+    for (const item of sortedReviews) {
+      const dateStr = item.date_seen || item.created_at;
+      const d = new Date(dateStr + (item.date_seen ? 'T00:00:00' : ''));
+      const key = `${d.getFullYear()}-${d.getMonth()}`;
+      if (key !== lastKey) {
+        lastKey = key;
+        out.push({
+          __monthHeader: true,
+          id: `month-${key}`,
+          label: d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+        });
+      }
+      out.push(item);
+    }
+    return out;
+  }, [sortedReviews, diarySort]);
 
   const handleDeleteDiaryItem = useCallback((review: UserReview) => {
     haptics.action();
@@ -249,10 +290,18 @@ export default function WatchedScreen() {
   }
 
   // ─── List view render ────────────────────────────────
-  const renderDiaryItem = ({ item }: { item: UserReview }) => {
+  const renderDiaryItem = ({ item }: { item: ListItem }) => {
+    if ('__monthHeader' in item) {
+      return (
+        <View style={styles.monthHeader}>
+          <Text style={styles.monthHeaderText}>{item.label}</Text>
+        </View>
+      );
+    }
     const show = showMap[item.show_id];
     const title = show?.title || item.show_id;
     const posterUrl = show?.images ? (getImageUrl(show.images.poster) || getImageUrl(show.images.thumbnail)) : null;
+    const dateObj = item.date_seen ? new Date(item.date_seen + 'T00:00:00') : null;
 
     return (
       <ReanimatedSwipeable
@@ -268,6 +317,11 @@ export default function WatchedScreen() {
           onPress={() => show && router.push(`/show/${show.slug}`)}
           onLongPress={() => handleDeleteDiaryItem(item)}
         >
+          {DIARY_LIST_MONTH_HEADERS && dateObj && (
+            <View style={styles.dateChip}>
+              <Text style={styles.dateChipDay}>{dateObj.getDate()}</Text>
+            </View>
+          )}
           {posterUrl ? (
             <Image source={{ uri: posterUrl }} style={styles.cardPoster} contentFit="cover" transition={200} />
           ) : (
@@ -279,7 +333,7 @@ export default function WatchedScreen() {
             <Text style={styles.cardTitle} numberOfLines={1}>{title}</Text>
             {show?.venue && <Text style={styles.cardVenue} numberOfLines={1}>{show.venue}</Text>}
             {item.review_text && <Text style={styles.cardNote} numberOfLines={1}>{item.review_text}</Text>}
-            {item.date_seen && (
+            {!DIARY_LIST_MONTH_HEADERS && item.date_seen && (
               <Text style={styles.cardDate}>
                 {new Date(item.date_seen + 'T00:00:00').toLocaleDateString('en-US', {
                   month: 'short', day: 'numeric', year: 'numeric',
@@ -303,6 +357,8 @@ export default function WatchedScreen() {
     const show = showMap[item.show_id];
     const title = show?.title || item.show_id;
     const posterUrl = show?.images ? (getImageUrl(show.images.poster) || getImageUrl(show.images.thumbnail)) : null;
+    const viewingCount = viewingCounts[item.show_id] || 1;
+    const dateObj = item.date_seen ? new Date(item.date_seen + 'T00:00:00') : null;
 
     return (
       <Pressable
@@ -310,13 +366,27 @@ export default function WatchedScreen() {
         onPress={() => show && router.push(`/show/${show.slug}`)}
         onLongPress={() => handleDeleteDiaryItem(item)}
       >
-        {posterUrl ? (
-          <Image source={{ uri: posterUrl }} style={styles.gridPoster} contentFit="cover" transition={200} />
-        ) : (
-          <View style={[styles.gridPoster, styles.cardPosterPlaceholder]}>
-            <Text style={styles.placeholderText}>{title.charAt(0)}</Text>
-          </View>
-        )}
+        <View style={styles.gridPosterWrap}>
+          {posterUrl ? (
+            <Image source={{ uri: posterUrl }} style={styles.gridPoster} contentFit="cover" transition={200} />
+          ) : (
+            <View style={[styles.gridPoster, styles.cardPosterPlaceholder]}>
+              <Text style={styles.placeholderText}>{title.charAt(0)}</Text>
+            </View>
+          )}
+          {DIARY_GRID_DATE_BADGES && dateObj && (
+            <View style={styles.gridDateBadge}>
+              <Text style={styles.gridDateBadgeText}>
+                {dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+              </Text>
+            </View>
+          )}
+          {DIARY_GRID_DATE_BADGES && viewingCount > 1 && (
+            <View style={styles.gridViewingBadge}>
+              <Text style={styles.gridViewingBadgeText}>×{viewingCount}</Text>
+            </View>
+          )}
+        </View>
         <View style={styles.gridCardInfo}>
           {item.rating > 0 && <MiniStars rating={item.rating} />}
         </View>
@@ -356,6 +426,7 @@ export default function WatchedScreen() {
           </Pressable>
           <View style={styles.viewToggleContainer}>
             <Pressable
+              accessibilityLabel="Grid view"
               style={[styles.viewToggleButton, viewMode === 'grid' && styles.viewToggleActive]}
               onPress={() => { haptics.tap(); setViewMode('grid'); }}
               hitSlop={4}
@@ -365,6 +436,7 @@ export default function WatchedScreen() {
               </Svg>
             </Pressable>
             <Pressable
+              accessibilityLabel="List view"
               style={[styles.viewToggleButton, viewMode === 'list' && styles.viewToggleActive]}
               onPress={() => { haptics.tap(); setViewMode('list'); }}
               hitSlop={4}
@@ -443,7 +515,7 @@ export default function WatchedScreen() {
       ) : (
         <FlatList
           key="list"
-          data={sortedReviews}
+          data={monthHeaderedReviews}
           keyExtractor={item => item.id}
           renderItem={renderDiaryItem}
           showsVerticalScrollIndicator={false}
@@ -559,6 +631,25 @@ const styles = StyleSheet.create({
   cardDate: { color: Colors.text.muted, fontSize: FontSize.xs },
   cardRating: { alignItems: 'center', gap: 2 },
   ratingText: { color: Colors.text.secondary, fontSize: FontSize.xs },
+  // DESIGN PROPOSAL — diary list month headers + date chip (workspace #256)
+  monthHeader: {
+    backgroundColor: Colors.surface.raised,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.sm,
+  },
+  monthHeaderText: {
+    color: Colors.text.secondary,
+    fontSize: FontSize.xs,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+  },
+  dateChip: {
+    width: 34, height: 40, borderRadius: BorderRadius.sm,
+    borderWidth: 1, borderColor: Colors.border.default,
+    alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+  },
+  dateChipDay: { color: Colors.text.primary, fontSize: FontSize.md, fontWeight: '700' },
   // Grid view
   gridContainer: { paddingHorizontal: Spacing.lg, paddingBottom: Spacing.xxl, paddingTop: Spacing.md },
   gridRow: { gap: Spacing.sm, paddingBottom: Spacing.sm },
@@ -569,6 +660,20 @@ const styles = StyleSheet.create({
     width: '100%', aspectRatio: 2 / 3, borderRadius: BorderRadius.md,
     backgroundColor: Colors.surface.overlay,
   },
+  // DESIGN PROPOSAL — diary grid date + ×2 viewing badges (workspace #256)
+  gridPosterWrap: { width: '100%' },
+  gridDateBadge: {
+    position: 'absolute', top: 5, right: 5,
+    backgroundColor: 'rgba(15,15,20,0.85)', borderRadius: 5,
+    paddingHorizontal: 5, paddingVertical: 2,
+  },
+  gridDateBadgeText: { color: Colors.text.primary, fontSize: 9, fontWeight: '700' },
+  gridViewingBadge: {
+    position: 'absolute', top: 5, left: 5,
+    backgroundColor: Colors.brand, borderRadius: 99,
+    paddingHorizontal: 6, paddingVertical: 2,
+  },
+  gridViewingBadgeText: { color: Colors.surface.default, fontSize: 10, fontWeight: '800' },
   gridCardInfo: { marginTop: 4, alignItems: 'center' },
   gridTitle: {
     color: Colors.text.secondary, fontSize: 12, fontWeight: '500',

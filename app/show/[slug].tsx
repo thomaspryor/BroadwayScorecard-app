@@ -24,6 +24,7 @@ import { buildTicketUrl, buildTicketEventProps, isAffiliatePlatform, chooseTicke
 import { addSentryBreadcrumb, captureException } from '@/lib/sentry';
 import Svg, { Path } from 'react-native-svg';
 import ShowPageRating from '@/components/user/ShowPageRating';
+import RatingActionSheet from '@/components/user/RatingActionSheet';
 import { BookmarkOverlay } from '@/components/BookmarkOverlay';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { ceremonyToYear } from '@/lib/tony-utils';
@@ -33,6 +34,30 @@ import { ShowDetailSkeleton } from '@/components/Skeleton';
 import { useAuth } from '@/lib/auth-context';
 import { useWatchlist } from '@/hooks/useWatchlist';
 import { featureFlags } from '@/lib/feature-flags';
+
+/**
+ * DESIGN PROPOSAL — show hero layout (workspace #256, unmerged).
+ * 'current' = shipped 3-row pile (pills row / title+venue+runtime+closing / score row).
+ * 'consolidated' = one pill row + single metadata line under the title.
+ * Flip to preview, then flip back before committing.
+ */
+function getHERO_LAYOUT_VARIANT(): 'current' | 'consolidated' { return 'current'; }
+let HERO_LAYOUT_VARIANT: 'current' | 'consolidated' = getHERO_LAYOUT_VARIANT();
+
+/**
+ * DESIGN PROPOSAL — cast rows (workspace #256, unmerged).
+ * 'current' = role/name text rows. 'name-first' = avatar-initials circle + name-first row.
+ */
+function getCAST_ROW_VARIANT(): 'current' | 'name-first' { return 'current'; }
+let CAST_ROW_VARIANT: 'current' | 'name-first' = getCAST_ROW_VARIANT();
+
+/**
+ * DESIGN PROPOSAL — video thumbnail fallback (workspace #256, unmerged).
+ * 'current' = grey placeholder box with a plain ▶. 'brand' = surface-raised tile
+ * with a brand-colored play glyph, matching the atlas mock.
+ */
+function getVIDEO_FALLBACK_VARIANT(): 'current' | 'brand' { return 'current'; }
+let VIDEO_FALLBACK_VARIANT: 'current' | 'brand' = getVIDEO_FALLBACK_VARIANT();
 
 interface SocialPulsePayload {
   _v: number;
@@ -295,8 +320,8 @@ export default function ShowDetailScreen() {
                 <FormatPill type={show.type} />
                 <ProductionPill isRevival={show.isRevival} />
                 <StatusBadge status={show.status} />
-                <CategoryBadge category={show.category} />
-                {show.openingDate && (
+                {HERO_LAYOUT_VARIANT === 'current' && <CategoryBadge category={show.category} />}
+                {HERO_LAYOUT_VARIANT === 'current' && show.openingDate && (
                   <View style={styles.dateChip}>
                     <Text style={styles.dateChipText} numberOfLines={1}>
                       {show.status === 'previews' ? 'Opens' : 'Opened'} {formatDateShort(show.openingDate)}
@@ -305,17 +330,31 @@ export default function ShowDetailScreen() {
                 )}
               </View>
               <Text style={styles.title} numberOfLines={2}>{show.title}</Text>
-              <Text style={styles.meta} numberOfLines={1}>{show.venue}</Text>
-              {show.runtime && <Text style={styles.meta} numberOfLines={1}>{show.runtime}</Text>}
-              {show.closingDate && (
-                <Text style={styles.meta} numberOfLines={1}>
-                  {show.status === 'closed' ? 'Closed' : 'Closes'} {formatDate(show.closingDate)}
+              {HERO_LAYOUT_VARIANT === 'consolidated' ? (
+                <Text style={styles.meta} numberOfLines={2}>
+                  {[
+                    show.venue,
+                    show.runtime,
+                    show.status === 'closed' && show.closingDate ? `Closed ${formatDate(show.closingDate)}` :
+                      show.closingDate ? `Closes ${formatDate(show.closingDate)}` :
+                      show.openingDate ? `${show.status === 'previews' ? 'Opens' : 'Opened'} ${formatDateShort(show.openingDate)}` : null,
+                  ].filter(Boolean).join(' · ')}
                 </Text>
-              )}
-              {show.status === 'closed' && show.openingDate && show.closingDate && (
-                <Text style={styles.meta} numberOfLines={1}>
-                  Ran for {runLength(show.openingDate, show.closingDate)}
-                </Text>
+              ) : (
+                <>
+                  <Text style={styles.meta} numberOfLines={1}>{show.venue}</Text>
+                  {show.runtime && <Text style={styles.meta} numberOfLines={1}>{show.runtime}</Text>}
+                  {show.closingDate && (
+                    <Text style={styles.meta} numberOfLines={1}>
+                      {show.status === 'closed' ? 'Closed' : 'Closes'} {formatDate(show.closingDate)}
+                    </Text>
+                  )}
+                  {show.status === 'closed' && show.openingDate && show.closingDate && (
+                    <Text style={styles.meta} numberOfLines={1}>
+                      Ran for {runLength(show.openingDate, show.closingDate)}
+                    </Text>
+                  )}
+                </>
               )}
             </View>
           </View>
@@ -400,6 +439,9 @@ export default function ShowDetailScreen() {
             closingDate={show.closingDate}
 
           />
+
+          {/* DESIGN PROPOSAL — rating action row + log bottom sheet (workspace #256, unmerged) */}
+          <RatingActionSheet showId={show.id} showTitle={show.title} />
         </View>
 
         {/* Audience Scorecard — grade badge header + horizontal source cards */}
@@ -652,10 +694,24 @@ export default function ShowDetailScreen() {
               Cast ({detail.cast.length})
             </Text>
             {(showAllCast ? detail.cast : detail.cast.slice(0, 6)).map((member, i) => (
-              <View key={i} style={styles.creditRow}>
-                <Text style={styles.creditRole}>{member.role}</Text>
-                <Text style={styles.creditName}>{member.name}</Text>
-              </View>
+              CAST_ROW_VARIANT === 'name-first' ? (
+                <View key={i} style={styles.castRowNameFirst}>
+                  <View style={styles.castAvatar}>
+                    <Text style={styles.castAvatarText}>
+                      {member.name.split(' ').filter(Boolean).slice(0, 2).map(p => p[0]).join('').toUpperCase()}
+                    </Text>
+                  </View>
+                  <View style={styles.castNameFirstInfo}>
+                    <Text style={styles.castNameFirstName}>{member.name}</Text>
+                    <Text style={styles.castNameFirstRole}>{member.role}</Text>
+                  </View>
+                </View>
+              ) : (
+                <View key={i} style={styles.creditRow}>
+                  <Text style={styles.creditRole}>{member.role}</Text>
+                  <Text style={styles.creditName}>{member.name}</Text>
+                </View>
+              )
             ))}
             {!showAllCast && detail.cast.length > 6 && (
               <Pressable
@@ -1496,6 +1552,10 @@ function VideoReviewsSection({ reviews }: { reviews: ShowDetail['videoReviews'] 
           >
             {v.thumbnail ? (
               <Image source={{ uri: v.thumbnail }} style={styles.videoThumb} contentFit="cover" transition={200} />
+            ) : VIDEO_FALLBACK_VARIANT === 'brand' ? (
+              <View style={[styles.videoThumb, styles.videoThumbPlaceholderBrand]}>
+                <Text style={styles.videoThumbPlaceholderBrandText}>▶</Text>
+              </View>
             ) : (
               <View style={[styles.videoThumb, styles.videoThumbPlaceholder]}>
                 <Text style={styles.videoThumbPlaceholderText}>▶</Text>
@@ -1967,6 +2027,41 @@ const styles = StyleSheet.create({
     color: Colors.text.muted,
     fontSize: FontSize.sm,
     width: 120,
+  },
+  // DESIGN PROPOSAL variant — name-first cast rows with avatar initials (workspace #256)
+  castRowNameFirst: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border.subtle,
+  },
+  castAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: Colors.surface.overlay,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  castAvatarText: {
+    color: Colors.text.secondary,
+    fontSize: FontSize.xs,
+    fontWeight: '700',
+  },
+  castNameFirstInfo: {
+    flex: 1,
+  },
+  castNameFirstName: {
+    color: Colors.text.primary,
+    fontSize: FontSize.sm,
+    fontWeight: '600',
+  },
+  castNameFirstRole: {
+    color: Colors.text.muted,
+    fontSize: FontSize.xs,
+    marginTop: 1,
   },
   creditName: {
     color: Colors.text.primary,
@@ -2459,6 +2554,17 @@ const styles = StyleSheet.create({
   videoThumbPlaceholderText: {
     color: Colors.text.muted,
     fontSize: FontSize.lg,
+  },
+  // DESIGN PROPOSAL variant — brand-colored video fallback tile (workspace #256)
+  videoThumbPlaceholderBrand: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: Colors.border.subtle,
+  },
+  videoThumbPlaceholderBrandText: {
+    color: Colors.brand,
+    fontSize: FontSize.xxl,
   },
   videoInfo: {
     flex: 1,

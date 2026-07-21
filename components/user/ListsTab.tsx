@@ -31,6 +31,13 @@ import { useUserLists } from '@/hooks/useUserLists';
 import { useShows } from '@/lib/data-context';
 import { getImageUrl } from '@/lib/images';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
+
+/**
+ * DESIGN PROPOSAL — Lists screen (workspace #256, unmerged).
+ * Poster previews overlap into a stack (Letterboxd-style) instead of a flat
+ * row, and the empty state uses a dashed-border tile instead of a bare emoji.
+ */
+const LISTS_OVERLAP_STACK = true;
 import * as haptics from '@/lib/haptics';
 import { trackListCreated, trackListDeleted, trackShowAddedToList, trackShowRemovedFromList, trackListReordered } from '@/lib/analytics';
 import type { UserList, ListItem } from '@/lib/user-types';
@@ -204,7 +211,13 @@ export default function ListsTab({ userId, showMap, createTrigger }: ListsTabPro
     if (lists.length === 0) {
       return (
         <View style={styles.emptyContainer}>
-          <Text style={styles.emptyEmoji}>📋</Text>
+          {LISTS_OVERLAP_STACK ? (
+            <View style={styles.emptyDashedTile}>
+              <Text style={styles.emptyEmoji}>📋</Text>
+            </View>
+          ) : (
+            <Text style={styles.emptyEmoji}>📋</Text>
+          )}
           <Text style={styles.emptyTitle}>No lists yet</Text>
           <Text style={styles.emptyDescription}>Create lists to organize shows you love</Text>
           <Pressable
@@ -244,18 +257,19 @@ export default function ListsTab({ userId, showMap, createTrigger }: ListsTabPro
                 </Text>
               </View>
               {/* Poster previews */}
-              <View style={styles.previewRow}>
-                {(list.preview_show_ids || []).slice(0, 4).map(sid => {
+              <View style={LISTS_OVERLAP_STACK ? styles.previewStack : styles.previewRow}>
+                {(list.preview_show_ids || []).slice(0, 4).map((sid, idx) => {
                   const show = showMap[sid];
+                  const overlapStyle = LISTS_OVERLAP_STACK && idx > 0 ? styles.previewPosterOverlap : null;
                   return show ? (
                     <Image
                       key={sid}
                       source={{ uri: getImageUrl(show.images?.poster) || getImageUrl(show.images?.thumbnail) || undefined }}
-                      style={styles.previewPoster}
+                      style={[styles.previewPoster, overlapStyle]}
                       contentFit="cover"
                     />
                   ) : (
-                    <View key={sid} style={[styles.previewPoster, styles.previewPlaceholder]}>
+                    <View key={sid} style={[styles.previewPoster, styles.previewPlaceholder, overlapStyle]}>
                       <Text style={styles.previewPlaceholderText}>🎭</Text>
                     </View>
                   );
@@ -678,6 +692,13 @@ const styles = StyleSheet.create({
     fontSize: 48,
     marginBottom: Spacing.sm,
   },
+  // DESIGN PROPOSAL — dashed-border empty state tile (workspace #256)
+  emptyDashedTile: {
+    width: 88, height: 88, borderRadius: BorderRadius.lg,
+    borderWidth: 1.5, borderStyle: 'dashed', borderColor: Colors.border.default,
+    alignItems: 'center', justifyContent: 'center',
+    marginBottom: Spacing.sm,
+  },
   emptyTitle: {
     color: Colors.text.primary,
     fontSize: FontSize.lg,
@@ -749,6 +770,15 @@ const styles = StyleSheet.create({
   previewRow: {
     flexDirection: 'row',
     gap: 3,
+  },
+  // DESIGN PROPOSAL — overlapping poster stack (workspace #256)
+  previewStack: {
+    flexDirection: 'row',
+  },
+  previewPosterOverlap: {
+    marginLeft: -18,
+    borderWidth: 1.5,
+    borderColor: Colors.surface.default,
   },
   previewPoster: {
     width: 40,

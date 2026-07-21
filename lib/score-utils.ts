@@ -21,7 +21,16 @@ export interface ScoreTier {
   range: string;
 }
 
-const SCORE_TIERS = {
+/**
+ * DESIGN PROPOSAL — score palette (workspace #256, unmerged).
+ * 'app' = current theme.ts values (as shipped). 'web' = aligned to web's
+ * score-buckets.ts tailwind hexes (amber-400/emerald-400/sky-400/orange-500/red-400).
+ * Flip to 'web' locally to preview, then flip back before committing.
+ */
+function getSCORE_PALETTE_VARIANT(): 'app' | 'web' { return 'app'; }
+let SCORE_PALETTE_VARIANT: 'app' | 'web' = getSCORE_PALETTE_VARIANT();
+
+const SCORE_TIERS_APP = {
   mustSee: {
     label: 'Critical Gold',
     color: '#FFD700',
@@ -63,6 +72,17 @@ const SCORE_TIERS = {
     range: '<55',
   },
 } as const;
+
+// Web score-buckets.ts hexes: amber-400, emerald-400, sky-400, orange-500, red-400.
+const SCORE_TIERS_WEB = {
+  mustSee: { ...SCORE_TIERS_APP.mustSee, color: '#fbbf24', shadowColor: '#f59e0b', textColor: '#1a1a1a' },
+  recommended: { ...SCORE_TIERS_APP.recommended, color: '#34d399', shadowColor: '#34d399', textColor: '#1a1a1a' },
+  worthSeeing: { ...SCORE_TIERS_APP.worthSeeing, color: '#38bdf8', shadowColor: '#38bdf8', textColor: '#1a1a1a' },
+  skippable: { ...SCORE_TIERS_APP.skippable, color: '#f97316', shadowColor: '#f97316', textColor: '#1a1a1a' },
+  stayAway: { ...SCORE_TIERS_APP.stayAway, color: '#f87171', shadowColor: '#f87171', textColor: '#1a1a1a' },
+} as const;
+
+const SCORE_TIERS = SCORE_PALETTE_VARIANT === 'web' ? SCORE_TIERS_WEB : SCORE_TIERS_APP;
 
 // Market-aware Critical Gold threshold — mirrors web src/config/score-buckets.ts.
 // WE star ratings (5-point scale) cluster at 80/100, so WE Gold requires 85+.

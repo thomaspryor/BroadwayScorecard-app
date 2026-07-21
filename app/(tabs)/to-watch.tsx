@@ -13,6 +13,7 @@ import {
   Pressable,
   StyleSheet,
   Alert,
+  Modal,
   Platform,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -27,6 +28,7 @@ import { useUserReviews } from '@/hooks/useUserReviews';
 import { useWatchlist } from '@/hooks/useWatchlist';
 import { useShows } from '@/lib/data-context';
 import { getImageUrl } from '@/lib/images';
+import { getScoreTier } from '@/lib/score-utils';
 import { daysUntilDate } from '@/lib/date-utils';
 import { featureFlags } from '@/lib/feature-flags';
 import type { WatchlistEntry } from '@/lib/user-types';
@@ -37,6 +39,15 @@ import { ShowSearchModal } from '@/components/ShowSearchModal';
 import * as haptics from '@/lib/haptics';
 
 type WatchlistSort = 'added-desc' | 'alphabetical' | 'closing-soon';
+
+/**
+ * DESIGN PROPOSAL — watchlist screen (workspace #256, unmerged).
+ * Grid posters get a tier-colored score chip (bottom-left) instead of being
+ * bare, and long-press opens a real in-app context menu (Remove / Add to List /
+ * Set reminder date) instead of the native Alert.alert confirm dialog.
+ */
+const WATCHLIST_SCORE_CHIPS = true;
+const WATCHLIST_CONTEXT_MENU = true;
 
 function EmptyState({ emoji, title, subtitle, actionLabel, onAction }: {
   emoji: string; title: string; subtitle: string; actionLabel?: string; onAction?: () => void;
@@ -68,6 +79,7 @@ export default function ToWatchScreen() {
   const [datePickingShowId, setDatePickingShowId] = useState<string | null>(null);
   const [pendingDate, setPendingDate] = useState<Date>(new Date());
   const [showSearchModal, setShowSearchModal] = useState(false);
+  const [contextMenuItem, setContextMenuItem] = useState<WatchlistEntry | null>(null);
 
   const showMap = useMemo(() => {
     const map: Record<string, Show> = {};
@@ -249,6 +261,7 @@ export default function ToWatchScreen() {
     const show = showMap[item.show_id];
     const title = show?.title || item.show_id;
     const posterUrl = show?.images ? (getImageUrl(show.images.poster) || getImageUrl(show.images.thumbnail)) : null;
+    const tier = WATCHLIST_SCORE_CHIPS && show?.compositeScore != null ? getScoreTier(show.compositeScore, show.category) : null;
 
     return (
       <Pressable
@@ -256,21 +269,70 @@ export default function ToWatchScreen() {
         style={({ pressed }) => [styles.gridCard, pressed && styles.pressed]}
         onPress={() => show && router.push(`/show/${show.slug}`)}
         onLongPress={() => {
+          if (WATCHLIST_CONTEXT_MENU) {
+            haptics.tap();
+            setContextMenuItem(item);
+            return;
+          }
           Alert.alert('Remove from Watchlist', `Remove ${title}?`, [
             { text: 'Cancel', style: 'cancel' },
             { text: 'Remove', style: 'destructive', onPress: () => handleRemove(item.show_id) },
           ]);
         }}
       >
-        {posterUrl ? (
-          <Image source={{ uri: posterUrl }} style={styles.gridPoster} contentFit="cover" transition={200} />
-        ) : (
-          <View style={[styles.gridPoster, styles.cardPosterPlaceholder]}>
-            <Text style={styles.placeholderText}>{title.charAt(0)}</Text>
-          </View>
-        )}
+        <View style={styles.gridPosterWrap}>
+          {posterUrl ? (
+            <Image source={{ uri: posterUrl }} style={styles.gridPoster} contentFit="cover" transition={200} />
+          ) : (
+            <View style={[styles.gridPoster, styles.cardPosterPlaceholder]}>
+              <Text style={styles.placeholderText}>{title.charAt(0)}</Text>
+            </View>
+          )}
+          {tier && (
+            <View style={[styles.scoreChip, { backgroundColor: tier.color }]}>
+              <Text style={[styles.scoreChipText, { color: tier.textColor }]}>{Math.round(show!.compositeScore!)}</Text>
+            </View>
+          )}
+        </View>
         <Text style={styles.gridTitle} numberOfLines={2}>{title}</Text>
       </Pressable>
+    );
+  };
+
+  // DESIGN PROPOSAL — in-app context menu, replaces Alert.alert (workspace #256)
+  // Called inline as a function (not tagged as a component) to avoid the
+  // "component defined during render" lint/perf trap.
+  const renderWatchlistContextMenu = () => {
+    if (!contextMenuItem) return null;
+    const show = showMap[contextMenuItem.show_id];
+    const title = show?.title || contextMenuItem.show_id;
+    const close = () => setContextMenuItem(null);
+    return (
+      <Modal visible transparent animationType="fade" onRequestClose={close}>
+        <Pressable style={styles.ctxOverlay} onPress={close}>
+          <View style={styles.ctxCard}>
+            <Text style={styles.ctxTitle} numberOfLines={1}>{title}</Text>
+            <Pressable
+              style={({ pressed }) => [styles.ctxItem, pressed && styles.pressed]}
+              onPress={() => { close(); setPendingDate(new Date()); setDatePickingShowId(contextMenuItem.show_id); }}
+            >
+              <Text style={styles.ctxItemText}>Set reminder date</Text>
+            </Pressable>
+            <Pressable
+              style={({ pressed }) => [styles.ctxItem, pressed && styles.pressed]}
+              onPress={() => { close(); show && router.push(`/show/${show.slug}`); }}
+            >
+              <Text style={styles.ctxItemText}>View show</Text>
+            </Pressable>
+            <Pressable
+              style={({ pressed }) => [styles.ctxItem, styles.ctxItemLast, pressed && styles.pressed]}
+              onPress={() => { close(); handleRemove(contextMenuItem.show_id); }}
+            >
+              <Text style={[styles.ctxItemText, styles.ctxItemDestructive]}>Remove from Watchlist</Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
     );
   };
 
@@ -478,6 +540,7 @@ export default function ToWatchScreen() {
         }}
         onClose={() => setShowSearchModal(false)}
       />
+      {renderWatchlistContextMenu()}
     </GestureHandlerRootView>
   );
 }
@@ -526,6 +589,31 @@ const styles = StyleSheet.create({
   cardPosterPlaceholder: { alignItems: 'center', justifyContent: 'center' },
   placeholderText: { color: Colors.text.muted, fontSize: 18, fontWeight: '600' },
   posterDate: { color: Colors.text.secondary, fontSize: 12, fontWeight: '500', textAlign: 'center', marginTop: 4 },
+  // DESIGN PROPOSAL — poster score chip + in-app context menu (workspace #256)
+  gridPosterWrap: { width: '100%' },
+  scoreChip: {
+    position: 'absolute', bottom: 5, left: 5,
+    borderRadius: BorderRadius.sm, paddingHorizontal: 6, paddingVertical: 2,
+  },
+  scoreChipText: { fontSize: 12, fontWeight: '800' },
+  ctxOverlay: {
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center',
+  },
+  ctxCard: {
+    width: 240, backgroundColor: Colors.surface.elevated, borderRadius: BorderRadius.lg,
+    paddingVertical: Spacing.sm, overflow: 'hidden',
+  },
+  ctxTitle: {
+    color: Colors.text.muted, fontSize: FontSize.xs, fontWeight: '700',
+    paddingHorizontal: Spacing.lg, paddingVertical: Spacing.sm,
+  },
+  ctxItem: {
+    paddingHorizontal: Spacing.lg, paddingVertical: Spacing.md,
+    borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: Colors.border.default,
+  },
+  ctxItemLast: {},
+  ctxItemText: { color: Colors.text.primary, fontSize: FontSize.md },
+  ctxItemDestructive: { color: Colors.score.red },
   gridTitle: {
     color: Colors.text.secondary, fontSize: 12, fontWeight: '500',
     textAlign: 'center', lineHeight: 15, marginTop: 2,

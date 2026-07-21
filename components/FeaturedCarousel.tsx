@@ -10,6 +10,7 @@ import { useRouter } from 'expo-router';
 import { Show } from '@/lib/types';
 import { getImageUrl } from '@/lib/images';
 import { ScoreBadge } from '@/components/show-cards';
+import { getScoreTier } from '@/lib/score-utils';
 import { BookmarkOverlay } from '@/components/BookmarkOverlay';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
 
@@ -20,10 +21,20 @@ interface FeaturedCarouselProps {
   getSubtitle?: (show: Show) => string | undefined;
 }
 
+/**
+ * DESIGN PROPOSAL — home shelf tier context (workspace #256, unmerged).
+ * 'none' = current (no tier context, date subtitle only). 'label' = tier
+ * label under title. 'border' = tier-colored chip border around the poster.
+ * Flip to preview, then flip back before committing.
+ */
+function getSHELF_TIER_VARIANT(): 'none' | 'label' | 'border' { return 'none'; }
+let SHELF_TIER_VARIANT: 'none' | 'label' | 'border' = getSHELF_TIER_VARIANT();
+
 const FeaturedCard = memo(function FeaturedCard({ show, cardWidth, isWatchlisted, onToggle, subtitle }: { show: Show; cardWidth: number; isWatchlisted?: boolean; onToggle?: () => void; subtitle?: string }) {
   const router = useRouter();
   const posterUrl = getImageUrl(show.images.poster) || getImageUrl(show.images.thumbnail);
   const cardHeight = cardWidth * 1.5;
+  const tier = SHELF_TIER_VARIANT !== 'none' ? getScoreTier(show.compositeScore, show.category) : null;
 
   return (
     <Pressable
@@ -35,7 +46,13 @@ const FeaturedCard = memo(function FeaturedCard({ show, cardWidth, isWatchlisted
       onPress={() => router.push(`/show/${show.slug}`)}
     >
       {/* Image container with bookmark top-right + score badge bottom-right */}
-      <View style={[styles.imageContainer, { height: cardHeight }]}>
+      <View
+        style={[
+          styles.imageContainer,
+          { height: cardHeight },
+          SHELF_TIER_VARIANT === 'border' && tier ? { borderWidth: 2, borderColor: tier.color } : null,
+        ]}
+      >
         {posterUrl ? (
           <Image
             source={{ uri: posterUrl }}
@@ -64,7 +81,9 @@ const FeaturedCard = memo(function FeaturedCard({ show, cardWidth, isWatchlisted
       <Text style={styles.cardTitle} numberOfLines={2}>
         {show.title}
       </Text>
-      {subtitle ? (
+      {SHELF_TIER_VARIANT === 'label' && tier ? (
+        <Text style={[styles.cardTierLabel, { color: tier.color }]} numberOfLines={1}>{tier.label}</Text>
+      ) : subtitle ? (
         <Text style={styles.cardSubtitle} numberOfLines={1}>{subtitle}</Text>
       ) : null}
     </Pressable>
@@ -148,6 +167,13 @@ const styles = StyleSheet.create({
   cardSubtitle: {
     color: Colors.text.muted,
     fontSize: FontSize.xs,
+    marginTop: 2,
+  },
+  cardTierLabel: {
+    fontSize: FontSize.xs,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
     marginTop: 2,
   },
 });
