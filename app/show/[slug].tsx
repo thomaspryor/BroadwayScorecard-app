@@ -886,8 +886,8 @@ function ReviewRow({ review, showId, category }: { review: ShowDetail['reviews']
       {/* Content indented past score badge */}
       <View style={styles.reviewContent}>
         {review.pullQuote && (
-          <Text style={styles.reviewQuote} numberOfLines={2}>
-            {'\u201C'}{review.pullQuote}{'\u201D'}
+          <Text style={styles.reviewQuote}>
+            {'\u201C'}{review.pullQuote}{/[.!?'\u2019"\u201D]$/.test(review.pullQuote.trim()) ? '' : '.'}{'\u201D'}
           </Text>
         )}
         <View style={styles.reviewFooter}>
