@@ -1351,9 +1351,62 @@ function LotteryRushSection({ data }: { data: NonNullable<ShowDetail['lotteryRus
 
 // ---------- Tony Awards ----------
 
+/**
+ * DESIGN PROPOSAL — Awards section (workspace #277, unmerged).
+ * 'current' = plain icon-row list. 'cards' = each win/nom gets a raised
+ * card with a circular trophy/star badge, matching the show-card visual
+ * language used elsewhere on the page (score badges, review rows).
+ * Flip to preview, then flip back before committing.
+ */
+function getAWARDS_VARIANT(): 'current' | 'cards' { return 'current'; }
+let AWARDS_VARIANT: 'current' | 'cards' = getAWARDS_VARIANT();
+
 function TonyAwardsSection({ awards }: { awards: ShowDetail['tonyAwards'] }) {
   const wins = awards.filter(a => a.won);
   const noms = awards.filter(a => !a.won);
+  if (AWARDS_VARIANT === 'cards') {
+    return (
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>
+          Tony Awards {wins.length > 0 ? `· ${wins.length} Win${wins.length > 1 ? 's' : ''}` : ''}
+        </Text>
+        {wins.length > 0 && (
+          <>
+            <Text style={styles.tonyGroupLabel}>WINS</Text>
+            {wins.map((a, i) => (
+              <View key={i} style={styles.tonyCard}>
+                <View style={styles.tonyCardBadgeWin}>
+                  <IconSymbol name="trophy.fill" size={18} color="#FFD700" />
+                </View>
+                <View style={styles.tonyInfo}>
+                  <Text style={styles.tonyCategory}>{a.category}</Text>
+                  {a.name && <Text style={styles.tonyName}>{a.name} · {ceremonyToYear(a.year)}</Text>}
+                  {!a.name && <Text style={styles.tonyName}>{ceremonyToYear(a.year)}</Text>}
+                </View>
+              </View>
+            ))}
+          </>
+        )}
+        {noms.length > 0 && (
+          <>
+            <Text style={[styles.tonyGroupLabel, { marginTop: wins.length > 0 ? Spacing.md : 0 }]}>NOMINATIONS</Text>
+            {noms.map((a, i) => (
+              <View key={i} style={styles.tonyCard}>
+                <View style={styles.tonyCardBadgeNom}>
+                  <IconSymbol name="star" size={16} color={Colors.text.muted} />
+                </View>
+                <View style={styles.tonyInfo}>
+                  <Text style={styles.tonyCategory}>{a.category}</Text>
+                  {a.name && <Text style={styles.tonyName}>{a.name} · {ceremonyToYear(a.year)}</Text>}
+                  {!a.name && <Text style={styles.tonyName}>{ceremonyToYear(a.year)}</Text>}
+                </View>
+              </View>
+            ))}
+          </>
+        )}
+      </View>
+    );
+  }
   return (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>
@@ -2363,6 +2416,32 @@ const styles = StyleSheet.create({
     color: Colors.text.muted,
     fontSize: FontSize.xs,
     marginTop: 2,
+  },
+  // DESIGN PROPOSAL — cards variant (workspace #277)
+  tonyCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    backgroundColor: Colors.surface.raised,
+    borderRadius: BorderRadius.md,
+    padding: Spacing.sm,
+    marginBottom: Spacing.xs,
+  },
+  tonyCardBadgeWin: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,215,0,0.15)',
+  },
+  tonyCardBadgeNom: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.surface.overlay,
   },
 
   // Social Scorecard

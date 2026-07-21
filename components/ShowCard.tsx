@@ -27,7 +27,18 @@ interface ShowCardProps {
   hideStatus?: boolean;
   isWatchlisted?: boolean;
   onToggleWatchlist?: () => void;
+  rank?: number;
 }
+
+/**
+ * DESIGN PROPOSAL — Browse row (workspace #277, unmerged).
+ * 'current' = today's 72x96 thumb, no rank. 'poster' = larger 2:3 poster
+ * (84x126) for stronger show identity. 'rank' = current thumb size + a
+ * numbered rank chip (only shown when sorted by Score, via the `rank` prop).
+ * Flip to preview, then flip back before committing.
+ */
+function getBROWSE_ROW_VARIANT(): 'current' | 'poster' | 'rank' { return 'current'; }
+let BROWSE_ROW_VARIANT: 'current' | 'poster' | 'rank' = getBROWSE_ROW_VARIANT();
 
 const MARKET_LABELS: Record<string, string> = {
   'broadway': 'on Broadway',
@@ -72,7 +83,7 @@ function getClosingInfo(closingDate: string | null, status: string): string | nu
   return null;
 }
 
-export const ShowCard = memo(function ShowCard({ show, scoreMode = 'critics', hideStatus = false, isWatchlisted, onToggleWatchlist }: ShowCardProps) {
+export const ShowCard = memo(function ShowCard({ show, scoreMode = 'critics', hideStatus = false, isWatchlisted, onToggleWatchlist, rank }: ShowCardProps) {
   const router = useRouter();
   const imageUrl = getImageUrl(show.images.poster ?? show.images.thumbnail);
   const scoreText = show.compositeScore ? `Score ${Math.round(show.compositeScore)}` : 'No score';
@@ -98,13 +109,13 @@ export const ShowCard = memo(function ShowCard({ show, scoreMode = 'critics', hi
         {imageUrl ? (
           <Image
             source={{ uri: imageUrl }}
-            style={styles.showImage}
+            style={BROWSE_ROW_VARIANT === 'poster' ? styles.showImagePoster : styles.showImage}
             contentFit="cover"
             transition={200}
             accessibilityLabel={`${show.title} poster`}
           />
         ) : (
-          <View style={[styles.showImage, styles.placeholderThumb]}>
+          <View style={[BROWSE_ROW_VARIANT === 'poster' ? styles.showImagePoster : styles.showImage, styles.placeholderThumb]}>
             <Text style={styles.placeholderText}>
               {show.title.charAt(0)}
             </Text>
@@ -113,6 +124,11 @@ export const ShowCard = memo(function ShowCard({ show, scoreMode = 'critics', hi
         {/* Bookmark — rendered AFTER image so it's on top (z-order) */}
         {isWatchlisted !== undefined && onToggleWatchlist && (
           <BookmarkOverlay isWatchlisted={isWatchlisted} onToggle={onToggleWatchlist} />
+        )}
+        {BROWSE_ROW_VARIANT === 'rank' && rank != null && (
+          <View style={styles.rankChip}>
+            <Text style={styles.rankChipText}>{rank}</Text>
+          </View>
         )}
       </View>
 
@@ -187,6 +203,30 @@ const styles = StyleSheet.create({
     width: 72,
     height: 96,
     borderRadius: BorderRadius.sm,
+  },
+  showImagePoster: {
+    width: 84,
+    height: 126,
+    borderRadius: BorderRadius.sm,
+  },
+  rankChip: {
+    position: 'absolute',
+    top: -6,
+    left: -6,
+    minWidth: 22,
+    height: 22,
+    paddingHorizontal: 5,
+    borderRadius: 11,
+    backgroundColor: Colors.surface.elevated,
+    borderWidth: 1,
+    borderColor: Colors.border.subtle,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rankChipText: {
+    color: Colors.text.primary,
+    fontSize: FontSize.xs,
+    fontWeight: '800',
   },
   placeholderThumb: {
     backgroundColor: Colors.surface.overlay,

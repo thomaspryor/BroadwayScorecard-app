@@ -13,6 +13,7 @@ import {
   FlatList,
   Pressable,
   Modal,
+  ScrollView,
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
@@ -43,9 +44,25 @@ interface ShowSearchModalProps {
   excludeIds?: Set<string>;
 }
 
+/**
+ * DESIGN PROPOSAL — search empty state (workspace #277, unmerged).
+ * 'current' = plain instructional text. 'suggestions' = trending open shows
+ * as tappable poster chips, so the sheet isn't a dead end before typing.
+ * Flip to preview, then flip back before committing.
+ */
+function getSEARCH_VARIANT(): 'current' | 'suggestions' { return 'current'; }
+let SEARCH_VARIANT: 'current' | 'suggestions' = getSEARCH_VARIANT();
+
 export function ShowSearchModal({ visible, title, onSelect, onClose, excludeIds }: ShowSearchModalProps) {
   const { shows } = useShows();
   const [query, setQuery] = useState('');
+  const trending = useMemo(
+    () => [...shows]
+      .filter(s => s.status === 'open' && s.compositeScore != null && !excludeIds?.has(s.id))
+      .sort((a, b) => (b.compositeScore ?? 0) - (a.compositeScore ?? 0))
+      .slice(0, 6),
+    [shows, excludeIds]
+  );
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const inputRef = useRef<TextInput>(null);
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -123,9 +140,36 @@ export function ShowSearchModal({ visible, title, onSelect, onClose, excludeIds 
 
         {/* Results */}
         {query.trim().length < 2 ? (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyText}>Search for a show by name</Text>
-          </View>
+          SEARCH_VARIANT === 'suggestions' ? (
+            <ScrollView contentContainerStyle={styles.suggestionsScroll} keyboardShouldPersistTaps="handled">
+              <Text style={styles.suggestionsLabel}>TRENDING NOW</Text>
+              <View style={styles.suggestionsGrid}>
+                {trending.map(show => {
+                  const posterUrl = getImageUrl(show.images.poster) || getImageUrl(show.images.thumbnail);
+                  return (
+                    <Pressable
+                      key={show.id}
+                      style={({ pressed }) => [styles.suggestionChip, pressed && styles.pressed]}
+                      onPress={() => onSelect(show)}
+                    >
+                      {posterUrl ? (
+                        <Image source={{ uri: posterUrl }} style={styles.suggestionPoster} contentFit="cover" />
+                      ) : (
+                        <View style={[styles.suggestionPoster, styles.resultPlaceholder]}>
+                          <Text style={styles.placeholderText}>{show.title.charAt(0)}</Text>
+                        </View>
+                      )}
+                      <Text style={styles.suggestionTitle} numberOfLines={1}>{show.title}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </ScrollView>
+          ) : (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyText}>Search for a show by name</Text>
+            </View>
+          )
         ) : results.length === 0 ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyText}>No shows found</Text>
@@ -229,6 +273,40 @@ const styles = StyleSheet.create({
     fontSize: FontSize.md,
     textAlign: 'center',
   },
+  // DESIGN PROPOSAL — suggestions variant (workspace #277)
+  pressed: {
+    opacity: 0.7,
+  },
+  suggestionsScroll: {
+    padding: Spacing.lg,
+  },
+  suggestionsLabel: {
+    color: Colors.text.muted,
+    fontSize: FontSize.xs,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    marginBottom: Spacing.md,
+  },
+  suggestionsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.md,
+  },
+  suggestionChip: {
+    width: '30%',
+  },
+  suggestionPoster: {
+    width: '100%',
+    aspectRatio: 2 / 3,
+    borderRadius: BorderRadius.md,
+    backgroundColor: Colors.surface.raised,
+  },
+  suggestionTitle: {
+    color: Colors.text.primary,
+    fontSize: FontSize.xs,
+    fontWeight: '600',
+    marginTop: Spacing.xs,
+  },
   list: {
     paddingBottom: Spacing.xxl,
   },
@@ -238,9 +316,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.sm,
     gap: Spacing.md,
-  },
-  pressed: {
-    opacity: 0.7,
   },
   resultPoster: {
     width: 44,
