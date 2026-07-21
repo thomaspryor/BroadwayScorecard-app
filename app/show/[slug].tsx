@@ -378,26 +378,20 @@ export default function ShowDetailScreen() {
             </View>
           )}
 
-          {/* Link buttons: Official Site, Ticket platforms */}
-          <View style={styles.linkButtons}>
-            {show.officialUrl && (
+          {/* Single Get Tickets CTA — TodayTix only (affiliate revenue; owner decision 2026-07-20).
+             Official Site moved to Quick Facts at the bottom of the page. */}
+          {show.status !== 'closed' && (() => {
+            const todayTix = show.ticketLinks?.find(l => /todaytix/i.test(l.platform)) ?? show.ticketLinks?.[0];
+            if (!todayTix) return null;
+            return (
               <Pressable
-                style={({ pressed }) => [styles.linkButton, pressed && styles.pressed]}
-                onPress={() => WebBrowser.openBrowserAsync(show.officialUrl!)}
+                style={({ pressed }) => [styles.getTicketsButton, pressed && styles.pressed]}
+                onPress={() => openTicketLink(todayTix, 0, 'show_detail')}
               >
-                <Text style={styles.linkButtonText}>Official Site</Text>
+                <Text style={styles.getTicketsText}>Get Tickets</Text>
               </Pressable>
-            )}
-            {show.status !== 'closed' && show.ticketLinks?.map((link, i) => (
-              <Pressable
-                key={i}
-                style={({ pressed }) => [styles.linkButton, pressed && styles.pressed]}
-                onPress={() => openTicketLink(link, i, 'show_detail')}
-              >
-                <Text style={styles.linkButtonText}>{link.platform}</Text>
-              </Pressable>
-            ))}
-          </View>
+            );
+          })()}
 
           {/* User rating + watchlist (feature-flagged) — inside header card */}
           <ShowPageRating
@@ -763,6 +757,50 @@ export default function ShowDetailScreen() {
         {/* Hidden share card for image capture */}
         <ShareCardWithRef ref={shareCardRef} show={show} />
 
+        {/* Quick Facts — structured basics + Official Site (relocated from the hero ticket row) */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Quick Facts</Text>
+          <View style={styles.qfCard}>
+            <View style={styles.qfRow}>
+              <Text style={styles.qfLabel}>Status</Text>
+              <Text style={styles.qfValue}>
+                {show.status === 'open' ? 'Now Playing' : show.status === 'previews' ? 'In Previews' : show.status === 'upcoming' ? 'Upcoming' : 'Closed'}
+              </Text>
+            </View>
+            {show.openingDate && (
+              <View style={styles.qfRow}>
+                <Text style={styles.qfLabel}>{show.status === 'previews' || show.status === 'upcoming' ? 'Opens' : 'Opened'}</Text>
+                <Text style={styles.qfValue}>{formatQuickFactDate(show.openingDate)}</Text>
+              </View>
+            )}
+            {show.closingDate && (
+              <View style={styles.qfRow}>
+                <Text style={styles.qfLabel}>{show.status === 'closed' ? 'Closed' : 'Closes'}</Text>
+                <Text style={styles.qfValue}>{formatQuickFactDate(show.closingDate)}</Text>
+              </View>
+            )}
+            {show.runtime && (
+              <View style={styles.qfRow}>
+                <Text style={styles.qfLabel}>Runtime</Text>
+                <Text style={styles.qfValue}>{show.runtime}</Text>
+              </View>
+            )}
+            <View style={styles.qfRow}>
+              <Text style={styles.qfLabel}>{show.category === 'west-end' ? 'Theatre' : 'Theater'}</Text>
+              <Text style={[styles.qfValue, styles.qfValueFlex]} numberOfLines={1}>{show.venue}</Text>
+            </View>
+            {show.officialUrl && (
+              <Pressable
+                style={({ pressed }) => [styles.qfRow, pressed && styles.pressed]}
+                onPress={() => WebBrowser.openBrowserAsync(show.officialUrl!)}
+              >
+                <Text style={styles.qfLabel}>Official Site</Text>
+                <Text style={styles.qfLink}>Visit ↗</Text>
+              </Pressable>
+            )}
+          </View>
+        </View>
+
         {/* Action buttons */}
         <View style={styles.actionButtons}>
           <Pressable
@@ -869,50 +907,64 @@ function ReviewRow({ review, showId, category }: { review: ShowDetail['reviews']
   const outletDomain = getOutletDomain(review.outlet);
   const logoUrl = outletDomain ? `https://www.google.com/s2/favicons?domain=${outletDomain}&sz=64` : null;
 
-  return (
-    <View style={styles.reviewRow}>
-      {/* Top row: score + logo + outlet + date */}
-      <View style={styles.reviewTopRow}>
-        <View style={[styles.reviewScore, { backgroundColor: scoreColor }]}>
-          <Text style={[styles.reviewScoreText, { color: scoreTextColor }]}>{review.score}</Text>
-        </View>
-        {logoUrl && (
-          <Image source={{ uri: logoUrl }} style={styles.outletLogo} contentFit="cover" />
-        )}
-        <Text style={styles.reviewOutlet} numberOfLines={1}>{review.outlet}</Text>
-        {review.designation === 'Critics_Pick' && (
-          <View style={styles.criticsPickBadge}>
-            <Text style={styles.criticsPickText}>★ Critics Pick</Text>
-          </View>
-        )}
-        {formattedDate && (
-          <Text style={styles.reviewDate}>{formattedDate}</Text>
-        )}
-      </View>
+  // Option A (owner-approved): whole row is the tap target with a chevron
+  // affordance — native list-row idiom, no more tiny "Full Review" text link.
+  const openFullReview = review.url
+    ? () => {
+        trackFullReviewTapped(showId, review.outlet, review.criticName || null);
+        WebBrowser.openBrowserAsync(review.url!);
+      }
+    : undefined;
 
-      {/* Content indented past score badge */}
-      <View style={styles.reviewContent}>
+  return (
+    <Pressable
+      style={({ pressed }) => [styles.reviewRow, pressed && openFullReview && styles.pressed]}
+      onPress={openFullReview}
+      disabled={!openFullReview}
+      accessibilityRole={openFullReview ? 'link' : undefined}
+      accessibilityLabel={`${review.score} from ${review.outlet}${review.criticName ? ` by ${review.criticName}` : ''}${openFullReview ? '. Opens full review' : ''}`}
+    >
+      <View style={[styles.reviewScore, { backgroundColor: scoreColor }]}>
+        <Text style={[styles.reviewScoreText, { color: scoreTextColor }]}>{review.score}</Text>
+      </View>
+      <View style={styles.reviewBody}>
+        <View style={styles.reviewTopRow}>
+          {logoUrl && (
+            <View style={styles.outletLogoBadge}>
+              <Image source={{ uri: logoUrl }} style={styles.outletLogo} contentFit="contain" />
+            </View>
+          )}
+          <Text style={styles.reviewOutlet} numberOfLines={1}>{review.outlet}</Text>
+          {review.designation === 'Critics_Pick' && (
+            <View style={styles.criticsPickBadge}>
+              <Text style={styles.criticsPickText}>★ Critics Pick</Text>
+            </View>
+          )}
+        </View>
         {review.pullQuote && (
           <Text style={styles.reviewQuote}>
             {'\u201C'}{review.pullQuote}{/[.!?'\u2019"\u201D]$/.test(review.pullQuote.trim()) ? '' : '.'}{'\u201D'}
           </Text>
         )}
-        <View style={styles.reviewFooter}>
+        <View style={styles.reviewMetaRow}>
           <Text style={styles.reviewCritic} numberOfLines={1}>
-            By {review.criticName || `${review.outlet} Staff`}
+            {review.criticName || `${review.outlet} Staff`}
           </Text>
-          {review.url && (
-            <Pressable onPress={() => {
-              trackFullReviewTapped(showId, review.outlet, review.criticName || null);
-              WebBrowser.openBrowserAsync(review.url!);
-            }}>
-              <Text style={styles.fullReviewLink}>Full Review →</Text>
-            </Pressable>
-          )}
+          {formattedDate && <Text style={styles.reviewMetaDot}>·</Text>}
+          {formattedDate && <Text style={styles.reviewDate}>{formattedDate}</Text>}
         </View>
       </View>
-    </View>
+      {openFullReview && (
+        <IconSymbol name="chevron.right" size={18} color={Colors.text.muted} style={styles.reviewChevron} />
+      )}
+    </Pressable>
   );
+}
+
+function formatQuickFactDate(d: string): string {
+  try {
+    return new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  } catch { return d; }
 }
 
 /** Map outlet display names to domains for Google Favicons */
@@ -1650,36 +1702,52 @@ const styles = StyleSheet.create({
 
   // Review rows
   reviewRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: Spacing.md,
     paddingVertical: Spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border.subtle,
   },
-  reviewTopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-  },
   reviewScore: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
+    width: 40,
+    height: 40,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
   },
   reviewScoreText: {
-    fontSize: FontSize.sm,
-    fontWeight: '700',
+    fontSize: FontSize.md,
+    fontWeight: '800',
+  },
+  reviewBody: {
+    flex: 1,
+    minWidth: 0,
+  },
+  reviewTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 3,
+  },
+  outletLogoBadge: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#ffffff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
   },
   outletLogo: {
-    width: 20,
-    height: 20,
-    borderRadius: 4,
+    width: 15,
+    height: 15,
   },
   reviewOutlet: {
     color: Colors.text.primary,
-    fontSize: FontSize.md,
-    fontWeight: '600',
-    flex: 1,
+    fontSize: FontSize.sm,
+    fontWeight: '700',
+    flexShrink: 1,
   },
   reviewDate: {
     color: Colors.text.muted,
@@ -1697,29 +1765,73 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: 0.3,
   },
-  reviewContent: {
-    marginLeft: 48, // align with text past score badge (36 + 12 gap)
-    marginTop: 4,
-  },
   reviewQuote: {
     color: Colors.text.secondary,
     fontSize: FontSize.sm,
-    lineHeight: 18,
+    lineHeight: 19,
   },
-  reviewFooter: {
+  reviewMetaRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 4,
+    gap: 6,
+    marginTop: 6,
   },
   reviewCritic: {
     color: Colors.text.muted,
+    fontSize: FontSize.xs,
+    flexShrink: 1,
+  },
+  reviewMetaDot: {
+    color: Colors.text.muted,
+    fontSize: FontSize.xs,
+  },
+  reviewChevron: {
+    alignSelf: 'center',
+  },
+  getTicketsButton: {
+    backgroundColor: Colors.brand,
+    borderRadius: BorderRadius.md,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginTop: Spacing.md,
+  },
+  getTicketsText: {
+    color: Colors.text.inverse,
+    fontSize: FontSize.md,
+    fontWeight: '800',
+  },
+  qfCard: {
+    backgroundColor: Colors.surface.raised,
+    borderRadius: BorderRadius.md,
+    paddingHorizontal: Spacing.md,
+  },
+  qfRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.md,
+    paddingVertical: Spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border.subtle,
+    minHeight: 44,
+  },
+  qfLabel: {
+    color: Colors.text.muted,
     fontSize: FontSize.sm,
   },
-  fullReviewLink: {
+  qfValue: {
+    color: Colors.text.primary,
+    fontSize: FontSize.sm,
+    fontWeight: '600',
+  },
+  qfValueFlex: {
+    flexShrink: 1,
+    textAlign: 'right',
+  },
+  qfLink: {
     color: Colors.brand,
     fontSize: FontSize.sm,
-    fontWeight: '500',
+    fontWeight: '700',
   },
 
   // Detail loading
