@@ -110,3 +110,4 @@ CLAUDE.md (**limit: 100 lines**). Keep it concise. Detailed notes → `memory/{t
 3. **Options where real.** Render 2-3 variants when direction is genuinely contested; one when it's obvious. Don't manufacture options for compliance.
 4. **Verify before showing.** Open the deliverable yourself first: every image sharp (embed from original PNGs, ≥900px, no re-compress/upscale), every section populated, no placeholders.
 Pipeline gotchas + full recipe: web repo memory `feedback_ios_design_conservative_real_tokens.md` (dev-client vs production build trap, Maestro launchApp/point-taps).
+**Owner link format (proven 2026-07-21):** `https://claude.ai/design/<projectId>` — opens with commenting. NEVER `claude.ai/project/<id>` (no-permission for the owner). Proposals project: https://claude.ai/design/d21b75cc-0388-4721-81f5-d886f744919f
