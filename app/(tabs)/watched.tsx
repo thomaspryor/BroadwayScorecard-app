@@ -37,6 +37,14 @@ import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
 import { Skeleton } from '@/components/Skeleton';
 import { ShowSearchModal } from '@/components/ShowSearchModal';
 import * as haptics from '@/lib/haptics';
+import DiaryCalendar from '@/components/diary-fable/DiaryCalendar';
+import DiaryMarquee from '@/components/diary-fable/DiaryMarquee';
+import DiaryLedger from '@/components/diary-fable/DiaryLedger';
+import { FABLE_REVIEWS } from '@/constants/diary-fable-fixture';
+
+// DESIGN ROUND ONLY (task #300): render one of the FABLE Diary directions
+// with fixture data instead of the live screen. 'off' restores the real tab.
+const FABLE_DIARY_VARIANT: 'off' | 'D' | 'E' | 'F' = 'off';
 
 type DiarySort = 'date-desc' | 'date-asc' | 'rating-desc';
 type ViewMode = 'list' | 'grid';
@@ -198,6 +206,14 @@ export default function WatchedScreen() {
       ],
     );
   }, [showMap, deleteReview]);
+
+  // DESIGN ROUND ONLY — see FABLE_DIARY_VARIANT above.
+  if (FABLE_DIARY_VARIANT !== 'off' && shows.length > 0) {
+    const props = { reviews: FABLE_REVIEWS, showMap, topInset: insets.top };
+    if (FABLE_DIARY_VARIANT === 'D') return <DiaryCalendar {...props} />;
+    if (FABLE_DIARY_VARIANT === 'E') return <DiaryMarquee {...props} />;
+    return <DiaryLedger {...props} />;
+  }
 
   if (!featureFlags.userAccounts) return null;
 
