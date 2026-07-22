@@ -51,3 +51,6 @@ app-example
 
 # env
 .env
+
+# worktree convenience symlink (node_modules/ pattern misses symlinks)
+node_modules
