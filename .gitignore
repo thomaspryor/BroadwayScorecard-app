@@ -51,3 +51,6 @@ app-example
 
 # env
 .env
+
+# also match a bare node_modules symlink (worktrees symlink it; "node_modules/" alone misses symlinks)
+node_modules
