@@ -49,7 +49,9 @@ export default function DiaryCalendar({ reviews, showMap, topInset }: Props) {
   // Heatmap ribbon runs oldest → newest so the season reads left to right.
   const ribbon = [...months].reverse();
   const maxCount = Math.max(...months.map(m => m.items.length), 1);
-  const busiest = months.reduce((a, b) => (b.items.length > a.items.length ? b : a), months[0]);
+  const busiest = months.length
+    ? months.reduce((a, b) => (b.items.length > a.items.length ? b : a), months[0])
+    : null;
 
   return (
     <ScrollView style={styles.root} contentContainerStyle={{ paddingBottom: Spacing.xxl * 2 }} showsVerticalScrollIndicator={false}>
@@ -88,9 +90,11 @@ export default function DiaryCalendar({ reviews, showMap, topInset }: Props) {
             );
           })}
         </View>
-        <Text style={styles.ribbonCaption}>
-          Busiest month — {MONTHS_LONG[busiest.month]} ({busiest.items.length} shows)
-        </Text>
+        {busiest && (
+          <Text style={styles.ribbonCaption}>
+            Busiest month — {MONTHS_LONG[busiest.month]} ({busiest.items.length} shows)
+          </Text>
+        )}
       </View>
 
       {/* Month calendars */}
@@ -98,10 +102,12 @@ export default function DiaryCalendar({ reviews, showMap, topInset }: Props) {
         const first = new Date(m.year, m.month, 1);
         const daysInMonth = new Date(m.year, m.month + 1, 0).getDate();
         const lead = first.getDay();
+        // One cell per day; if two viewings share a date, keep the first
+        // (items are newest-first, so the most recent viewing wins the cell).
         const byDay: Record<number, UserReview> = {};
         for (const r of m.items) {
           const d = parseSeen(r.date_seen);
-          if (d) byDay[d.getDate()] = r;
+          if (d && !byDay[d.getDate()]) byDay[d.getDate()] = r;
         }
         const cells: (number | null)[] = [
           ...Array.from({ length: lead }, () => null),
