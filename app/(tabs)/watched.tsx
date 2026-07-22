@@ -44,7 +44,9 @@ import { FABLE_REVIEWS } from '@/constants/diary-fable-fixture';
 
 // DESIGN ROUND ONLY (task #300): render one of the FABLE Diary directions
 // with fixture data instead of the live screen. 'off' restores the real tab.
-const FABLE_DIARY_VARIANT: 'off' | 'D' | 'E' | 'F' = 'off';
+const FABLE_DIARY_VARIANT = 'off' as 'off' | 'D' | 'E' | 'F';
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+if (FABLE_DIARY_VARIANT !== 'off') require('react-native').LogBox.ignoreAllLogs(true);
 
 type DiarySort = 'date-desc' | 'date-asc' | 'rating-desc';
 type ViewMode = 'list' | 'grid';

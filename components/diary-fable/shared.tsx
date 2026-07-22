@@ -11,8 +11,12 @@ import { getImageUrl } from '@/lib/images';
 import type { Show } from '@/lib/types';
 import type { UserReview } from '@/lib/user-types';
 
-export const SERIF = 'Georgia';
-export const MONO = 'Menlo';
+/**
+ * Typography stays on the system font — the design system's font and colors
+ * are not changed in this round (owner directive 2026-07-21). Tabular figures
+ * keep date/number columns aligned without a monospace face.
+ */
+export const TABULAR = { fontVariant: ['tabular-nums' as const] };
 
 /** Plain-object absolute fill (typed for style-object props). */
 export const FILL = {

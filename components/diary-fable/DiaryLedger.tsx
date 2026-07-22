@@ -2,7 +2,7 @@
  * DIRECTION F — "The Ledger".
  *
  * The diary as a stagehand's logbook: a dense, scannable table with a
- * monospace date rail, micro posters, rewatch marks, and per-month totals.
+ * tabular date rail, micro posters, rewatch marks, and per-month totals.
  * Reference: Letterboxd's diary page (their ledger table), translated to
  * native rows instead of a web table.
  * DESIGN ONLY.
@@ -11,10 +11,10 @@
 import React from 'react';
 import { View, Text, ScrollView, StyleSheet } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
-import { Colors, Spacing, BorderRadius } from '@/constants/theme';
+import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
 import type { Show } from '@/lib/types';
 import type { UserReview } from '@/lib/user-types';
-import { SERIF, MONO, parseSeen, seasonStats, MONTHS_LONG, Poster, StarsRow } from './shared';
+import { TABULAR, parseSeen, seasonStats, MONTHS_LONG, Poster, StarsRow } from './shared';
 
 type Props = {
   reviews: UserReview[]; // newest → oldest
@@ -138,32 +138,32 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     marginBottom: Spacing.sm,
   },
-  h1: { color: Colors.text.primary, fontFamily: SERIF, fontSize: 34 },
-  yearTabs: { flexDirection: 'row', gap: 6 },
+  h1: { color: Colors.text.primary, fontSize: FontSize.xxl, fontWeight: '700' },
+  yearTabs: { flexDirection: 'row', gap: 6, marginRight: 56 },
   yearTab: {
     paddingHorizontal: 12, paddingVertical: 5, borderRadius: BorderRadius.pill,
     backgroundColor: Colors.surface.raised,
   },
   yearTabActive: { backgroundColor: Colors.brand },
-  yearTabText: { color: Colors.text.secondary, fontFamily: MONO, fontSize: 13 },
+  yearTabText: { color: Colors.text.secondary, fontSize: 13, fontWeight: '600', ...TABULAR },
   yearTabTextActive: { color: Colors.text.inverse, fontWeight: '700' },
-  ledgerLine: { color: Colors.text.muted, fontFamily: MONO, fontSize: 12, letterSpacing: 0.5 },
+  ledgerLine: { color: Colors.text.muted, fontSize: 12, fontWeight: '500', letterSpacing: 0.5, ...TABULAR },
   section: { marginBottom: Spacing.md },
   sectionHeader: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     paddingHorizontal: Spacing.lg, paddingVertical: Spacing.sm,
     backgroundColor: Colors.surface.raised,
   },
-  sectionMonth: { color: Colors.brand, fontFamily: MONO, fontSize: 12, letterSpacing: 1.5, fontWeight: '700' },
-  sectionMeta: { color: Colors.text.muted, fontFamily: MONO, fontSize: 12 },
+  sectionMonth: { color: Colors.brand, fontSize: 12, letterSpacing: 1, fontWeight: '700' },
+  sectionMeta: { color: Colors.text.muted, fontSize: 12, ...TABULAR },
   row: {
     flexDirection: 'row', alignItems: 'center', gap: Spacing.md,
     paddingHorizontal: Spacing.lg, paddingVertical: 7,
     borderBottomWidth: 1, borderBottomColor: Colors.border.subtle,
   },
   dayCol: { width: 32, alignItems: 'center' },
-  dayNum: { color: Colors.text.primary, fontFamily: MONO, fontSize: 16, fontWeight: '700' },
-  dayDow: { color: Colors.text.muted, fontFamily: MONO, fontSize: 12, transform: [{ scale: 0.85 }] },
+  dayNum: { color: Colors.text.primary, fontSize: 16, fontWeight: '700', ...TABULAR },
+  dayDow: { color: Colors.text.muted, fontSize: 12, fontWeight: '500', transform: [{ scale: 0.85 }] },
   rowPoster: { width: 30, height: 42 },
   rowInfo: { flex: 1, gap: 1 },
   rowTitleLine: { flexDirection: 'row', alignItems: 'center', gap: 6 },
@@ -172,5 +172,5 @@ const styles = StyleSheet.create({
   rowRight: { alignItems: 'flex-end', gap: 4 },
   footer: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.md },
   footerRule: { height: 1, backgroundColor: Colors.border.default, marginBottom: Spacing.sm },
-  footerText: { color: Colors.text.muted, fontFamily: MONO, fontSize: 12, letterSpacing: 0.5 },
+  footerText: { color: Colors.text.muted, fontSize: 12, fontWeight: '500', letterSpacing: 0.5, ...TABULAR },
 });

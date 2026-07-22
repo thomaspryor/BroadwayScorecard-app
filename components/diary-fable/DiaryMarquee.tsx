@@ -11,10 +11,10 @@
 import React from 'react';
 import { View, Text, ScrollView, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Colors, Spacing, BorderRadius } from '@/constants/theme';
+import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
 import type { Show } from '@/lib/types';
 import type { UserReview } from '@/lib/user-types';
-import { SERIF, MONO, FILL, parseSeen, seasonStats, MONTHS_SHORT, Poster, StarsRow, toHundred, tierColor } from './shared';
+import { TABULAR, FILL, parseSeen, seasonStats, MONTHS_SHORT, Poster, StarsRow, toHundred, tierColor } from './shared';
 
 type Props = {
   reviews: UserReview[]; // newest → oldest
@@ -35,14 +35,15 @@ export default function DiaryMarquee({ reviews, showMap, topInset }: Props) {
       <View style={[styles.header, { paddingTop: topInset + Spacing.md }]}>
         <Text style={styles.h1}>Diary</Text>
         <Text style={styles.headerMeta}>
-          {stats.viewings} nights · {stats.shows} shows this season
+          {stats.viewings} nights · {stats.shows} shows
         </Text>
       </View>
 
       {reviews.map(r => {
         const show = showMap[r.show_id];
         const d = parseSeen(r.date_seen);
-        const critic = show?.criticScore?.score ?? show?.compositeScore ?? null;
+        const criticRaw = show?.criticScore?.score ?? show?.compositeScore ?? null;
+        const critic = criticRaw === null ? null : Math.round(criticRaw);
         seen[r.show_id] = (seen[r.show_id] || 0) + 1;
         const nth = counts[r.show_id] - seen[r.show_id] + 1; // 1 = first viewing chronologically last
         const isRewatch = counts[r.show_id] > 1 && nth > 1;
@@ -112,8 +113,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg, paddingBottom: Spacing.md,
     flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between',
   },
-  h1: { color: Colors.text.primary, fontFamily: SERIF, fontSize: 34 },
-  headerMeta: { color: Colors.text.muted, fontSize: 13 },
+  h1: { color: Colors.text.primary, fontSize: FontSize.xxl, fontWeight: '700' },
+  headerMeta: { color: Colors.text.muted, fontSize: 13, marginRight: 56 },
   card: {
     height: 400, marginBottom: 2, overflow: 'hidden',
     backgroundColor: Colors.surface.raised,
@@ -124,36 +125,36 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10, paddingVertical: 6, alignItems: 'center',
     borderWidth: 1, borderColor: Colors.border.default,
   },
-  dateLampMonth: { color: Colors.brand, fontFamily: MONO, fontSize: 12, letterSpacing: 1.5 },
-  dateLampDay: { color: Colors.text.primary, fontFamily: SERIF, fontSize: 24, lineHeight: 26 },
+  dateLampMonth: { color: Colors.brand, fontSize: 12, fontWeight: '700', letterSpacing: 1.2 },
+  dateLampDay: { color: Colors.text.primary, fontSize: 24, fontWeight: '700', lineHeight: 27, ...TABULAR },
   rewatchLamp: {
     position: 'absolute', top: Spacing.md, right: Spacing.lg,
     backgroundColor: Colors.brand, borderRadius: BorderRadius.pill,
     paddingHorizontal: 10, paddingVertical: 4,
   },
-  rewatchText: { color: Colors.text.inverse, fontFamily: MONO, fontSize: 13, fontWeight: '700' },
+  rewatchText: { color: Colors.text.inverse, fontSize: 13, fontWeight: '700' },
   bill: {
     position: 'absolute', left: 0, right: 0, bottom: 0,
     paddingHorizontal: Spacing.lg, paddingBottom: Spacing.lg,
   },
   billVenue: {
-    color: Colors.text.secondary, fontFamily: MONO, fontSize: 12, letterSpacing: 1.5,
+    color: Colors.text.secondary, fontSize: 12, fontWeight: '600', letterSpacing: 1,
     marginBottom: 4,
   },
   billTitle: {
-    color: Colors.text.primary, fontFamily: SERIF, fontSize: 30, lineHeight: 34,
+    color: Colors.text.primary, fontSize: FontSize.xxl, fontWeight: '800', lineHeight: 32,
     marginBottom: Spacing.sm,
   },
   scoreRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.lg },
   youBlock: { gap: 3 },
-  youLabel: { color: Colors.text.secondary, fontFamily: MONO, fontSize: 12, letterSpacing: 1 },
+  youLabel: { color: Colors.text.secondary, fontSize: 12, fontWeight: '600', letterSpacing: 0.5 },
   criticBlock: { alignItems: 'center' },
-  criticNum: { fontFamily: SERIF, fontSize: 24, lineHeight: 26, fontWeight: '700' },
-  criticLabel: { color: Colors.text.muted, fontFamily: MONO, fontSize: 12, letterSpacing: 1 },
+  criticNum: { fontSize: 24, lineHeight: 27, fontWeight: '800', ...TABULAR },
+  criticLabel: { color: Colors.text.muted, fontSize: 12, fontWeight: '600', letterSpacing: 0.5 },
   deltaBlock: { flex: 1, alignItems: 'flex-end' },
-  deltaText: { color: Colors.text.muted, fontFamily: MONO, fontSize: 13 },
+  deltaText: { color: Colors.text.muted, fontSize: 13, fontWeight: '600', ...TABULAR },
   note: {
-    color: Colors.text.secondary, fontFamily: SERIF, fontStyle: 'italic',
-    fontSize: 15, lineHeight: 21, marginTop: Spacing.sm,
+    color: Colors.text.secondary, fontStyle: 'italic',
+    fontSize: FontSize.sm, lineHeight: 21, marginTop: Spacing.sm,
   },
 });

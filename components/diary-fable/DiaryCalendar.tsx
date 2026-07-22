@@ -8,11 +8,11 @@
  */
 
 import React from 'react';
-import { View, Text, ScrollView, StyleSheet } from 'react-native';
-import { Colors, Spacing, BorderRadius } from '@/constants/theme';
+import { View, Text, ScrollView, StyleSheet, Dimensions } from 'react-native';
+import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
 import type { Show } from '@/lib/types';
 import type { UserReview } from '@/lib/user-types';
-import { SERIF, MONO, parseSeen, seasonStats, MONTHS_LONG, MONTHS_SHORT, Poster, StarsRow } from './shared';
+import { TABULAR, parseSeen, seasonStats, MONTHS_LONG, MONTHS_SHORT, Poster, StarsRow } from './shared';
 
 type Props = {
   reviews: UserReview[]; // newest → oldest
@@ -23,6 +23,10 @@ type Props = {
 type MonthCell = { key: string; year: number; month: number; items: UserReview[] };
 
 const DOW = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+
+// Fixed cell size: screen minus page padding and six 4px gaps, split across 7.
+const CELL_W = Math.floor((Dimensions.get('window').width - Spacing.lg * 2 - 6 * 4) / 7);
+const CELL_H = Math.round(CELL_W / 0.86);
 
 export default function DiaryCalendar({ reviews, showMap, topInset }: Props) {
   const stats = seasonStats(reviews, showMap);
@@ -52,7 +56,7 @@ export default function DiaryCalendar({ reviews, showMap, topInset }: Props) {
       {/* Season header */}
       <View style={[styles.header, { paddingTop: topInset + Spacing.md }]}>
         <Text style={styles.eyebrow}>2025–26 SEASON</Text>
-        <Text style={styles.h1}>Your year{'\n'}at the theatre</Text>
+        <Text style={styles.h1}>Diary</Text>
         <Text style={styles.statLine}>
           <Text style={styles.statNum}>{stats.viewings}</Text> nights · <Text style={styles.statNum}>{stats.shows}</Text> shows · <Text style={styles.statNum}>{stats.venues}</Text> theatres · avg <Text style={styles.statNum}>★{stats.avg.toFixed(1)}</Text>
         </Text>
@@ -104,6 +108,8 @@ export default function DiaryCalendar({ reviews, showMap, topInset }: Props) {
           ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
         ];
         while (cells.length % 7 !== 0) cells.push(null);
+        const weeks: (number | null)[][] = [];
+        for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
 
         return (
           <View key={m.key} style={styles.monthBlock}>
@@ -116,28 +122,30 @@ export default function DiaryCalendar({ reviews, showMap, topInset }: Props) {
                 <Text key={i} style={styles.dow}>{d}</Text>
               ))}
             </View>
-            <View style={styles.grid}>
-              {cells.map((day, i) => {
-                if (day === null) return <View key={i} style={styles.cell} />;
-                const r = byDay[day];
-                if (!r) {
+            {weeks.map((week, wi) => (
+              <View key={wi} style={styles.weekRow}>
+                {week.map((day, i) => {
+                  if (day === null) return <View key={i} style={styles.cell} />;
+                  const r = byDay[day];
+                  if (!r) {
+                    return (
+                      <View key={i} style={[styles.cell, styles.cellEmpty]}>
+                        <Text style={styles.cellDay}>{day}</Text>
+                      </View>
+                    );
+                  }
+                  const show = showMap[r.show_id];
                   return (
-                    <View key={i} style={[styles.cell, styles.cellEmpty]}>
-                      <Text style={styles.cellDay}>{day}</Text>
+                    <View key={i} style={[styles.cell, styles.cellSeen]}>
+                      <Poster show={show} style={styles.cellPoster} radius={7} />
+                      <View style={styles.cellDayChip}>
+                        <Text style={styles.cellDayChipText}>{day}</Text>
+                      </View>
                     </View>
                   );
-                }
-                const show = showMap[r.show_id];
-                return (
-                  <View key={i} style={[styles.cell, styles.cellSeen]}>
-                    <Poster show={show} style={styles.cellPoster} radius={7} />
-                    <View style={styles.cellDayChip}>
-                      <Text style={styles.cellDayChipText}>{day}</Text>
-                    </View>
-                  </View>
-                );
-              })}
-            </View>
+                })}
+              </View>
+            ))}
             {/* Playbill line for the month */}
             <View style={styles.monthList}>
               {m.items.map(r => {
@@ -164,11 +172,11 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Colors.surface.default },
   header: { paddingHorizontal: Spacing.lg, paddingBottom: Spacing.lg },
   eyebrow: {
-    color: Colors.brand, fontFamily: MONO, fontSize: 12, letterSpacing: 2,
+    color: Colors.brand, fontSize: 12, fontWeight: '700', letterSpacing: 1.5,
     marginBottom: Spacing.sm,
   },
   h1: {
-    color: Colors.text.primary, fontFamily: SERIF, fontSize: 36, lineHeight: 40,
+    color: Colors.text.primary, fontSize: FontSize.xxl, fontWeight: '700', lineHeight: 33,
     marginBottom: Spacing.sm,
   },
   statLine: { color: Colors.text.muted, fontSize: 15 },
@@ -181,8 +189,8 @@ const styles = StyleSheet.create({
     alignSelf: 'stretch', height: 40, borderRadius: BorderRadius.sm,
     alignItems: 'center', justifyContent: 'center',
   },
-  ribbonCount: { color: Colors.text.secondary, fontFamily: MONO, fontSize: 12, fontWeight: '700' },
-  ribbonLabel: { color: Colors.text.muted, fontFamily: MONO, fontSize: 12 },
+  ribbonCount: { color: Colors.text.secondary, fontSize: 12, fontWeight: '700', ...TABULAR },
+  ribbonLabel: { color: Colors.text.muted, fontSize: 12, fontWeight: '500' },
   ribbonCaption: { color: Colors.text.muted, fontSize: 12, marginTop: Spacing.sm },
   // Month calendar
   monthBlock: { paddingHorizontal: Spacing.lg, marginBottom: Spacing.xl },
@@ -190,17 +198,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'baseline', gap: Spacing.sm,
     marginBottom: Spacing.sm,
   },
-  monthName: { color: Colors.text.primary, fontFamily: SERIF, fontSize: 24 },
-  monthYear: { color: Colors.text.muted, fontFamily: MONO, fontSize: 13 },
+  monthName: { color: Colors.text.primary, fontSize: FontSize.lg, fontWeight: '700' },
+  monthYear: { color: Colors.text.muted, fontSize: 13, ...TABULAR },
   dowRow: { flexDirection: 'row', gap: 4, marginBottom: 4 },
-  dow: { flex: 1, textAlign: 'center', color: Colors.text.muted, fontSize: 12, fontFamily: MONO },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
-  cell: { width: `${100 / 7.32}%`, aspectRatio: 0.86 },
+  dow: { flex: 1, textAlign: 'center', color: Colors.text.muted, fontSize: 12, fontWeight: '500' },
+  weekRow: { flexDirection: 'row', gap: 4, marginBottom: 4 },
+  cell: { width: CELL_W, height: CELL_H },
   cellEmpty: {
     borderRadius: 7, backgroundColor: Colors.surface.raised,
     alignItems: 'center', justifyContent: 'center',
   },
-  cellDay: { color: Colors.text.muted, fontSize: 12, fontFamily: MONO },
+  cellDay: { color: Colors.text.muted, fontSize: 12, ...TABULAR },
   cellSeen: {
     borderRadius: 8, borderWidth: 1.5, borderColor: Colors.brand,
     overflow: 'hidden',
@@ -211,10 +219,10 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(15, 15, 20, 0.82)', borderRadius: 5,
     paddingHorizontal: 3, paddingVertical: 1,
   },
-  cellDayChipText: { color: Colors.brand, fontSize: 12, fontFamily: MONO, fontWeight: '700' },
+  cellDayChipText: { color: Colors.brand, fontSize: 12, fontWeight: '700', ...TABULAR },
   // Month playbill list
   monthList: { marginTop: Spacing.sm, gap: 6 },
   monthListRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
-  monthListDay: { color: Colors.text.muted, fontFamily: MONO, fontSize: 12, width: 22 },
+  monthListDay: { color: Colors.text.muted, fontSize: 12, fontWeight: '600', width: 22, ...TABULAR },
   monthListTitle: { color: Colors.text.secondary, fontSize: 14, flex: 1 },
 });
