@@ -38,6 +38,7 @@ import { supabaseRestInsert, supabaseRestUpdate } from '@/lib/supabase-rest';
 import { recordRatingGiven } from '@/lib/store-review';
 import { getImageUrl } from '@/lib/images';
 import { toLocalYMD } from '@/lib/date-utils';
+import { savePendingAction, getPendingAction, clearPendingAction } from '@/lib/deferred-auth';
 import * as haptics from '@/lib/haptics';
 import StarRating from '@/components/user/StarRating';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
@@ -50,12 +51,18 @@ const MARKET_LABELS: Record<string, string> = {
   'west-end': 'West End',
 };
 
+/** Mode eyebrow above the header title — web parity (RatingEditor HEADER_COPY). */
+const MODE_EYEBROW = {
+  new: 'Your rating for',
+  edit: 'Editing your rating for',
+} as const;
+
 export default function RateModal() {
   const params = useLocalSearchParams<{ showId: string; showTitle: string; reviewId?: string; initialRating?: string; suggestedDate?: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { user } = useAuth();
-  const { getReviewsForShow, invalidateCache } = useUserReviews(user?.id || null);
+  const { user, showSignIn } = useAuth();
+  const { getReviewsForShow, deleteReview, invalidateCache } = useUserReviews(user?.id || null);
   const { removeFromWatchlist } = useWatchlist(user?.id || null);
   const { shows } = useShows();
   const { showToast } = useToastSafe();
@@ -184,48 +191,69 @@ export default function RateModal() {
     }
   }, [router]);
 
+  // Persists a rating for the CURRENTLY signed-in user. Shared by the normal
+  // Save path and the post-sign-in resume path below.
+  const performSave = useCallback(async (ratingVal: number, textVal: string, dateVal: string) => {
+    if (!user) return;
+    if (reviewId) {
+      const filters = `id=eq.${reviewId}&user_id=eq.${user.id}`;
+      const { error } = await supabaseRestUpdate('reviews', filters, {
+        rating: ratingVal,
+        review_text: textVal.trim() || null,
+        date_seen: dateVal || null,
+        updated_at: new Date().toISOString(),
+      });
+      if (error) throw new Error(error.message);
+    } else {
+      const { error } = await supabaseRestInsert('reviews', {
+        user_id: user.id,
+        show_id: showId,
+        rating: ratingVal,
+        review_text: textVal.trim() || null,
+        date_seen: dateVal || null,
+      });
+      if (error) throw new Error(error.message);
+      // Watchlist = want to see; a first rating means you've seen it
+      // (web parity, owner rule 2026-07-12). Best-effort — never block save.
+      await removeFromWatchlist(showId).catch(() => {});
+    }
+    await invalidateCache();
+    haptics.success();
+    isDirty.current = false; // prevent discard alert
+    recordRatingGiven();
+  }, [user, reviewId, showId, invalidateCache, removeFromWatchlist]);
+
   const handleSave = useCallback(async () => {
     if (!canSave || currentRating === null) return;
+
+    // Gate at Save, not at entry — the sheet is reachable pre-auth so a
+    // signed-out user can fill out the full rating (stars + notes + date)
+    // before ever being interrupted (web "invest then gate" parity). The
+    // draft is preserved in PendingAction; the sign-in overlay renders on
+    // top of this screen (AuthProvider mounts it globally), so this screen
+    // stays alive underneath and resumes the save once auth resolves below.
     if (!user) {
-      setSaveError('You must be signed in to save. Please close and try again.');
+      setSaving(true);
+      await savePendingAction({
+        type: 'rating',
+        showId,
+        rating: currentRating,
+        reviewText: reviewText.trim() || undefined,
+        dateSeen: dateSeen || undefined,
+        returnRoute: `/rate/${showId}`,
+        timestamp: Date.now(),
+      });
+      setSaving(false);
+      showSignIn('rating');
       return;
     }
+
     setSaving(true);
     setSaveError(null);
-
     try {
-      if (reviewId) {
-        // Update existing review
-        const filters = `id=eq.${reviewId}&user_id=eq.${user.id}`;
-        const { error } = await supabaseRestUpdate('reviews', filters, {
-          rating: currentRating,
-          review_text: reviewText.trim() || null,
-          date_seen: dateSeen || null,
-          updated_at: new Date().toISOString(),
-        });
-        if (error) throw new Error(error.message);
-      } else {
-        // Insert new review
-        const { error } = await supabaseRestInsert('reviews', {
-          user_id: user.id,
-          show_id: showId,
-          rating: currentRating,
-          review_text: reviewText.trim() || null,
-          date_seen: dateSeen || null,
-        });
-        if (error) throw new Error(error.message);
-        // Watchlist = want to see; a first rating means you've seen it
-        // (web parity, owner rule 2026-07-12). Best-effort — never block save.
-        await removeFromWatchlist(showId).catch(() => {});
-      }
-
-      // Success: invalidate cache FIRST, then navigate back
-      await invalidateCache();
-      haptics.success();
-      isDirty.current = false; // prevent discard alert
+      await performSave(currentRating, reviewText, dateSeen);
       router.back();
       showToast(reviewId ? 'Rating updated' : 'Rating saved', 'success', '/(tabs)/watched');
-      recordRatingGiven();
     } catch (e) {
       const detail = e instanceof Error ? e.message : 'Unknown error';
       haptics.error();
@@ -233,7 +261,60 @@ export default function RateModal() {
     } finally {
       setSaving(false);
     }
-  }, [canSave, currentRating, user, reviewId, reviewText, dateSeen, showId, invalidateCache, removeFromWatchlist, router, showToast]);
+  }, [canSave, currentRating, user, reviewId, reviewText, dateSeen, showId, performSave, router, showToast, showSignIn]);
+
+  // Resume a gated save once sign-in succeeds — this screen is still mounted
+  // underneath the sign-in sheet, so it picks its own pending action back up.
+  const hasExecutedPendingRef = useRef(false);
+  useEffect(() => {
+    if (!user || hasExecutedPendingRef.current) return;
+    (async () => {
+      const pending = await getPendingAction();
+      if (!pending || pending.type !== 'rating' || pending.showId !== showId) return;
+      hasExecutedPendingRef.current = true;
+      await clearPendingAction();
+      setSaving(true);
+      try {
+        await performSave(pending.rating ?? currentRating ?? 0, pending.reviewText ?? reviewText, pending.dateSeen ?? dateSeen);
+        router.back();
+        showToast(reviewId ? 'Rating updated' : 'Rating saved', 'success', '/(tabs)/watched');
+      } catch (e) {
+        const detail = e instanceof Error ? e.message : 'Unknown error';
+        setSaveError(`Save failed: ${detail}`);
+      } finally {
+        setSaving(false);
+      }
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- resumes once per sign-in, ref guards re-fire
+  }, [user, showId]);
+
+  const handleDelete = useCallback(() => {
+    if (!reviewId) return;
+    Alert.alert(
+      'Delete this rating?',
+      'This removes it from your diary. This can\'t be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteReview(reviewId);
+              await invalidateCache();
+              haptics.action();
+              isDirty.current = false;
+              router.back();
+              showToast('Rating deleted.', 'info');
+            } catch (e) {
+              const detail = e instanceof Error ? e.message : 'Unknown error';
+              showToast(`Delete failed: ${detail}`, 'error');
+            }
+          },
+        },
+      ],
+    );
+  }, [reviewId, deleteReview, invalidateCache, router, showToast]);
 
   // If showId is missing, bail
   if (!showId) {
@@ -260,7 +341,12 @@ export default function RateModal() {
           <Pressable onPress={handleCancel} hitSlop={12} style={styles.headerButton}>
             <Text style={styles.cancelText}>Cancel</Text>
           </Pressable>
-          <Text style={styles.headerTitle} numberOfLines={1}>{showTitle}</Text>
+          <View style={styles.headerTitleCol}>
+            <Text style={styles.headerEyebrow} numberOfLines={1}>
+              {reviewId ? MODE_EYEBROW.edit : MODE_EYEBROW.new}
+            </Text>
+            <Text style={styles.headerTitle} numberOfLines={1}>{showTitle}</Text>
+          </View>
           <Pressable
             onPress={handleSave}
             disabled={!canSave}
@@ -309,6 +395,11 @@ export default function RateModal() {
                 />
                 {currentRating === null && (
                   <Text style={styles.tapHint}>Tap a star to rate</Text>
+                )}
+                {reviewId && (
+                  <Pressable onPress={handleDelete} hitSlop={10} style={styles.deleteButton} accessibilityRole="button" accessibilityLabel="Delete this rating">
+                    <Text style={styles.deleteButtonText}>Delete rating</Text>
+                  </Pressable>
                 )}
               </View>
 
@@ -435,13 +526,21 @@ const styles = StyleSheet.create({
     minHeight: 44,
     justifyContent: 'center',
   },
-  headerTitle: {
+  headerTitleCol: {
     flex: 1,
+    marginHorizontal: Spacing.sm,
+  },
+  headerEyebrow: {
+    color: Colors.text.muted,
+    fontSize: 12,
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  headerTitle: {
     color: Colors.text.primary,
     fontSize: FontSize.md,
     fontWeight: '600',
     textAlign: 'center',
-    marginHorizontal: Spacing.sm,
   },
   cancelText: {
     color: Colors.text.secondary,
@@ -497,6 +596,16 @@ const styles = StyleSheet.create({
     color: Colors.text.muted,
     fontSize: FontSize.xs,
     marginTop: Spacing.sm,
+  },
+  deleteButton: {
+    marginTop: Spacing.md,
+    minHeight: 32,
+    justifyContent: 'center',
+  },
+  deleteButtonText: {
+    color: Colors.score.red,
+    fontSize: FontSize.xs,
+    fontWeight: '500',
   },
   errorBanner: {
     backgroundColor: 'rgba(239, 68, 68, 0.1)',

@@ -328,6 +328,8 @@ export default function ListsTab({ userId, showMap, createTrigger }: ListsTabPro
         <Text style={styles.detailTitle}>{activeList?.name}</Text>
         {activeList?.is_ranked && <Text style={styles.rankedBadgeLarge}># Ranked</Text>}
       </View>
+      {/* Count line — web parity (ListDetailView "N Shows"). */}
+      <Text style={styles.detailCount}>{listItems.length} {listItems.length === 1 ? 'show' : 'shows'}</Text>
       {activeList?.description && (
         <Text style={styles.detailDescription}>{activeList.description}</Text>
       )}
@@ -833,6 +835,12 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     borderRadius: 6,
     overflow: 'hidden',
+  },
+  detailCount: {
+    color: Colors.text.muted,
+    fontSize: FontSize.xs,
+    paddingHorizontal: Spacing.lg,
+    paddingBottom: Spacing.xs,
   },
   detailDescription: {
     color: Colors.text.muted,
