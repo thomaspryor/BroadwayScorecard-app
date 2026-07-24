@@ -407,16 +407,29 @@ export default function WatchedScreen() {
       {/* Header */}
       <View style={styles.headerRow}>
         <Text style={styles.pageTitle}>My Watched Shows</Text>
-        <Pressable
-          style={({ pressed }) => [styles.addButton, pressed && styles.pressed]}
-          onPress={() => setShowSearchModal(true)}
-          hitSlop={8}
-          accessibilityLabel="Rate a show"
-        >
-          <Svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={Colors.text.secondary} strokeWidth={2.5}>
-            <Path strokeLinecap="round" d="M12 5v14M5 12h14" />
-          </Svg>
-        </Pressable>
+        <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
+          <Pressable
+            style={({ pressed }) => [styles.addButton, pressed && styles.pressed]}
+            onPress={() => router.push('/import' as any)}
+            hitSlop={8}
+            accessibilityLabel="Import shows from Show Score or Mezzanine"
+            testID="import-shows-button"
+          >
+            <Svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke={Colors.text.secondary} strokeWidth={2}>
+              <Path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+            </Svg>
+          </Pressable>
+          <Pressable
+            style={({ pressed }) => [styles.addButton, pressed && styles.pressed]}
+            onPress={() => setShowSearchModal(true)}
+            hitSlop={8}
+            accessibilityLabel="Rate a show"
+          >
+            <Svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={Colors.text.secondary} strokeWidth={2.5}>
+              <Path strokeLinecap="round" d="M12 5v14M5 12h14" />
+            </Svg>
+          </Pressable>
+        </View>
       </View>
 
       {/* Controls */}

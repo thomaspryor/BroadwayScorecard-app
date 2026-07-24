@@ -206,6 +206,14 @@ function RootLayout() {
           animation: 'slide_from_bottom',
         }}
       />
+      <Stack.Screen
+        name="import"
+        options={{
+          presentation: 'modal',
+          headerShown: false,
+          animation: 'slide_from_bottom',
+        }}
+      />
     </Stack>
   );
 
