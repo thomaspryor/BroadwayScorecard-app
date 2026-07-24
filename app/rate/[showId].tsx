@@ -36,6 +36,7 @@ import { useToastSafe } from '@/lib/toast-context';
 import { supabaseRestInsert, supabaseRestUpdate } from '@/lib/supabase-rest';
 import { recordRatingGiven } from '@/lib/store-review';
 import { getImageUrl } from '@/lib/images';
+import { toLocalYMD } from '@/lib/date-utils';
 import * as haptics from '@/lib/haptics';
 import StarRating from '@/components/user/StarRating';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
@@ -47,13 +48,6 @@ const MARKET_LABELS: Record<string, string> = {
   'off-broadway': 'Off-Broadway',
   'west-end': 'West End',
 };
-
-// Local-timezone YYYY-MM-DD. toISOString() is UTC and rolls the date forward
-// for evening picks in US timezones (web fixed the same boundary bug).
-function toLocalYMD(d: Date): string {
-  const offsetMs = d.getTimezoneOffset() * 60 * 1000;
-  return new Date(d.getTime() - offsetMs).toISOString().split('T')[0];
-}
 
 export default function RateModal() {
   const params = useLocalSearchParams<{ showId: string; showTitle: string; reviewId?: string; initialRating?: string; suggestedDate?: string }>();

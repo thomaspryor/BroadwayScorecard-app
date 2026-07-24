@@ -763,14 +763,18 @@ const styles = StyleSheet.create({
   previewPlaceholderText: {
     fontSize: 14,
   },
+  // Sized to match real list rows (minHeight 90) so the affordance reads as
+  // "the next list", not a stray button.
   createButton: {
     marginTop: Spacing.lg,
+    minHeight: 90,
     paddingVertical: Spacing.md,
     borderRadius: BorderRadius.md,
     borderWidth: 1,
     borderColor: Colors.border.subtle,
     borderStyle: 'dashed',
     alignItems: 'center',
+    justifyContent: 'center',
   },
   createButtonText: {
     color: Colors.text.muted,

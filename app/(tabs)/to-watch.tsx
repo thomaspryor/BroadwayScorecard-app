@@ -27,7 +27,8 @@ import { useUserReviews } from '@/hooks/useUserReviews';
 import { useWatchlist } from '@/hooks/useWatchlist';
 import { useShows } from '@/lib/data-context';
 import { getImageUrl } from '@/lib/images';
-import { daysUntilDate } from '@/lib/date-utils';
+import { daysUntilDate, isClosingSoonDate, toLocalYMD } from '@/lib/date-utils';
+import { getStatusInfo } from '@/lib/score-utils';
 import { featureFlags } from '@/lib/feature-flags';
 import type { WatchlistEntry } from '@/lib/user-types';
 import type { Show } from '@/lib/types';
@@ -37,6 +38,39 @@ import { ShowSearchModal } from '@/components/ShowSearchModal';
 import * as haptics from '@/lib/haptics';
 
 type WatchlistSort = 'added-desc' | 'alphabetical' | 'closing-soon';
+
+/**
+ * Poster-corner status label (web parity: WatchlistCard bookabilityLabel).
+ * Closing Soon wins over the raw status; upcoming shows say when they open.
+ * ("Tix on sale" needs a ticketsOnSale field the mobile payload doesn't
+ * carry yet — see parity notes.)
+ */
+function statusOverlay(show?: Show): { label: string; color: string } | null {
+  if (!show) return null;
+  if (show.status === 'closed') return getStatusInfo('closed');
+  if (show.closingDate && isClosingSoonDate(show.closingDate)) {
+    return { label: 'CLOSING SOON', color: '#f59e0b' };
+  }
+  if (show.status === 'open' || show.status === 'previews') return getStatusInfo(show.status);
+  if (show.status === 'upcoming' || show.status === 'announced') {
+    if (show.openingDate) {
+      const opens = new Date(show.openingDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      return { label: `OPENS ${opens.toUpperCase()}`, color: getStatusInfo('upcoming').color };
+    }
+    return getStatusInfo('upcoming');
+  }
+  return null;
+}
+
+function StatusOverlayPill({ show }: { show?: Show }) {
+  const info = statusOverlay(show);
+  if (!info) return null;
+  return (
+    <View style={[styles.statusPill, { backgroundColor: 'rgba(0,0,0,0.72)', borderColor: info.color + '66' }]}>
+      <Text style={[styles.statusPillText, { color: info.color }]}>{info.label}</Text>
+    </View>
+  );
+}
 
 function EmptyState({ emoji, title, subtitle, actionLabel, onAction }: {
   emoji: string; title: string; subtitle: string; actionLabel?: string; onAction?: () => void;
@@ -150,8 +184,7 @@ export default function ToWatchScreen() {
       // Android: picker dismisses on selection, save immediately
       setDatePickingShowId(null);
       if (selectedDate && datePickingShowId) {
-        const isoDate = selectedDate.toISOString().split('T')[0];
-        updatePlannedDate(datePickingShowId, isoDate);
+        updatePlannedDate(datePickingShowId, toLocalYMD(selectedDate));
       }
     } else if (selectedDate) {
       // iOS inline: just store the selection, save on "Done" tap
@@ -232,6 +265,7 @@ export default function ToWatchScreen() {
             <Text style={styles.placeholderText}>{title.charAt(0)}</Text>
           </View>
         )}
+        <StatusOverlayPill show={show} />
         {item.planned_date && (
           <Text style={styles.posterDate}>
             {new Date(item.planned_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
@@ -269,6 +303,7 @@ export default function ToWatchScreen() {
             <Text style={styles.placeholderText}>{title.charAt(0)}</Text>
           </View>
         )}
+        <StatusOverlayPill show={show} />
         <Text style={styles.gridTitle} numberOfLines={2}>{title}</Text>
       </Pressable>
     );
@@ -301,6 +336,10 @@ export default function ToWatchScreen() {
         <View style={styles.listInfo}>
           <Text style={styles.listTitle} numberOfLines={1}>{title}</Text>
           {show?.venue && <Text style={styles.listVenue} numberOfLines={1}>{show.venue}</Text>}
+          {(() => {
+            const info = statusOverlay(show);
+            return info ? <Text style={[styles.listStatus, { color: info.color }]}>{info.label}</Text> : null;
+          })()}
         </View>
       </Pressable>
     );
@@ -429,7 +468,7 @@ export default function ToWatchScreen() {
             </View>
           )}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: Spacing.xxl }}
+          contentContainerStyle={{ paddingBottom: insets.bottom + 72 }}
         />
       )}
 
@@ -441,8 +480,7 @@ export default function ToWatchScreen() {
               <Text style={styles.datePickerTitle}>When are you going?</Text>
               <Pressable onPress={() => {
                 if (datePickingShowId) {
-                  const isoDate = pendingDate.toISOString().split('T')[0];
-                  updatePlannedDate(datePickingShowId, isoDate);
+                  updatePlannedDate(datePickingShowId, toLocalYMD(pendingDate));
                 }
                 setDatePickingShowId(null);
               }} hitSlop={8}>
@@ -526,6 +564,13 @@ const styles = StyleSheet.create({
   cardPosterPlaceholder: { alignItems: 'center', justifyContent: 'center' },
   placeholderText: { color: Colors.text.muted, fontSize: 18, fontWeight: '600' },
   posterDate: { color: Colors.text.secondary, fontSize: 12, fontWeight: '500', textAlign: 'center', marginTop: 4 },
+  statusPill: {
+    position: 'absolute', top: 4, left: 4, zIndex: 10,
+    paddingHorizontal: 5, paddingVertical: 1,
+    borderRadius: 4, borderWidth: 1,
+  },
+  statusPillText: { fontSize: 12, fontWeight: '700', letterSpacing: 0.3 },
+  listStatus: { fontSize: 12, fontWeight: '600', marginTop: 2, letterSpacing: 0.3 },
   gridTitle: {
     color: Colors.text.secondary, fontSize: 12, fontWeight: '500',
     textAlign: 'center', lineHeight: 15, marginTop: 2,

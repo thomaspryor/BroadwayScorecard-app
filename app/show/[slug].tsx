@@ -2100,7 +2100,7 @@ const styles = StyleSheet.create({
   },
   criticsTakeFooterText: {
     color: Colors.text.muted,
-    fontSize: 10,
+    fontSize: 12,
     letterSpacing: 0.3,
     textTransform: 'uppercase',
   },
@@ -2230,7 +2230,7 @@ const styles = StyleSheet.create({
   },
   lrDisclosure: {
     color: Colors.text.muted,
-    fontSize: 10,
+    fontSize: 12,
     marginTop: Spacing.xs,
   },
 

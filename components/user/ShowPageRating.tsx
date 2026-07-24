@@ -409,7 +409,7 @@ export default function ShowPageRating({
             <Svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={Colors.text.muted} strokeWidth={2}>
               <Path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
             </Svg>
-            <Text style={styles.listButtonText}>List</Text>
+            <Text style={styles.listButtonText}>+ List</Text>
           </Pressable>
           {showWatchlistDatePicker && (
             <View style={styles.datePickerContainer}>

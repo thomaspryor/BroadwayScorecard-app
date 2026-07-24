@@ -22,3 +22,13 @@ export function isClosingSoonDate(closingDate: string): boolean {
   const now = Date.now();
   return closing.getTime() - now < fourWeeks && closing.getTime() > now;
 }
+
+/**
+ * Local-timezone YYYY-MM-DD for a Date. toISOString() is UTC and rolls the
+ * date forward for evening picks in US timezones — never use it for date_seen
+ * or planned_date persistence.
+ */
+export function toLocalYMD(d: Date): string {
+  const offsetMs = d.getTimezoneOffset() * 60 * 1000;
+  return new Date(d.getTime() - offsetMs).toISOString().split('T')[0];
+}

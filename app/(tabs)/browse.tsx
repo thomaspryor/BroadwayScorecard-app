@@ -165,7 +165,7 @@ export default function BrowseScreen() {
     <AnimatedListItem index={index}>
       <ShowCard show={item} scoreMode={scoreMode} hideStatus={statusFilter === 'open'} isWatchlisted={watchlistSet.has(item.id)} onToggleWatchlist={() => toggleWatchlist(item.id)} myRating={ratingsMap.get(item.id) ?? null} />
     </AnimatedListItem>
-  ), [scoreMode, statusFilter, watchlistSet, toggleWatchlist]);
+  ), [scoreMode, statusFilter, watchlistSet, toggleWatchlist, ratingsMap]);
 
   const handleMarketChange = useCallback((m: Market) => {
     setMarket(m);
@@ -316,7 +316,7 @@ export default function BrowseScreen() {
           </View>
           </View>
         }
-        contentContainerStyle={styles.list}
+        contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 72 }]}
         showsVerticalScrollIndicator={false}
         windowSize={5}
         maxToRenderPerBatch={8}

@@ -273,7 +273,7 @@ export default function HomeScreen() {
             </View>
           ) : null
         }
-        contentContainerStyle={styles.list}
+        contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 72 }]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
