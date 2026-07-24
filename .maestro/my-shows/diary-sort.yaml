@@ -5,6 +5,9 @@ appId: com.broadwayscorecard.app
 ---
 - launchApp
 - openLink: broadwayscorecard:///my-shows
+- tapOn:
+    text: "Open"
+    optional: true
 
 # Diary tab with sort button
 - assertVisible: "Diary"

@@ -5,6 +5,11 @@ appId: com.broadwayscorecard.app
 ---
 - launchApp
 
+# Dismiss iOS "Open in" dialog if present
+- tapOn:
+    text: "Open"
+    optional: true
+
 # Wait for app to load (home is default tab)
 - extendedWaitUntil:
     visible: "Broadway Scorecard"

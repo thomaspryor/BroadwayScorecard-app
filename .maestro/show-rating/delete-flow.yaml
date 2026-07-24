@@ -6,6 +6,9 @@ appId: com.broadwayscorecard.app
 ---
 - launchApp
 - openLink: broadwayscorecard://test/show-rating-fixture?state=existing
+- tapOn:
+    text: "Open"
+    optional: true
 
 # Existing review should show delete button
 - assertVisible: "Delete rating"

@@ -24,6 +24,9 @@ appId: com.broadwayscorecard.app
 
 # Navigate to Watched (will show sign-in CTA if not authed)
 - openLink: broadwayscorecard:///watched
+- tapOn:
+    text: "Open"
+    optional: true
 - waitForAnimationToEnd:
     timeout: 5000
 
@@ -61,6 +64,9 @@ appId: com.broadwayscorecard.app
 
 # Re-navigate to Watched (now authed)
 - openLink: broadwayscorecard:///watched
+- tapOn:
+    text: "Open"
+    optional: true
 - waitForAnimationToEnd
 - takeScreenshot: ~/Documents/claude-outputs/bwsc-my-shows-mocks/ios-after-pass1/maestro-01-watched-grid
 
@@ -77,11 +83,17 @@ appId: com.broadwayscorecard.app
 
 # Navigate to To Watch
 - openLink: broadwayscorecard:///to-watch
+- tapOn:
+    text: "Open"
+    optional: true
 - waitForAnimationToEnd
 - takeScreenshot: ~/Documents/claude-outputs/bwsc-my-shows-mocks/ios-after-pass1/maestro-02-to-watch
 
 # Navigate to Lists
 - openLink: broadwayscorecard:///lists
+- tapOn:
+    text: "Open"
+    optional: true
 - waitForAnimationToEnd
 - takeScreenshot: ~/Documents/claude-outputs/bwsc-my-shows-mocks/ios-after-pass1/maestro-03-lists
 
