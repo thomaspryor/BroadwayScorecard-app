@@ -9,14 +9,14 @@
 
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { View, Text, Pressable, StyleSheet, Platform } from 'react-native';
-import { usePathname, useRouter } from 'expo-router';
-import { useFocusEffect } from 'expo-router';
+import { usePathname, useRouter, useFocusEffect, Link } from 'expo-router';
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import Svg, { Path } from 'react-native-svg';
 import { useAuth } from '@/lib/auth-context';
 import { toLocalYMD } from '@/lib/date-utils';
 import { useUserReviews } from '@/hooks/useUserReviews';
 import { useWatchlist } from '@/hooks/useWatchlist';
+import { useUserLists } from '@/hooks/useUserLists';
 import { useToastSafe } from '@/lib/toast-context';
 import { savePendingAction, getPendingAction, clearPendingAction } from '@/lib/deferred-auth';
 import { featureFlags } from '@/lib/feature-flags';
@@ -49,6 +49,7 @@ export default function ShowPageRating({
     updatePlannedDate,
     watchlist,
   } = useWatchlist(user?.id || null);
+  const { lists, getLists } = useUserLists(user?.id || null);
   const { showToast } = useToastSafe();
   const pathname = usePathname();
   const router = useRouter();
@@ -65,8 +66,9 @@ export default function ShowPageRating({
     if (isAuthenticated && user) {
       getReviewsForShow(showId);
       getWatchlist();
+      getLists();
     }
-  }, [isAuthenticated, user, showId, getReviewsForShow, getWatchlist]);
+  }, [isAuthenticated, user, showId, getReviewsForShow, getWatchlist, getLists]);
 
   // Refresh when returning from rate modal (focus regained)
   useFocusEffect(
@@ -74,8 +76,9 @@ export default function ShowPageRating({
       if (isAuthenticated && user) {
         getReviewsForShow(showId);
         getWatchlist();
+        getLists();
       }
-    }, [isAuthenticated, user, showId, getReviewsForShow, getWatchlist]),
+    }, [isAuthenticated, user, showId, getReviewsForShow, getWatchlist, getLists]),
   );
 
   // Derive state
@@ -87,24 +90,25 @@ export default function ShowPageRating({
   const viewCount = showReviews.length;
   const watchlistEntry = watchlist.find(w => w.show_id === showId);
 
+  // Lists containing this show — caption only, no button on show page (web parity).
+  const listsWithShow = lists.filter(l => (l.all_show_ids ?? l.preview_show_ids ?? []).includes(showId));
+  const firstListContainingShow = listsWithShow[0];
+
   // ─── Execute pending action after auth ───────────────────
+  // 'rating' is handled entirely by the rate sheet itself now (it's reachable
+  // pre-auth and gates at Save) — reacting to it here too would double-fire
+  // the same PendingAction read/clear race against that screen's own effect.
   useEffect(() => {
     if (!isAuthenticated || !user || hasExecutedPending.current) return;
 
     (async () => {
       const pending = await getPendingAction();
-      if (!pending || pending.showId !== showId) return;
+      if (!pending || pending.showId !== showId || pending.type === 'rating') return;
 
       hasExecutedPending.current = true;
       await clearPendingAction();
 
-      if (pending.type === 'rating' && pending.rating) {
-        // Navigate to rating modal with the pending rating pre-filled
-        router.push({
-          pathname: '/rate/[showId]',
-          params: { showId, showTitle, initialRating: String(pending.rating) },
-        });
-      } else if (pending.type === 'watchlist') {
+      if (pending.type === 'watchlist') {
         try {
           await addToWatchlist(showId);
           await getWatchlist();
@@ -125,24 +129,16 @@ export default function ShowPageRating({
 
   const handleRatingChange = useCallback(
     (rating: number) => {
-      if (!isAuthenticated) {
-        savePendingAction({
-          type: 'rating',
-          showId,
-          rating,
-          returnRoute: pathname,
-          timestamp: Date.now(),
-        });
-        showSignIn('rating');
-        return;
-      }
-      // Navigate to rating modal with the tapped rating pre-filled
+      // Pre-auth and signed-in both go straight to the rate sheet — it's
+      // reachable regardless of auth state and gates only at Save, so a
+      // signed-out tap doesn't lose the star (or any notes/date typed after)
+      // to an immediate sign-in interruption (web "invest then gate" parity).
       router.push({
         pathname: '/rate/[showId]',
         params: { showId, showTitle, initialRating: String(rating) },
       });
     },
-    [isAuthenticated, showId, showTitle, pathname, showSignIn, router],
+    [showId, showTitle, router],
   );
 
   const handleEdit = useCallback(
@@ -412,6 +408,15 @@ export default function ShowPageRating({
             </Svg>
             <Text style={styles.listButtonText}>+ List</Text>
           </Pressable>
+          {/* Membership caption — where this show already lives (web parity: "Also on"). */}
+          {firstListContainingShow && (
+            <Link
+              href="/(tabs)/lists"
+              style={styles.membershipCaption}
+            >
+              Also on {listsWithShow.length === 1 ? firstListContainingShow.name : `${listsWithShow.length} of your lists`}
+            </Link>
+          )}
           {showWatchlistDatePicker && (
             <View style={styles.datePickerContainer}>
               <View style={styles.datePickerHeader}>
@@ -567,6 +572,13 @@ const styles = StyleSheet.create({
     color: Colors.text.muted,
     fontSize: FontSize.xs,
     fontWeight: '500',
+  },
+  membershipCaption: {
+    color: Colors.text.muted,
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: 4,
+    maxWidth: 90,
   },
   watchlistDateCol: {
     alignItems: 'center',

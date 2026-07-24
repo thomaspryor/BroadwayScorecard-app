@@ -1,8 +1,9 @@
 /**
  * Watched tab — diary of rated shows.
  *
- * Shows "To Be Rated" section at top (past planned dates, no rating).
- * Then year-grouped grid/list of rated shows with star ratings.
+ * Sections: To Be Rated (past planned dates, no rating), Upcoming (future
+ * planned watchlist dates), then year-grouped grid/list of rated shows with
+ * star ratings — a "No date" bucket catches undated entries (imports).
  * Not signed in: full-screen CTA with sign-in button.
  */
 
@@ -16,6 +17,7 @@ import {
   Alert,
 } from 'react-native';
 import { Image } from 'expo-image';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
@@ -41,6 +43,8 @@ import * as haptics from '@/lib/haptics';
 
 type DiarySort = 'date-desc' | 'date-asc' | 'rating-desc';
 type ViewMode = 'list' | 'grid';
+
+const VIEW_MODE_KEY = '@bsc:diary_view_mode';
 
 // ─── Swipe delete action ─────────────────────────────
 function SwipeDeleteAction({ onDelete, drag }: { onDelete: () => void; drag: SharedValue<number> }) {
@@ -75,9 +79,9 @@ function EmptyState({ emoji, title, subtitle, actionLabel, onAction }: {
 }
 
 // ─── Add show card (grid footer) ──────────────────────
-function AddShowCard({ label, onPress }: { label: string; onPress: () => void }) {
+function AddShowCard({ label, onPress, fixedWidth }: { label: string; onPress: () => void; fixedWidth?: boolean }) {
   return (
-    <Pressable style={({ pressed }) => [styles.addShowCard, pressed && styles.pressed]} onPress={onPress}>
+    <Pressable style={({ pressed }) => [styles.addShowCard, fixedWidth && styles.addShowCardFixed, pressed && styles.pressed]} onPress={onPress}>
       <Svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke={Colors.text.muted} strokeWidth={2}>
         <Path strokeLinecap="round" d="M12 5v14M5 12h14" />
       </Svg>
@@ -91,12 +95,24 @@ export default function WatchedScreen() {
   const router = useRouter();
   const { user, isAuthenticated, loading: authLoading, showSignIn } = useAuth();
   const { reviews, getAllReviews, deleteReview, loading: reviewsLoading } = useUserReviews(user?.id || null);
-  const { watchlist, getWatchlist, loading: watchlistLoading } = useWatchlist(user?.id || null);
+  const { watchlist, getWatchlist, removeFromWatchlist, loading: watchlistLoading } = useWatchlist(user?.id || null);
   const { shows } = useShows();
 
   const [diarySort, setDiarySort] = useState<DiarySort>('date-desc');
-  const [viewMode, setViewMode] = useState<ViewMode>('grid');
+  const [viewMode, setViewModeState] = useState<ViewMode>('grid');
   const [showSearchModal, setShowSearchModal] = useState(false);
+
+  // Restore the user's last view mode (web parity — persisted, not reset per session).
+  useEffect(() => {
+    AsyncStorage.getItem(VIEW_MODE_KEY).then(stored => {
+      if (stored === 'list' || stored === 'grid') setViewModeState(stored);
+    }).catch(() => {});
+  }, []);
+
+  const setViewMode = useCallback((mode: ViewMode) => {
+    setViewModeState(mode);
+    AsyncStorage.setItem(VIEW_MODE_KEY, mode).catch(() => {});
+  }, []);
 
   const showMap = useMemo(() => {
     const map: Record<string, Show> = {};
@@ -121,7 +137,6 @@ export default function WatchedScreen() {
   );
 
   const loading = authLoading || reviewsLoading || watchlistLoading;
-  const showsSeen = new Set(reviews.map(r => r.show_id)).size;
 
   // Sorted diary
   const sortedReviews = useMemo(() => {
@@ -146,15 +161,58 @@ export default function WatchedScreen() {
     }
   }, [reviews, diarySort]);
 
-  // To Be Rated — shows from watchlist where planned_date has passed but not yet rated
   const today = toLocalYMD(new Date());
   const reviewedShowIds = useMemo(() => new Set(reviews.map(r => r.show_id)), [reviews]);
 
+  // To Be Rated — shows from watchlist where planned_date has passed but not yet rated
   const toBeRated = useMemo(() => {
     return watchlist
       .filter(w => w.planned_date && w.planned_date < today && !reviewedShowIds.has(w.show_id))
       .sort((a, b) => (b.planned_date || '').localeCompare(a.planned_date || ''));
   }, [watchlist, today, reviewedShowIds]);
+
+  // Upcoming — watchlist entries with a future (or today) planned date, not yet rated.
+  // Mirrors the To Watch tab's own Upcoming split (>= today) so a today-dated
+  // show is never invisible to both tabs at once.
+  const upcomingWatchlistEntries = useMemo(() => {
+    return watchlist
+      .filter(w => w.planned_date && w.planned_date >= today && !reviewedShowIds.has(w.show_id))
+      .sort((a, b) => (a.planned_date || '').localeCompare(b.planned_date || ''));
+  }, [watchlist, today, reviewedShowIds]);
+
+  // Reviews with a future date_seen (diary imports / manual back-dating could
+  // produce these even though the rate sheet itself caps at today).
+  const upcomingReviews = useMemo(
+    () => sortedReviews.filter(r => r.date_seen && r.date_seen > today),
+    [sortedReviews, today],
+  );
+  const pastReviews = useMemo(
+    () => sortedReviews.filter(r => !(r.date_seen && r.date_seen > today)),
+    [sortedReviews, today],
+  );
+
+  // Past reviews grouped by year (date_seen only — created_at fallback filed
+  // undated imports under the year they were IMPORTED, web parity fix 2026-07-14).
+  const showYearGroups = diarySort !== 'rating-desc';
+  const reviewsByYear = useMemo(() => {
+    const map: Record<string, UserReview[]> = {};
+    for (const review of pastReviews) {
+      const dateStr = review.date_seen;
+      const year = dateStr ? new Date(dateStr + 'T00:00:00').getFullYear().toString() : 'No date';
+      if (!map[year]) map[year] = [];
+      map[year].push(review);
+    }
+    return map;
+  }, [pastReviews]);
+  const sortedYears = useMemo(() => {
+    return Object.keys(reviewsByYear).sort((a, b) => {
+      if (a === 'No date') return 1;
+      if (b === 'No date') return -1;
+      return diarySort === 'date-asc' ? a.localeCompare(b) : b.localeCompare(a);
+    });
+  }, [reviewsByYear, diarySort]);
+
+  const showsSeen = new Set(reviews.map(r => r.show_id)).size;
 
   // Sort cycling
   const cycleDiarySort = useCallback(() => {
@@ -167,20 +225,6 @@ export default function WatchedScreen() {
   }, []);
 
   const sortLabel = diarySort === 'date-desc' ? 'Newest' : diarySort === 'date-asc' ? 'Oldest' : 'Top Rated';
-
-  // Grid data with add-show card inline + spacers to fill row
-  type GridItem = UserReview | { __spacer: true; id: string } | { __addCard: true; id: string };
-  const gridData: GridItem[] = useMemo(() => {
-    const cols = 4;
-    const items: GridItem[] = [...sortedReviews, { __addCard: true as const, id: 'add-card' }];
-    const remainder = items.length % cols;
-    if (remainder === 0) return items;
-    const spacers = Array.from({ length: cols - remainder }, (_, i) => ({
-      __spacer: true as const,
-      id: `spacer-${i}`,
-    }));
-    return [...items, ...spacers];
-  }, [sortedReviews]);
 
   const handleDeleteDiaryItem = useCallback((review: UserReview) => {
     haptics.action();
@@ -200,56 +244,14 @@ export default function WatchedScreen() {
     );
   }, [showMap, deleteReview]);
 
+  const handleRemoveUpcoming = useCallback((entry: WatchlistEntry) => {
+    haptics.action();
+    removeFromWatchlist(entry.show_id).catch(() => {});
+  }, [removeFromWatchlist]);
+
   // Clearance for the native tab bar: FlatList content must scroll past it
   // (fixed Spacing.xxl left the last row hidden behind the bar).
   const listBottomPad = insets.bottom + 72;
-
-  // To Be Rated shelf — rendered as ListHeaderComponent so it scrolls away
-  // with the content instead of pinning above the list.
-  const toBeRatedHeader = toBeRated.length > 0 ? (
-    <View style={styles.toBeRatedSection}>
-      <View style={styles.toBeRatedHeader}>
-        <Text style={styles.toBeRatedLabel}>TO BE RATED</Text>
-        <View style={styles.toBeRatedDot} />
-        <Text style={styles.toBeRatedCount}>{toBeRated.length}</Text>
-      </View>
-      <View style={styles.toBeRatedGrid}>
-        {toBeRated.map(item => {
-          const show = showMap[item.show_id];
-          const title = show?.title || item.show_id;
-          const posterUrl = show?.images ? (getImageUrl(show.images.poster) || getImageUrl(show.images.thumbnail)) : null;
-          return (
-            <Pressable
-              key={item.id}
-              style={({ pressed }) => [styles.gridCard, pressed && styles.pressed]}
-              onPress={() => show && router.push({
-                pathname: '/rate/[showId]' as any,
-                params: { showId: item.show_id, showTitle: title, suggestedDate: item.planned_date || '' },
-              })}
-            >
-              {posterUrl ? (
-                <Image source={{ uri: posterUrl }} style={styles.gridPoster} contentFit="cover" transition={200} />
-              ) : (
-                <View style={[styles.gridPoster, styles.cardPosterPlaceholder]}>
-                  <Text style={styles.placeholderText}>{title.charAt(0)}</Text>
-                </View>
-              )}
-              <Text style={styles.toBeRatedPosterDate}>
-                {item.planned_date ? new Date(item.planned_date + 'T00:00:00').toLocaleDateString('en-US', {
-                  month: 'short', day: 'numeric',
-                }) : 'Rate'}
-              </Text>
-              <Text style={styles.gridTitle} numberOfLines={2}>{title}</Text>
-            </Pressable>
-          );
-        })}
-        {/* Spacers to keep grid items same size */}
-        {Array.from({ length: (4 - (toBeRated.length % 4)) % 4 }, (_, i) => (
-          <View key={`tbr-spacer-${i}`} style={styles.gridCardSpacer} />
-        ))}
-      </View>
-    </View>
-  ) : null;
 
   if (!featureFlags.userAccounts) return null;
 
@@ -300,14 +302,15 @@ export default function WatchedScreen() {
     );
   }
 
-  // ─── List view render ────────────────────────────────
-  const renderDiaryItem = ({ item }: { item: UserReview }) => {
+  // ─── List row (shared by To Be Rated is separate; this is for rated diary entries) ────
+  const renderDiaryListRow = (item: UserReview) => {
     const show = showMap[item.show_id];
     const title = show?.title || item.show_id;
     const posterUrl = show?.images ? (getImageUrl(show.images.poster) || getImageUrl(show.images.thumbnail)) : null;
 
     return (
       <ReanimatedSwipeable
+        key={item.id}
         friction={2}
         rightThreshold={40}
         renderRightActions={(_progress, drag) => (
@@ -357,17 +360,16 @@ export default function WatchedScreen() {
     );
   };
 
-  // ─── Grid view render ────────────────────────────────
-  const renderDiaryGridItem = ({ item }: { item: GridItem }) => {
-    if ('__spacer' in item) return <View style={styles.gridCardSpacer} />;
-    if ('__addCard' in item) return <AddShowCard label="Rate a show" onPress={() => setShowSearchModal(true)} />;
+  // ─── Grid card (shared by To Be Rated is separate; this is for rated diary entries) ────
+  const renderDiaryGridCard = (item: UserReview) => {
     const show = showMap[item.show_id];
     const title = show?.title || item.show_id;
     const posterUrl = show?.images ? (getImageUrl(show.images.poster) || getImageUrl(show.images.thumbnail)) : null;
 
     return (
       <Pressable
-        style={({ pressed }) => [styles.gridCard, pressed && styles.pressed]}
+        key={item.id}
+        style={({ pressed }) => [styles.gridCardFixed, pressed && styles.pressed]}
         onPress={() => show && router.push(`/show/${show.slug}`)}
         onLongPress={() => handleDeleteDiaryItem(item)}
       >
@@ -394,13 +396,231 @@ export default function WatchedScreen() {
               ? new Date(item.date_seen + 'T00:00:00').toLocaleDateString('en-US', {
                   month: 'short', day: 'numeric', year: 'numeric',
                 })
-              : ' '}
+              : ' '}
           </Text>
         </Pressable>
         <Text style={styles.gridTitle} numberOfLines={2}>{title}</Text>
       </Pressable>
     );
   };
+
+  const renderUpcomingRow = (entry: WatchlistEntry) => {
+    const show = showMap[entry.show_id];
+    const title = show?.title || entry.show_id;
+    const posterUrl = show?.images ? (getImageUrl(show.images.poster) || getImageUrl(show.images.thumbnail)) : null;
+    const daysUntil = entry.planned_date
+      ? Math.ceil((new Date(entry.planned_date + 'T00:00:00').getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
+      : null;
+    const formattedDate = entry.planned_date
+      ? new Date(entry.planned_date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+      : null;
+
+    return (
+      <Pressable
+        key={entry.id}
+        style={({ pressed }) => [styles.upcomingRow, pressed && styles.pressed]}
+        onPress={() => show && router.push(`/show/${show.slug}`)}
+        onLongPress={() => handleRemoveUpcoming(entry)}
+      >
+        {posterUrl ? (
+          <Image source={{ uri: posterUrl }} style={styles.upcomingPoster} contentFit="cover" transition={200} />
+        ) : (
+          <View style={[styles.upcomingPoster, styles.cardPosterPlaceholder]}>
+            <Text style={styles.placeholderText}>{title.charAt(0)}</Text>
+          </View>
+        )}
+        <View style={styles.cardInfo}>
+          <Text style={styles.cardTitle} numberOfLines={1}>{title}</Text>
+          {show?.venue && <Text style={styles.cardVenue} numberOfLines={1}>{show.venue}</Text>}
+        </View>
+        <View style={styles.upcomingDateCol}>
+          {formattedDate && <Text style={styles.upcomingDateText}>{formattedDate}</Text>}
+          {daysUntil !== null && daysUntil > 0 && (
+            <Text style={styles.upcomingDaysText}>{daysUntil === 1 ? 'Tomorrow' : `${daysUntil}d`}</Text>
+          )}
+        </View>
+        <Pressable onPress={() => handleRemoveUpcoming(entry)} hitSlop={10} accessibilityRole="button" accessibilityLabel={`Remove ${title} from watchlist`}>
+          <Svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={Colors.text.muted} strokeWidth={2}>
+            <Path strokeLinecap="round" strokeLinejoin="round" d="M18 6L6 18M6 6l12 12" />
+          </Svg>
+        </Pressable>
+      </Pressable>
+    );
+  };
+
+  const isDiaryEmpty = sortedReviews.length === 0 && toBeRated.length === 0 && upcomingWatchlistEntries.length === 0;
+  const hasOtherSections = upcomingWatchlistEntries.length > 0 || upcomingReviews.length > 0 || toBeRated.length > 0;
+  const showYearHeaders = viewMode === 'grid' || sortedYears.length > 1 || hasOtherSections;
+
+  const diaryContent = (
+    <View>
+      {/* To Be Rated — at top so users notice it */}
+      {toBeRated.length > 0 && (
+        <View style={styles.toBeRatedSection}>
+          <View style={styles.toBeRatedHeader}>
+            <Text style={styles.toBeRatedLabel}>TO BE RATED</Text>
+            <View style={styles.toBeRatedDot} />
+            <Text style={styles.toBeRatedCount}>{toBeRated.length}</Text>
+          </View>
+          <View style={styles.toBeRatedGrid}>
+            {toBeRated.map(item => {
+              const show = showMap[item.show_id];
+              const title = show?.title || item.show_id;
+              const posterUrl = show?.images ? (getImageUrl(show.images.poster) || getImageUrl(show.images.thumbnail)) : null;
+              return (
+                <Pressable
+                  key={item.id}
+                  style={({ pressed }) => [styles.gridCard, pressed && styles.pressed]}
+                  onPress={() => show && router.push({
+                    pathname: '/rate/[showId]' as any,
+                    params: { showId: item.show_id, showTitle: title, suggestedDate: item.planned_date || '' },
+                  })}
+                >
+                  {posterUrl ? (
+                    <Image source={{ uri: posterUrl }} style={styles.gridPoster} contentFit="cover" transition={200} />
+                  ) : (
+                    <View style={[styles.gridPoster, styles.cardPosterPlaceholder]}>
+                      <Text style={styles.placeholderText}>{title.charAt(0)}</Text>
+                    </View>
+                  )}
+                  <Text style={styles.toBeRatedPosterDate}>
+                    {item.planned_date ? new Date(item.planned_date + 'T00:00:00').toLocaleDateString('en-US', {
+                      month: 'short', day: 'numeric',
+                    }) : 'Rate'}
+                  </Text>
+                  <Text style={styles.gridTitle} numberOfLines={2}>{title}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+      )}
+
+      {/* Upcoming — future planned watchlist dates + (rare) future date_seen reviews */}
+      {(upcomingWatchlistEntries.length > 0 || upcomingReviews.length > 0) && (
+        <View style={styles.upcomingSection}>
+          <View style={styles.sectionHeaderRow}>
+            <Text style={styles.sectionLabel}>UPCOMING</Text>
+            <Text style={styles.sectionCount}>
+              {upcomingWatchlistEntries.length + upcomingReviews.length} {(upcomingWatchlistEntries.length + upcomingReviews.length) === 1 ? 'entry' : 'entries'}
+            </Text>
+          </View>
+          {viewMode === 'grid' ? (
+            <View style={styles.toBeRatedGrid}>
+              {upcomingWatchlistEntries.map(entry => {
+                const show = showMap[entry.show_id];
+                const title = show?.title || entry.show_id;
+                const posterUrl = show?.images ? (getImageUrl(show.images.poster) || getImageUrl(show.images.thumbnail)) : null;
+                const formattedDate = entry.planned_date
+                  ? new Date(entry.planned_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                  : null;
+                return (
+                  <Pressable
+                    key={entry.id}
+                    style={({ pressed }) => [styles.gridCard, pressed && styles.pressed]}
+                    onPress={() => show && router.push(`/show/${show.slug}`)}
+                    onLongPress={() => handleRemoveUpcoming(entry)}
+                  >
+                    {posterUrl ? (
+                      <Image source={{ uri: posterUrl }} style={styles.gridPoster} contentFit="cover" transition={200} />
+                    ) : (
+                      <View style={[styles.gridPoster, styles.cardPosterPlaceholder]}>
+                        <Text style={styles.placeholderText}>{title.charAt(0)}</Text>
+                      </View>
+                    )}
+                    {formattedDate && <Text style={styles.toBeRatedPosterDate}>{formattedDate}</Text>}
+                    <Text style={styles.gridTitle} numberOfLines={2}>{title}</Text>
+                  </Pressable>
+                );
+              })}
+              {upcomingReviews.map(renderDiaryGridCard)}
+            </View>
+          ) : (
+            <View style={{ gap: Spacing.sm, paddingHorizontal: Spacing.lg }}>
+              {upcomingWatchlistEntries.map(renderUpcomingRow)}
+              {upcomingReviews.map(renderDiaryListRow)}
+            </View>
+          )}
+        </View>
+      )}
+
+      {/* Past shows — grouped by year, flat when sorting by rating */}
+      {pastReviews.length > 0 && (
+        showYearGroups ? (
+          <View style={{ gap: Spacing.xl }}>
+            {sortedYears.map(year => (
+              <View key={year}>
+                {showYearHeaders && (
+                  <View style={styles.sectionHeaderRow}>
+                    <Text style={styles.sectionLabel}>
+                      {year}{year === 'No date' ? ' — edit to add a date' : ''}
+                    </Text>
+                    <Text style={styles.sectionCount}>
+                      {reviewsByYear[year].length} {reviewsByYear[year].length === 1 ? 'entry' : 'entries'}
+                    </Text>
+                  </View>
+                )}
+                {viewMode === 'grid' ? (
+                  <View style={styles.pastGrid}>
+                    {reviewsByYear[year].map(renderDiaryGridCard)}
+                    {year === sortedYears[sortedYears.length - 1] && (
+                      <AddShowCard label="Rate a show" onPress={() => setShowSearchModal(true)} fixedWidth />
+                    )}
+                  </View>
+                ) : (
+                  <View style={{ gap: Spacing.xs, paddingHorizontal: 0 }}>
+                    {reviewsByYear[year].map(renderDiaryListRow)}
+                  </View>
+                )}
+              </View>
+            ))}
+          </View>
+        ) : (
+          <View>
+            {hasOtherSections && (
+              <View style={styles.sectionHeaderRow}>
+                <Text style={styles.sectionLabel}>ALL RATED</Text>
+                <Text style={styles.sectionCount}>{pastReviews.length} {pastReviews.length === 1 ? 'entry' : 'entries'}</Text>
+              </View>
+            )}
+            {viewMode === 'grid' ? (
+              <View style={styles.pastGrid}>
+                {pastReviews.map(renderDiaryGridCard)}
+                <AddShowCard label="Rate a show" onPress={() => setShowSearchModal(true)} fixedWidth />
+              </View>
+            ) : (
+              <View style={{ gap: Spacing.xs }}>
+                {pastReviews.map(renderDiaryListRow)}
+              </View>
+            )}
+          </View>
+        )
+      )}
+
+      {/* Add-show footer when there's no past section to attach it to */}
+      {pastReviews.length === 0 && (
+        viewMode === 'grid' ? (
+          <View style={styles.pastGrid}>
+            <AddShowCard label="Rate a show" onPress={() => setShowSearchModal(true)} fixedWidth />
+          </View>
+        ) : (
+          <Pressable
+            style={({ pressed }) => [styles.card, pressed && styles.pressed]}
+            onPress={() => setShowSearchModal(true)}
+          >
+            <View style={[styles.cardPoster, styles.cardPosterPlaceholder]}>
+              <Svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke={Colors.text.muted} strokeWidth={2}>
+                <Path strokeLinecap="round" d="M12 5v14M5 12h14" />
+              </Svg>
+            </View>
+            <View style={styles.cardInfo}>
+              <Text style={[styles.cardTitle, { color: Colors.text.muted }]}>Rate a show</Text>
+            </View>
+          </Pressable>
+        )
+      )}
+    </View>
+  );
 
   return (
     <GestureHandlerRootView style={[styles.container, { paddingTop: insets.top }]}>
@@ -432,11 +652,11 @@ export default function WatchedScreen() {
         </View>
       </View>
 
-      {/* Controls */}
+      {/* Controls — sort + view toggle only; per-section headers already
+          carry their own counts, so a top stats line just pushed content
+          down (web parity, owner 2026-07-17). */}
       <View style={styles.controlsRow}>
-        <Text style={styles.statsText}>
-          <Text style={styles.statsNumber}>{sortedReviews.length}</Text> {sortedReviews.length === 1 ? 'viewing' : 'viewings'}{showsSeen !== sortedReviews.length ? ` · ${showsSeen} shows` : ''}
-        </Text>
+        <Text style={styles.showsSeenLabel}>{showsSeen} {showsSeen === 1 ? 'show' : 'shows'} seen</Text>
         <View style={styles.controlsRight}>
           <Pressable style={styles.sortButton} onPress={cycleDiarySort}>
             <Text style={styles.sortText}>{sortLabel}</Text>
@@ -468,7 +688,7 @@ export default function WatchedScreen() {
       </View>
 
       {/* Diary content */}
-      {sortedReviews.length === 0 && toBeRated.length === 0 ? (
+      {isDiaryEmpty ? (
         <EmptyState
           emoji="🎭"
           title="Your diary is empty"
@@ -476,43 +696,13 @@ export default function WatchedScreen() {
           actionLabel="Rate a Show"
           onAction={() => setShowSearchModal(true)}
         />
-      ) : viewMode === 'grid' ? (
-        <FlatList
-          key="grid"
-          data={gridData}
-          keyExtractor={item => ('__spacer' in item ? item.id : '__addCard' in item ? item.id : item.id)}
-          renderItem={renderDiaryGridItem}
-          numColumns={4}
-          columnWrapperStyle={styles.gridRow}
-          contentContainerStyle={[styles.gridContainer, { paddingBottom: listBottomPad }]}
-          ListHeaderComponent={toBeRatedHeader}
-          ListHeaderComponentStyle={toBeRatedHeader ? styles.listHeaderBleed : undefined}
-          showsVerticalScrollIndicator={false}
-        />
       ) : (
         <FlatList
-          key="list"
-          data={sortedReviews}
-          keyExtractor={item => item.id}
-          renderItem={renderDiaryItem}
+          data={['content']}
+          keyExtractor={() => 'content'}
+          renderItem={() => diaryContent}
           showsVerticalScrollIndicator={false}
-          ListHeaderComponent={toBeRatedHeader}
-          contentContainerStyle={{ paddingBottom: listBottomPad }}
-          ListFooterComponent={
-            <Pressable
-              style={({ pressed }) => [styles.card, pressed && styles.pressed]}
-              onPress={() => setShowSearchModal(true)}
-            >
-              <View style={[styles.cardPoster, styles.cardPosterPlaceholder]}>
-                <Svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke={Colors.text.muted} strokeWidth={2}>
-                  <Path strokeLinecap="round" d="M12 5v14M5 12h14" />
-                </Svg>
-              </View>
-              <View style={styles.cardInfo}>
-                <Text style={[styles.cardTitle, { color: Colors.text.muted }]}>Rate a show</Text>
-              </View>
-            </Pressable>
-          }
+          contentContainerStyle={[styles.gridContainer, { paddingBottom: listBottomPad }]}
         />
       )}
       {/* Search modal — select show → rate it immediately */}
@@ -548,8 +738,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     paddingHorizontal: Spacing.lg, paddingBottom: Spacing.sm,
   },
-  statsText: { color: Colors.text.secondary, fontSize: FontSize.sm },
-  statsNumber: { color: Colors.text.primary, fontWeight: '700' },
+  showsSeenLabel: { color: Colors.text.muted, fontSize: FontSize.xs },
   controlsRight: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
   sortButton: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
@@ -568,12 +757,31 @@ const styles = StyleSheet.create({
   viewToggleActive: {
     backgroundColor: 'rgba(255,255,255,0.1)',
   },
+  // Section headers (Upcoming / year groups / All Rated)
+  sectionHeaderRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: Spacing.lg, marginBottom: Spacing.sm,
+  },
+  sectionLabel: { color: Colors.text.muted, fontSize: 12, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase' },
+  sectionCount: { color: Colors.text.muted, fontSize: 12 },
+  upcomingSection: { marginBottom: Spacing.xl },
+  // Upcoming list row
+  upcomingRow: {
+    flexDirection: 'row', alignItems: 'center', gap: Spacing.md,
+    paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm,
+    backgroundColor: Colors.surface.overlay, borderRadius: BorderRadius.md,
+  },
+  upcomingPoster: { width: 48, height: 48, borderRadius: BorderRadius.sm, backgroundColor: Colors.surface.raised },
+  upcomingDateCol: { alignItems: 'flex-end' },
+  upcomingDateText: { color: '#fcd34d', fontSize: FontSize.xs, fontWeight: '600' },
+  upcomingDaysText: { color: Colors.text.muted, fontSize: 12, marginTop: 1 },
   // To Be Rated
   toBeRatedSection: {
     backgroundColor: 'rgba(245, 158, 11, 0.06)',
     borderTopWidth: 1, borderBottomWidth: 1,
     borderColor: 'rgba(245, 158, 11, 0.15)',
-    paddingVertical: Spacing.sm, marginBottom: Spacing.sm,
+    paddingVertical: Spacing.sm, marginBottom: Spacing.xl,
+    marginHorizontal: -Spacing.lg,
   },
   toBeRatedHeader: {
     flexDirection: 'row', alignItems: 'center', gap: Spacing.xs,
@@ -611,14 +819,15 @@ const styles = StyleSheet.create({
   ratingText: { color: Colors.text.secondary, fontSize: FontSize.xs },
   // Grid view
   gridContainer: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.md },
-  gridRow: { gap: Spacing.sm, paddingBottom: Spacing.sm },
-  // To Be Rated header sits inside the padded grid container; bleed back out
-  // so its tinted band spans the full screen width.
-  listHeaderBleed: { marginHorizontal: -Spacing.lg },
+  pastGrid: {
+    flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm,
+  },
   gridDateText: { color: Colors.text.muted, fontSize: 12, marginTop: 2 },
-  gridFooterRow: { flexDirection: 'row', gap: Spacing.sm, paddingBottom: Spacing.sm },
   gridCard: { flex: 1, alignItems: 'center' },
-  gridCardSpacer: { flex: 1 },
+  // Fixed-width card for the flexWrap sections (Upcoming/Past-by-year) — a
+  // flex:1 card inside flexWrap stretches unevenly on partial rows, so these
+  // use the same fixed-percentage convention as the To Watch tab's grid.
+  gridCardFixed: { width: '23%', alignItems: 'center' },
   gridPoster: {
     width: '100%', aspectRatio: 2 / 3, borderRadius: BorderRadius.md,
     backgroundColor: Colors.surface.overlay,
@@ -634,6 +843,7 @@ const styles = StyleSheet.create({
     borderWidth: 2, borderStyle: 'dashed', borderColor: Colors.surface.overlay,
     alignItems: 'center', justifyContent: 'center', gap: 4,
   },
+  addShowCardFixed: { flex: undefined, width: '23%' },
   addShowLabel: { color: Colors.text.muted, fontSize: 12, fontWeight: '500' },
   // Swipe
   swipeDelete: {

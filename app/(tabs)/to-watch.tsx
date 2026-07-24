@@ -17,6 +17,7 @@ import {
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
@@ -181,6 +182,24 @@ export default function ToWatchScreen() {
     }
   }, [removeFromWatchlist]);
 
+  const handleRateFromWatchlist = useCallback((item: WatchlistEntry, stars: number) => {
+    const show = showMap[item.show_id];
+    const title = show?.title || item.show_id;
+    haptics.tap();
+    router.push({
+      pathname: '/rate/[showId]' as any,
+      params: { showId: item.show_id, showTitle: title, initialRating: String(stars) },
+    });
+  }, [showMap, router]);
+
+  const showWatchlistActionSheet = useCallback((item: WatchlistEntry, title: string) => {
+    Alert.alert(title, undefined, [
+      { text: 'Set date', onPress: () => { setPendingDate(new Date()); setDatePickingShowId(item.show_id); } },
+      { text: 'Remove', style: 'destructive', onPress: () => handleRemove(item.show_id) },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  }, [handleRemove]);
+
   const handleDateChange = useCallback((_event: unknown, selectedDate?: Date) => {
     if (Platform.OS === 'android') {
       // Android: picker dismisses on selection, save immediately
@@ -287,27 +306,49 @@ export default function ToWatchScreen() {
     const posterUrl = show?.images ? (getImageUrl(show.images.poster) || getImageUrl(show.images.thumbnail)) : null;
 
     return (
-      <Pressable
-        key={item.id}
-        style={({ pressed }) => [styles.gridCard, pressed && styles.pressed]}
-        onPress={() => show && router.push(`/show/${show.slug}`)}
-        onLongPress={() => {
-          Alert.alert('Remove from Watchlist', `Remove ${title}?`, [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Remove', style: 'destructive', onPress: () => handleRemove(item.show_id) },
-          ]);
-        }}
-      >
-        {posterUrl ? (
-          <Image source={{ uri: posterUrl }} style={styles.gridPoster} contentFit="cover" transition={200} />
-        ) : (
-          <View style={[styles.gridPoster, styles.cardPosterPlaceholder]}>
-            <Text style={styles.placeholderText}>{title.charAt(0)}</Text>
+      <View key={item.id} style={styles.gridCard}>
+        <Pressable
+          style={({ pressed }) => pressed && styles.pressed}
+          onPress={() => show && router.push(`/show/${show.slug}`)}
+          onLongPress={() => showWatchlistActionSheet(item, title)}
+        >
+          <View>
+            {posterUrl ? (
+              <Image source={{ uri: posterUrl }} style={styles.gridPoster} contentFit="cover" transition={200} />
+            ) : (
+              <View style={[styles.gridPoster, styles.cardPosterPlaceholder]}>
+                <Text style={styles.placeholderText}>{title.charAt(0)}</Text>
+              </View>
+            )}
+            <StatusOverlayPill show={show} />
+            {/* Rate strip — five tappable stars anchored to the poster bottom
+                (web parity: MyShowsClient.tsx watchlist rate strip). Deep-links
+                straight to the rate sheet with the tapped star pre-filled. */}
+            <LinearGradient
+              colors={['transparent', 'rgba(0,0,0,0.85)']}
+              style={styles.rateStrip}
+              pointerEvents="box-none"
+            >
+              <View style={styles.rateStripStars}>
+                {[1, 2, 3, 4, 5].map(i => (
+                  <Pressable
+                    key={i}
+                    onPress={() => handleRateFromWatchlist(item, i)}
+                    hitSlop={2}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Rate ${i} star${i !== 1 ? 's' : ''}`}
+                  >
+                    <Svg width={13} height={13} viewBox="0 0 24 24" fill="none">
+                      <Path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill="none" stroke="#FFD700" strokeWidth={1.5} strokeLinejoin="round" />
+                    </Svg>
+                  </Pressable>
+                ))}
+              </View>
+            </LinearGradient>
           </View>
-        )}
-        <StatusOverlayPill show={show} />
-        <Text style={styles.gridTitle} numberOfLines={2}>{title}</Text>
-      </Pressable>
+          <Text style={styles.gridTitle} numberOfLines={2}>{title}</Text>
+        </Pressable>
+      </View>
     );
   };
 
@@ -321,12 +362,7 @@ export default function ToWatchScreen() {
         key={item.id}
         style={({ pressed }) => [styles.listRow, pressed && styles.pressed]}
         onPress={() => show && router.push(`/show/${show.slug}`)}
-        onLongPress={() => {
-          Alert.alert('Remove from Watchlist', `Remove ${title}?`, [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Remove', style: 'destructive', onPress: () => handleRemove(item.show_id) },
-          ]);
-        }}
+        onLongPress={() => showWatchlistActionSheet(item, title)}
       >
         {posterUrl ? (
           <Image source={{ uri: posterUrl }} style={styles.listPoster} contentFit="cover" transition={200} />
@@ -579,6 +615,11 @@ const styles = StyleSheet.create({
   },
   statusPillText: { fontSize: 12, fontWeight: '700', letterSpacing: 0.3 },
   listStatus: { fontSize: 12, fontWeight: '600', marginTop: 2, letterSpacing: 0.3 },
+  rateStrip: {
+    position: 'absolute', left: 0, right: 0, bottom: 0,
+    alignItems: 'center', paddingTop: 14, paddingBottom: 4,
+  },
+  rateStripStars: { flexDirection: 'row', gap: 1 },
   gridTitle: {
     color: Colors.text.secondary, fontSize: 12, fontWeight: '500',
     textAlign: 'center', lineHeight: 15, marginTop: 2,
