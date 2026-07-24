@@ -54,6 +54,8 @@ Last audited: 2026-07-24 (Mezzanine/Show Score import shipped, card 398 — Find
 
 ## Web-Only (Not Planned for App)
 
+- **Public/shareable lists** (share link, public toggle) — owner decision 2026-07-24 (Option B): skip on mobile until a real user asks; web share links open fine from the app.
+
 Content-heavy reference pages — users access via web links from the app.
 
 - Critic/Cast/Creative detail pages
