@@ -199,6 +199,57 @@ export default function WatchedScreen() {
     );
   }, [showMap, deleteReview]);
 
+  // Clearance for the native tab bar: FlatList content must scroll past it
+  // (fixed Spacing.xxl left the last row hidden behind the bar).
+  const listBottomPad = insets.bottom + 72;
+
+  // To Be Rated shelf — rendered as ListHeaderComponent so it scrolls away
+  // with the content instead of pinning above the list.
+  const toBeRatedHeader = toBeRated.length > 0 ? (
+    <View style={styles.toBeRatedSection}>
+      <View style={styles.toBeRatedHeader}>
+        <Text style={styles.toBeRatedLabel}>TO BE RATED</Text>
+        <View style={styles.toBeRatedDot} />
+        <Text style={styles.toBeRatedCount}>{toBeRated.length}</Text>
+      </View>
+      <View style={styles.toBeRatedGrid}>
+        {toBeRated.map(item => {
+          const show = showMap[item.show_id];
+          const title = show?.title || item.show_id;
+          const posterUrl = show?.images ? (getImageUrl(show.images.poster) || getImageUrl(show.images.thumbnail)) : null;
+          return (
+            <Pressable
+              key={item.id}
+              style={({ pressed }) => [styles.gridCard, pressed && styles.pressed]}
+              onPress={() => show && router.push({
+                pathname: '/rate/[showId]' as any,
+                params: { showId: item.show_id, showTitle: title, suggestedDate: item.planned_date || '' },
+              })}
+            >
+              {posterUrl ? (
+                <Image source={{ uri: posterUrl }} style={styles.gridPoster} contentFit="cover" transition={200} />
+              ) : (
+                <View style={[styles.gridPoster, styles.cardPosterPlaceholder]}>
+                  <Text style={styles.placeholderText}>{title.charAt(0)}</Text>
+                </View>
+              )}
+              <Text style={styles.toBeRatedPosterDate}>
+                {item.planned_date ? new Date(item.planned_date + 'T00:00:00').toLocaleDateString('en-US', {
+                  month: 'short', day: 'numeric',
+                }) : 'Rate'}
+              </Text>
+              <Text style={styles.gridTitle} numberOfLines={2}>{title}</Text>
+            </Pressable>
+          );
+        })}
+        {/* Spacers to keep grid items same size */}
+        {Array.from({ length: (4 - (toBeRated.length % 4)) % 4 }, (_, i) => (
+          <View key={`tbr-spacer-${i}`} style={styles.gridCardSpacer} />
+        ))}
+      </View>
+    </View>
+  ) : null;
+
   if (!featureFlags.userAccounts) return null;
 
   // Not authenticated
@@ -319,6 +370,13 @@ export default function WatchedScreen() {
         )}
         <View style={styles.gridCardInfo}>
           {item.rating > 0 && <MiniStars rating={item.rating} />}
+          <Text style={styles.gridDateText}>
+            {item.date_seen
+              ? new Date(item.date_seen + 'T00:00:00').toLocaleDateString('en-US', {
+                  month: 'short', day: 'numeric', year: 'numeric',
+                })
+              : ' '}
+          </Text>
         </View>
         <Text style={styles.gridTitle} numberOfLines={2}>{title}</Text>
       </Pressable>
@@ -377,49 +435,6 @@ export default function WatchedScreen() {
         </View>
       </View>
 
-      {/* To Be Rated section — poster grid with amber accent */}
-      {toBeRated.length > 0 && (
-        <View style={styles.toBeRatedSection}>
-          <View style={styles.toBeRatedHeader}>
-            <Text style={styles.toBeRatedLabel}>TO BE RATED</Text>
-            <View style={styles.toBeRatedDot} />
-            <Text style={styles.toBeRatedCount}>{toBeRated.length}</Text>
-          </View>
-          <View style={styles.toBeRatedGrid}>
-            {toBeRated.map(item => {
-              const show = showMap[item.show_id];
-              const title = show?.title || item.show_id;
-              const posterUrl = show?.images ? (getImageUrl(show.images.poster) || getImageUrl(show.images.thumbnail)) : null;
-              return (
-                <Pressable
-                  key={item.id}
-                  style={({ pressed }) => [styles.gridCard, pressed && styles.pressed]}
-                  onPress={() => show && router.push({ pathname: '/rate/[showId]' as any, params: { showId: item.show_id, showTitle: title } })}
-                >
-                  {posterUrl ? (
-                    <Image source={{ uri: posterUrl }} style={styles.gridPoster} contentFit="cover" transition={200} />
-                  ) : (
-                    <View style={[styles.gridPoster, styles.cardPosterPlaceholder]}>
-                      <Text style={styles.placeholderText}>{title.charAt(0)}</Text>
-                    </View>
-                  )}
-                  <Text style={styles.toBeRatedPosterDate}>
-                    {item.planned_date ? new Date(item.planned_date + 'T00:00:00').toLocaleDateString('en-US', {
-                      month: 'short', day: 'numeric',
-                    }) : 'Rate'}
-                  </Text>
-                  <Text style={styles.gridTitle} numberOfLines={2}>{title}</Text>
-                </Pressable>
-              );
-            })}
-            {/* Spacers to keep grid items same size */}
-            {Array.from({ length: (4 - (toBeRated.length % 4)) % 4 }, (_, i) => (
-              <View key={`tbr-spacer-${i}`} style={styles.gridCardSpacer} />
-            ))}
-          </View>
-        </View>
-      )}
-
       {/* Diary content */}
       {sortedReviews.length === 0 && toBeRated.length === 0 ? (
         <EmptyState
@@ -437,7 +452,9 @@ export default function WatchedScreen() {
           renderItem={renderDiaryGridItem}
           numColumns={4}
           columnWrapperStyle={styles.gridRow}
-          contentContainerStyle={styles.gridContainer}
+          contentContainerStyle={[styles.gridContainer, { paddingBottom: listBottomPad }]}
+          ListHeaderComponent={toBeRatedHeader}
+          ListHeaderComponentStyle={toBeRatedHeader ? styles.listHeaderBleed : undefined}
           showsVerticalScrollIndicator={false}
         />
       ) : (
@@ -447,7 +464,8 @@ export default function WatchedScreen() {
           keyExtractor={item => item.id}
           renderItem={renderDiaryItem}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: Spacing.xxl }}
+          ListHeaderComponent={toBeRatedHeader}
+          contentContainerStyle={{ paddingBottom: listBottomPad }}
           ListFooterComponent={
             <Pressable
               style={({ pressed }) => [styles.card, pressed && styles.pressed]}
@@ -560,8 +578,12 @@ const styles = StyleSheet.create({
   cardRating: { alignItems: 'center', gap: 2 },
   ratingText: { color: Colors.text.secondary, fontSize: FontSize.xs },
   // Grid view
-  gridContainer: { paddingHorizontal: Spacing.lg, paddingBottom: Spacing.xxl, paddingTop: Spacing.md },
+  gridContainer: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.md },
   gridRow: { gap: Spacing.sm, paddingBottom: Spacing.sm },
+  // To Be Rated header sits inside the padded grid container; bleed back out
+  // so its tinted band spans the full screen width.
+  listHeaderBleed: { marginHorizontal: -Spacing.lg },
+  gridDateText: { color: Colors.text.muted, fontSize: 12, marginTop: 2 },
   gridFooterRow: { flexDirection: 'row', gap: Spacing.sm, paddingBottom: Spacing.sm },
   gridCard: { flex: 1, alignItems: 'center' },
   gridCardSpacer: { flex: 1 },

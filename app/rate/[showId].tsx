@@ -42,8 +42,21 @@ import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
 
 const MAX_CHARS = 2000;
 
+const MARKET_LABELS: Record<string, string> = {
+  'broadway': 'Broadway',
+  'off-broadway': 'Off-Broadway',
+  'west-end': 'West End',
+};
+
+// Local-timezone YYYY-MM-DD. toISOString() is UTC and rolls the date forward
+// for evening picks in US timezones (web fixed the same boundary bug).
+function toLocalYMD(d: Date): string {
+  const offsetMs = d.getTimezoneOffset() * 60 * 1000;
+  return new Date(d.getTime() - offsetMs).toISOString().split('T')[0];
+}
+
 export default function RateModal() {
-  const params = useLocalSearchParams<{ showId: string; showTitle: string; reviewId?: string; initialRating?: string }>();
+  const params = useLocalSearchParams<{ showId: string; showTitle: string; reviewId?: string; initialRating?: string; suggestedDate?: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
@@ -56,25 +69,49 @@ export default function RateModal() {
   const showTitle = params.showTitle || 'Rate Show';
   const reviewId = params.reviewId;
   const initialRating = params.initialRating ? parseFloat(params.initialRating) : null;
+  const suggestedDate = params.suggestedDate;
 
-  // Find show data for poster + closingDate
+  // Find show data for poster + production context
   const show = shows.find(s => s.id === showId);
   const posterUrl = show ? getImageUrl(show.images.poster) || getImageUrl(show.images.thumbnail) : null;
-  const closingDate = show?.closingDate;
 
-  // Form state
+  // Production context — which run of this title is being rated
+  const marketLabel = show?.category ? MARKET_LABELS[show.category] || null : null;
+  const openingYear = show?.openingDate ? show.openingDate.slice(0, 4) : null;
+  const closingYear = show?.closingDate ? show.closingDate.slice(0, 4) : null;
+  const runLabel = openingYear
+    ? closingYear
+      ? (openingYear === closingYear ? openingYear : `${openingYear}–${closingYear}`)
+      : `${openingYear}–present`
+    : null;
+  const contextLine = [show?.venue, marketLabel, runLabel].filter(Boolean).join(' · ');
+
+  const todayYMD = toLocalYMD(new Date());
+
+  // Form state. New ratings prefill the watchlist planned date when given
+  // (clamped to today), else today — matching web RatingEditor. Edits load
+  // the stored date async and start blank.
   const [currentRating, setCurrentRating] = useState<number | null>(initialRating);
   const [reviewText, setReviewText] = useState('');
-  const [dateSeen, setDateSeen] = useState('');
+  const [dateSeen, setDateSeen] = useState(() => {
+    if (reviewId) return '';
+    if (suggestedDate) return suggestedDate > todayYMD ? todayYMD : suggestedDate;
+    return todayYMD;
+  });
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [loadingReview, setLoadingReview] = useState(!!reviewId);
   const isDirty = useRef(false);
   const populatingRef = useRef(!!reviewId); // true while loading edit data
+  const mountedRef = useRef(false); // effect fires once on mount before any user input
 
-  // Track dirty state — skip changes from initial data population
+  // Track dirty state — skip the mount run and changes from initial data population
   useEffect(() => {
+    if (!mountedRef.current) {
+      mountedRef.current = true;
+      return;
+    }
     if (!populatingRef.current) {
       isDirty.current = true;
     }
@@ -116,7 +153,12 @@ export default function RateModal() {
   const canSave = currentRating !== null && !isOverLimit && !saving;
 
   const today = new Date();
-  const maxDate = closingDate ? new Date(closingDate + 'T00:00:00') : today;
+  // Cap only at today. Do NOT cap at the show's closing date: return
+  // engagements, Encores runs, and diary imports mapped to an earlier
+  // production made the closing-date cap read as "completely locked"
+  // (same rationale as web RatingEditor, La Cage report 2026-07-13 —
+  // this was the "only lets me pick May 2011 or earlier" bug).
+  const maxDate = today;
   const dateValue = dateSeen ? new Date(dateSeen + 'T00:00:00') : today;
   const formattedDate = dateSeen
     ? new Date(dateSeen + 'T00:00:00').toLocaleDateString('en-US', {
@@ -127,7 +169,7 @@ export default function RateModal() {
   const handleDateChange = useCallback((_event: DateTimePickerEvent, selectedDate?: Date) => {
     if (Platform.OS !== 'ios') setShowDatePicker(false);
     if (selectedDate) {
-      setDateSeen(selectedDate.toISOString().split('T')[0]);
+      setDateSeen(toLocalYMD(selectedDate));
     }
   }, []);
 
@@ -240,11 +282,14 @@ export default function RateModal() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* Poster thumbnail */}
+          {/* Poster thumbnail + production context (which run is being rated) */}
           {posterUrl && (
             <View style={styles.posterContainer}>
               <Image source={{ uri: posterUrl }} style={styles.poster} contentFit="cover" />
             </View>
+          )}
+          {contextLine.length > 0 && (
+            <Text style={styles.contextLine} numberOfLines={2}>{contextLine}</Text>
           )}
 
           {/* Loading state for edit mode */}
@@ -421,7 +466,14 @@ const styles = StyleSheet.create({
   },
   posterContainer: {
     alignItems: 'center',
+    marginBottom: Spacing.sm,
+  },
+  contextLine: {
+    color: Colors.text.muted,
+    fontSize: FontSize.xs,
+    textAlign: 'center',
     marginBottom: Spacing.lg,
+    paddingHorizontal: Spacing.lg,
   },
   poster: {
     width: 80,
