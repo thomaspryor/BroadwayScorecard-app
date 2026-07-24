@@ -126,9 +126,14 @@ jobs:
           retention-days: 3
 
       - name: Fixture canary (fast __DEV__/env-gate check)
+        # Only show-rating/*.yaml exercises show-rating-fixture.tsx — scoped
+        # to suites that actually use it so an unrelated regression here can't
+        # fail my-shows/tabs runs (the exact false-coupling this canary exists
+        # to prevent, just inverted).
+        if: ${{ inputs.suite == 'all' || inputs.suite == 'show-rating' }}
         run: |
           if ! maestro test .maestro/ci-canary-show-rating-fixture.yaml; then
-            echo "::error::show-rating-fixture route did not render — check __DEV__/EXPO_PUBLIC_DEV_AUTO_SIGNIN gating (task #432/#403)"
+            echo "::error::show-rating-fixture route did not render — may indicate __DEV__/EXPO_PUBLIC_DEV_AUTO_SIGNIN gating regressed (task #432/#403), but could also be an unrelated routing/render issue"
             exit 1
           fi
 
