@@ -14,6 +14,7 @@ import type { UserProfile } from './user-types';
 import SignInSheet from '@/components/SignInSheet';
 import { trackSignInStarted, trackSignInCompleted, trackSignOut as trackSignOutEvent, identifyUser, resetAnalyticsUser } from '@/lib/analytics';
 import { setSentryUser, clearSentryUser } from '@/lib/sentry';
+import { clearPendingAction } from '@/lib/deferred-auth';
 
 // Lazy-load native auth modules — they crash at import time if native modules
 // aren't registered (e.g. dev client built without the plugin, or Expo Go).
@@ -402,7 +403,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       {children}
       <SignInSheet
         visible={sheetOpen}
-        onClose={() => setSheetOpen(false)}
+        onClose={() => {
+          setSheetOpen(false);
+          // Dismissing without signing in leaves the draft action stale — clear
+          // it so a LATER sign-in (different flow) can't silently resurrect and
+          // auto-save it over whatever the user has open by then.
+          clearPendingAction();
+        }}
         onSignIn={handleSheetSignIn}
         onEmailSignIn={handleSheetEmailSignIn}
         onDevSignIn={__DEV__ ? devSignIn : undefined}

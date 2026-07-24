@@ -246,8 +246,21 @@ export default function WatchedScreen() {
 
   const handleRemoveUpcoming = useCallback((entry: WatchlistEntry) => {
     haptics.action();
-    removeFromWatchlist(entry.show_id).catch(() => {});
-  }, [removeFromWatchlist]);
+    const show = showMap[entry.show_id];
+    const title = show?.title || 'this show';
+    Alert.alert(
+      'Remove from Watchlist',
+      `Remove ${title} from your watchlist?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: () => { removeFromWatchlist(entry.show_id).catch(() => {}); },
+        },
+      ],
+    );
+  }, [showMap, removeFromWatchlist]);
 
   // Clearance for the native tab bar: FlatList content must scroll past it
   // (fixed Spacing.xxl left the last row hidden behind the bar).
