@@ -1,26 +1,39 @@
 /**
- * BookmarkOverlay — subtle bookmark icon for top-right of poster cards.
- * Gold (#FFD700) when watchlisted, semi-transparent when not.
- * Shows filled bookmark if watchlisted, outline if not.
+ * BookmarkOverlay — poster-corner slot for top-right of poster cards.
+ * Three states (web parity, ShowPageBookmark "4B"):
+ *   rated       → gold ★ rating chip (display-only, replaces the bookmark)
+ *   watchlisted → filled gold bookmark
+ *   default     → outline bookmark
  */
 
 import React, { memo } from 'react';
-import { Pressable, StyleSheet, Platform } from 'react-native';
+import { Pressable, StyleSheet, Platform, View, Text } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import Svg, { Path } from 'react-native-svg';
 
 interface BookmarkOverlayProps {
   isWatchlisted: boolean;
   onToggle: () => void;
+  /** Signed-in user's own star rating for this show; replaces the bookmark when set */
+  myRating?: number | null;
 }
 
-export const BookmarkOverlay = memo(function BookmarkOverlay({ isWatchlisted, onToggle }: BookmarkOverlayProps) {
+export const BookmarkOverlay = memo(function BookmarkOverlay({ isWatchlisted, onToggle, myRating }: BookmarkOverlayProps) {
   const handlePress = () => {
     if (Platform.OS === 'ios') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
     onToggle();
   };
+
+  if (myRating !== null && myRating !== undefined) {
+    return (
+      <View style={[styles.container, styles.ratingChip]} testID="my-rating-chip" accessibilityLabel={`Your rating: ${myRating.toFixed(1)} stars`}>
+        <Text style={styles.ratingStar}>★</Text>
+        <Text style={styles.ratingText}>{myRating.toFixed(1)}</Text>
+      </View>
+    );
+  }
 
   return (
     <Pressable
@@ -45,8 +58,8 @@ export const BookmarkOverlay = memo(function BookmarkOverlay({ isWatchlisted, on
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-    top: 2,
-    right: 2,
+    top: 0,
+    right: 0,
     zIndex: 10,
     padding: 6,
     // Drop shadow for visibility on any poster
@@ -56,4 +69,20 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     elevation: 4,
   },
+  ratingChip: {
+    top: 4,
+    right: 4,
+    padding: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 999,
+    backgroundColor: 'rgba(0,0,0,0.75)',
+    borderWidth: 1,
+    borderColor: 'rgba(251, 191, 36, 0.3)',
+  },
+  ratingStar: { color: '#FFD700', fontSize: 12, fontWeight: '700' },
+  ratingText: { color: '#FFD700', fontSize: 12, fontWeight: '700', fontVariant: ['tabular-nums'] },
 });

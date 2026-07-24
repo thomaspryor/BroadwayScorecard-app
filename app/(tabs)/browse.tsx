@@ -18,6 +18,7 @@ import { Show } from '@/lib/types';
 import { StaleBanner } from '@/components/StaleBanner';
 import { useAuth } from '@/lib/auth-context';
 import { useWatchlist } from '@/hooks/useWatchlist';
+import { useMyRatingsMap } from '@/hooks/useMyRatingsMap';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
 import { trackFilterChanged, trackScoreModeToggled, trackMarketChanged, trackDataRefreshed } from '@/lib/analytics';
 
@@ -101,6 +102,7 @@ export default function BrowseScreen() {
   const { user, isAuthenticated, showSignIn } = useAuth();
   const { watchlist, addToWatchlist, removeFromWatchlist } = useWatchlist(user?.id || null);
   const watchlistSet = useMemo(() => new Set(watchlist.map(w => w.show_id)), [watchlist]);
+  const ratingsMap = useMyRatingsMap(user?.id || null);
   const toggleWatchlist = useCallback(async (showId: string) => {
     if (!isAuthenticated) { showSignIn('watchlist'); return; }
     try {
@@ -161,7 +163,7 @@ export default function BrowseScreen() {
 
   const renderItem = useCallback(({ item, index }: { item: Show; index: number }) => (
     <AnimatedListItem index={index}>
-      <ShowCard show={item} scoreMode={scoreMode} hideStatus={statusFilter === 'open'} isWatchlisted={watchlistSet.has(item.id)} onToggleWatchlist={() => toggleWatchlist(item.id)} />
+      <ShowCard show={item} scoreMode={scoreMode} hideStatus={statusFilter === 'open'} isWatchlisted={watchlistSet.has(item.id)} onToggleWatchlist={() => toggleWatchlist(item.id)} myRating={ratingsMap.get(item.id) ?? null} />
     </AnimatedListItem>
   ), [scoreMode, statusFilter, watchlistSet, toggleWatchlist]);
 

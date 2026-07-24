@@ -13,6 +13,7 @@ import Svg, { Path, Circle } from 'react-native-svg';
 import { useShows } from '@/lib/data-context';
 import { useAuth } from '@/lib/auth-context';
 import { useWatchlist } from '@/hooks/useWatchlist';
+import { useMyRatingsMap } from '@/hooks/useMyRatingsMap';
 import { ShowCard } from '@/components/ShowCard';
 import { AnimatedListItem } from '@/components/AnimatedListItem';
 import { FeaturedCarousel } from '@/components/FeaturedCarousel';
@@ -33,6 +34,7 @@ export default function HomeScreen() {
   const { user, isAuthenticated, showSignIn } = useAuth();
   const { watchlist, addToWatchlist, removeFromWatchlist } = useWatchlist(user?.id || null);
   const watchlistSet = useMemo(() => new Set(watchlist.map(w => w.show_id)), [watchlist]);
+  const ratingsMap = useMyRatingsMap(user?.id || null);
   const toggleWatchlist = useCallback(async (showId: string) => {
     if (!isAuthenticated) { showSignIn('watchlist'); return; }
     try {
@@ -180,9 +182,9 @@ export default function HomeScreen() {
 
   const renderItem = useCallback(({ item, index }: { item: Show; index: number }) => (
     <AnimatedListItem index={index}>
-      <ShowCard show={item} hideStatus isWatchlisted={watchlistSet.has(item.id)} onToggleWatchlist={() => toggleWatchlist(item.id)} />
+      <ShowCard show={item} hideStatus isWatchlisted={watchlistSet.has(item.id)} onToggleWatchlist={() => toggleWatchlist(item.id)} myRating={ratingsMap.get(item.id) ?? null} />
     </AnimatedListItem>
-  ), [watchlistSet, toggleWatchlist]);
+  ), [watchlistSet, toggleWatchlist, ratingsMap]);
 
   const handleProfilePress = useCallback(() => {
     router.push('/settings');
@@ -253,7 +255,7 @@ export default function HomeScreen() {
             {featuredRows.map((row, i) => (
               <View key={i}>
                 <Text style={styles.sectionTitle}>{row.title}</Text>
-                <FeaturedCarousel shows={row.shows} watchlistSet={watchlistSet} onToggleWatchlist={toggleWatchlist} getSubtitle={row.getSubtitle} />
+                <FeaturedCarousel shows={row.shows} watchlistSet={watchlistSet} onToggleWatchlist={toggleWatchlist} getSubtitle={row.getSubtitle} ratingsMap={ratingsMap} />
               </View>
             ))}
 
