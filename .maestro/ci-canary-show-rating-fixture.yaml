@@ -1,0 +1,20 @@
+# CI Canary — show-rating-fixture route liveness check
+# Fails fast (<2 min) if a __DEV__-only guard blocks /test/* fixture routes in
+# CI's Release build, instead of masquerading as N unrelated content-assertion
+# failures across every show-rating test (task #403: 4 full ~90min CI cycles
+# spent diagnosing this before the real cause — app/test/show-rating-fixture.tsx
+# gating on __DEV__, which xcodebuild -configuration Release sets to false).
+#
+# Kept at .maestro/ root (not under show-rating/) so the ".maestro/**/*.yaml"
+# glob used by the main test loop in maestro-e2e.yml (suite=all) doesn't match
+# it — same convention as ci-skip-onboarding.yaml. It only runs once, in its
+# own early step.
+
+appId: com.broadwayscorecard.app
+---
+- launchApp
+- openLink: broadwayscorecard://test/show-rating-fixture?state=empty
+- tapOn:
+    text: "Open"
+    optional: true
+- assertVisible: "TEST FIXTURE"

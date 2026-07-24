@@ -125,6 +125,13 @@ jobs:
           path: /tmp/app-screenshot.png
           retention-days: 3
 
+      - name: Fixture canary (fast __DEV__/env-gate check)
+        run: |
+          if ! maestro test .maestro/ci-canary-show-rating-fixture.yaml; then
+            echo "::error::show-rating-fixture route did not render — check __DEV__/EXPO_PUBLIC_DEV_AUTO_SIGNIN gating (task #432/#403)"
+            exit 1
+          fi
+
       - name: Run Maestro tests
         run: |
           case "${{ inputs.suite }}" in
