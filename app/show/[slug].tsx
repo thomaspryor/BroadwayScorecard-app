@@ -32,6 +32,7 @@ import { ShareCardWithRef, ShareCardHandle } from '@/components/ShareCard';
 import { ShowDetailSkeleton } from '@/components/Skeleton';
 import { useAuth } from '@/lib/auth-context';
 import { useWatchlist } from '@/hooks/useWatchlist';
+import { useMyRatingsMap } from '@/hooks/useMyRatingsMap';
 import { featureFlags } from '@/lib/feature-flags';
 
 interface SocialPulsePayload {
@@ -62,6 +63,7 @@ export default function ShowDetailScreen() {
   const show = useMemo(() => shows.find(s => s.slug === slug), [shows, slug]);
   const { user, isAuthenticated, showSignIn } = useAuth();
   const { isWatchlisted, addToWatchlist, removeFromWatchlist } = useWatchlist(user?.id || null);
+  const ratingsMap = useMyRatingsMap(user?.id || null);
 
   // Other Productions: same title, different ID (any status)
   const otherProductions = useMemo(() => {
@@ -286,6 +288,7 @@ export default function ShowDetailScreen() {
                       else await addToWatchlist(show.id);
                     } catch {}
                   }}
+                  myRating={ratingsMap.get(show.id) ?? null}
                 />
               )}
             </View>
