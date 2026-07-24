@@ -31,6 +31,7 @@ import Svg, { Path } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/lib/auth-context';
 import { useUserReviews } from '@/hooks/useUserReviews';
+import { useWatchlist } from '@/hooks/useWatchlist';
 import { useShows } from '@/lib/data-context';
 import { useToastSafe } from '@/lib/toast-context';
 import { supabaseRestInsert, supabaseRestUpdate } from '@/lib/supabase-rest';
@@ -55,6 +56,7 @@ export default function RateModal() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const { getReviewsForShow, invalidateCache } = useUserReviews(user?.id || null);
+  const { removeFromWatchlist } = useWatchlist(user?.id || null);
   const { shows } = useShows();
   const { showToast } = useToastSafe();
 
@@ -212,6 +214,9 @@ export default function RateModal() {
           date_seen: dateSeen || null,
         });
         if (error) throw new Error(error.message);
+        // Watchlist = want to see; a first rating means you've seen it
+        // (web parity, owner rule 2026-07-12). Best-effort — never block save.
+        await removeFromWatchlist(showId).catch(() => {});
       }
 
       // Success: invalidate cache FIRST, then navigate back
@@ -228,7 +233,7 @@ export default function RateModal() {
     } finally {
       setSaving(false);
     }
-  }, [canSave, currentRating, user, reviewId, reviewText, dateSeen, showId, invalidateCache, router, showToast]);
+  }, [canSave, currentRating, user, reviewId, reviewText, dateSeen, showId, invalidateCache, removeFromWatchlist, router, showToast]);
 
   // If showId is missing, bail
   if (!showId) {

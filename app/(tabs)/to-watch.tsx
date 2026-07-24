@@ -128,7 +128,7 @@ export default function ToWatchScreen() {
   );
 
   const loading = authLoading || watchlistLoading;
-  const today = new Date().toISOString().split('T')[0];
+  const today = toLocalYMD(new Date());
   const reviewedShowIds = useMemo(() => new Set(reviews.map(r => r.show_id)), [reviews]);
 
   // Split: upcoming (future planned dates), regular (no date or no planned date)
@@ -497,7 +497,6 @@ export default function ToWatchScreen() {
               mode="date"
               display={Platform.OS === 'ios' ? 'inline' : 'default'}
               onChange={handleDateChange}
-              minimumDate={new Date()}
               themeVariant="dark"
             />
           </View>

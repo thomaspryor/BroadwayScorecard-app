@@ -28,6 +28,7 @@ import { useUserReviews } from '@/hooks/useUserReviews';
 import { useWatchlist } from '@/hooks/useWatchlist';
 import { useShows } from '@/lib/data-context';
 import { getImageUrl } from '@/lib/images';
+import { toLocalYMD } from '@/lib/date-utils';
 import { featureFlags } from '@/lib/feature-flags';
 import StarRating from '@/components/user/StarRating';
 import MiniStars from '@/components/user/MiniStars';
@@ -146,7 +147,7 @@ export default function WatchedScreen() {
   }, [reviews, diarySort]);
 
   // To Be Rated — shows from watchlist where planned_date has passed but not yet rated
-  const today = new Date().toISOString().split('T')[0];
+  const today = toLocalYMD(new Date());
   const reviewedShowIds = useMemo(() => new Set(reviews.map(r => r.show_id)), [reviews]);
 
   const toBeRated = useMemo(() => {

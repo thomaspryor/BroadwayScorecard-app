@@ -168,10 +168,20 @@ export default function ListsTab({ userId, showMap, createTrigger }: ListsTabPro
 
   const handleRemoveShow = async (showId: string) => {
     if (!activeListId) return;
-    haptics.action();
-    await removeFromList(activeListId, showId);
-    trackShowRemovedFromList(activeListId, showId);
-    setListItems(prev => prev.filter(i => i.show_id !== showId));
+    const title = showMap[showId]?.title || 'this show';
+    Alert.alert('Remove from list', `Remove ${title} from this list?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Remove',
+        style: 'destructive',
+        onPress: async () => {
+          haptics.action();
+          await removeFromList(activeListId, showId);
+          trackShowRemovedFromList(activeListId, showId);
+          setListItems(prev => prev.filter(i => i.show_id !== showId));
+        },
+      },
+    ]);
   };
 
   const handleDragEnd = async (data: ListItem[]) => {

@@ -14,6 +14,7 @@ import { useFocusEffect } from 'expo-router';
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import Svg, { Path } from 'react-native-svg';
 import { useAuth } from '@/lib/auth-context';
+import { toLocalYMD } from '@/lib/date-utils';
 import { useUserReviews } from '@/hooks/useUserReviews';
 import { useWatchlist } from '@/hooks/useWatchlist';
 import { useToastSafe } from '@/lib/toast-context';
@@ -226,7 +227,7 @@ export default function ShowPageRating({
         // Android: picker dismisses on selection, save immediately
         setShowWatchlistDatePicker(false);
         if (selectedDate) {
-          const iso = selectedDate.toISOString().split('T')[0];
+          const iso = toLocalYMD(selectedDate);
           updatePlannedDate(showId, iso).catch(() => {
             showToast('Failed to save date.', 'error');
           });
@@ -416,7 +417,7 @@ export default function ShowPageRating({
               <View style={styles.datePickerHeader}>
                 <Text style={styles.datePickerTitle}>When are you going?</Text>
                 <Pressable onPress={() => {
-                  const iso = pendingWatchlistDate.toISOString().split('T')[0];
+                  const iso = toLocalYMD(pendingWatchlistDate);
                   updatePlannedDate(showId, iso).catch(() => {
                     showToast('Failed to save date.', 'error');
                   });
@@ -430,8 +431,7 @@ export default function ShowPageRating({
                 mode="date"
                 display={Platform.OS === 'ios' ? 'inline' : 'default'}
                 onChange={handleWatchlistDateChange}
-                minimumDate={new Date()}
-                themeVariant="dark"
+                  themeVariant="dark"
                 style={{ alignSelf: 'center' }}
               />
             </View>
