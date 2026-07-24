@@ -338,10 +338,19 @@ export default function WatchedScreen() {
               </Text>
             )}
           </View>
-          <View style={styles.cardRating}>
+          <Pressable
+            style={styles.cardRating}
+            onPress={() => router.push({
+              pathname: '/rate/[showId]' as any,
+              params: { showId: item.show_id, showTitle: title, reviewId: item.id },
+            })}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={`Edit your ${item.rating.toFixed(1)} star rating`}
+          >
             <StarRating rating={item.rating} onRatingChange={() => {}} size="sm" readOnly hideLabel />
             <Text style={styles.ratingText}>{item.rating.toFixed(1)}</Text>
-          </View>
+          </Pressable>
         </Pressable>
       </ReanimatedSwipeable>
     );
@@ -368,7 +377,16 @@ export default function WatchedScreen() {
             <Text style={styles.placeholderText}>{title.charAt(0)}</Text>
           </View>
         )}
-        <View style={styles.gridCardInfo}>
+        <Pressable
+          style={styles.gridCardInfo}
+          onPress={() => router.push({
+            pathname: '/rate/[showId]' as any,
+            params: { showId: item.show_id, showTitle: title, reviewId: item.id },
+          })}
+          hitSlop={6}
+          accessibilityRole="button"
+          accessibilityLabel={`Edit your rating for ${title}`}
+        >
           {item.rating > 0 && <MiniStars rating={item.rating} />}
           <Text style={styles.gridDateText}>
             {item.date_seen
@@ -377,7 +395,7 @@ export default function WatchedScreen() {
                 })
               : ' '}
           </Text>
-        </View>
+        </Pressable>
         <Text style={styles.gridTitle} numberOfLines={2}>{title}</Text>
       </Pressable>
     );

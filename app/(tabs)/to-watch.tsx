@@ -41,9 +41,8 @@ type WatchlistSort = 'added-desc' | 'alphabetical' | 'closing-soon';
 
 /**
  * Poster-corner status label (web parity: WatchlistCard bookabilityLabel).
- * Closing Soon wins over the raw status; upcoming shows say when they open.
- * ("Tix on sale" needs a ticketsOnSale field the mobile payload doesn't
- * carry yet — see parity notes.)
+ * Closing Soon wins over the raw status; upcoming shows say when they open,
+ * or "Tix on sale" once tickets are bookable.
  */
 function statusOverlay(show?: Show): { label: string; color: string } | null {
   if (!show) return null;
@@ -53,6 +52,9 @@ function statusOverlay(show?: Show): { label: string; color: string } | null {
   }
   if (show.status === 'open' || show.status === 'previews') return getStatusInfo(show.status);
   if (show.status === 'upcoming' || show.status === 'announced') {
+    if (show.ticketsOnSale) {
+      return { label: 'TIX ON SALE', color: Colors.status.open };
+    }
     if (show.openingDate) {
       const opens = new Date(show.openingDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
       return { label: `OPENS ${opens.toUpperCase()}`, color: getStatusInfo('upcoming').color };
@@ -430,7 +432,7 @@ export default function ToWatchScreen() {
               {sortedWatchlist.length > 0 && (
                 <View>
                   <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionTitle}>Watchlist</Text>
+                    <Text style={styles.sectionTitle}>Not Yet Booked</Text>
                     <Text style={styles.sectionCount}>{sortedWatchlist.length} shows</Text>
                   </View>
                   {viewMode === 'grid' ? (
@@ -478,6 +480,9 @@ export default function ToWatchScreen() {
           <View style={styles.datePickerCard}>
             <View style={styles.datePickerHeader}>
               <Text style={styles.datePickerTitle}>When are you going?</Text>
+              <Pressable onPress={() => setDatePickingShowId(null)} hitSlop={8}>
+                <Text style={styles.datePickerSkip}>Skip</Text>
+              </Pressable>
               <Pressable onPress={() => {
                 if (datePickingShowId) {
                   updatePlannedDate(datePickingShowId, toLocalYMD(pendingDate));
@@ -510,6 +515,10 @@ export default function ToWatchScreen() {
           try {
             await addToWatchlist(show.id);
             await getWatchlist();
+            // Web parity: prompt "when are you going?" right after adding
+            // instead of hiding the planned date behind a long-press.
+            setPendingDate(new Date());
+            setDatePickingShowId(show.id);
           } catch {
             // Hook sets error state
           }
@@ -614,6 +623,7 @@ const styles = StyleSheet.create({
   },
   datePickerTitle: { color: Colors.text.secondary, fontSize: FontSize.sm, fontWeight: '500' },
   datePickerDone: { color: Colors.brand, fontSize: FontSize.sm, fontWeight: '600' },
+  datePickerSkip: { color: Colors.text.muted, fontSize: FontSize.sm, fontWeight: '500', marginLeft: 'auto', marginRight: Spacing.lg },
   quickAddBar: {
     flexDirection: 'row', alignItems: 'center', gap: Spacing.sm,
     marginHorizontal: Spacing.lg, marginTop: Spacing.lg,
