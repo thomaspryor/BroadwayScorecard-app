@@ -185,7 +185,9 @@ export default function ShowRatingFixtureScreen() {
 
   // ─── Render ─────────────────────────────────────────
   // Production guard — after all hooks (React rules)
-  if (!__DEV__) return null;
+  // __DEV__ is false in CI's Release xcodebuild, so also allow the same
+  // CI-only opt-in flag auth-context.tsx already uses for dev-auto-signin.
+  if (!__DEV__ && process.env.EXPO_PUBLIC_DEV_AUTO_SIGNIN !== '1') return null;
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
