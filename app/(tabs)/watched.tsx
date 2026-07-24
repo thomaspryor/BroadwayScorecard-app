@@ -7,7 +7,7 @@
  * Not signed in: full-screen CTA with sign-in button.
  */
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -101,6 +101,19 @@ export default function WatchedScreen() {
   const [diarySort, setDiarySort] = useState<DiarySort>('date-desc');
   const [viewMode, setViewModeState] = useState<ViewMode>('grid');
   const [showSearchModal, setShowSearchModal] = useState(false);
+
+  // Guards nested-Pressable rows (card + its rating chip) against a rapid
+  // double-tap firing two router.push calls for the SAME row (e.g. a
+  // mis-slopped touch registering on both the card and the chip in quick
+  // succession). Keyed by row id so tapping a different row isn't blocked.
+  const lastNavAtRef = useRef<Map<string, number>>(new Map());
+  const guardedPush = useCallback((key: string, push: () => void) => {
+    const now = Date.now();
+    const last = lastNavAtRef.current.get(key) ?? 0;
+    if (now - last < 600) return;
+    lastNavAtRef.current.set(key, now);
+    push();
+  }, []);
 
   // Restore the user's last view mode (web parity — persisted, not reset per session).
   useEffect(() => {
@@ -320,7 +333,7 @@ export default function WatchedScreen() {
       >
         <Pressable
           style={({ pressed }) => [styles.card, styles.cardSwipeable, pressed && styles.pressed]}
-          onPress={() => show && router.push(`/show/${show.slug}`)}
+          onPress={() => show && guardedPush(item.id, () => router.push(`/show/${show.slug}`))}
           onLongPress={() => handleDeleteDiaryItem(item)}
         >
           {posterUrl ? (
@@ -344,11 +357,11 @@ export default function WatchedScreen() {
           </View>
           <Pressable
             style={styles.cardRating}
-            onPress={() => router.push({
+            onPress={() => guardedPush(item.id, () => router.push({
               pathname: '/rate/[showId]' as any,
               params: { showId: item.show_id, showTitle: title, reviewId: item.id },
-            })}
-            hitSlop={8}
+            }))}
+            hitSlop={{ top: 8, bottom: 8, right: 8, left: 2 }}
             accessibilityRole="button"
             accessibilityLabel={`Edit your ${item.rating.toFixed(1)} star rating`}
           >

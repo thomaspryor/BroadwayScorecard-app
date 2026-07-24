@@ -63,7 +63,7 @@ export default function RateModal() {
   const insets = useSafeAreaInsets();
   const { user, showSignIn } = useAuth();
   const { getReviewsForShow, deleteReview, invalidateCache } = useUserReviews(user?.id || null);
-  const { removeFromWatchlist } = useWatchlist(user?.id || null);
+  const { watchlist, getWatchlist, removeFromWatchlist } = useWatchlist(user?.id || null);
   const { shows } = useShows();
   const { showToast } = useToastSafe();
 
@@ -150,6 +150,15 @@ export default function RateModal() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reviewId, user, showId]);
 
+  // Refresh watchlist so the "Removed from watchlist" future-plan check
+  // (performSave, below) has current data even when this sheet was opened
+  // without another screen having already populated the shared cache
+  // (e.g. a cold deep link straight to the rate sheet).
+  useEffect(() => {
+    if (user) getWatchlist();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+
   // Computed values
   const charsRemaining = MAX_CHARS - reviewText.length;
   const isOverLimit = charsRemaining < 0;
@@ -215,13 +224,19 @@ export default function RateModal() {
       if (error) throw new Error(error.message);
       // Watchlist = want to see; a first rating means you've seen it
       // (web parity, owner rule 2026-07-12). Best-effort — never block save.
+      // A FUTURE-dated entry disappearing with no feedback reads as data loss
+      // on mobile, so surface a toast for that case only (past-dated/undated
+      // removals are the expected "marking it watched" flow, no toast needed).
+      const watchlistEntry = watchlist.find(w => w.show_id === showId);
+      const hadFuturePlan = !!watchlistEntry?.planned_date && watchlistEntry.planned_date >= toLocalYMD(new Date());
       await removeFromWatchlist(showId).catch(() => {});
+      if (hadFuturePlan) showToast('Removed from watchlist', 'success');
     }
     await invalidateCache();
     haptics.success();
     isDirty.current = false; // prevent discard alert
     recordRatingGiven();
-  }, [user, reviewId, showId, invalidateCache, removeFromWatchlist]);
+  }, [user, reviewId, showId, invalidateCache, removeFromWatchlist, watchlist, showToast]);
 
   const handleSave = useCallback(async () => {
     if (!canSave || currentRating === null) return;
