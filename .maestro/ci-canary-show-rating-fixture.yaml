@@ -17,4 +17,8 @@ appId: com.broadwayscorecard.app
 - tapOn:
     text: "Open"
     optional: true
-- assertVisible: "TEST FIXTURE"
+# ".*" suffix required: Maestro's text selector does a full regex match, not a
+# substring match, and the label's full text is "TEST FIXTURE — state: empty"
+# (verified via CI screen-hierarchy dump — the bare "TEST FIXTURE" selector
+# failed 100% of the time despite the text being genuinely on screen).
+- assertVisible: "TEST FIXTURE.*"
