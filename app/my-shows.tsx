@@ -31,7 +31,7 @@ import { useUserLists } from '@/hooks/useUserLists';
 import ListsTab from '@/components/user/ListsTab';
 import { useShows } from '@/lib/data-context';
 import { getImageUrl } from '@/lib/images';
-import { daysUntilDate, isClosingSoonDate } from '@/lib/date-utils';
+import { daysUntilDate, isClosingSoonDate, toLocalYMD } from '@/lib/date-utils';
 import { featureFlags } from '@/lib/feature-flags';
 import StarRating from '@/components/user/StarRating';
 import MiniStars from '@/components/user/MiniStars';
@@ -118,7 +118,7 @@ export default function MyShowsScreen() {
   }, [reviews, diarySort]);
 
   // Split watchlist into upcoming (planned_date >= today) and rest
-  const today = new Date().toISOString().split('T')[0];
+  const today = toLocalYMD(new Date());
   const reviewedShowIds = useMemo(() => new Set(reviews.map(r => r.show_id)), [reviews]);
 
   const { toBeRated, upcomingWatchlist, regularWatchlist } = useMemo(() => {
@@ -171,7 +171,7 @@ export default function MyShowsScreen() {
   const handleDateChange = useCallback((_event: unknown, selectedDate?: Date) => {
     if (Platform.OS === 'android') setDatePickingShowId(null);
     if (selectedDate && datePickingShowId) {
-      const isoDate = selectedDate.toISOString().split('T')[0];
+      const isoDate = toLocalYMD(selectedDate);
       updatePlannedDate(datePickingShowId, isoDate);
     }
   }, [datePickingShowId, updatePlannedDate]);
