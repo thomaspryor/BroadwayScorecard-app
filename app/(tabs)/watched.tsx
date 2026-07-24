@@ -198,7 +198,8 @@ export default function WatchedScreen() {
     const map: Record<string, UserReview[]> = {};
     for (const review of pastReviews) {
       const dateStr = review.date_seen;
-      const year = dateStr ? new Date(dateStr + 'T00:00:00').getFullYear().toString() : 'No date';
+      const parsedYear = dateStr ? new Date(dateStr + 'T00:00:00').getFullYear() : NaN;
+      const year = Number.isFinite(parsedYear) ? parsedYear.toString() : 'No date';
       if (!map[year]) map[year] = [];
       map[year].push(review);
     }

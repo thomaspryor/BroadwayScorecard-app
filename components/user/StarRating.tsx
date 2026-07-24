@@ -205,7 +205,7 @@ export default function StarRating({
         onResponderStart={handleTouchStart}
         onResponderMove={handleTouchMove}
         onResponderRelease={handleTouchEnd}
-        accessibilityRole={readOnly ? 'adjustable' : 'radiogroup'}
+        accessibilityRole={readOnly ? 'text' : 'radiogroup'}
         accessibilityLabel={readOnly ? `Rating: ${(rating ?? 0).toFixed(1)} out of 5 stars` : 'Rate this show'}
         hitSlop={readOnly ? undefined : 6}
       >

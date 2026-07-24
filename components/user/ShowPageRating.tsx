@@ -413,6 +413,7 @@ export default function ShowPageRating({
             <Link
               href="/(tabs)/lists"
               style={styles.membershipCaption}
+              numberOfLines={1}
             >
               Also on {listsWithShow.length === 1 ? firstListContainingShow.name : `${listsWithShow.length} of your lists`}
             </Link>
@@ -578,7 +579,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     textAlign: 'center',
     marginTop: 4,
-    maxWidth: 90,
+    maxWidth: 160,
   },
   watchlistDateCol: {
     alignItems: 'center',
