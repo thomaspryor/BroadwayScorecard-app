@@ -1,10 +1,46 @@
 name: Build iOS App
 on:
   workflow_dispatch:
+  schedule:
+    # Every 6h: auto-build TestFlight when main has user-visible drift vs the
+    # last production build (2026-07-24 build-54 incident: merged fixes sat
+    # undelivered because builds were manual-only). Gate: scripts/check-testflight-drift.js
+    - cron: '20 3,9,15,21 * * *'
+
+# Never cancel-in-progress: cancelling the GH job does NOT cancel the EAS build,
+# which would keep running and still auto-submit (web-repo cancel-cascade class).
+concurrency:
+  group: eas-build
+  cancel-in-progress: false
 
 jobs:
+  gate:
+    name: TestFlight drift gate
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    outputs:
+      should_build: ${{ steps.gate.outputs.should_build }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Decide whether TestFlight drifted
+        id: gate
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: node scripts/check-testflight-drift.js
+
   build:
     name: EAS Build (iOS)
+    needs: [gate]
+    if: ${{ !cancelled() && (github.event_name == 'workflow_dispatch' || needs.gate.outputs.should_build == 'true') }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
