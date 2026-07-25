@@ -829,8 +829,9 @@ const styles = StyleSheet.create({
   // Cards (list view)
   card: {
     flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: Spacing.lg, paddingVertical: Spacing.sm,
+    paddingHorizontal: 0, paddingVertical: Spacing.sm,
     gap: Spacing.md,
+    borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: Colors.border.subtle,
   },
   cardSwipeable: { backgroundColor: Colors.surface.default },
   cardPoster: {
@@ -852,7 +853,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm,
   },
   gridDateText: { color: Colors.text.muted, fontSize: 12, marginTop: 2 },
-  gridCard: { flex: 1, alignItems: 'center' },
   // Fixed-width card for the flexWrap sections (Upcoming/Past-by-year) — a
   // flex:1 card inside flexWrap stretches unevenly on partial rows, so these
   // use the same fixed-percentage convention as the To Watch tab's grid.

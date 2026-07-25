@@ -39,7 +39,7 @@ export const BookmarkOverlay = memo(function BookmarkOverlay({ isWatchlisted, on
     <Pressable
       style={styles.container}
       onPress={handlePress}
-      hitSlop={8}
+      hitSlop={10}
       testID="bookmark-overlay"
       accessibilityLabel={isWatchlisted ? 'Remove from watchlist' : 'Add to watchlist'}
     >

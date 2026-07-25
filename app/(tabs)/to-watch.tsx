@@ -584,8 +584,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6, paddingVertical: 2,
     borderRadius: 6, borderWidth: 1,
   },
-  statusPillText: { fontSize: 9, fontWeight: '700', letterSpacing: 0.5 },
-  listStatus: { fontSize: 10, fontWeight: '600', marginTop: 2, letterSpacing: 0.4 },
+  statusPillText: { fontSize: 12, fontWeight: '600', letterSpacing: 0.3 },
+  listStatus: { fontSize: 12, fontWeight: '600', marginTop: 2, letterSpacing: 0.3 },
   gridTitle: {
     color: Colors.text.secondary, fontSize: 12, fontWeight: '500',
     textAlign: 'center', lineHeight: 15, marginTop: 2,

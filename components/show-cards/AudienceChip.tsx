@@ -5,7 +5,7 @@
 
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { FontSize, BorderRadius, Spacing } from '@/constants/theme';
+import { FontSize, BorderRadius } from '@/constants/theme';
 
 interface AudienceChipProps {
   grade: string;

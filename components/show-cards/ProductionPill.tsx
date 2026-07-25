@@ -35,7 +35,7 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
   },
   label: {
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: '600',
     letterSpacing: 0.4,
   },

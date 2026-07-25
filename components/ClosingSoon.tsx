@@ -68,7 +68,7 @@ export function ClosingSoon({ shows }: ClosingSoonProps) {
             >
               {/* Poster + overlays (wrapper so absolute overlays anchor to the
                   image, not the whole card) */}
-              <View>
+              <View style={styles.posterWrap}>
                 {posterUrl ? (
                   <Image source={{ uri: posterUrl }} style={styles.poster} contentFit="cover" transition={200} />
                 ) : (
@@ -93,7 +93,7 @@ export function ClosingSoon({ shows }: ClosingSoonProps) {
               <View style={styles.cardInfo}>
                 <Text style={styles.cardTitle} numberOfLines={2}>{show.title}</Text>
                 {show.closingDate && (
-                  <Text style={[styles.closingDate, { color: urgencyColor }]}>
+                  <Text style={styles.closingDate}>
                     Closes {new Date(show.closingDate + 'T12:00:00').toLocaleDateString('en-US', {
                       month: 'short', day: 'numeric',
                     })}
@@ -140,6 +140,9 @@ const styles = StyleSheet.create({
   pressed: {
     opacity: 0.7,
   },
+  posterWrap: {
+    width: 140,
+  },
   poster: {
     width: 140,
     height: 200,
@@ -184,6 +187,7 @@ const styles = StyleSheet.create({
     right: Spacing.sm,
   },
   closingDate: {
+    color: Colors.text.muted,
     fontSize: FontSize.xs,
     fontWeight: '500',
   },
