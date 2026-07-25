@@ -408,11 +408,13 @@ export default function ImportScreen() {
       checkpoint.processedCount = i + 1;
       checkpoint.stats = stats;
       setImportProgress({ done: checkpoint.processedCount, total: checkpoint.plans.length });
-      // Persist every 5 rows — durable enough to survive a kill without
-      // making every single insert wait on an AsyncStorage round-trip.
-      if (checkpoint.processedCount % 5 === 0 || checkpoint.processedCount === checkpoint.plans.length) {
-        await AsyncStorage.setItem(CHECKPOINT_KEY(user!.id), JSON.stringify(checkpoint)).catch(() => {});
-      }
+      // Persist after every row. The `reviews` table intentionally has no
+      // unique constraint (multiple viewings per show are allowed), so a
+      // kill between persists would replay already-inserted review rows on
+      // resume as genuine duplicates instead of hitting 23505 — confirmed
+      // live (task #436): rows landed in Supabase but re-inserted on resume.
+      // Watchlist has a DB constraint and self-heals via 23505 either way.
+      await AsyncStorage.setItem(CHECKPOINT_KEY(user!.id), JSON.stringify(checkpoint)).catch(() => {});
     }
 
     setImportStats(stats);

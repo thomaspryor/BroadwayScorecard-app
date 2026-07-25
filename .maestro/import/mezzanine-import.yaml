@@ -1,0 +1,69 @@
+# My Shows Import — Real Mezzanine JSON file, end-to-end (task #436)
+# Drives the actual document-picker + file-parse + match + bulk-insert path,
+# not just "the screen renders". Requires a local HTTP server serving
+# .maestro/fixtures/mezzanine-import.json with a Content-Disposition:
+# attachment header on http://localhost:8931/ — a raw filesystem copy into
+# the simulator's Downloads folder is NOT picked up by the document picker;
+# only a real Safari-initiated download registers it (see maestro-e2e.yml).
+# Fixture is deliberately small + stable against the shared dev-test account:
+#   - Titanique: real, matched, rated → inserted into reviews, then deleted
+#     by the workflow's cleanup step (reviews has no unique constraint, so
+#     repeat CI runs would otherwise pile up duplicate rows forever).
+#   - Zorbatron: A New Musical: fake title → always unmatched.
+#   - Buena Vista Social Club: real, but already a permanent seed row in
+#     dev-test's watchlist → always skipped as "already in your shows",
+#     no cleanup needed (watchlist DOES have a DB unique constraint).
+
+appId: com.broadwayscorecard.app
+---
+- launchApp
+- openLink: broadwayscorecard:///import
+- tapOn:
+    text: "Open"
+    optional: true
+- assertVisible: "Import your shows"
+- tapOn: "Choose JSON File"
+- extendedWaitUntil:
+    visible: "Browse"
+    timeout: 10000
+- tapOn: "Browse"
+- extendedWaitUntil:
+    visible: "On My iPhone"
+    timeout: 10000
+- tapOn: "On My iPhone"
+- extendedWaitUntil:
+    visible: "Downloads"
+    timeout: 10000
+- tapOn: "Downloads"
+# Fresh CI install → Downloads has exactly this one fixture file. The first
+# tap on a grid cell sometimes only highlights it instead of opening it
+# (observed live, not consistently reproducible) — a second tap at the same
+# point is a safe no-op once Review Import is already showing, since that
+# point lands on plain summary text there, not a checkbox row.
+- tapOn:
+    point: "71,306"
+- tapOn:
+    point: "71,306"
+    optional: true
+- extendedWaitUntil:
+    visible: "Review Import"
+    timeout: 20000
+
+# Real parse + real matchShow() ran — verify the three outcomes:
+- assertVisible: "1 not on Broadway Scorecard"
+- assertVisible: "Diary — 1 of 1 selected"
+- assertVisible: "Watchlist — 0 of 1 selected"
+# Each row is one composite accessibility element (checkbox + title + rating
+# + context all joined) — assertVisible requires a full match, so substring
+# selectors need a wildcard (see .maestro/README.md).
+- assertVisible: ".*Titanique.*"
+- assertVisible: ".*Zorbatron: A New Musical.*"
+- assertVisible: ".*Buena Vista Social Club.*"
+
+# Real bulk insert against Supabase.
+- tapOn: "Import 1 Show"
+- extendedWaitUntil:
+    visible: "Import Complete"
+    timeout: 20000
+- assertVisible: "1 shows imported"
+- assertVisible: "Not imported — 1 show we couldn't find"
