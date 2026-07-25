@@ -5,7 +5,7 @@
 
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { FontSize, BorderRadius } from '@/constants/theme';
+import { BorderRadius } from '@/constants/theme';
 
 interface ProductionPillProps {
   isRevival: boolean;
