@@ -30,11 +30,19 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: npm
+
+      - name: Install dependencies (pins eas-cli to package.json version)
+        run: npm ci
+
+      - name: Unit-test gate logic
+        run: node --test scripts/check-testflight-drift.test.mjs
 
       - name: Decide whether TestFlight drifted
         id: gate
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          TESTFLIGHT_GATE_DISABLED: ${{ vars.TESTFLIGHT_GATE_DISABLED }}
         run: node scripts/check-testflight-drift.js
 
   build:
