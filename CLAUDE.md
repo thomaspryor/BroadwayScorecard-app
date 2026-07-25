@@ -98,7 +98,7 @@ The source web project lives at: `~/Broadwayscore/` (repo: `thomaspryor/Broadway
 
 ## Deployment (EAS Build)
 - **Dev:** `npx expo start` → Expo Go on iPhone
-- **TestFlight:** EAS Build → TestFlight (automated via GitHub Actions)
+- **TestFlight:** NOT automatic. Merging to main ships NOTHING — `eas-build.yml` is `workflow_dispatch`-only. After merging user-visible work, run `gh workflow run eas-build.yml --ref main` (production build, autoIncrement, --auto-submit to TestFlight) and verify with `npx eas-cli build:list` that the new production build FINISHED. A session ending "merged + pushed" without dispatching this left the owner on a stale build (2026-07-24, build 54).
 - **App Store:** EAS Submit (future)
 
 ## File Hygiene
