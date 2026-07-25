@@ -58,10 +58,10 @@ export const BookmarkOverlay = memo(function BookmarkOverlay({ isWatchlisted, on
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-    top: 0,
-    right: 0,
+    top: 1,
+    right: 1,
     zIndex: 10,
-    padding: 6,
+    padding: 3,
     // Drop shadow for visibility on any poster
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },

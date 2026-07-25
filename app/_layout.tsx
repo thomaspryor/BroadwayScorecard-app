@@ -183,6 +183,9 @@ function RootLayout() {
       screenOptions={{
         animation: 'slide_from_right',
         animationDuration: 250,
+        // Pushed screens otherwise inherit the previous ROUTE name as the back
+        // label — Settings showed "(tabs)" (beta feedback 2026-07-25).
+        headerBackTitle: 'Back',
       }}
     >
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />

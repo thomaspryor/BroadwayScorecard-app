@@ -25,8 +25,8 @@ const styles = StyleSheet.create({
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 2,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
     borderRadius: BorderRadius.pill,
     alignSelf: 'flex-start',
   },
@@ -36,7 +36,7 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   grade: {
-    fontSize: FontSize.xs,
-    fontWeight: '600',
+    fontSize: FontSize.sm,
+    fontWeight: '700',
   },
 });

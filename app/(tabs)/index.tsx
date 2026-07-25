@@ -63,8 +63,12 @@ export default function HomeScreen() {
     const rows: { title: string; shows: Show[]; getSubtitle?: (show: Show) => string | undefined }[] = [];
     const now = new Date();
     const shortDate = (d: string) => {
-      try { return new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); }
-      catch { return null; }
+      // new Date('T12:00:00') doesn't throw — it yields Invalid Date, whose
+      // toLocaleDateString is the literal string "Invalid Date" (beta feedback
+      // 2026-07-25: "Opens Invalid Date" on the Starting Soon shelf).
+      const parsed = new Date(d + 'T12:00:00');
+      if (isNaN(parsed.getTime())) return null;
+      return parsed.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     };
     const isOpen = (s: Show) => s.status === 'open' || s.status === 'previews';
     const byScore = (a: Show, b: Show) => (b.compositeScore ?? 0) - (a.compositeScore ?? 0);

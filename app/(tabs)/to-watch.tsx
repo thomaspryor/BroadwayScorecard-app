@@ -17,7 +17,6 @@ import {
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Image } from 'expo-image';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
@@ -182,16 +181,6 @@ export default function ToWatchScreen() {
     }
   }, [removeFromWatchlist]);
 
-  const handleRateFromWatchlist = useCallback((item: WatchlistEntry, stars: number) => {
-    const show = showMap[item.show_id];
-    const title = show?.title || item.show_id;
-    haptics.tap();
-    router.push({
-      pathname: '/rate/[showId]' as any,
-      params: { showId: item.show_id, showTitle: title, initialRating: String(stars) },
-    });
-  }, [showMap, router]);
-
   const showWatchlistActionSheet = useCallback((item: WatchlistEntry, title: string) => {
     Alert.alert(title, undefined, [
       { text: 'Set date', onPress: () => { setPendingDate(new Date()); setDatePickingShowId(item.show_id); } },
@@ -286,7 +275,10 @@ export default function ToWatchScreen() {
             <Text style={styles.placeholderText}>{title.charAt(0)}</Text>
           </View>
         )}
-        <StatusOverlayPill show={show} />
+        {/* No status pill here — these are booked (beta feedback 2026-07-25:
+            "TIX ON SALE on the Upcoming shelf" is noise once you have tickets).
+            Name above date, matching web. */}
+        <Text style={styles.gridTitle} numberOfLines={2}>{title}</Text>
         {item.planned_date && (
           <Text style={styles.posterDate}>
             {new Date(item.planned_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
@@ -295,7 +287,6 @@ export default function ToWatchScreen() {
             )}
           </Text>
         )}
-        <Text style={styles.gridTitle} numberOfLines={2}>{title}</Text>
       </Pressable>
     );
   };
@@ -321,30 +312,8 @@ export default function ToWatchScreen() {
               </View>
             )}
             <StatusOverlayPill show={show} />
-            {/* Rate strip — five tappable stars anchored to the poster bottom
-                (web parity: MyShowsClient.tsx watchlist rate strip). Deep-links
-                straight to the rate sheet with the tapped star pre-filled. */}
-            <LinearGradient
-              colors={['transparent', 'rgba(0,0,0,0.85)']}
-              style={styles.rateStrip}
-              pointerEvents="box-none"
-            >
-              <View style={styles.rateStripStars}>
-                {[1, 2, 3, 4, 5].map(i => (
-                  <Pressable
-                    key={i}
-                    onPress={() => handleRateFromWatchlist(item, i)}
-                    hitSlop={2}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Rate ${i} star${i !== 1 ? 's' : ''}`}
-                  >
-                    <Svg width={13} height={13} viewBox="0 0 24 24" fill="none">
-                      <Path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill="none" stroke="#FFD700" strokeWidth={1.5} strokeLinejoin="round" />
-                    </Svg>
-                  </Pressable>
-                ))}
-              </View>
-            </LinearGradient>
+            {/* No persistent empty-star strip (beta feedback 2026-07-25) —
+                rating lives on the show page / long-press action sheet. */}
           </View>
           <Text style={styles.gridTitle} numberOfLines={2}>{title}</Text>
         </Pressable>
@@ -608,18 +577,15 @@ const styles = StyleSheet.create({
   cardPosterPlaceholder: { alignItems: 'center', justifyContent: 'center' },
   placeholderText: { color: Colors.text.muted, fontSize: 18, fontWeight: '600' },
   posterDate: { color: Colors.text.secondary, fontSize: 12, fontWeight: '500', textAlign: 'center', marginTop: 4 },
+  // Compact web-style pill (beta feedback 2026-07-25: the old 12pt chunky
+  // labels spanned nearly the whole poster width and "looked bad vs web").
   statusPill: {
-    position: 'absolute', top: 4, left: 4, zIndex: 10,
-    paddingHorizontal: 5, paddingVertical: 1,
-    borderRadius: 4, borderWidth: 1,
+    position: 'absolute', top: 5, left: 5, zIndex: 10,
+    paddingHorizontal: 6, paddingVertical: 2,
+    borderRadius: 6, borderWidth: 1,
   },
-  statusPillText: { fontSize: 12, fontWeight: '700', letterSpacing: 0.3 },
-  listStatus: { fontSize: 12, fontWeight: '600', marginTop: 2, letterSpacing: 0.3 },
-  rateStrip: {
-    position: 'absolute', left: 0, right: 0, bottom: 0,
-    alignItems: 'center', paddingTop: 14, paddingBottom: 4,
-  },
-  rateStripStars: { flexDirection: 'row', gap: 1 },
+  statusPillText: { fontSize: 9, fontWeight: '700', letterSpacing: 0.5 },
+  listStatus: { fontSize: 10, fontWeight: '600', marginTop: 2, letterSpacing: 0.4 },
   gridTitle: {
     color: Colors.text.secondary, fontSize: 12, fontWeight: '500',
     textAlign: 'center', lineHeight: 15, marginTop: 2,

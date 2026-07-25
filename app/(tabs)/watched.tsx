@@ -418,15 +418,17 @@ export default function WatchedScreen() {
           accessibilityLabel={`Edit your rating for ${title}`}
         >
           {item.rating > 0 && <MiniStars rating={item.rating} />}
-          <Text style={styles.gridDateText}>
-            {item.date_seen
-              ? new Date(item.date_seen + 'T00:00:00').toLocaleDateString('en-US', {
-                  month: 'short', day: 'numeric', year: 'numeric',
-                })
-              : ' '}
-          </Text>
         </Pressable>
+        {/* Name above date (beta feedback 2026-07-25: date sat between image
+            and name; web order is name → date) */}
         <Text style={styles.gridTitle} numberOfLines={2}>{title}</Text>
+        <Text style={styles.gridDateText}>
+          {item.date_seen
+            ? new Date(item.date_seen + 'T00:00:00').toLocaleDateString('en-US', {
+                month: 'short', day: 'numeric', year: 'numeric',
+              })
+            : ' '}
+        </Text>
       </Pressable>
     );
   };
@@ -442,28 +444,30 @@ export default function WatchedScreen() {
       ? new Date(entry.planned_date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
       : null;
 
+    // Same row anatomy as the rated diary rows (beta feedback 2026-07-25:
+    // Upcoming rows had their own boxed format — inconsistent with the list).
     return (
       <Pressable
         key={entry.id}
-        style={({ pressed }) => [styles.upcomingRow, pressed && styles.pressed]}
+        style={({ pressed }) => [styles.card, pressed && styles.pressed]}
         onPress={() => show && router.push(`/show/${show.slug}`)}
         onLongPress={() => handleRemoveUpcoming(entry)}
       >
         {posterUrl ? (
-          <Image source={{ uri: posterUrl }} style={styles.upcomingPoster} contentFit="cover" transition={200} />
+          <Image source={{ uri: posterUrl }} style={styles.cardPoster} contentFit="cover" transition={200} />
         ) : (
-          <View style={[styles.upcomingPoster, styles.cardPosterPlaceholder]}>
+          <View style={[styles.cardPoster, styles.cardPosterPlaceholder]}>
             <Text style={styles.placeholderText}>{title.charAt(0)}</Text>
           </View>
         )}
         <View style={styles.cardInfo}>
           <Text style={styles.cardTitle} numberOfLines={1}>{title}</Text>
           {show?.venue && <Text style={styles.cardVenue} numberOfLines={1}>{show.venue}</Text>}
-        </View>
-        <View style={styles.upcomingDateCol}>
-          {formattedDate && <Text style={styles.upcomingDateText}>{formattedDate}</Text>}
-          {daysUntil !== null && daysUntil > 0 && (
-            <Text style={styles.upcomingDaysText}>{daysUntil === 1 ? 'Tomorrow' : `${daysUntil}d`}</Text>
+          {formattedDate && (
+            <Text style={styles.upcomingDateText}>
+              {formattedDate}
+              {daysUntil !== null && daysUntil > 0 && (daysUntil === 1 ? ' · Tomorrow' : ` · ${daysUntil}d`)}
+            </Text>
           )}
         </View>
         <Pressable onPress={() => handleRemoveUpcoming(entry)} hitSlop={10} accessibilityRole="button" accessibilityLabel={`Remove ${title} from watchlist`}>
@@ -497,7 +501,7 @@ export default function WatchedScreen() {
               return (
                 <Pressable
                   key={item.id}
-                  style={({ pressed }) => [styles.gridCard, pressed && styles.pressed]}
+                  style={({ pressed }) => [styles.gridCardFixed, pressed && styles.pressed]}
                   onPress={() => show && router.push({
                     pathname: '/rate/[showId]' as any,
                     params: { showId: item.show_id, showTitle: title, suggestedDate: item.planned_date || '' },
@@ -510,12 +514,12 @@ export default function WatchedScreen() {
                       <Text style={styles.placeholderText}>{title.charAt(0)}</Text>
                     </View>
                   )}
+                  <Text style={styles.gridTitle} numberOfLines={2}>{title}</Text>
                   <Text style={styles.toBeRatedPosterDate}>
                     {item.planned_date ? new Date(item.planned_date + 'T00:00:00').toLocaleDateString('en-US', {
                       month: 'short', day: 'numeric',
                     }) : 'Rate'}
                   </Text>
-                  <Text style={styles.gridTitle} numberOfLines={2}>{title}</Text>
                 </Pressable>
               );
             })}
@@ -544,7 +548,7 @@ export default function WatchedScreen() {
                 return (
                   <Pressable
                     key={entry.id}
-                    style={({ pressed }) => [styles.gridCard, pressed && styles.pressed]}
+                    style={({ pressed }) => [styles.gridCardFixed, pressed && styles.pressed]}
                     onPress={() => show && router.push(`/show/${show.slug}`)}
                     onLongPress={() => handleRemoveUpcoming(entry)}
                   >
@@ -555,15 +559,15 @@ export default function WatchedScreen() {
                         <Text style={styles.placeholderText}>{title.charAt(0)}</Text>
                       </View>
                     )}
-                    {formattedDate && <Text style={styles.toBeRatedPosterDate}>{formattedDate}</Text>}
                     <Text style={styles.gridTitle} numberOfLines={2}>{title}</Text>
+                    {formattedDate && <Text style={styles.toBeRatedPosterDate}>{formattedDate}</Text>}
                   </Pressable>
                 );
               })}
               {upcomingReviews.map(renderDiaryGridCard)}
             </View>
           ) : (
-            <View style={{ gap: Spacing.sm, paddingHorizontal: Spacing.lg }}>
+            <View style={{ gap: Spacing.xs, paddingHorizontal: 0 }}>
               {upcomingWatchlistEntries.map(renderUpcomingRow)}
               {upcomingReviews.map(renderDiaryListRow)}
             </View>
@@ -662,8 +666,10 @@ export default function WatchedScreen() {
             accessibilityLabel="Import shows from Show Score or Mezzanine"
             testID="import-shows-button"
           >
+            {/* Arrow INTO the tray (import), not the share-out icon (beta
+                feedback 2026-07-25: share icon implied exporting) */}
             <Svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke={Colors.text.secondary} strokeWidth={2}>
-              <Path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+              <Path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
             </Svg>
           </Pressable>
           <Pressable
@@ -784,24 +790,20 @@ const styles = StyleSheet.create({
   viewToggleActive: {
     backgroundColor: 'rgba(255,255,255,0.1)',
   },
-  // Section headers (Upcoming / year groups / All Rated)
+  // Section headers (Upcoming / year groups / All Rated) — full-width bands so
+  // year boundaries read at a glance (beta feedback 2026-07-25).
   sectionHeaderRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: Spacing.lg, marginBottom: Spacing.sm,
+    marginHorizontal: -Spacing.lg,
+    paddingHorizontal: Spacing.lg, paddingVertical: 8,
+    marginBottom: Spacing.sm,
+    backgroundColor: Colors.surface.raised,
+    borderTopWidth: 1, borderBottomWidth: 1, borderColor: Colors.border.subtle,
   },
-  sectionLabel: { color: Colors.text.muted, fontSize: 12, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase' },
+  sectionLabel: { color: Colors.text.primary, fontSize: 13, fontWeight: '700', letterSpacing: 0.6, textTransform: 'uppercase' },
   sectionCount: { color: Colors.text.muted, fontSize: 12 },
   upcomingSection: { marginBottom: Spacing.xl },
-  // Upcoming list row
-  upcomingRow: {
-    flexDirection: 'row', alignItems: 'center', gap: Spacing.md,
-    paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm,
-    backgroundColor: Colors.surface.overlay, borderRadius: BorderRadius.md,
-  },
-  upcomingPoster: { width: 48, height: 48, borderRadius: BorderRadius.sm, backgroundColor: Colors.surface.raised },
-  upcomingDateCol: { alignItems: 'flex-end' },
   upcomingDateText: { color: '#fcd34d', fontSize: FontSize.xs, fontWeight: '600' },
-  upcomingDaysText: { color: Colors.text.muted, fontSize: 12, marginTop: 1 },
   // To Be Rated
   toBeRatedSection: {
     backgroundColor: 'rgba(245, 158, 11, 0.06)',

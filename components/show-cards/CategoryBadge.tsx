@@ -29,15 +29,15 @@ export function CategoryBadge({ category }: CategoryBadgeProps) {
 
 const styles = StyleSheet.create({
   pill: {
-    paddingHorizontal: 10,
-    paddingVertical: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
     borderRadius: BorderRadius.pill,
     borderWidth: 1,
     alignSelf: 'flex-start',
   },
   label: {
-    fontSize: FontSize.xs,
+    fontSize: 10,
     fontWeight: '600',
-    letterSpacing: 0.5,
+    letterSpacing: 0.4,
   },
 });

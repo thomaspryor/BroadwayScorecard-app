@@ -66,33 +66,39 @@ export function ClosingSoon({ shows }: ClosingSoonProps) {
               style={({ pressed }) => [styles.card, pressed && styles.pressed]}
               onPress={() => router.push(`/show/${show.slug}`)}
             >
-              {/* Poster */}
-              {posterUrl ? (
-                <Image source={{ uri: posterUrl }} style={styles.poster} contentFit="cover" transition={200} />
-              ) : (
-                <View style={[styles.poster, styles.posterPlaceholder]}>
-                  <Text style={styles.posterInitial}>{show.title.charAt(0)}</Text>
-                </View>
-              )}
+              {/* Poster + overlays (wrapper so absolute overlays anchor to the
+                  image, not the whole card) */}
+              <View>
+                {posterUrl ? (
+                  <Image source={{ uri: posterUrl }} style={styles.poster} contentFit="cover" transition={200} />
+                ) : (
+                  <View style={[styles.poster, styles.posterPlaceholder]}>
+                    <Text style={styles.posterInitial}>{show.title.charAt(0)}</Text>
+                  </View>
+                )}
 
-              {/* Countdown badge overlaid on poster */}
-              <View style={[styles.countdownBadge, { backgroundColor: urgencyColor }]}>
-                <Text style={styles.countdownText}>{formatCountdown(days)}</Text>
+                {/* Countdown badge overlaid on poster */}
+                <View style={[styles.countdownBadge, { backgroundColor: urgencyColor }]}>
+                  <Text style={styles.countdownText}>{formatCountdown(days)}</Text>
+                </View>
+
+                {/* Score badge overlaid on the poster like every other shelf
+                    (beta feedback 2026-07-25: it sat below the image here) */}
+                <View style={styles.scoreOverlay}>
+                  <ScoreBadge score={show.compositeScore} category={show.category} size="small" />
+                </View>
               </View>
 
-              {/* Title + score */}
+              {/* Title + closing date */}
               <View style={styles.cardInfo}>
                 <Text style={styles.cardTitle} numberOfLines={2}>{show.title}</Text>
-                <View style={styles.scoreRow}>
-                  <ScoreBadge score={show.compositeScore} category={show.category} size="small" />
-                  {show.closingDate && (
-                    <Text style={[styles.closingDate, { color: urgencyColor }]}>
-                      {new Date(show.closingDate + 'T12:00:00').toLocaleDateString('en-US', {
-                        month: 'short', day: 'numeric',
-                      })}
-                    </Text>
-                  )}
-                </View>
+                {show.closingDate && (
+                  <Text style={[styles.closingDate, { color: urgencyColor }]}>
+                    Closes {new Date(show.closingDate + 'T12:00:00').toLocaleDateString('en-US', {
+                      month: 'short', day: 'numeric',
+                    })}
+                  </Text>
+                )}
               </View>
             </Pressable>
           );
@@ -172,10 +178,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     lineHeight: 18,
   },
-  scoreRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+  scoreOverlay: {
+    position: 'absolute',
+    bottom: Spacing.sm,
+    right: Spacing.sm,
   },
   closingDate: {
     fontSize: FontSize.xs,

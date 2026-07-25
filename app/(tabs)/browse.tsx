@@ -283,6 +283,20 @@ export default function BrowseScreen() {
             {/* Type + Sort + OB toggle */}
             {!searchResults && <View style={styles.filterRowInline}>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterGroup}>
+                {/* Market-scope toggle FIRST so it's visible without scrolling
+                    (beta feedback 2026-07-25: owner couldn't find Off-Bway —
+                    it was stranded past the sort pills at the scroll end). */}
+                {market === 'nyc' && (
+                  <>
+                    <FilterPill
+                      label="Off-Bway"
+                      active={includeOB}
+                      onPress={handleOBToggle}
+                      color="#14b8a6"
+                    />
+                    <View style={styles.sortDivider} />
+                  </>
+                )}
                 {TYPE_OPTIONS.map(opt => (
                   <FilterPill
                     key={opt.key}
@@ -300,17 +314,6 @@ export default function BrowseScreen() {
                     onPress={() => handleSortChange(opt.key)}
                   />
                 ))}
-                {market === 'nyc' && (
-                  <>
-                    <View style={styles.sortDivider} />
-                    <FilterPill
-                      label="Off-Bway"
-                      active={includeOB}
-                      onPress={handleOBToggle}
-                      color="#14b8a6"
-                    />
-                  </>
-                )}
               </ScrollView>
             </View>}
           </View>
