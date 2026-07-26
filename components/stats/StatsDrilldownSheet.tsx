@@ -96,7 +96,12 @@ export function StatsDrilldownSheet({
     const subtitle =
       item.kind === 'review'
         ? [show?.venue, formatDate(item.review.date_seen)].filter(Boolean).join(' · ')
-        : [show?.venue, show?.status === 'previews' ? 'In previews' : 'Now playing']
+        : [
+            show?.venue,
+            // Only claim a live status the show actually has — build 61 told
+            // users Memphis was "Now playing" at the Shubert (closed 2012).
+            show?.status === 'previews' ? 'In previews' : show?.status === 'open' ? 'Now playing' : 'Closed',
+          ]
             .filter(Boolean)
             .join(' · ');
 

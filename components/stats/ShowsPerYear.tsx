@@ -52,7 +52,27 @@ export function ShowsPerYear({ bundle, scope, onSelectYear, onOpenMonth, onOpenR
   const byMonths = scope.kind !== 'all';
   const bars = useMemo(() => {
     if (byMonths) {
-      return diary.byMonth.map((b) => ({
+      // Pad to the scope's full month range (capped at the current month for
+      // in-progress scopes) — byMonth only spans logged months, so a 2024
+      // scope opened at "J J A S O N D" with Jan–May silently missing.
+      const counts = new Map(diary.byMonth.map((b) => [b.month, b.count]));
+      const now = new Date();
+      const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+      const firstKey = scope.start?.slice(0, 7) ?? diary.byMonth[0]?.month;
+      let lastKey = scope.end?.slice(0, 7) ?? diary.byMonth[diary.byMonth.length - 1]?.month;
+      if (scope.inProgress && lastKey && lastKey > thisMonth) lastKey = thisMonth;
+      const months: { month: string; count: number }[] = [];
+      if (firstKey && lastKey && firstKey <= lastKey) {
+        let [y, m] = firstKey.split('-').map(Number);
+        for (let i = 0; i < 15 && `${y}-${String(m).padStart(2, '0')}` <= lastKey; i++) {
+          const key = `${y}-${String(m).padStart(2, '0')}`;
+          months.push({ month: key, count: counts.get(key) ?? 0 });
+          m += 1;
+          if (m > 12) { m = 1; y += 1; }
+        }
+      }
+      const src = months.length > 0 ? months : diary.byMonth;
+      return src.map((b) => ({
         key: b.month,
         count: b.count,
         label: shortMonth(b.month),
@@ -72,7 +92,7 @@ export function ShowsPerYear({ bundle, scope, onSelectYear, onOpenMonth, onOpenR
           ? `${b.year}: ${b.count} ${b.count === 1 ? 'show' : 'shows'}. Scopes to ${b.year}.`
           : `${b.year}: no shows logged.`,
     }));
-  }, [byMonths, diary.byMonth, diary.byYear, onOpenMonth, onSelectYear]);
+  }, [byMonths, diary.byMonth, diary.byYear, onOpenMonth, onSelectYear, scope]);
 
   const max = bars.reduce((m, b) => Math.max(m, b.count), 0);
   const peak = bars.find((b) => b.count === max && max > 0);

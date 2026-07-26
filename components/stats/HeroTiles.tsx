@@ -34,15 +34,18 @@ export function formatHours(minutes: number): string {
 }
 
 export function HeroTiles({ bundle, scope, onOpen }: HeroTilesProps) {
-  const { diary, demoteHours } = bundle;
+  const { diary, demoteHours, distinctShows } = bundle;
   const marquee = STATS_LAYOUT === 'marquee';
 
   const tiles = [
+    // Distinct shows, to agree with the Grid's "N shows seen" line; repeat
+    // viewings surface as an entries sublabel instead of inflating the count.
     <StatTile
       key="shows"
       testID="stats-tile-shows"
-      value={String(diary.total)}
-      label={diary.total === 1 ? 'Show' : 'Shows'}
+      value={String(distinctShows)}
+      label={distinctShows === 1 ? 'Show' : 'Shows'}
+      sublabel={diary.total > distinctShows ? `${diary.total} entries` : undefined}
       onPress={() => onOpen('shows')}
     />,
     // The spec's self-demotion (>25% runtime fallback -> footnote) shipped in
@@ -95,14 +98,14 @@ export function HeroTiles({ bundle, scope, onOpen }: HeroTilesProps) {
             testID="stats-tile-shows"
             onPress={() => onOpen('shows')}
             accessibilityRole="button"
-            accessibilityLabel={`${diary.total} shows in your diary. Opens the list.`}
+            accessibilityLabel={`${distinctShows} shows in your diary. Opens the list.`}
             style={({ pressed }) => [styles.headline, pressed && styles.pressed]}
           >
             <Text style={[styles.headlineValue, TABULAR]} numberOfLines={1} adjustsFontSizeToFit>
-              {diary.total}
+              {distinctShows}
             </Text>
             <Text style={styles.headlineLabel}>
-              {diary.total === 1 ? 'show in your diary' : 'shows in your diary'}
+              {distinctShows === 1 ? 'show in your diary' : 'shows in your diary'}
             </Text>
           </Pressable>
           <View style={styles.row}>{tiles.slice(1)}</View>

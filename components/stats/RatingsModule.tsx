@@ -41,9 +41,10 @@ export function RatingsModule({ bundle, onOpenBucket, onOpenUnrated }: RatingsMo
 
   const max = histogram.buckets.reduce((m, b) => Math.max(m, b.count), 0);
   const avg = histogram.average ?? 0;
-  // The marker sits proportionally along the ten buckets: 0.5★ is the centre of
-  // slot 0, 5.0★ the centre of slot 9.
-  const markerPct = ((avg - 0.5) / 4.5) * 100;
+  // The marker sits proportionally along the ten buckets: 0.5★ is the CENTRE
+  // of slot 0 (5% of the track), 5.0★ the centre of slot 9 (95%) — mapping to
+  // the track edges put it up to half a slot off (sim QA #9).
+  const markerPct = 5 + ((avg - 0.5) / 4.5) * 90;
 
   return (
     <StatsCard flush={marquee}>

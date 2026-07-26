@@ -6,9 +6,9 @@
  * date_seen strictly earlier than the ceremony date — computed in the vendored
  * canonProgress, never here).
  *
- * Scope note: under a season/year scope these counts describe what you saw IN
- * that window, which is why the caption always names the scope. Without that,
- * "8 of 53" under a year scope reads as a lifetime total and looks broken.
+ * Scope note: canon coverage is computed from the FULL diary (lifetime facts —
+ * "winners you've ever seen"); under a dated scope the caption says "All time"
+ * so the number can't be misread as scoped.
  */
 
 import React from 'react';
@@ -149,7 +149,7 @@ export function CanonChecklists({ bundle, scope, onOpenList, onOpenEntry }: Cano
         caption={
           scope.kind === 'all'
             ? `${canonStats.totalSeen} winners seen · ${canonStats.totalSawBeforeItWon} before they won`
-            : `Winners you saw in ${scope.label}`
+            : 'Winners you have ever seen · all time'
         }
       />
       <CanonBlock

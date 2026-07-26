@@ -78,6 +78,7 @@ export interface StatsBundle {
   critics: ReturnType<typeof youVsCritics>;
   gold: ReturnType<typeof goldCoverage>;
   audience: ReturnType<typeof audienceVsYou>;
+  distinctShows: number;
   /** True when the Hours tile must drop out of the hero (spec §3.1, >25%). */
   demoteHours: boolean;
 }
@@ -233,18 +234,25 @@ export function useStatsData({ reviews, shows, canon, scope, today }: UseStatsDa
     () => computeDiaryStats(rows, showMeta, { houseIndex: HOUSE_INDEX, today: day }),
     [rows, showMeta, day],
   );
+  // Theater completion is likewise lifetime — "2 of 42 houses" under a season
+  // scope read as lost data (build-61 P0). The ring always answers "ever".
   const theaters = useMemo(
-    () => theaterCompletion(rows, showMeta, THEATER_HOUSES, { houseIndex: HOUSE_INDEX }),
-    [rows, showMeta],
+    () => theaterCompletion(allRows, showMeta, THEATER_HOUSES, { houseIndex: HOUSE_INDEX }),
+    [allRows, showMeta],
   );
   const windows = useMemo(() => seasonWindows(canon, { today: day }), [canon, day]);
+  // Canon coverage is a lifetime fact ("winners you've EVER seen") — computing
+  // it from scoped rows produced "51 to go" for a user who'd seen 8 (sim QA #7).
   const canonStats = useMemo(
-    () => canonProgress(rows, canon, { windows }),
-    [rows, canon, windows],
+    () => canonProgress(allRows, canon, { windows }),
+    [allRows, canon, windows],
   );
   const histogram = useMemo(() => ratingsHistogram(rows), [rows]);
   const critics = useMemo(() => youVsCritics(rows, criticIndex), [rows, criticIndex]);
   const audience = useMemo(() => audienceVsYou(rows, criticIndex), [rows, criticIndex]);
+  // Distinct shows for the hero tile — diary.total counts ENTRIES (repeat
+  // viewings), which put Stats one ahead of the Grid's "shows seen" line.
+  const distinctShows = useMemo(() => new Set(rows.map((r) => r.show_id)).size, [rows]);
 
   // Gold coverage is intentionally computed against ALL rows, not the scope:
   // "of the gold shows open right now, how many have you ever seen".
@@ -277,6 +285,7 @@ export function useStatsData({ reviews, shows, canon, scope, today }: UseStatsDa
     histogram,
     critics,
     audience,
+    distinctShows,
     gold,
     demoteHours: diary.runtimeFallbackShare > 0.25,
   };

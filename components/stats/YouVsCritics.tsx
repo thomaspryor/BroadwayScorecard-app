@@ -72,14 +72,59 @@ export function YouVsCritics({ bundle, onOpenAligned, onOpenPick, onOpenGold }: 
   const { critics, gold } = bundle;
   const marquee = STATS_LAYOUT === 'marquee';
 
+  const goldBlock =
+    gold.total > 0 ? (
+      <>
+        <View style={styles.goldBlock}>
+          <View style={styles.goldHeader}>
+            <Text style={styles.goldTitle}>Critical Gold, open now</Text>
+            <Text style={[styles.goldValue, TABULAR]}>
+              {gold.seen} of {gold.total}
+            </Text>
+          </View>
+          <GoldTrack pct={gold.total ? gold.seen / gold.total : 0} />
+          <View style={styles.goldActions}>
+            <Pressable
+              testID="stats-gold-seen"
+              onPress={() => {
+                haptics.tap();
+                onOpenGold('seen');
+              }}
+              accessibilityRole="button"
+              style={({ pressed }) => [styles.goldAction, pressed && styles.pressed]}
+            >
+              <Text style={styles.goldActionText}>Seen</Text>
+            </Pressable>
+            <Pressable
+              testID="stats-gold-unseen"
+              onPress={() => {
+                haptics.tap();
+                onOpenGold('unseen');
+              }}
+              accessibilityRole="button"
+              style={({ pressed }) => [styles.goldAction, pressed && styles.pressed]}
+            >
+              <Text style={styles.goldActionText}>{gold.total - gold.seen} to see</Text>
+            </Pressable>
+          </View>
+        </View>
+      </>
+    ) : null;
+
+  // Critical Gold is all-time by design, so it must survive the scoped lock:
+  // build 61 hid the (lifetime) gold block whenever a thin scope locked the
+  // alignment gauge (sim QA #14).
   if (critics.comparable < MIN_RATED_WITH_SCORE) {
     return (
-      <ModuleLocked
-        title="You vs. the critics"
-        need={`Rate ${MIN_RATED_WITH_SCORE - critics.comparable} more scored show${
-          MIN_RATED_WITH_SCORE - critics.comparable === 1 ? '' : 's'
-        } to unlock your taste profile.`}
-      />
+      <>
+        <ModuleLocked
+          title="You vs. the critics"
+          need={`Rate ${MIN_RATED_WITH_SCORE - critics.comparable} more scored show${
+            MIN_RATED_WITH_SCORE - critics.comparable === 1 ? '' : 's'
+          } with critic scores to unlock your taste profile.`}
+        />
+        {goldBlock && <StatsCard>{goldBlock}</StatsCard>}
+      </>
     );
   }
 
@@ -133,41 +178,7 @@ export function YouVsCritics({ bundle, onOpenAligned, onOpenPick, onOpenGold }: 
         </View>
       )}
 
-      {gold.total > 0 && (
-        <View style={styles.goldBlock}>
-          <View style={styles.goldHeader}>
-            <Text style={styles.goldTitle}>Critical Gold, open now</Text>
-            <Text style={[styles.goldValue, TABULAR]}>
-              {gold.seen} of {gold.total}
-            </Text>
-          </View>
-          <GoldTrack pct={gold.total ? gold.seen / gold.total : 0} />
-          <View style={styles.goldActions}>
-            <Pressable
-              testID="stats-gold-seen"
-              onPress={() => {
-                haptics.tap();
-                onOpenGold('seen');
-              }}
-              accessibilityRole="button"
-              style={({ pressed }) => [styles.goldAction, pressed && styles.pressed]}
-            >
-              <Text style={styles.goldActionText}>Seen</Text>
-            </Pressable>
-            <Pressable
-              testID="stats-gold-unseen"
-              onPress={() => {
-                haptics.tap();
-                onOpenGold('unseen');
-              }}
-              accessibilityRole="button"
-              style={({ pressed }) => [styles.goldAction, pressed && styles.pressed]}
-            >
-              <Text style={styles.goldActionText}>{gold.total - gold.seen} to see</Text>
-            </Pressable>
-          </View>
-        </View>
-      )}
+      {goldBlock}
     </StatsCard>
   );
 }
