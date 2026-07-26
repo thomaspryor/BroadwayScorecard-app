@@ -1,0 +1,31 @@
+title = "BroadwayScorecard-app gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Known false positives"
+
+paths = [
+  # Gitignored, never committed — but a --no-git filesystem scan (see the
+  # working-tree step in gitleaks.yml, and the local acceptance check) reads
+  # whatever happens to be on disk regardless of git tracking. These mirror
+  # .gitignore so local clutter (node_modules, native build output, stray
+  # worktrees, real .env.local secrets meant to stay local) can't fail a scan
+  # that git itself would never see.
+  '''(^|/)node_modules/.*''',
+  '''(^|/)ios/.*''',
+  '''(^|/)android/.*''',
+  '''(^|/)dist/.*''',
+  '''(^|/)\.expo/.*''',
+  '''(^|/)\.claude/worktrees/.*''',
+  '''(^|/)\.git-worktrees/.*''',
+  '''(^|/)\.env(\..*)?$''',
+]
+
+regexes = [
+  # Apple App Store Connect API Key Issuer ID in eas.json — a public identifier
+  # scoped to the Apple Developer team, useless without the paired .p8 private
+  # key (never committed — .gitignore blocks *.p8). Not a secret on its own.
+  '''2d03cc88-e016-4fb7-8d89-a70a4a912875''',
+]
