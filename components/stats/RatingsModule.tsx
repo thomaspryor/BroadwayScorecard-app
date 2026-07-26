@@ -107,7 +107,7 @@ export function RatingsModule({ bundle, onOpenBucket, onOpenUnrated }: RatingsMo
         style={({ pressed }) => [styles.footer, pressed && styles.pressed]}
       >
         <Text style={styles.footerText}>
-          {histogram.rated} of {histogram.total} shows rated
+          {histogram.rated} of {histogram.total} entries rated
           {histogram.unrated > 0 ? ` · ${histogram.unrated} to rate` : ''}
         </Text>
       </Pressable>

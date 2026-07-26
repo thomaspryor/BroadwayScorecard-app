@@ -249,7 +249,9 @@ export function useStatsData({ reviews, shows, canon, scope, today }: UseStatsDa
   );
   const histogram = useMemo(() => ratingsHistogram(rows), [rows]);
   const critics = useMemo(() => youVsCritics(rows, criticIndex), [rows, criticIndex]);
-  const audience = useMemo(() => audienceVsYou(rows, criticIndex), [rows, criticIndex]);
+  // Lifetime like gold/canon — scoped rows made the card silently vanish
+  // under a thin scope with no locked state (fix-branch verify #2).
+  const audience = useMemo(() => audienceVsYou(allRows, criticIndex), [allRows, criticIndex]);
   // Distinct shows for the hero tile — diary.total counts ENTRIES (repeat
   // viewings), which put Stats one ahead of the Grid's "shows seen" line.
   const distinctShows = useMemo(() => new Set(rows.map((r) => r.show_id)).size, [rows]);
