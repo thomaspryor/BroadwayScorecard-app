@@ -190,7 +190,9 @@ export function periodTileLabel(scope: ScopeOption): string {
     case 'year':
       return scope.inProgress ? `${scope.year} YTD` : `In ${scope.year}`;
     default:
-      return 'Per year';
+      // All time has no "period", so the tile answers the next-most-useful
+      // question instead of inventing a frame the scope doesn't have.
+      return 'Years logged';
   }
 }
 
