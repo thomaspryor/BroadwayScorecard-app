@@ -452,7 +452,7 @@ export default function ListsTab({ userId, showMap, createTrigger }: ListsTabPro
                 )}
                 <View style={styles.itemInfo}>
                   <Text style={styles.itemTitle} numberOfLines={1}>
-                    {show?.title || item.show_id}
+                    {show?.title || humanizeShowId(item.show_id)}
                   </Text>
                   {show?.venue && (
                     <Text style={styles.itemVenue} numberOfLines={1}>{show.venue}</Text>
