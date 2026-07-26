@@ -725,6 +725,7 @@ export default function WatchedScreen() {
           </Pressable>
           <View style={styles.viewToggleContainer}>
             <Pressable
+              testID="diary-grid-view-toggle"
               style={[styles.viewToggleButton, viewMode === 'grid' && styles.viewToggleActive]}
               onPress={() => { haptics.tap(); setViewMode('grid'); }}
               hitSlop={4}
@@ -734,6 +735,7 @@ export default function WatchedScreen() {
               </Svg>
             </Pressable>
             <Pressable
+              testID="diary-list-view-toggle"
               style={[styles.viewToggleButton, viewMode === 'list' && styles.viewToggleActive]}
               onPress={() => { haptics.tap(); setViewMode('list'); }}
               hitSlop={4}
