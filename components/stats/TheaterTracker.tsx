@@ -31,16 +31,46 @@ import {
 
 /**
  * Short display name for a chip. "Gerald Schoenfeld Theatre" → "Schoenfeld".
- * The grid is only scannable if the chips are short; the full name is in the
- * accessibility label and the detail sheet.
+ *
+ * The grid is only scannable if chips are short and never break mid-word; the
+ * full name lives in the accessibility label and the detail sheet.
+ *
+ * An explicit table beats clever regexes here: the first attempt stripped the
+ * " Theatre" suffix before testing a full-name pattern, so the Steinberg house
+ * fell through and rendered as "Harold and Miriam St…" in the grid.
  */
+const HOUSE_SHORT_NAMES: Record<string, string> = {
+  'Harold and Miriam Steinberg Center for Theatre': 'Steinberg',
+  'Circle in the Square Theatre': 'Circle Sq',
+  'Vivian Beaumont Theater': 'Beaumont',
+  'Lunt-Fontanne Theatre': 'Lunt-Font.',
+  'New Amsterdam Theatre': 'New Amst.',
+  'Winter Garden Theatre': 'Winter Gdn',
+  'Al Hirschfeld Theatre': 'Hirschfeld',
+  'Stephen Sondheim Theatre': 'Sondheim',
+  'Samuel J. Friedman Theatre': 'Friedman',
+  'Bernard B. Jacobs Theatre': 'Jacobs',
+  'Gerald Schoenfeld Theatre': 'Schoenfeld',
+  'James Earl Jones Theatre': 'Jones',
+  'Ethel Barrymore Theatre': 'Barrymore',
+  'Eugene O’Neill Theatre': 'O’Neill',
+  "Eugene O'Neill Theatre": "O'Neill",
+  'Helen Hayes Theater': 'Hayes',
+  'Walter Kerr Theatre': 'Kerr',
+  'Richard Rodgers Theatre': 'Rodgers',
+  'Todd Haimes Theatre': 'Haimes',
+  'Lena Horne Theatre': 'Horne',
+  'August Wilson Theatre': 'A. Wilson',
+  'Ambassador Theatre': 'Ambass.',
+  'Nederlander Theatre': 'Nederland.',
+};
+
 export function houseShortName(name: string): string {
+  const mapped = HOUSE_SHORT_NAMES[name];
+  if (mapped) return mapped;
   return name
     .replace(/\s+(Theatre|Theater)$/i, '')
     .replace(/^Lincoln Center Theater\s*-\s*/i, '')
-    .replace(/^(Bernard B\.|Gerald|Samuel J\.|Ethel|Helen|Eugene|Walter|Richard|Stephen|James Earl|John|Todd|Vivian|Lena|Harold and Miriam Steinberg Center for Theatre)\s*/i, (m) =>
-      /Steinberg/i.test(m) ? 'Steinberg ' : '',
-    )
     .trim();
 }
 

@@ -12,7 +12,7 @@
  */
 
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Colors, FontSize, Spacing } from '@/constants/theme';
 import { periodTileLabel, type ScopeOption } from '@/lib/stats-scope';
 import { STATS_LAYOUT } from '@/lib/stats-layout';
@@ -78,15 +78,24 @@ export function HeroTiles({ bundle, scope, onOpen }: HeroTilesProps) {
       {marquee ? (
         <>
           {/* Bolder LAYOUT: one headline number, then a secondary strip. Same
-              tokens, same font, same gold — only the arrangement changes. */}
-          <View style={styles.headline}>
+              tokens, same font, same gold — only the arrangement changes.
+              Pressable like every other stat: "every number is a door"
+              (spec §1) has to hold in this variant too, and it carries the
+              testID the faithful variant puts on the Shows tile. */}
+          <Pressable
+            testID="stats-tile-shows"
+            onPress={() => onOpen('shows')}
+            accessibilityRole="button"
+            accessibilityLabel={`${diary.total} shows in your diary. Opens the list.`}
+            style={({ pressed }) => [styles.headline, pressed && styles.pressed]}
+          >
             <Text style={[styles.headlineValue, TABULAR]} numberOfLines={1} adjustsFontSizeToFit>
               {diary.total}
             </Text>
             <Text style={styles.headlineLabel}>
               {diary.total === 1 ? 'show in your diary' : 'shows in your diary'}
             </Text>
-          </View>
+          </Pressable>
           <View style={styles.row}>{tiles.slice(1)}</View>
         </>
       ) : (
@@ -121,6 +130,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   headlineLabel: { color: Colors.text.secondary, fontSize: FontSize.md, marginTop: -4 },
+  pressed: { opacity: 0.7 },
   footnote: {
     color: Colors.text.muted,
     fontSize: FontSize.xs,
