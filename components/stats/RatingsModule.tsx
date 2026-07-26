@@ -79,11 +79,14 @@ export function RatingsModule({ bundle, onOpenBucket, onOpenUnrated }: RatingsMo
           ))}
         </View>
 
-        {/* Your-average marker — neutral ink, deliberately not gold. */}
+        {/* Your-average marker — neutral ink, deliberately not gold.
+            The label sits ABOVE the line, at the top of the chart: printed at
+            the bottom it landed on top of the tallest bar and became
+            unreadable gold-on-gold (caught in simulator review). */}
         <View style={styles.markerLayer} pointerEvents="none">
           <View style={[styles.marker, { left: `${Math.min(Math.max(markerPct, 0), 100)}%` }]}>
-            <View style={styles.markerLine} />
             <Text style={[styles.markerText, TABULAR]}>{avg.toFixed(1)}★</Text>
+            <View style={styles.markerLine} />
           </View>
         </View>
       </View>
@@ -112,15 +115,15 @@ export function RatingsModule({ bundle, onOpenBucket, onOpenUnrated }: RatingsMo
 }
 
 const styles = StyleSheet.create({
-  chartWrap: { position: 'relative' },
+  chartWrap: { position: 'relative', paddingTop: 20 },
   chart: { flexDirection: 'row', alignItems: 'flex-end', gap: 4, height: 132 },
   barSlot: { flex: 1, height: '100%', justifyContent: 'flex-end', alignItems: 'center' },
   barTrack: { width: '80%', flex: 1, justifyContent: 'flex-end' },
   barLabel: { color: Colors.text.muted, fontSize: FontSize.xs, marginTop: Spacing.xs, minHeight: 16 },
   markerLayer: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
-  marker: { position: 'absolute', top: 0, bottom: 20, alignItems: 'center', marginLeft: -18, width: 36 },
-  markerLine: { flex: 1, width: 2, backgroundColor: Colors.text.secondary, borderRadius: 1 },
-  markerText: { color: Colors.text.secondary, fontSize: FontSize.xs, fontWeight: '700', marginTop: 2 },
+  marker: { position: 'absolute', top: 0, bottom: 20, alignItems: 'center', marginLeft: -20, width: 40 },
+  markerLine: { flex: 1, width: 2, backgroundColor: Colors.text.muted, borderRadius: 1, marginTop: 2 },
+  markerText: { color: Colors.text.primary, fontSize: FontSize.xs, fontWeight: '700' },
   footer: { minHeight: 44, justifyContent: 'center', marginTop: Spacing.sm },
   footerText: { color: Colors.text.muted, fontSize: FontSize.xs },
   pressed: { opacity: 0.7 },

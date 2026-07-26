@@ -449,7 +449,10 @@ const styles = StyleSheet.create({
     minHeight: 44,
     justifyContent: 'center',
     flexGrow: 1,
-    flexBasis: '30%',
+    // Two per row, not three: at 30% "Gershwin · 1,933" truncated to
+    // "Gershwin ·…" on a Pro Max, which is the half of the record that
+    // matters (caught in simulator review).
+    flexBasis: '46%',
   },
   recordLabel: { color: Colors.text.muted, fontSize: FontSize.xs },
   recordValue: { color: Colors.text.primary, fontSize: FontSize.sm, fontWeight: '600', marginTop: 2 },

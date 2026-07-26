@@ -1,40 +1,47 @@
 # Capture the Stats-screen design proposal shots from the REAL app.
 #
 # LOCAL-ONLY TOOL — deliberately outside .maestro/ so maestro-e2e.yml's
-# `.maestro/**/*.yaml` glob for suite=all doesn't sweep it in: it writes to a
-# ~/Documents path that doesn't exist on CI runners.
+# `.maestro/**/*.yaml` glob for suite=all doesn't sweep it in: it writes to an
+# absolute ~/Documents path that doesn't exist on CI runners.
 #
 # Per app CLAUDE.md "Design Proposals" #1 (fidelity honesty): a proposal shown
 # to the owner must be rendered by the real product and captured from the
-# simulator. This flow drives the shipped build; there is no mockup anywhere in
-# the pipeline.
+# simulator. This flow drives the shipped Release build; there is no mockup
+# anywhere in the pipeline.
 #
 # Pre-reqs: app installed, EXPO_PUBLIC_DEV_AUTO_SIGNIN=1 in .env.local at bundle
 # time (dev-test@broadwayscorecard.com — 52 real diary entries, 2022–2026).
 #
-# Run per variant/device (SHOT_PREFIX names the output files):
-#   maestro --device <udid> test -e SHOT_PREFIX=ledger-max .maestro-manual/stats-screenshots.yaml
+# Paths are absolute: Maestro does NOT expand `~`, it creates a literal "~"
+# directory in the working tree (learned the hard way 2026-07-26).
+#
+# Run per variant/device:
+#   maestro --device <udid> test -e SHOT=<prefix> .maestro-manual/stats-screenshots.yaml
 
 appId: com.broadwayscorecard.app
+env:
+  OUT: /Users/tompryor/Documents/claude-outputs/show-stats-ios-options
 ---
-- launchApp:
-    clearState: false
+- launchApp
 
 - tapOn:
     text: "Open"
     optional: true
 
+# Fresh install shows the welcome carousel; each Skip is individually optional
+# because the carousel length is not fixed.
+- tapOn:
+    text: "Skip"
+    optional: true
+- tapOn:
+    text: "Skip"
+    optional: true
+- tapOn:
+    text: "Skip"
+    optional: true
 - extendedWaitUntil:
     visible: "Broadway Scorecard"
-    timeout: 60000
-
-- runFlow:
-    when:
-      visible: "Skip"
-    commands:
-      - tapOn: "Skip"
-      - tapOn: "Skip"
-      - tapOn: "Skip"
+    timeout: 45000
 
 - openLink: broadwayscorecard:///watched
 - tapOn:
@@ -42,71 +49,76 @@ appId: com.broadwayscorecard.app
     optional: true
 - extendedWaitUntil:
     visible: "My Watched Shows"
-    timeout: 40000
+    timeout: 45000
 
-# ── Stats overview (module 1–2) ────────────────────────────────────────
 - tapOn:
     id: "diary-stats-view-toggle"
 - extendedWaitUntil:
     visible:
       id: "stats-scope-pill"
-    timeout: 30000
+    timeout: 40000
 - waitForAnimationToEnd:
-    timeout: 6000
-- takeScreenshot: ~/Documents/claude-outputs/show-stats-ios-options/${SHOT_PREFIX}-01-overview
+    timeout: 8000
 
-# ── Theater checklist (module 3) ───────────────────────────────────────
-- scroll
-- scroll
-- waitForAnimationToEnd:
-    timeout: 3000
-- takeScreenshot: ~/Documents/claude-outputs/show-stats-ios-options/${SHOT_PREFIX}-02-theaters
+# ── 01 Hero tiles + shows-per-year ─────────────────────────────────────
+- takeScreenshot: ${OUT}/${SHOT}-01-hero-and-years
 
-# ── You vs. the Critics (module 4) ─────────────────────────────────────
-- scroll
-- scroll
-- waitForAnimationToEnd:
-    timeout: 3000
-- takeScreenshot: ~/Documents/claude-outputs/show-stats-ios-options/${SHOT_PREFIX}-03-critics
-
-# ── Tony canon + ratings (modules 5–6) ─────────────────────────────────
-- scroll
+# ── 02-06 One screen per scroll — a continuous filmstrip of the modules.
+# Deliberately NOT scrollUntilVisible: the tall modules mean a target can
+# already satisfy the visibility check without scrolling at all, which
+# silently produced two identical screenshots on the first run.
 - scroll
 - waitForAnimationToEnd:
-    timeout: 3000
-- takeScreenshot: ~/Documents/claude-outputs/show-stats-ios-options/${SHOT_PREFIX}-04-canon-ratings
+    timeout: 4000
+- takeScreenshot: ${OUT}/${SHOT}-02-theater-ring-checklist
 
 - scroll
 - waitForAnimationToEnd:
-    timeout: 3000
-- takeScreenshot: ~/Documents/claude-outputs/show-stats-ios-options/${SHOT_PREFIX}-05-ratings
+    timeout: 4000
+- takeScreenshot: ${OUT}/${SHOT}-03-house-records-and-critics
 
-# ── Drill-down sheet (proves "every number is a door") ─────────────────
+- scroll
+- waitForAnimationToEnd:
+    timeout: 4000
+- takeScreenshot: ${OUT}/${SHOT}-04-critical-gold
+
+- scroll
+- waitForAnimationToEnd:
+    timeout: 4000
+- takeScreenshot: ${OUT}/${SHOT}-05-tony-canon
+
+- scroll
+- waitForAnimationToEnd:
+    timeout: 4000
+- takeScreenshot: ${OUT}/${SHOT}-06-ratings-histogram
+
+# ── 07 Drill-down sheet — proves "every number is a door" ──────────────
 - scrollUntilVisible:
     element:
       id: "stats-tile-shows"
     direction: UP
-    timeout: 20000
+    visibilityPercentage: 50
+    timeout: 30000
 - tapOn:
     id: "stats-tile-shows"
 - extendedWaitUntil:
     visible:
       id: "stats-drilldown-sheet"
-    timeout: 15000
+    timeout: 20000
 - waitForAnimationToEnd:
-    timeout: 3000
-- takeScreenshot: ~/Documents/claude-outputs/show-stats-ios-options/${SHOT_PREFIX}-06-drilldown
+    timeout: 4000
+- takeScreenshot: ${OUT}/${SHOT}-07-drilldown
 - tapOn:
     id: "stats-drilldown-close"
 - waitForAnimationToEnd:
-    timeout: 3000
+    timeout: 4000
 
-# ── Scope picker ───────────────────────────────────────────────────────
+# ── 08 Scope picker ────────────────────────────────────────────────────
 - tapOn:
     id: "stats-scope-pill"
 - extendedWaitUntil:
     visible: "SEASONS"
-    timeout: 15000
+    timeout: 20000
 - waitForAnimationToEnd:
-    timeout: 3000
-- takeScreenshot: ~/Documents/claude-outputs/show-stats-ios-options/${SHOT_PREFIX}-07-scope-picker
+    timeout: 4000
+- takeScreenshot: ${OUT}/${SHOT}-08-scope-picker

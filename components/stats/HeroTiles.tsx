@@ -69,7 +69,6 @@ export function HeroTiles({ bundle, scope, onOpen }: HeroTilesProps) {
       testID="stats-tile-period"
       value={String(scope.kind === 'all' ? diary.byYear.length : diary.total)}
       label={periodTileLabel(scope)}
-      sublabel={scope.kind === 'all' ? 'years logged' : undefined}
       onPress={() => onOpen('period')}
     />,
   ];
