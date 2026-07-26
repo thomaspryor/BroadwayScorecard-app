@@ -211,8 +211,12 @@ export function ProgressRing({
           strokeLinecap="round"
           fill="none"
           strokeDasharray={`${circumference * clamped} ${circumference}`}
-          // Start at 12 o'clock rather than 3.
-          transform={`rotate(-90 ${size / 2} ${size / 2})`}
+          // Start at 12 o'clock rather than 3. Explicit rotation/origin props
+          // rather than a transform string — the string form has bitten this
+          // repo's SVG usage before and these are unambiguous.
+          rotation={-90}
+          originX={size / 2}
+          originY={size / 2}
         />
       </Svg>
       <View style={styles.ringCenter}>{children}</View>
