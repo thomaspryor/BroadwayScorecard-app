@@ -37,15 +37,6 @@ export function HeroTiles({ bundle, scope, onOpen }: HeroTilesProps) {
   const { diary, demoteHours } = bundle;
   const marquee = STATS_LAYOUT === 'marquee';
 
-  const hoursTile = (
-    <StatTile
-      testID="stats-tile-hours"
-      value={formatHours(diary.minutesInSeat)}
-      label="Hours in a seat"
-      onPress={() => onOpen('hours')}
-    />
-  );
-
   const tiles = [
     <StatTile
       key="shows"
@@ -54,7 +45,17 @@ export function HeroTiles({ bundle, scope, onOpen }: HeroTilesProps) {
       label={diary.total === 1 ? 'Show' : 'Shows'}
       onPress={() => onOpen('shows')}
     />,
-    ...(demoteHours ? [] : [React.cloneElement(hoursTile, { key: 'hours' })]),
+    ...(demoteHours
+      ? []
+      : [
+          <StatTile
+            key="hours"
+            testID="stats-tile-hours"
+            value={formatHours(diary.minutesInSeat)}
+            label="Hours in a seat"
+            onPress={() => onOpen('hours')}
+          />,
+        ]),
     <StatTile
       key="theaters"
       testID="stats-tile-theaters"
