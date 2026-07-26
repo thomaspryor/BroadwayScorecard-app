@@ -19,8 +19,11 @@ paths = [
   '''(^|/)dist/.*''',
   '''(^|/)\.expo/.*''',
   '''(^|/)\.claude/worktrees/.*''',
-  '''(^|/)\.git-worktrees/.*''',
-  '''(^|/)\.env(\..*)?$''',
+  # Matches ONLY what .gitignore actually excludes (.env and .env*.local) —
+  # NOT the broader .env.* (e.g. .env.production is NOT gitignored here and
+  # could be committed; don't blind the scanner to a real leak in it).
+  '''(^|/)\.env$''',
+  '''(^|/)\.env[^/]*\.local$''',
 ]
 
 regexes = [
