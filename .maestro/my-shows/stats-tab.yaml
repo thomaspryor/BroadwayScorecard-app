@@ -8,6 +8,12 @@
 # Lives in my-shows/ so it runs under the `my-shows` suite and under `all`.
 # Requires the dev-test account (EXPO_PUBLIC_DEV_AUTO_SIGNIN=1), same as every
 # other signed-in flow in this directory.
+#
+# STATE HYGIENE: the diary's view mode persists, so leaving the app on Stats
+# leaks into whatever flow runs next. The tail of this flow taps back to Grid —
+# but a tail step never runs when an earlier step fails, which is exactly when
+# the app is left on Stats. So this flow ALSO resets to Grid at the start and
+# does not depend on its own clean exit.
 
 appId: com.broadwayscorecard.app
 ---
@@ -31,6 +37,16 @@ appId: com.broadwayscorecard.app
 - extendedWaitUntil:
     visible: "My Watched Shows"
     timeout: 30000
+
+# ── Start-of-flow reset ────────────────────────────────────────────────
+# Land on Grid regardless of what a previously-failed flow left behind.
+# optional: true because on a genuinely cold launch we are already on Grid and
+# the toggle may not have laid out yet — this is hygiene, not an assertion.
+- tapOn:
+    id: "diary-grid-view-toggle"
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 5000
 
 # ── Segmented control → Stats ──────────────────────────────────────────
 - tapOn:

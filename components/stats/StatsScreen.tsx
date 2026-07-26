@@ -13,14 +13,13 @@
  */
 
 import React, { useCallback, useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Colors, FontSize, Spacing } from '@/constants/theme';
-import { useStatsCanon, useStatsData, toDiaryRows, MIN_ENTRIES_FOR_STATS } from '@/hooks/useStatsData';
-import { buildScopes, defaultScope, localToday, scopeSuffix, type ScopeOption } from '@/lib/stats-scope';
+import { useStatsCanon, useStatsData, MIN_ENTRIES_FOR_STATS } from '@/hooks/useStatsData';
+import { localToday, scopeSuffix, type ScopeOption } from '@/lib/stats-scope';
 import { ScopePill } from './ScopePill';
 import type { CanonEntry, HouseVisit } from '@/lib/stats';
-import { matchVenueToHouse, buildHouseIndex } from '@/lib/stats';
-import { THEATER_HOUSES, HOUSE_NAMES } from '@/lib/stats-canon-source';
+import { matchVenueToHouse } from '@/lib/stats';
 import type { Show } from '@/lib/types';
 import type { UserReview } from '@/lib/user-types';
 import { GhostState } from './StatsPrimitives';
@@ -38,20 +37,29 @@ export interface StatsScreenProps {
   /** Bottom padding so the tab bar never covers the last module. */
   bottomPad: number;
   onRateShow?: () => void;
+  /** Pull-to-refresh, wired to the same handler as the Grid and Feed segments. */
+  refreshing?: boolean;
+  onRefresh?: () => void;
 }
 
-export function StatsScreen({ reviews, shows, bottomPad, onRateShow }: StatsScreenProps) {
+export function StatsScreen({
+  reviews,
+  shows,
+  bottomPad,
+  onRateShow,
+  refreshing = false,
+  onRefresh,
+}: StatsScreenProps) {
   const today = localToday();
-  const { canon } = useStatsCanon();
+  const { canon, loading: canonLoading } = useStatsCanon();
   const [scope, setScope] = useState<ScopeOption | null>(null);
   const [drilldown, setDrilldown] = useState<DrilldownPayload | null>(null);
 
-  const allRows = useMemo(() => toDiaryRows(reviews), [reviews]);
-  const scopes = useMemo(() => buildScopes(allRows, canon, { today }), [allRows, canon, today]);
-  const active = scope ?? defaultScope(scopes, allRows, today);
-
-  const bundle = useStatsData({ reviews, shows, canon, scope: active, today });
-  const { reviewsInScope, showsById } = bundle;
+  // Scopes and the default scope are owned by the hook — computing them here
+  // too meant two `defaultScope()` calls that could disagree, and
+  // `bundle.scopes` was never read.
+  const bundle = useStatsData({ reviews, shows, canon, scope, today });
+  const { allRows, scopes, scope: active, houseIndex, reviewsInScope, showsById } = bundle;
 
   /** Diary rows behind a set of show ids, newest first — the drill-down list. */
   const reviewsFor = useCallback(
@@ -69,15 +77,6 @@ export function StatsScreen({ reviews, shows, bottomPad, onRateShow }: StatsScre
     [reviewsInScope],
   );
 
-  const houseIndex = useMemo(
-    () => buildHouseIndex(HOUSE_NAMES, {}, Object.fromEntries(
-      Object.entries(THEATER_HOUSES)
-        .filter(([, m]) => m.formerNames?.length)
-        .map(([n, m]) => [n, m.formerNames as string[]]),
-    )),
-    [],
-  );
-
   /** Diary rows logged at a specific Broadway house. */
   const reviewsAtHouse = useCallback(
     (house: string) =>
@@ -88,10 +87,32 @@ export function StatsScreen({ reviews, shows, bottomPad, onRateShow }: StatsScre
     [sortedInScope, bundle.showMeta, houseIndex],
   );
 
+  const refresh = onRefresh ? (
+    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.text.secondary} />
+  ) : undefined;
+
+  // ── Canon gate ──────────────────────────────────────────────────────
+  // Season boundaries come from stats-canon.json. Rendering before it resolves
+  // paints EMPTY_CANON — which offers no season scopes, so `defaultScope`
+  // returns All time — and then every number on screen silently changes when
+  // the canon lands and the default becomes the current season. Hold the whole
+  // screen for one AsyncStorage read instead (cache-first, so this is a frame
+  // or two on a warm launch).
+  if (canonLoading) {
+    return (
+      <View style={styles.loading}>
+        <ActivityIndicator color={Colors.brand} />
+      </View>
+    );
+  }
+
   // ── Ghost state ─────────────────────────────────────────────────────
   if (allRows.length < MIN_ENTRIES_FOR_STATS) {
     return (
-      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: bottomPad }]}>
+      <ScrollView
+        contentContainerStyle={[styles.content, { paddingBottom: bottomPad }]}
+        refreshControl={refresh}
+      >
         <GhostState logged={allRows.length} needed={MIN_ENTRIES_FOR_STATS} onAction={onRateShow} />
       </ScrollView>
     );
@@ -149,6 +170,9 @@ export function StatsScreen({ reviews, shows, bottomPad, onRateShow }: StatsScre
     }
     if (kind === 'streak') {
       // The streak's months are the trailing run of non-empty months.
+      // slice(-0) is slice(0) — the WHOLE array — so a zero streak would open a
+      // sheet listing every show in scope. Guard it explicitly.
+      if (diary.currentStreak <= 0) return;
       const months = diary.byMonth.slice(-diary.currentStreak).map((m) => m.month);
       const rows = sortedInScope.filter((r) => months.some((m) => (r.date_seen ?? '').startsWith(m)));
       setDrilldown({
@@ -329,6 +353,7 @@ export function StatsScreen({ reviews, shows, bottomPad, onRateShow }: StatsScre
         testID="stats-scroll"
         contentContainerStyle={[styles.content, { paddingBottom: bottomPad }]}
         showsVerticalScrollIndicator={false}
+        refreshControl={refresh}
       >
         <HeroTiles bundle={bundle} scope={active} onOpen={openHero} />
         <ShowsPerYear
@@ -364,6 +389,7 @@ export function StatsScreen({ reviews, shows, bottomPad, onRateShow }: StatsScre
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
+  loading: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: Spacing.xxl },
   content: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.sm },
   footnote: {
     color: Colors.text.muted,

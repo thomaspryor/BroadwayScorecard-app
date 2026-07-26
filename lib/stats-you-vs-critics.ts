@@ -15,7 +15,7 @@
 
 import { parseRating, ratingToHundred } from '@/lib/stats';
 import type { DiaryRow } from '@/lib/stats';
-import { getGoldThreshold, getMarketMinReviews } from '@/lib/score-utils';
+import { getMarketMinReviews, isCriticalGold } from '@/lib/score-utils';
 
 /** |your ★×20 − critic score| at or below this counts as agreement (spec §5.1). */
 export const ALIGNMENT_WINDOW = 10;
@@ -192,9 +192,7 @@ export function youVsCritics(
 export function goldCoverage(rows: DiaryRow[], openShows: CriticShowMeta[]): GoldCoverage {
   const seenIds = new Set(rows.map((r) => r.show_id));
   const gold = openShows.filter(
-    (s) =>
-      hasDisplayableScore(s) &&
-      Math.round(s.compositeScore as number) >= getGoldThreshold(s.category ?? undefined),
+    (s) => hasDisplayableScore(s) && isCriticalGold(s.compositeScore, s.category ?? undefined),
   );
   const seen = gold.filter((s) => seenIds.has(s.id));
   const unseen = gold

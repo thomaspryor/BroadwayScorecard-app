@@ -124,9 +124,12 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', gap: Spacing.sm },
   headline: { paddingBottom: Spacing.lg },
   headlineValue: {
+    // FontSize.title is the largest token there is; the previous hardcoded 72
+    // was outside the type scale entirely (spec §9: identical tokens to the
+    // rest of the app — bold is layout, never a bespoke size).
     color: Colors.text.primary,
-    fontSize: 72,
-    lineHeight: 78,
+    fontSize: FontSize.title,
+    lineHeight: Math.round(FontSize.title * 1.1),
     fontWeight: '800',
   },
   headlineLabel: { color: Colors.text.secondary, fontSize: FontSize.md, marginTop: -4 },

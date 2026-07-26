@@ -789,6 +789,8 @@ export default function WatchedScreen() {
           shows={shows}
           bottomPad={listBottomPad}
           onRateShow={() => setShowSearchModal(true)}
+          refreshing={refreshing}
+          onRefresh={onRefresh}
         />
       ) : isDiaryEmpty ? (
         <EmptyState

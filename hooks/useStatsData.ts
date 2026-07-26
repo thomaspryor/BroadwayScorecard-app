@@ -15,12 +15,14 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import {
+  buildHouseIndex,
   canonProgress,
   computeDiaryStats,
   ratingsHistogram,
   seasonWindows,
   theaterCompletion,
   type DiaryRow,
+  type HouseIndex,
   type ShowMetaIndex,
   type StatsCanon,
 } from '@/lib/stats';
@@ -52,7 +54,21 @@ export interface StatsBundle {
   showMeta: ShowMetaIndex;
   showsById: Record<string, Show>;
   canon: StatsCanon;
+  /** Every scope the pill offers, in pill order. */
   scopes: ScopeOption[];
+  /**
+   * The scope every number in this bundle was computed under — the caller's
+   * `scope` when it passed one, otherwise `defaultScope(scopes, …)`. Read this
+   * rather than recomputing the default: two `defaultScope()` calls on either
+   * side of the seam is exactly how the screen and its numbers drift apart.
+   */
+  scope: ScopeOption;
+  /**
+   * The ONE house index. Both reducers and every venue lookup in the UI must
+   * use it — a second index built without `formerNames` counts a "Brooks
+   * Atkinson Theatre" row in one place and not the other.
+   */
+  houseIndex: HouseIndex;
   diary: ReturnType<typeof computeDiaryStats>;
   theaters: ReturnType<typeof theaterCompletion>;
   canonStats: ReturnType<typeof canonProgress>;
@@ -109,24 +125,49 @@ export function toDiaryRows(reviews: UserReview[]): DiaryRow[] {
   }));
 }
 
+/**
+ * Longest the Stats screen will hold its first paint waiting for the canon.
+ *
+ * loadStatsCanon() is cache-first, so this only bites on the first ever visit
+ * with no cache — but its network leg has no timeout of its own, so without a
+ * cap a dead connection would spin the screen for RN's full fetch timeout.
+ */
+export const CANON_GATE_TIMEOUT_MS = 6000;
+
 export function useStatsCanon(): { canon: StatsCanon; loading: boolean } {
   const [canon, setCanon] = useState<StatsCanon>(EMPTY_CANON);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
+    let gaveUp = false;
+    const timer = setTimeout(() => {
+      if (cancelled) return;
+      // Past the cap we paint with what we have (EMPTY_CANON = calendar-year
+      // scopes only) AND refuse the late arrival: swapping the canon in after
+      // first paint would re-run defaultScope() and change every number under
+      // the user, which is precisely what the gate exists to prevent. The
+      // fetch still populates the cache, so the next mount gets the real thing.
+      gaveUp = true;
+      setLoading(false);
+    }, CANON_GATE_TIMEOUT_MS);
     loadStatsCanon()
       .then((c) => {
-        if (!cancelled) setCanon(c);
+        if (!cancelled && !gaveUp) setCanon(c);
       })
       .finally(() => {
+        clearTimeout(timer);
         if (!cancelled) setLoading(false);
       });
     return () => {
       cancelled = true;
+      clearTimeout(timer);
     };
   }, []);
 
+  // `canon` is assigned at most once, and always before `loading` flips false.
+  // Callers can therefore treat `loading === false` as "the scope decision is
+  // now stable" — nothing downstream re-defaults after first paint.
   return { canon, loading };
 }
 
@@ -138,6 +179,28 @@ export interface UseStatsDataArgs {
   /** Overridable for deterministic tests/screenshots. */
   today?: string;
 }
+
+/**
+ * The single Broadway-house index for the whole Stats screen.
+ *
+ * Built once, module-scope, from the vendored house list PLUS every
+ * `formerNames` entry in the metadata. `computeDiaryStats` would otherwise
+ * build its own from bare `houseNames` (no former names) while
+ * `theaterCompletion` built one with them, so a diary row logged at "Brooks
+ * Atkinson Theatre" counted toward the completion ring but not toward the hero
+ * tile's "N Broadway" sublabel.
+ *
+ * THEATER_HOUSES is a static vendored JSON import, so this can't go stale.
+ */
+export const HOUSE_INDEX: HouseIndex = buildHouseIndex(
+  HOUSE_NAMES,
+  {},
+  Object.fromEntries(
+    Object.entries(THEATER_HOUSES)
+      .filter(([, meta]) => meta.formerNames?.length)
+      .map(([name, meta]) => [name, meta.formerNames as string[]]),
+  ),
+);
 
 export function useStatsData({ reviews, shows, canon, scope, today }: UseStatsDataArgs): StatsBundle {
   const day = today ?? localToday();
@@ -152,17 +215,22 @@ export function useStatsData({ reviews, shows, canon, scope, today }: UseStatsDa
 
   const allRows = useMemo(() => toDiaryRows(reviews), [reviews]);
   const scopes = useMemo(() => buildScopes(allRows, canon, { today: day }), [allRows, canon, day]);
-  const active = scope ?? defaultScope(scopes, allRows, day);
+  const active = useMemo(
+    () => scope ?? defaultScope(scopes, allRows, day),
+    [scope, scopes, allRows, day],
+  );
 
   const reviewsInScope = useMemo(() => filterRows(reviews, active), [reviews, active]);
   const rows = useMemo(() => toDiaryRows(reviewsInScope), [reviewsInScope]);
 
+  // Both reducers take the SAME prebuilt index (opts.houseIndex wins over the
+  // houseNames / theaterMetadata fallbacks each would otherwise build from).
   const diary = useMemo(
-    () => computeDiaryStats(rows, showMeta, { houseNames: HOUSE_NAMES, today: day }),
+    () => computeDiaryStats(rows, showMeta, { houseIndex: HOUSE_INDEX, today: day }),
     [rows, showMeta, day],
   );
   const theaters = useMemo(
-    () => theaterCompletion(rows, showMeta, THEATER_HOUSES),
+    () => theaterCompletion(rows, showMeta, THEATER_HOUSES, { houseIndex: HOUSE_INDEX }),
     [rows, showMeta],
   );
   const windows = useMemo(() => seasonWindows(canon, { today: day }), [canon, day]);
@@ -189,6 +257,8 @@ export function useStatsData({ reviews, shows, canon, scope, today }: UseStatsDa
     showsById,
     canon,
     scopes,
+    scope: active,
+    houseIndex: HOUSE_INDEX,
     diary,
     theaters,
     canonStats,

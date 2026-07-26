@@ -12,7 +12,7 @@ import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-nati
 import Svg, { Path } from 'react-native-svg';
 import { BorderRadius, Colors, FontSize, Spacing } from '@/constants/theme';
 import * as haptics from '@/lib/haptics';
-import type { ScopeOption } from '@/lib/stats-scope';
+import { ALL_TIME, type ScopeOption } from '@/lib/stats-scope';
 
 const SECTIONS: ScopeOption['section'][] = ['All time', 'Seasons', 'Years'];
 
@@ -51,8 +51,10 @@ export function ScopePill({
           <Pressable
             testID="stats-scope-clear"
             onPress={() => {
+              // ALL_TIME by identity, not scopes[0] — the button says "All
+              // time" and must mean it even if the list order ever changes.
               haptics.tap();
-              onChange(scopes[0]);
+              onChange(ALL_TIME);
             }}
             accessibilityRole="button"
             accessibilityLabel="Show all time"

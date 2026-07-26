@@ -15,9 +15,9 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Colors, FontSize, Spacing } from '@/constants/theme';
 import * as haptics from '@/lib/haptics';
 import type { ScopeOption } from '@/lib/stats-scope';
-import type { StatsBundle } from '@/hooks/useStatsData';
+import { MIN_DATED_FOR_YEAR_CHART, type StatsBundle } from '@/hooks/useStatsData';
 import { STATS_LAYOUT } from '@/lib/stats-layout';
-import { GoldBar, ModuleHeader, RecordPill, StatsCard, TABULAR } from './StatsPrimitives';
+import { GoldBar, ModuleHeader, ModuleLocked, RecordPill, StatsCard, TABULAR } from './StatsPrimitives';
 
 const MONTH_ABBR = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
 
@@ -71,6 +71,19 @@ export function ShowsPerYear({ bundle, scope, onSelectYear, onOpenMonth, onOpenR
 
   const max = bars.reduce((m, b) => Math.max(m, b.count), 0);
   const peak = bars.find((b) => b.count === max && max > 0);
+
+  // Spec §7 per-module threshold. Undated rows can't be placed on a timeline,
+  // so the gate counts DATED entries — a chart drawn from one or two of them is
+  // a shape, not a trend.
+  if (diary.dated < MIN_DATED_FOR_YEAR_CHART) {
+    const need = MIN_DATED_FOR_YEAR_CHART - diary.dated;
+    return (
+      <ModuleLocked
+        title={byMonths ? 'Month by month' : 'Shows per year'}
+        need={`Log ${need} more dated ${need === 1 ? 'entry' : 'entries'} to see this chart.`}
+      />
+    );
+  }
 
   if (!bars.length) return null;
 

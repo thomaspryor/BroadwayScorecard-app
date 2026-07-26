@@ -8,8 +8,19 @@
 //
 //   2. DRIFT   — the web repo's src/lib/stats/ moved on and this copy is stale.
 //      Detected by re-reading the source and comparing sourceSha256. Only
-//      possible when a Broadwayscore checkout is present (BSC_WEB_REPO or
-//      ~/Broadwayscore), so it SKIPS rather than fails on CI.
+//      possible when a Broadwayscore checkout is present (BROADWAYSCORE_DIR,
+//      BSC_WEB_REPO, or ~/Broadwayscore), so it SKIPS rather than fails when
+//      one is absent — and prints a loud SKIPPED line naming what to run, so a
+//      skip is never mistaken for a pass.
+//
+// TODO(cross-repo CI): the drift half currently never runs on CI, because the
+// runner has no Broadwayscore checkout. The real fix is a second
+// actions/checkout of thomaspryor/Broadwayscore into a sibling path and
+// BROADWAYSCORE_DIR pointing at it in the gate job of
+// .github/workflows/eas-build.yml. Until then `sourceCommit` in
+// VENDOR_MANIFEST.json is the CI-visible record of WHICH web-repo commit this
+// vendored copy came from — asserted below — and drift itself is caught by a
+// human running `node scripts/vendor-stats-lib.js --check` locally.
 //
 // Rule 15 (never copy logic into tests): this imports the real check()/
 // buildVendorSet() from scripts/vendor-stats-lib.js.
@@ -20,6 +31,7 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
@@ -67,6 +79,32 @@ describe('vendored stats engine — tamper check (no web repo needed)', () => {
     }
   });
 
+  test('manifest records the web-repo commit it was vendored from', () => {
+    // Without this the manifest can only answer "was this copy edited here?",
+    // never "which Broadwayscore commit is it a copy OF" — and the drift half
+    // of this file does not run on CI, so provenance is all CI can check.
+    assert.equal(
+      typeof manifest.sourceCommit, 'string',
+      'VENDOR_MANIFEST.json has no sourceCommit. Re-run scripts/vendor-stats-lib.js ' +
+      'from a machine with the Broadwayscore checkout (BROADWAYSCORE_DIR).',
+    );
+    assert.match(
+      manifest.sourceCommit, /^[0-9a-f]{40}$/,
+      `sourceCommit "${manifest.sourceCommit}" is not a 40-char git sha`,
+    );
+    assert.equal(manifest.sourceRepo, 'thomaspryor/Broadwayscore');
+    assert.ok(manifest.generatedAt, 'manifest has no generatedAt timestamp');
+  });
+
+  test('every manifest entry names its source and carries both checksums', () => {
+    // A record missing sourceSha256 silently passes the drift check forever.
+    for (const [file, rec] of Object.entries(manifest.files)) {
+      assert.match(rec.sha256 ?? '', /^[0-9a-f]{64}$/, `${file}: bad or missing sha256`);
+      assert.match(rec.sourceSha256 ?? '', /^[0-9a-f]{64}$/, `${file}: bad or missing sourceSha256`);
+      assert.ok(rec.source, `${file}: no source path recorded`);
+    }
+  });
+
   test('derived theater-houses.json is a usable denominator', () => {
     const houses = JSON.parse(fs.readFileSync(path.join(DEST_DIR, 'theater-houses.json'), 'utf8'));
     const names = Object.keys(houses);
@@ -81,12 +119,48 @@ describe('vendored stats engine — tamper check (no web repo needed)', () => {
   });
 });
 
-describe('vendored stats engine — drift vs Broadwayscore', { skip: webRepoPresent ? false : `no web repo at ${WEB_REPO}` }, () => {
+if (!webRepoPresent) {
+  // A silently-skipped gate is indistinguishable from a passing one in CI logs.
+  // Say out loud that drift was NOT checked and name the command that checks it.
+  console.error(
+    [
+      '',
+      '─────────────────────────────────────────────────────────────────────',
+      'SKIPPED: vendored stats engine — drift vs Broadwayscore',
+      `  No Broadwayscore checkout at ${WEB_REPO}, so this run proved only that`,
+      '  lib/stats/ matches VENDOR_MANIFEST.json — NOT that the manifest still',
+      "  matches the web repo's src/lib/stats/.",
+      `  Vendored from commit: ${manifest.sourceCommit ?? '(none recorded)'}`,
+      '  Run locally to close the gap:',
+      '    BROADWAYSCORE_DIR=~/Broadwayscore node scripts/vendor-stats-lib.js --check',
+      '─────────────────────────────────────────────────────────────────────',
+      '',
+    ].join('\n'),
+  );
+}
+
+describe('vendored stats engine — drift vs Broadwayscore', { skip: webRepoPresent ? false : `no web repo at ${WEB_REPO} (see SKIPPED banner above)` }, () => {
   test('web repo sources still hash to what was vendored', () => {
     const problems = vendor.check(vendor.buildVendorSet());
     assert.deepEqual(
       problems, [],
       'Run `node scripts/vendor-stats-lib.js` and commit the result.',
+    );
+  });
+
+  test('the recorded sourceCommit exists in the web repo', () => {
+    // Catches a hand-edited sourceCommit, or one vendored from an unrelated
+    // checkout: the sha has to be a real commit object over there.
+    assert.match(manifest.sourceCommit ?? '', /^[0-9a-f]{40}$/);
+    const probe = spawnSync(
+      'git',
+      ['-C', WEB_REPO, 'cat-file', '-e', `${manifest.sourceCommit}^{commit}`],
+      { encoding: 'utf8' },
+    );
+    assert.equal(
+      probe.status, 0,
+      `sourceCommit ${manifest.sourceCommit} is not a commit in ${WEB_REPO}. ` +
+      'Re-run scripts/vendor-stats-lib.js.',
     );
   });
 });
