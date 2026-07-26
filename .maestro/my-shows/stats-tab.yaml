@@ -1,0 +1,98 @@
+# Stats tab smoke — segmented control nav + one tap-through.
+#
+# Covers the two things that break silently: the Grid · Feed · Stats segmented
+# control reaching the new screen at all, and a stat actually opening its
+# filtered show list (spec §1 "every number is a door"). A white-screened Stats
+# tab or a drilldown that renders nothing both fail here.
+#
+# Lives in my-shows/ so it runs under the `my-shows` suite and under `all`.
+# Requires the dev-test account (EXPO_PUBLIC_DEV_AUTO_SIGNIN=1), same as every
+# other signed-in flow in this directory.
+
+appId: com.broadwayscorecard.app
+---
+- launchApp
+
+# iOS "Open in" dialog, when a deep link was used to launch.
+- tapOn:
+    text: "Open"
+    optional: true
+
+- extendedWaitUntil:
+    visible: "Broadway Scorecard"
+    timeout: 45000
+
+- openLink: broadwayscorecard:///watched
+- tapOn:
+    text: "Open"
+    optional: true
+
+# Auto sign-in can lag a cold start; the diary header is the ready signal.
+- extendedWaitUntil:
+    visible: "My Watched Shows"
+    timeout: 30000
+
+# ── Segmented control → Stats ──────────────────────────────────────────
+- tapOn:
+    id: "diary-stats-view-toggle"
+- waitForAnimationToEnd:
+    timeout: 5000
+
+# The scope pill is pinned under the header on the Stats screen and nowhere
+# else, so its presence proves we're on Stats and it rendered past first paint.
+- extendedWaitUntil:
+    visible:
+      id: "stats-scope-pill"
+    timeout: 20000
+
+- assertVisible:
+    id: "stats-tile-shows"
+- assertVisible:
+    id: "stats-house-grid"
+
+# ── Tap-through: a hero tile opens its filtered diary list ─────────────
+- tapOn:
+    id: "stats-tile-shows"
+- extendedWaitUntil:
+    visible:
+      id: "stats-drilldown-sheet"
+    timeout: 10000
+- assertVisible:
+    id: "stats-drilldown-row"
+- tapOn:
+    id: "stats-drilldown-close"
+- waitForAnimationToEnd:
+    timeout: 5000
+
+# ── Tap-through: a theater chip opens the house detail sheet ───────────
+- tapOn:
+    id: "stats-house-chip"
+    index: 0
+- extendedWaitUntil:
+    visible:
+      id: "stats-drilldown-sheet"
+    timeout: 10000
+- tapOn:
+    id: "stats-drilldown-close"
+- waitForAnimationToEnd:
+    timeout: 5000
+
+# ── Scope pill opens and applies ───────────────────────────────────────
+- tapOn:
+    id: "stats-scope-pill"
+- extendedWaitUntil:
+    visible: "SEASONS"
+    timeout: 10000
+- tapOn:
+    id: "stats-scope-option-all"
+- waitForAnimationToEnd:
+    timeout: 5000
+- assertVisible:
+    id: "stats-tile-shows"
+
+# ── Back to Grid — the segmented control still works both ways ─────────
+- tapOn:
+    id: "diary-grid-view-toggle"
+- waitForAnimationToEnd:
+    timeout: 5000
+- assertVisible: "My Watched Shows"

@@ -1,0 +1,112 @@
+# Capture the Stats-screen design proposal shots from the REAL app.
+#
+# LOCAL-ONLY TOOL — deliberately outside .maestro/ so maestro-e2e.yml's
+# `.maestro/**/*.yaml` glob for suite=all doesn't sweep it in: it writes to a
+# ~/Documents path that doesn't exist on CI runners.
+#
+# Per app CLAUDE.md "Design Proposals" #1 (fidelity honesty): a proposal shown
+# to the owner must be rendered by the real product and captured from the
+# simulator. This flow drives the shipped build; there is no mockup anywhere in
+# the pipeline.
+#
+# Pre-reqs: app installed, EXPO_PUBLIC_DEV_AUTO_SIGNIN=1 in .env.local at bundle
+# time (dev-test@broadwayscorecard.com — 52 real diary entries, 2022–2026).
+#
+# Run per variant/device (SHOT_PREFIX names the output files):
+#   maestro --device <udid> test -e SHOT_PREFIX=ledger-max .maestro-manual/stats-screenshots.yaml
+
+appId: com.broadwayscorecard.app
+---
+- launchApp:
+    clearState: false
+
+- tapOn:
+    text: "Open"
+    optional: true
+
+- extendedWaitUntil:
+    visible: "Broadway Scorecard"
+    timeout: 60000
+
+- runFlow:
+    when:
+      visible: "Skip"
+    commands:
+      - tapOn: "Skip"
+      - tapOn: "Skip"
+      - tapOn: "Skip"
+
+- openLink: broadwayscorecard:///watched
+- tapOn:
+    text: "Open"
+    optional: true
+- extendedWaitUntil:
+    visible: "My Watched Shows"
+    timeout: 40000
+
+# ── Stats overview (module 1–2) ────────────────────────────────────────
+- tapOn:
+    id: "diary-stats-view-toggle"
+- extendedWaitUntil:
+    visible:
+      id: "stats-scope-pill"
+    timeout: 30000
+- waitForAnimationToEnd:
+    timeout: 6000
+- takeScreenshot: ~/Documents/claude-outputs/show-stats-ios-options/${SHOT_PREFIX}-01-overview
+
+# ── Theater checklist (module 3) ───────────────────────────────────────
+- scroll
+- scroll
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: ~/Documents/claude-outputs/show-stats-ios-options/${SHOT_PREFIX}-02-theaters
+
+# ── You vs. the Critics (module 4) ─────────────────────────────────────
+- scroll
+- scroll
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: ~/Documents/claude-outputs/show-stats-ios-options/${SHOT_PREFIX}-03-critics
+
+# ── Tony canon + ratings (modules 5–6) ─────────────────────────────────
+- scroll
+- scroll
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: ~/Documents/claude-outputs/show-stats-ios-options/${SHOT_PREFIX}-04-canon-ratings
+
+- scroll
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: ~/Documents/claude-outputs/show-stats-ios-options/${SHOT_PREFIX}-05-ratings
+
+# ── Drill-down sheet (proves "every number is a door") ─────────────────
+- scrollUntilVisible:
+    element:
+      id: "stats-tile-shows"
+    direction: UP
+    timeout: 20000
+- tapOn:
+    id: "stats-tile-shows"
+- extendedWaitUntil:
+    visible:
+      id: "stats-drilldown-sheet"
+    timeout: 15000
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: ~/Documents/claude-outputs/show-stats-ios-options/${SHOT_PREFIX}-06-drilldown
+- tapOn:
+    id: "stats-drilldown-close"
+- waitForAnimationToEnd:
+    timeout: 3000
+
+# ── Scope picker ───────────────────────────────────────────────────────
+- tapOn:
+    id: "stats-scope-pill"
+- extendedWaitUntil:
+    visible: "SEASONS"
+    timeout: 15000
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: ~/Documents/claude-outputs/show-stats-ios-options/${SHOT_PREFIX}-07-scope-picker

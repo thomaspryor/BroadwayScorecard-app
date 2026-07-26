@@ -43,6 +43,13 @@ jobs:
       - name: Unit-test advanced filters
         run: node --experimental-strip-types --test scripts/advanced-filters.test.mjs
 
+      # Vendored stats engine (lib/stats/) must match its checksum manifest.
+      # The web-repo drift half auto-skips here (no Broadwayscore checkout on
+      # the runner); the tamper half is what stops an edited vendored copy from
+      # shipping to TestFlight.
+      - name: Unit-test vendored stats engine drift
+        run: node --test scripts/vendor-stats-lib.test.mjs
+
       - name: Decide whether TestFlight drifted
         id: gate
         env:
