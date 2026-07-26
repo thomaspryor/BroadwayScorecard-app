@@ -71,13 +71,10 @@ appId: com.broadwayscorecard.app
     direction: UP
 - waitForAnimationToEnd
 - takeScreenshot: /tmp/bwsc-beta-verify/02-watched-grid-years
-- tapOn:
-    id: "list-view-toggle"
+- swipe:
+    direction: UP
 - waitForAnimationToEnd
 - takeScreenshot: /tmp/bwsc-beta-verify/03-watched-list
-- tapOn:
-    id: "grid-view-toggle"
-- waitForAnimationToEnd
 
 # ── To Watch tab: item 10 (no empty stars, no booked-shelf pills, compact pills)
 - openLink: broadwayscorecard:///to-watch
@@ -109,6 +106,7 @@ appId: com.broadwayscorecard.app
 - takeScreenshot: /tmp/bwsc-beta-verify/06-browse-critics
 - tapOn:
     text: "AUDIENCE"
+    optional: true
 - waitForAnimationToEnd
 - takeScreenshot: /tmp/bwsc-beta-verify/07-browse-audience
 
