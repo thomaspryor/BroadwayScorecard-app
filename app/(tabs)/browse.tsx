@@ -22,6 +22,8 @@ import { useWatchlist } from '@/hooks/useWatchlist';
 import { useMyRatingsMap } from '@/hooks/useMyRatingsMap';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
 import { trackFilterChanged, trackScoreModeToggled, trackMarketChanged, trackDataRefreshed } from '@/lib/analytics';
+import { AdvancedFiltersSheet } from '@/components/AdvancedFiltersSheet';
+import { applyAdvancedFilters, countActiveSelections, AdvancedSelections } from '@/lib/advanced-filters';
 
 // Grade ordering: A+ is best (0), then A (1), A- (2), B+ (3), etc.
 const GRADE_ORDER: Record<string, number> = {
@@ -97,6 +99,8 @@ export default function BrowseScreen() {
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
   const [sortBy, setSortBy] = useState<SortOption>('score');
   const [includeOB, setIncludeOB] = useState(false);
+  const [advancedSelections, setAdvancedSelections] = useState<AdvancedSelections>({});
+  const [filtersSheetOpen, setFiltersSheetOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const searchInputRef = useRef<TextInput>(null);
   const isWestEnd = market === 'london';
@@ -131,6 +135,7 @@ export default function BrowseScreen() {
     if (typeFilter !== 'all') {
       result = result.filter(s => s.type === typeFilter);
     }
+    result = applyAdvancedFilters(result, advancedSelections);
 
     switch (sortBy) {
       case 'score':
@@ -155,7 +160,14 @@ export default function BrowseScreen() {
     }
 
     return result;
-  }, [shows, market, includeOB, statusFilter, typeFilter, sortBy, scoreMode]);
+  }, [shows, market, includeOB, statusFilter, typeFilter, sortBy, scoreMode, advancedSelections]);
+
+  const advancedCount = countActiveSelections(advancedSelections);
+
+  const handleAdvancedChange = useCallback((next: AdvancedSelections) => {
+    setAdvancedSelections(next);
+    trackFilterChanged('advanced', String(countActiveSelections(next)), 'browse');
+  }, []);
 
   const totalForMarket = useMemo(
     () => shows.filter(s => filterByMarketCategory(s.category, market, includeOB)).length,
@@ -281,9 +293,17 @@ export default function BrowseScreen() {
             </View>
 
             }
-            {/* Type + Sort + OB toggle */}
+            {/* Type + Sort + OB toggle + Advanced filters */}
             {!searchResults && <View style={styles.filterRowInline}>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterGroup}>
+                {/* Advanced filters entry point — desktop parity
+                    (beta feedback 2026-07-26). */}
+                <FilterPill
+                  label={advancedCount > 0 ? `Filters · ${advancedCount}` : 'Filters'}
+                  active={advancedCount > 0}
+                  onPress={() => setFiltersSheetOpen(true)}
+                />
+                <View style={styles.sortDivider} />
                 {/* Market-scope toggle FIRST so it's visible without scrolling
                     (beta feedback 2026-07-25: owner couldn't find Off-Bway —
                     it was stranded past the sort pills at the scroll end). */}
@@ -340,6 +360,13 @@ export default function BrowseScreen() {
             </View>
           ) : null
         }
+      />
+      <AdvancedFiltersSheet
+        visible={filtersSheetOpen}
+        selections={advancedSelections}
+        matchCount={filteredShows.length}
+        onChange={handleAdvancedChange}
+        onClose={() => setFiltersSheetOpen(false)}
       />
     </View>
   );

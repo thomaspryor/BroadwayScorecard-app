@@ -71,7 +71,7 @@ function StatusOverlayPill({ show }: { show?: Show }) {
   const info = statusOverlay(show);
   if (!info) return null;
   return (
-    <View style={[styles.statusPill, { backgroundColor: 'rgba(0,0,0,0.72)', borderColor: info.color + '66' }]}>
+    <View style={[styles.statusPill, { backgroundColor: 'rgba(0,0,0,0.72)' }]}>
       <Text style={[styles.statusPillText, { color: info.color }]}>{info.label}</Text>
     </View>
   );
@@ -448,6 +448,22 @@ export default function ToWatchScreen() {
                   </View>
                   <View style={styles.posterGrid}>
                     {upcomingWatchlist.map(renderUpcomingItem)}
+                    {/* Dashed add tile on this shelf too (beta feedback
+                        2026-07-26) — search modal prompts for a date after
+                        adding, so the new entry lands here directly. */}
+                    <View style={styles.gridCard}>
+                      <Pressable
+                        style={({ pressed }) => [styles.addShowCard, pressed && styles.pressed]}
+                        onPress={() => setShowSearchModal(true)}
+                        accessibilityRole="button"
+                        accessibilityLabel="Add an upcoming show"
+                      >
+                        <Svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke={Colors.text.muted} strokeWidth={2}>
+                          <Path strokeLinecap="round" d="M12 5v14M5 12h14" />
+                        </Svg>
+                        <Text style={styles.addShowLabel}>Add Show</Text>
+                      </Pressable>
+                    </View>
                   </View>
                 </View>
               )}
@@ -596,18 +612,21 @@ const styles = StyleSheet.create({
   cardPosterPlaceholder: { alignItems: 'center', justifyContent: 'center' },
   placeholderText: { color: Colors.text.muted, fontSize: 18, fontWeight: '600' },
   posterDate: { color: Colors.text.secondary, fontSize: 12, fontWeight: '500', textAlign: 'center', marginTop: 4 },
-  // Compact web-style pill (beta feedback 2026-07-25: the old 12pt chunky
-  // labels spanned nearly the whole poster width and "looked bad vs web").
+  // Small overlay label (beta feedback 2026-07-26: the 12pt bordered pills
+  // still read "ugly and too large" — shrink to a plain dark scrim tag).
   statusPill: {
-    position: 'absolute', top: 5, left: 5, zIndex: 10,
-    paddingHorizontal: 6, paddingVertical: 2,
-    borderRadius: 6, borderWidth: 1,
+    position: 'absolute', top: 4, left: 4, zIndex: 10,
+    paddingHorizontal: 5, paddingVertical: 2,
+    borderRadius: 4,
   },
-  statusPillText: { fontSize: 12, fontWeight: '600', letterSpacing: 0.3 },
+  statusPillText: { fontSize: 9, fontWeight: '700', letterSpacing: 0.4 },
   listStatus: { fontSize: 12, fontWeight: '600', marginTop: 2, letterSpacing: 0.3 },
   gridTitle: {
     color: Colors.text.secondary, fontSize: 12, fontWeight: '500',
     textAlign: 'center', lineHeight: 15, marginTop: 2,
+    // Reserve both title lines so dates below align across cards
+    // (beta feedback 2026-07-26).
+    minHeight: 30,
   },
   addShowCard: {
     width: '100%', aspectRatio: 2 / 3, borderRadius: BorderRadius.md,

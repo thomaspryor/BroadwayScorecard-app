@@ -379,14 +379,10 @@ export default function WatchedScreen() {
             <Text style={styles.cardTitle} numberOfLines={1}>{title}</Text>
             {show?.venue && <Text style={styles.cardVenue} numberOfLines={1}>{show.venue}</Text>}
             {item.review_text && <Text style={styles.cardNote} numberOfLines={1}>{item.review_text}</Text>}
-            {item.date_seen && (
-              <Text style={styles.cardDate}>
-                {new Date(item.date_seen + 'T00:00:00').toLocaleDateString('en-US', {
-                  month: 'short', day: 'numeric', year: 'numeric',
-                })}
-              </Text>
-            )}
           </View>
+          {/* Stars only + date on the right (beta feedback 2026-07-26: "Move
+              the dates to the right. Remove 4.0 — the stars themselves are
+              clear."). */}
           <Pressable
             style={styles.cardRating}
             onPress={() => guardedPush(item.id, () => router.push({
@@ -398,7 +394,13 @@ export default function WatchedScreen() {
             accessibilityLabel={`Edit your ${item.rating.toFixed(1)} star rating`}
           >
             <StarRating rating={item.rating} onRatingChange={() => {}} size="sm" readOnly hideLabel />
-            <Text style={styles.ratingText}>{item.rating.toFixed(1)}</Text>
+            {item.date_seen && (
+              <Text style={styles.cardDate}>
+                {new Date(item.date_seen + 'T00:00:00').toLocaleDateString('en-US', {
+                  month: 'short', day: 'numeric', year: 'numeric',
+                })}
+              </Text>
+            )}
           </Pressable>
         </Pressable>
       </ReanimatedSwipeable>
@@ -426,19 +428,9 @@ export default function WatchedScreen() {
               <Text style={styles.placeholderText}>{title.charAt(0)}</Text>
             </View>
           )}
-          {/* Visible delete affordance — grid cards were long-press-only with
-              no hint that a delete gesture existed (2026-07-26 Tier-1 assessment). */}
-          <Pressable
-            style={styles.gridDeleteButton}
-            onPress={() => handleDeleteDiaryItem(item)}
-            hitSlop={8}
-            accessibilityRole="button"
-            accessibilityLabel={`Delete your rating for ${title}`}
-          >
-            <Svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth={2.5}>
-              <Path strokeLinecap="round" strokeLinejoin="round" d="M18 6L6 18M6 6l12 12" />
-            </Svg>
-          </Pressable>
+          {/* No corner delete button — owner reverted the Tier-1 sweep's X
+              (beta feedback 2026-07-26: "Removing isn't a common action.
+              They can long press or click in to delete instead"). */}
         </View>
         <Pressable
           style={styles.gridCardInfo}
@@ -496,18 +488,15 @@ export default function WatchedScreen() {
         <View style={styles.cardInfo}>
           <Text style={styles.cardTitle} numberOfLines={1}>{title}</Text>
           {show?.venue && <Text style={styles.cardVenue} numberOfLines={1}>{show.venue}</Text>}
-          {formattedDate && (
-            <Text style={styles.upcomingDateText}>
-              {formattedDate}
-              {daysUntil !== null && daysUntil > 0 && (daysUntil === 1 ? ' · Tomorrow' : ` · ${daysUntil}d`)}
-            </Text>
-          )}
         </View>
-        <Pressable onPress={() => handleRemoveUpcoming(entry)} hitSlop={10} accessibilityRole="button" accessibilityLabel={`Remove ${title} from watchlist`}>
-          <Svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={Colors.text.muted} strokeWidth={2}>
-            <Path strokeLinecap="round" strokeLinejoin="round" d="M18 6L6 18M6 6l12 12" />
-          </Svg>
-        </Pressable>
+        {/* Date on the right, no X (beta feedback 2026-07-26: removing isn't
+            a common action — long-press handles it). */}
+        {formattedDate && (
+          <Text style={styles.upcomingDateText}>
+            {formattedDate}
+            {daysUntil !== null && daysUntil > 0 && (daysUntil === 1 ? ' · Tomorrow' : ` · ${daysUntil}d`)}
+          </Text>
+        )}
       </Pressable>
     );
   };
@@ -570,7 +559,11 @@ export default function WatchedScreen() {
             </Text>
           </View>
           {viewMode === 'grid' ? (
-            <View style={styles.toBeRatedGrid}>
+            // pastGrid, not toBeRatedGrid: this section sits inside the
+            // already-padded list container, so the padded grid double-indented
+            // it (beta feedback 2026-07-26: "upcoming list should be left
+            // aligned to match the other rows").
+            <View style={styles.pastGrid}>
               {upcomingWatchlistEntries.map(entry => {
                 const show = showMap[entry.show_id];
                 const title = show?.title || humanizeShowId(entry.show_id);
@@ -879,8 +872,7 @@ const styles = StyleSheet.create({
   cardVenue: { color: Colors.text.muted, fontSize: FontSize.xs },
   cardNote: { color: Colors.text.secondary, fontSize: FontSize.xs, fontStyle: 'italic' },
   cardDate: { color: Colors.text.muted, fontSize: FontSize.xs },
-  cardRating: { alignItems: 'center', gap: 2 },
-  ratingText: { color: Colors.text.secondary, fontSize: FontSize.xs },
+  cardRating: { alignItems: 'flex-end', gap: 3 },
   // Grid view
   gridContainer: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.md },
   pastGrid: {
@@ -896,16 +888,13 @@ const styles = StyleSheet.create({
     width: '100%', aspectRatio: 2 / 3, borderRadius: BorderRadius.md,
     backgroundColor: Colors.surface.overlay,
   },
-  gridDeleteButton: {
-    position: 'absolute', top: 4, right: 4,
-    width: 22, height: 22, borderRadius: 11,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-    alignItems: 'center', justifyContent: 'center',
-  },
   gridCardInfo: { marginTop: 4, alignItems: 'center' },
   gridTitle: {
     color: Colors.text.secondary, fontSize: 12, fontWeight: '500',
     textAlign: 'center', lineHeight: 15, marginTop: 2,
+    // Reserve both title lines so the date below always sits on the same
+    // baseline across cards (beta feedback 2026-07-26).
+    minHeight: 30,
   },
   // Add show card
   addShowCard: {

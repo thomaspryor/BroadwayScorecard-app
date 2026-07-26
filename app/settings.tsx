@@ -5,7 +5,6 @@
 
 import React, { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, Pressable, ScrollView, Alert } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as WebBrowser from 'expo-web-browser';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
@@ -38,7 +37,6 @@ function SettingsRow({ label, value, onPress, destructive }: { label: string; va
 
 export default function SettingsScreen() {
   const { lastUpdated, refresh, shows } = useShows();
-  const insets = useSafeAreaInsets();
   const router = useRouter();
   const { market, setMarket } = useMarket();
   const handleMarketChange = useCallback((m: Market) => {
@@ -165,13 +163,15 @@ export default function SettingsScreen() {
 
   const open = (path: string) => WebBrowser.openBrowserAsync(`${WEB}${path}`);
 
+  // The native stack header owns the "Settings" title and safe-area inset
+  // (beta feedback 2026-07-26: in-page duplicate heading + insets.top padding
+  // under the header produced a large dead gap; header title was the
+  // lowercase route name because the route wasn't registered in _layout).
   return (
     <ScrollView
-      style={[styles.container, { paddingTop: insets.top }]}
+      style={styles.container}
       contentContainerStyle={styles.content}
     >
-      <Text style={styles.title}>Settings</Text>
-
       {/* Market picker */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>MARKET</Text>
@@ -253,15 +253,8 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface.default,
   },
   content: {
+    paddingTop: Spacing.md,
     paddingBottom: Spacing.xxl,
-  },
-  title: {
-    color: Colors.text.primary,
-    fontSize: FontSize.xxl,
-    fontWeight: '700',
-    paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.xl,
-    paddingBottom: Spacing.lg,
   },
   section: {
     marginBottom: Spacing.xl,

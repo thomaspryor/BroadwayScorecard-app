@@ -29,7 +29,9 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # 22+: advanced-filters test imports the real .ts module via
+          # --experimental-strip-types (unavailable on 20)
+          node-version: 22
           cache: npm
 
       - name: Install dependencies (pins eas-cli to package.json version)
@@ -37,6 +39,9 @@ jobs:
 
       - name: Unit-test gate logic
         run: node --test scripts/check-testflight-drift.test.mjs
+
+      - name: Unit-test advanced filters
+        run: node --experimental-strip-types --test scripts/advanced-filters.test.mjs
 
       - name: Decide whether TestFlight drifted
         id: gate

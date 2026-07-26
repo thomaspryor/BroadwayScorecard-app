@@ -203,6 +203,18 @@ function RootLayout() {
         }}
       />
       <Stack.Screen
+        name="settings"
+        options={{
+          headerShown: true,
+          title: 'Settings',
+          headerBackTitle: 'Back',
+          headerStyle: { backgroundColor: Colors.surface.default },
+          headerTintColor: Colors.brand,
+          headerTitleStyle: { color: Colors.text.primary },
+          animation: 'slide_from_right',
+        }}
+      />
+      <Stack.Screen
         name="rate/[showId]"
         options={{
           presentation: 'modal',
