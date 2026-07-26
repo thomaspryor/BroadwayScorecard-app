@@ -47,8 +47,6 @@ appId: com.broadwayscorecard.app
 
 - assertVisible:
     id: "stats-tile-shows"
-- assertVisible:
-    id: "stats-house-grid"
 
 # ── Tap-through: a hero tile opens its filtered diary list ─────────────
 - tapOn:
@@ -65,6 +63,16 @@ appId: com.broadwayscorecard.app
     timeout: 5000
 
 # ── Tap-through: a theater chip opens the house detail sheet ───────────
+# The checklist starts below the fold, so scroll it into view first —
+# assertVisible/tapOn only see what is actually on screen.
+- scrollUntilVisible:
+    element:
+      id: "stats-house-grid"
+    direction: DOWN
+    visibilityPercentage: 20
+    timeout: 30000
+- assertVisible:
+    id: "stats-house-grid"
 - tapOn:
     id: "stats-house-chip"
     index: 0
@@ -87,6 +95,14 @@ appId: com.broadwayscorecard.app
     id: "stats-scope-option-all"
 - waitForAnimationToEnd:
     timeout: 5000
+# The screen is still scrolled down at the checklist, so come back up before
+# asserting the hero survived the scope change.
+- scrollUntilVisible:
+    element:
+      id: "stats-tile-shows"
+    direction: UP
+    visibilityPercentage: 40
+    timeout: 30000
 - assertVisible:
     id: "stats-tile-shows"
 
