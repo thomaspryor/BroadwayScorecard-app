@@ -23,26 +23,24 @@ interface Props {
   selections: AdvancedSelections;
   /** Shows matching the CURRENT selections (for the Done button count) */
   matchCount: number;
-  onChange: (next: AdvancedSelections) => void;
+  /** Toggle one option — parent applies it via a functional state update */
+  onToggle: (groupKey: string, optionId: string) => void;
+  onClearAll: () => void;
   onClose: () => void;
 }
 
-export function AdvancedFiltersSheet({ visible, selections, matchCount, onChange, onClose }: Props) {
+export function AdvancedFiltersSheet({ visible, selections, matchCount, onToggle, onClearAll, onClose }: Props) {
   const insets = useSafeAreaInsets();
   const activeCount = countActiveSelections(selections);
 
   const toggle = (groupKey: string, optionId: string) => {
     haptics.tap();
-    const current = selections[groupKey] ?? [];
-    const next = current.includes(optionId)
-      ? current.filter((id) => id !== optionId)
-      : [...current, optionId];
-    onChange({ ...selections, [groupKey]: next });
+    onToggle(groupKey, optionId);
   };
 
   const clearAll = () => {
     haptics.tap();
-    onChange({});
+    onClearAll();
   };
 
   return (
@@ -117,7 +115,9 @@ const styles = StyleSheet.create({
   },
   title: { color: Colors.text.primary, fontSize: FontSize.lg, fontWeight: '700' },
   clearAll: { color: Colors.brand, fontSize: FontSize.sm, fontWeight: '600' },
-  groups: { flexGrow: 0 },
+  // flexShrink 1: RN defaults flexShrink to 0, so without this the ScrollView
+  // sizes to content and pushes the Done button past the sheet's maxHeight.
+  groups: { flexGrow: 0, flexShrink: 1 },
   group: { marginBottom: Spacing.lg },
   groupLabel: {
     color: Colors.text.muted, fontSize: FontSize.xs, fontWeight: '600',

@@ -7,6 +7,7 @@ import {
   ADVANCED_FILTER_GROUPS,
   applyAdvancedFilters,
   countActiveSelections,
+  toggleSelection,
 } from '../lib/advanced-filters.ts';
 
 // Minimal real-shaped shows — predicates only read tags/isRevival/compositeScore.
@@ -55,6 +56,39 @@ test('null compositeScore never matches a score tier', () => {
     applyAdvancedFilters(ALL, { score_tier: ['critical-miss'] }).map(s => s.id),
     ['flop'],
   );
+});
+
+test('fractional scores round into the tier their badge displays', () => {
+  const ragtime = show('ragtime', { compositeScore: 82.94 }); // badge shows 83
+  const doubt = show('doubt', { compositeScore: 74.9 });      // badge shows 75
+  assert.deepEqual(
+    applyAdvancedFilters([ragtime], { score_tier: ['critical-gold'] }).map(s => s.id),
+    ['ragtime'],
+  );
+  assert.deepEqual(
+    applyAdvancedFilters([doubt], { score_tier: ['recommended'] }).map(s => s.id),
+    ['doubt'],
+  );
+  // Every fractional score lands in exactly one tier
+  const tiers = ADVANCED_FILTER_GROUPS.find(g => g.key === 'score_tier').options;
+  for (const sc of [54.4, 54.6, 64.5, 74.49, 82.5, 99.9]) {
+    const matches = tiers.filter(t => applyAdvancedFilters([show('x', { compositeScore: sc })], { score_tier: [t.id] }).length);
+    assert.equal(matches.length, 1, `score ${sc}`);
+  }
+});
+
+test('toggleSelection adds, removes, and is pure', () => {
+  const s1 = toggleSelection({}, 'genre', 'comedy');
+  assert.deepEqual(s1, { genre: ['comedy'] });
+  const s2 = toggleSelection(s1, 'genre', 'drama');
+  assert.deepEqual(s2.genre, ['comedy', 'drama']);
+  const s3 = toggleSelection(s2, 'genre', 'comedy');
+  assert.deepEqual(s3.genre, ['drama']);
+  assert.deepEqual(s1, { genre: ['comedy'] }); // inputs not mutated
+  // Two toggles composed functionally both land (rapid-tap scenario)
+  let state = {};
+  for (const id of ['lottery', 'rush']) state = toggleSelection(state, 'tickets', id);
+  assert.equal(countActiveSelections(state), 2);
 });
 
 test('every group option id is unique within its group', () => {

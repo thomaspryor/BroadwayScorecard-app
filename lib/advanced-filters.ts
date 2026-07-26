@@ -29,8 +29,15 @@ export type AdvancedSelections = Record<string, string[]>;
 const hasTag = (tag: string): FilterPredicate =>
   (s) => s.tags.includes(tag);
 
+// Round before bucketing: compositeScore is fractional for most shows and the
+// displayed badge is the rounded value — a raw 82.94 must land in the 83+ tier
+// it displays as, not fall between closed ranges.
 const inScoreRange = (min: number, max: number): FilterPredicate =>
-  (s) => s.compositeScore !== null && s.compositeScore >= min && s.compositeScore <= max;
+  (s) => {
+    if (s.compositeScore === null) return false;
+    const rounded = Math.round(s.compositeScore);
+    return rounded >= min && rounded <= max;
+  };
 
 export const ADVANCED_FILTER_GROUPS: AdvancedFilterGroup[] = [
   {
@@ -83,6 +90,22 @@ export const ADVANCED_FILTER_GROUPS: AdvancedFilterGroup[] = [
     ],
   },
 ];
+
+/**
+ * Toggle one option in a selections map (pure — safe for functional
+ * setState, so rapid consecutive taps can't clobber each other).
+ */
+export function toggleSelection(
+  prev: AdvancedSelections,
+  groupKey: string,
+  optionId: string,
+): AdvancedSelections {
+  const current = prev[groupKey] ?? [];
+  const next = current.includes(optionId)
+    ? current.filter((id) => id !== optionId)
+    : [...current, optionId];
+  return { ...prev, [groupKey]: next };
+}
 
 /** Total selected option count across all groups (badge on the Filters pill). */
 export function countActiveSelections(selections: AdvancedSelections): number {

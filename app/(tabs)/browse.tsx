@@ -23,7 +23,7 @@ import { useMyRatingsMap } from '@/hooks/useMyRatingsMap';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
 import { trackFilterChanged, trackScoreModeToggled, trackMarketChanged, trackDataRefreshed } from '@/lib/analytics';
 import { AdvancedFiltersSheet } from '@/components/AdvancedFiltersSheet';
-import { applyAdvancedFilters, countActiveSelections, AdvancedSelections } from '@/lib/advanced-filters';
+import { applyAdvancedFilters, countActiveSelections, toggleSelection, AdvancedSelections } from '@/lib/advanced-filters';
 
 // Grade ordering: A+ is best (0), then A (1), A- (2), B+ (3), etc.
 const GRADE_ORDER: Record<string, number> = {
@@ -164,9 +164,16 @@ export default function BrowseScreen() {
 
   const advancedCount = countActiveSelections(advancedSelections);
 
-  const handleAdvancedChange = useCallback((next: AdvancedSelections) => {
-    setAdvancedSelections(next);
-    trackFilterChanged('advanced', String(countActiveSelections(next)), 'browse');
+  // Functional updates: rapid consecutive pill taps compose instead of the
+  // second tap clobbering the first (ship-check adversarial review 2026-07-26).
+  const handleAdvancedToggle = useCallback((groupKey: string, optionId: string) => {
+    setAdvancedSelections(prev => toggleSelection(prev, groupKey, optionId));
+    trackFilterChanged('advanced', `${groupKey}:${optionId}`, 'browse');
+  }, []);
+
+  const handleAdvancedClearAll = useCallback(() => {
+    setAdvancedSelections({});
+    trackFilterChanged('advanced', 'clear_all', 'browse');
   }, []);
 
   const totalForMarket = useMemo(
@@ -365,7 +372,8 @@ export default function BrowseScreen() {
         visible={filtersSheetOpen}
         selections={advancedSelections}
         matchCount={filteredShows.length}
-        onChange={handleAdvancedChange}
+        onToggle={handleAdvancedToggle}
+        onClearAll={handleAdvancedClearAll}
         onClose={() => setFiltersSheetOpen(false)}
       />
     </View>

@@ -419,6 +419,9 @@ export default function WatchedScreen() {
         style={({ pressed }) => [styles.gridCardFixed, pressed && styles.pressed]}
         onPress={() => show ? router.push(`/show/${show.slug}`) : handleMissingShow()}
         onLongPress={() => handleDeleteDiaryItem(item)}
+        accessibilityHint="Long press to delete this rating"
+        accessibilityActions={[{ name: 'delete', label: 'Delete rating' }]}
+        onAccessibilityAction={(e) => { if (e.nativeEvent.actionName === 'delete') handleDeleteDiaryItem(item); }}
       >
         <View style={styles.gridPosterWrap}>
           {posterUrl ? (
@@ -477,6 +480,9 @@ export default function WatchedScreen() {
         style={({ pressed }) => [styles.card, pressed && styles.pressed]}
         onPress={() => show ? router.push(`/show/${show.slug}`) : handleMissingShow()}
         onLongPress={() => handleRemoveUpcoming(entry)}
+        accessibilityHint="Long press to remove from watchlist"
+        accessibilityActions={[{ name: 'delete', label: 'Remove from watchlist' }]}
+        onAccessibilityAction={(e) => { if (e.nativeEvent.actionName === 'delete') handleRemoveUpcoming(entry); }}
       >
         {posterUrl ? (
           <Image source={{ uri: posterUrl }} style={styles.cardPoster} contentFit="cover" transition={200} />
@@ -577,6 +583,9 @@ export default function WatchedScreen() {
                     style={({ pressed }) => [styles.gridCardFixed, pressed && styles.pressed]}
                     onPress={() => show ? router.push(`/show/${show.slug}`) : handleMissingShow()}
                     onLongPress={() => handleRemoveUpcoming(entry)}
+                    accessibilityHint="Long press to remove from watchlist"
+                    accessibilityActions={[{ name: 'delete', label: 'Remove from watchlist' }]}
+                    onAccessibilityAction={(e) => { if (e.nativeEvent.actionName === 'delete') handleRemoveUpcoming(entry); }}
                   >
                     {posterUrl ? (
                       <Image source={{ uri: posterUrl }} style={styles.gridPoster} contentFit="cover" transition={200} />
