@@ -4,9 +4,9 @@
  * Shows · Hours in a seat · Theaters · <scope-aware period tile>.
  *
  * Two behaviours the spec calls out explicitly, both implemented here:
- *  - The Hours tile SELF-DEMOTES out of the hero when more than 25% of entries
- *    fall back to the 2h30m/2h type default. A big confident "122 hours" built
- *    mostly from guesses is worse than no tile; it moves to a footnote line.
+ *  - The Hours tile always renders (owner decision, build-61 beta feedback);
+ *    when more than 25% of entries fall back to the 2h30m/2h type default it
+ *    is marked "estimated" and the footnote explains the fallback share.
  *  - The fourth tile's label is literal and never mixes frames: "This season so
  *    far" under a season scope, "2026 YTD" under a year scope.
  */
@@ -45,17 +45,18 @@ export function HeroTiles({ bundle, scope, onOpen }: HeroTilesProps) {
       label={diary.total === 1 ? 'Show' : 'Shows'}
       onPress={() => onOpen('shows')}
     />,
-    ...(demoteHours
-      ? []
-      : [
-          <StatTile
-            key="hours"
-            testID="stats-tile-hours"
-            value={formatHours(diary.minutesInSeat)}
-            label="Hours in a seat"
-            onPress={() => onOpen('hours')}
-          />,
-        ]),
+    // The spec's self-demotion (>25% runtime fallback -> footnote) shipped in
+    // build 61 and the owner overruled it: "Hours in seat is supposed to have
+    // its own box." The tile always renders; high-fallback diaries get an
+    // "estimated" sublabel and keep the explanatory footnote.
+    <StatTile
+      key="hours"
+      testID="stats-tile-hours"
+      value={formatHours(diary.minutesInSeat)}
+      label="Hours in a seat"
+      sublabel={demoteHours ? 'estimated' : undefined}
+      onPress={() => onOpen('hours')}
+    />,
     <StatTile
       key="theaters"
       testID="stats-tile-theaters"
@@ -64,13 +65,21 @@ export function HeroTiles({ bundle, scope, onOpen }: HeroTilesProps) {
       sublabel={`${diary.distinctBroadwayHouses} Broadway`}
       onPress={() => onOpen('theaters')}
     />,
-    <StatTile
-      key="period"
-      testID="stats-tile-period"
-      value={String(scope.kind === 'all' ? diary.byYear.length : diary.total)}
-      label={periodTileLabel(scope)}
-      onPress={() => onOpen('period')}
-    />,
+    // Under a dated scope this tile printed the same number as the Shows tile
+    // (both were the scoped total) — so it only renders for All time, where it
+    // counts years actually attended, not the gap-filled span (a 2015 + 2026
+    // diary is 2 years logged, not 12).
+    ...(scope.kind === 'all'
+      ? [
+          <StatTile
+            key="period"
+            testID="stats-tile-period"
+            value={String(diary.byYear.filter((b) => b.count > 0).length)}
+            label={periodTileLabel(scope)}
+            onPress={() => onOpen('period')}
+          />,
+        ]
+      : []),
   ];
 
   return (

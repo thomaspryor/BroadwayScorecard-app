@@ -34,7 +34,9 @@ import {
   localToday,
   type ScopeOption,
 } from '@/lib/stats-scope';
-import { goldCoverage, youVsCritics, type CriticShowIndex, type CriticShowMeta } from '@/lib/stats-you-vs-critics';
+import { audienceVsYou, goldCoverage, youVsCritics, type CriticShowIndex, type CriticShowMeta } from '@/lib/stats-you-vs-critics';
+import { filterByMarket } from '@/components/MarketPicker';
+import { useMarket } from '@/lib/market-context';
 import type { Show } from '@/lib/types';
 import type { UserReview } from '@/lib/user-types';
 
@@ -75,6 +77,7 @@ export interface StatsBundle {
   histogram: ReturnType<typeof ratingsHistogram>;
   critics: ReturnType<typeof youVsCritics>;
   gold: ReturnType<typeof goldCoverage>;
+  audience: ReturnType<typeof audienceVsYou>;
   /** True when the Hours tile must drop out of the hero (spec §3.1, >25%). */
   demoteHours: boolean;
 }
@@ -113,6 +116,7 @@ function toCriticMeta(s: Show): CriticShowMeta {
     category: s.category,
     status: s.status,
     poster: s.images.poster ?? s.images.thumbnail ?? null,
+    audienceGrade: s.audienceGrade?.grade ?? null,
   };
 }
 
@@ -240,12 +244,20 @@ export function useStatsData({ reviews, shows, canon, scope, today }: UseStatsDa
   );
   const histogram = useMemo(() => ratingsHistogram(rows), [rows]);
   const critics = useMemo(() => youVsCritics(rows, criticIndex), [rows, criticIndex]);
+  const audience = useMemo(() => audienceVsYou(rows, criticIndex), [rows, criticIndex]);
 
   // Gold coverage is intentionally computed against ALL rows, not the scope:
   // "of the gold shows open right now, how many have you ever seen".
+  // Market-scoped (build-61 owner report): a to-see list of London shows is
+  // noise for a NYC user, and vice versa — same rule Home/Browse follow.
+  const { market } = useMarket();
   const openShows = useMemo(
-    () => shows.filter((s) => s.status === 'open' || s.status === 'previews').map(toCriticMeta),
-    [shows],
+    () =>
+      shows
+        .filter((s) => s.status === 'open' || s.status === 'previews')
+        .filter((s) => filterByMarket(s.category ?? '', market))
+        .map(toCriticMeta),
+    [shows, market],
   );
   const gold = useMemo(() => goldCoverage(allRows, openShows), [allRows, openShows]);
 
@@ -264,6 +276,7 @@ export function useStatsData({ reviews, shows, canon, scope, today }: UseStatsDa
     canonStats,
     histogram,
     critics,
+    audience,
     gold,
     demoteHours: diary.runtimeFallbackShare > 0.25,
   };

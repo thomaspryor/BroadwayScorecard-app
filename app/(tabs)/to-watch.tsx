@@ -594,12 +594,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.sm, paddingVertical: 6,
   },
   sortText: { color: Colors.text.secondary, fontSize: FontSize.xs, fontWeight: '500' },
+  // Full-width band matching Watched's year headers (beta feedback 2026-07-26:
+  // "sub headings here aren't the same format as on the Watched tab").
   sectionHeader: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: Spacing.lg, paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.lg, paddingVertical: 8,
+    marginBottom: Spacing.sm,
+    backgroundColor: Colors.surface.raised,
+    borderTopWidth: 1, borderBottomWidth: 1, borderColor: Colors.border.subtle,
   },
-  sectionTitle: { color: Colors.text.primary, fontSize: FontSize.lg, fontWeight: '600' },
-  sectionCount: { color: Colors.text.muted, fontSize: FontSize.xs },
+  sectionTitle: { color: Colors.text.primary, fontSize: 13, fontWeight: '700', letterSpacing: 0.6, textTransform: 'uppercase' },
+  sectionCount: { color: Colors.text.muted, fontSize: 12 },
   posterGrid: {
     flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm,
     paddingHorizontal: Spacing.lg,
@@ -619,7 +624,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 5, paddingVertical: 2,
     borderRadius: 4,
   },
-  statusPillText: { fontSize: 9, fontWeight: '700', letterSpacing: 0.4 },
+  statusPillText: { fontSize: 12, fontWeight: '700', letterSpacing: 0.3 },
   listStatus: { fontSize: 12, fontWeight: '600', marginTop: 2, letterSpacing: 0.3 },
   gridTitle: {
     color: Colors.text.secondary, fontSize: 12, fontWeight: '500',

@@ -18,6 +18,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { BorderRadius, Colors, FontSize, Spacing } from '@/constants/theme';
 import * as haptics from '@/lib/haptics';
 import { STATS_LAYOUT } from '@/lib/stats-layout';
+import type { ScopeOption } from '@/lib/stats-scope';
 import type { StatsBundle } from '@/hooks/useStatsData';
 import type { HouseVisit } from '@/lib/stats';
 import {
@@ -76,6 +77,9 @@ export function houseShortName(name: string): string {
 
 export interface TheaterTrackerProps {
   bundle: StatsBundle;
+  /** Active scope — a dated scope must be visible in the caption, or "2 of 42"
+      under a season scope reads as lost lifetime data (build-61 P0). */
+  scope?: ScopeOption;
   onOpenHouse: (house: HouseVisit) => void;
   onOpenRecord: (kind: 'home' | 'biggest' | 'smallest' | 'oldest') => void;
   onOpenRing: () => void;
@@ -83,6 +87,7 @@ export interface TheaterTrackerProps {
 }
 
 export function TheaterTracker({
+  scope,
   bundle,
   onOpenHouse,
   onOpenRecord,
@@ -115,7 +120,9 @@ export function TheaterTracker({
     <StatsCard flush={marquee}>
       <ModuleHeader
         title="Broadway theaters"
-        caption={`${Math.round(theaters.completion * 100)}% of the operating houses`}
+        caption={`${Math.round(theaters.completion * 100)}% of the operating houses${
+          scope && scope.kind !== 'all' ? ` · ${scope.label}` : ''
+        }`}
         right={marquee ? ring : undefined}
       />
 

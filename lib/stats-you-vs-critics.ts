@@ -34,6 +34,8 @@ export interface CriticShowMeta {
   category?: string | null;
   status?: string | null;
   poster?: string | null;
+  /** Audience letter grade ("A+", "B-") — feeds the audience-agreement row. */
+  audienceGrade?: string | null;
 }
 
 export type CriticShowIndex = Record<string, CriticShowMeta>;
@@ -203,5 +205,53 @@ export function goldCoverage(rows: DiaryRow[], openShows: CriticShowMeta[]): Gol
     seen: seen.length,
     unseen,
     seenShowIds: seen.map((s) => s.id),
+  };
+}
+
+
+/** Letter grade → 0-100 midpoint, matching the site's grade bands. */
+const GRADE_SCORES: Record<string, number> = {
+  'A+': 97, A: 93, 'A-': 90,
+  'B+': 87, B: 83, 'B-': 80,
+  'C+': 77, C: 73, 'C-': 70,
+  'D+': 67, D: 63, 'D-': 60,
+  F: 50,
+};
+
+export interface AudienceAgreement {
+  comparable: number;
+  aligned: number;
+  /** 0-1 share of rated shows within ±10 pts of the audience grade. */
+  alignment: number;
+  alignedShowIds: string[];
+  comparableShowIds: string[];
+}
+
+/**
+ * "The audience & you" (spec §5.1 / mockup screen 4): your ★×20 against each
+ * show's audience letter grade, same ±10-pt alignment band as the critics row.
+ */
+export function audienceVsYou(rows: DiaryRow[], index: CriticShowIndex): AudienceAgreement {
+  const byShow = new Map<string, number>();
+  for (const r of rows) {
+    const rating = Number(r.rating ?? 0);
+    if (rating > 0 && !byShow.has(r.show_id)) byShow.set(r.show_id, rating);
+  }
+  const comparableShowIds: string[] = [];
+  const alignedShowIds: string[] = [];
+  for (const [showId, rating] of byShow) {
+    const grade = index[showId]?.audienceGrade;
+    const theirs = grade ? GRADE_SCORES[grade] : undefined;
+    if (theirs === undefined) continue;
+    comparableShowIds.push(showId);
+    if (Math.abs(rating * 20 - theirs) <= 10) alignedShowIds.push(showId);
+  }
+  const comparable = comparableShowIds.length;
+  return {
+    comparable,
+    aligned: alignedShowIds.length,
+    alignment: comparable > 0 ? alignedShowIds.length / comparable : 0,
+    alignedShowIds,
+    comparableShowIds,
   };
 }
