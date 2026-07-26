@@ -133,11 +133,16 @@ export function StatTile({
  */
 export function GoldBar({
   heightPct,
+  heightPx,
   selected,
   minHeight = 3,
 }: {
   /** 0–1 of the track height. */
   heightPct: number;
+  /** Explicit px height — pass when the track's own height is fixed. A %-height
+      here resolves against an undefined parent inside horizontal ScrollViews
+      and collapses to minHeight (build-61 sliver-bars bug). */
+  heightPx?: number;
   selected?: boolean;
   minHeight?: number;
 }) {
@@ -145,7 +150,7 @@ export function GoldBar({
     <View
       style={{
         width: '100%',
-        height: `${Math.max(heightPct * 100, 0)}%`,
+        height: heightPx !== undefined ? Math.round(heightPx) : `${Math.max(heightPct * 100, 0)}%`,
         minHeight: heightPct > 0 ? Math.max(minHeight, 4) : minHeight,
         borderRadius: 3,
         backgroundColor: heightPct > 0 ? (selected ? Colors.brand : withAlpha(Colors.brand, 0.45)) : Colors.surface.overlay,

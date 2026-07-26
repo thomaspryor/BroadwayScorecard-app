@@ -13,7 +13,7 @@
  */
 
 import React, { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Colors, FontSize, Spacing } from '@/constants/theme';
 import { useStatsCanon, useStatsData, MIN_ENTRIES_FOR_STATS } from '@/hooks/useStatsData';
 import { localToday, scopeSuffix, type ScopeOption } from '@/lib/stats-scope';
@@ -22,7 +22,7 @@ import type { CanonEntry, HouseVisit } from '@/lib/stats';
 import { matchVenueToHouse } from '@/lib/stats';
 import type { Show } from '@/lib/types';
 import type { UserReview } from '@/lib/user-types';
-import { GhostState } from './StatsPrimitives';
+import { GhostState, ModuleHeader, StatsCard } from './StatsPrimitives';
 import { HeroTiles, formatHours } from './HeroTiles';
 import { ShowsPerYear, formatMonth } from './ShowsPerYear';
 import { TheaterTracker, houseShortName } from './TheaterTracker';
@@ -34,6 +34,11 @@ import { StatsDrilldownSheet, type DrilldownPayload } from './StatsDrilldownShee
 export interface StatsScreenProps {
   reviews: UserReview[];
   shows: Show[];
+  /** True while the show catalog or the diary is still loading. */
+  loading?: boolean;
+  /** Diary fetch error — renders the retry state instead of stats. */
+  error?: string | null;
+  onRetry?: () => void;
   /** Bottom padding so the tab bar never covers the last module. */
   bottomPad: number;
   onRateShow?: () => void;
@@ -45,6 +50,9 @@ export interface StatsScreenProps {
 export function StatsScreen({
   reviews,
   shows,
+  loading = false,
+  error = null,
+  onRetry,
   bottomPad,
   onRateShow,
   refreshing = false,
@@ -98,10 +106,25 @@ export function StatsScreen({
   // the canon lands and the default becomes the current season. Hold the whole
   // screen for one AsyncStorage read instead (cache-first, so this is a frame
   // or two on a warm launch).
-  if (canonLoading) {
+  if (canonLoading || loading) {
     return (
       <View style={styles.loading}>
         <ActivityIndicator color={Colors.brand} />
+      </View>
+    );
+  }
+
+  // A failed diary fetch must say so — silently rendering the empty-diary
+  // ghost to a full diary reads as data loss (plan Sprint 2 item 4).
+  if (error) {
+    return (
+      <View style={styles.loading}>
+        <Text style={styles.errorText}>Stats are unavailable right now.</Text>
+        {onRetry && (
+          <Pressable onPress={onRetry} accessibilityRole="button" style={({ pressed }) => pressed && { opacity: 0.7 }}>
+            <Text style={styles.retryText}>Retry</Text>
+          </Pressable>
+        )}
       </View>
     );
   }
@@ -248,6 +271,14 @@ export function StatsScreen({
     });
   };
 
+  const openAudience = () => {
+    setDrilldown({
+      title: 'The audience & you',
+      caption: `${bundle.audience.aligned} of ${bundle.audience.comparable} shows within a grade of the audience`,
+      reviews: reviewsFor(bundle.audience.alignedShowIds),
+    });
+  };
+
   const openAligned = () => {
     setDrilldown({
       title: bundle.critics.label,
@@ -286,10 +317,17 @@ export function StatsScreen({
     const list = which === 'musical' ? bundle.canonStats.bestMusical : bundle.canonStats.bestPlay;
     const label = which === 'musical' ? 'Best Musical' : 'Best Play';
     if (filter === 'unseen') {
+      // Caption must match the rows beneath it: only a fraction of historical
+      // winners exist in the catalog, so "51 of 51" over 22 rows read as a bug.
+      const inCatalog = list.unseen.map((e) => showsById[e.id]).filter(Boolean);
+      const missing = list.unseen.length - inCatalog.length;
       setDrilldown({
         title: `${label} winners to see`,
-        caption: `${list.unseen.length} of ${list.total}`,
-        shows: list.unseen.map((e) => showsById[e.id]).filter(Boolean),
+        caption:
+          missing > 0
+            ? `${list.unseen.length} unseen · ${inCatalog.length} in the catalog`
+            : `${list.unseen.length} of ${list.total}`,
+        shows: inCatalog,
         emptyText: 'Every winner in the catalog is in your diary.',
       });
       return;
@@ -331,10 +369,11 @@ export function StatsScreen({
 
   const openUnrated = () => {
     const ids = new Set(bundle.histogram.unratedShowIds);
+    const rows = sortedInScope.filter((r) => ids.has(r.show_id) && !(r.rating > 0));
     setDrilldown({
       title: 'Not yet rated',
-      caption: `${ids.size} ${ids.size === 1 ? 'entry' : 'entries'} in your diary without a rating`,
-      reviews: sortedInScope.filter((r) => ids.has(r.show_id) && !(r.rating > 0)),
+      caption: `${rows.length} ${rows.length === 1 ? 'entry' : 'entries'} in your diary without a rating`,
+      reviews: rows,
     });
   };
 
@@ -365,12 +404,38 @@ export function StatsScreen({
         />
         <TheaterTracker
           bundle={bundle}
+          scope={active}
           onOpenHouse={openHouse}
           onOpenRecord={openHouseRecord}
           onOpenRing={openRing}
           onOpenExtraCredit={openExtraCredit}
         />
         <YouVsCritics bundle={bundle} onOpenAligned={openAligned} onOpenPick={openPick} onOpenGold={openGold} />
+        {/* "The audience & you" — promised on the mockup's screen 4 as V1 and
+            missing from build 61 (audit finding #5). Same ±10-pt band and ≥5
+            threshold as the critics gauge. */}
+        {bundle.audience.comparable >= 5 && (
+          <StatsCard>
+            <ModuleHeader title="The audience & you" />
+            <Pressable
+              testID="stats-audience-row"
+              onPress={openAudience}
+              accessibilityRole="button"
+              accessibilityLabel={`You agree with the audience grade ${Math.round(bundle.audience.alignment * 100)} percent of the time. Opens the list.`}
+              style={({ pressed }) => pressed && { opacity: 0.7 }}
+            >
+              <Text style={styles.audienceText}>
+                You agree with the audience grade{' '}
+                <Text style={styles.audiencePct}>{Math.round(bundle.audience.alignment * 100)}%</Text> of the time
+                {bundle.audience.alignment >= 0.7
+                  ? ' — one of the crowd.'
+                  : bundle.audience.alignment >= 0.45
+                    ? ' — you go your own way sometimes.'
+                    : ' — a true contrarian.'}
+              </Text>
+            </Pressable>
+          </StatsCard>
+        )}
         <CanonChecklists bundle={bundle} scope={active} onOpenList={openCanonList} onOpenEntry={openCanonEntry} />
         <RatingsModule bundle={bundle} onOpenBucket={openBucket} onOpenUnrated={openUnrated} />
 
@@ -390,7 +455,11 @@ export function StatsScreen({
 const styles = StyleSheet.create({
   root: { flex: 1 },
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: Spacing.xxl },
+  errorText: { color: Colors.text.primary, fontSize: FontSize.md, marginBottom: Spacing.md },
+  retryText: { color: Colors.brand, fontSize: FontSize.md, fontWeight: '700', padding: Spacing.sm },
   content: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.sm },
+  audienceText: { color: Colors.text.secondary, fontSize: FontSize.sm, lineHeight: 20 },
+  audiencePct: { color: Colors.brand, fontWeight: '800' },
   footnote: {
     color: Colors.text.muted,
     fontSize: FontSize.xs,

@@ -34,7 +34,9 @@ import {
   localToday,
   type ScopeOption,
 } from '@/lib/stats-scope';
-import { goldCoverage, youVsCritics, type CriticShowIndex, type CriticShowMeta } from '@/lib/stats-you-vs-critics';
+import { audienceVsYou, goldCoverage, youVsCritics, type CriticShowIndex, type CriticShowMeta } from '@/lib/stats-you-vs-critics';
+import { filterByMarket } from '@/components/MarketPicker';
+import { useMarket } from '@/lib/market-context';
 import type { Show } from '@/lib/types';
 import type { UserReview } from '@/lib/user-types';
 
@@ -75,6 +77,8 @@ export interface StatsBundle {
   histogram: ReturnType<typeof ratingsHistogram>;
   critics: ReturnType<typeof youVsCritics>;
   gold: ReturnType<typeof goldCoverage>;
+  audience: ReturnType<typeof audienceVsYou>;
+  distinctShows: number;
   /** True when the Hours tile must drop out of the hero (spec §3.1, >25%). */
   demoteHours: boolean;
 }
@@ -113,6 +117,7 @@ function toCriticMeta(s: Show): CriticShowMeta {
     category: s.category,
     status: s.status,
     poster: s.images.poster ?? s.images.thumbnail ?? null,
+    audienceGrade: s.audienceGrade?.grade ?? null,
   };
 }
 
@@ -229,23 +234,40 @@ export function useStatsData({ reviews, shows, canon, scope, today }: UseStatsDa
     () => computeDiaryStats(rows, showMeta, { houseIndex: HOUSE_INDEX, today: day }),
     [rows, showMeta, day],
   );
+  // Theater completion is likewise lifetime — "2 of 42 houses" under a season
+  // scope read as lost data (build-61 P0). The ring always answers "ever".
   const theaters = useMemo(
-    () => theaterCompletion(rows, showMeta, THEATER_HOUSES, { houseIndex: HOUSE_INDEX }),
-    [rows, showMeta],
+    () => theaterCompletion(allRows, showMeta, THEATER_HOUSES, { houseIndex: HOUSE_INDEX }),
+    [allRows, showMeta],
   );
   const windows = useMemo(() => seasonWindows(canon, { today: day }), [canon, day]);
+  // Canon coverage is a lifetime fact ("winners you've EVER seen") — computing
+  // it from scoped rows produced "51 to go" for a user who'd seen 8 (sim QA #7).
   const canonStats = useMemo(
-    () => canonProgress(rows, canon, { windows }),
-    [rows, canon, windows],
+    () => canonProgress(allRows, canon, { windows }),
+    [allRows, canon, windows],
   );
   const histogram = useMemo(() => ratingsHistogram(rows), [rows]);
   const critics = useMemo(() => youVsCritics(rows, criticIndex), [rows, criticIndex]);
+  // Lifetime like gold/canon — scoped rows made the card silently vanish
+  // under a thin scope with no locked state (fix-branch verify #2).
+  const audience = useMemo(() => audienceVsYou(allRows, criticIndex), [allRows, criticIndex]);
+  // Distinct shows for the hero tile — diary.total counts ENTRIES (repeat
+  // viewings), which put Stats one ahead of the Grid's "shows seen" line.
+  const distinctShows = useMemo(() => new Set(rows.map((r) => r.show_id)).size, [rows]);
 
   // Gold coverage is intentionally computed against ALL rows, not the scope:
   // "of the gold shows open right now, how many have you ever seen".
+  // Market-scoped (build-61 owner report): a to-see list of London shows is
+  // noise for a NYC user, and vice versa — same rule Home/Browse follow.
+  const { market } = useMarket();
   const openShows = useMemo(
-    () => shows.filter((s) => s.status === 'open' || s.status === 'previews').map(toCriticMeta),
-    [shows],
+    () =>
+      shows
+        .filter((s) => s.status === 'open' || s.status === 'previews')
+        .filter((s) => filterByMarket(s.category ?? '', market))
+        .map(toCriticMeta),
+    [shows, market],
   );
   const gold = useMemo(() => goldCoverage(allRows, openShows), [allRows, openShows]);
 
@@ -264,6 +286,8 @@ export function useStatsData({ reviews, shows, canon, scope, today }: UseStatsDa
     canonStats,
     histogram,
     critics,
+    audience,
+    distinctShows,
     gold,
     demoteHours: diary.runtimeFallbackShare > 0.25,
   };

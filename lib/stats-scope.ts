@@ -142,17 +142,16 @@ export function currentSeasonWindow(
 }
 
 /**
- * The scope selected on first launch: the current Tony season if the diary has
- * anything in it, otherwise All time.
+ * The scope selected on first launch: All time.
  *
- * Defaulting an empty-this-season diary to the season scope would show a brand
- * new user six zeroes and hide the stats they do have.
+ * The spec's season-first default shipped in build 61 and gutted every module
+ * for the owner: right after a ceremony the current season is a weeks-old
+ * window, so a 107-entry diary opened as "2 of 42 houses", locked taste
+ * modules and a 0-of-53 canon. Lifetime is the only default that is always
+ * meaningful; the current season is one tap away on the pill's quick toggle.
  */
-export function defaultScope(scopes: ScopeOption[], rows: DiaryRow[], today = localToday()): ScopeOption {
-  const currentSeason = scopes.find((s) => s.kind === 'season' && s.inProgress)
-    ?? scopes.find((s) => s.kind === 'season' && inScope(s, today));
-  if (!currentSeason) return ALL_TIME;
-  return filterRows(rows, currentSeason).length > 0 ? currentSeason : ALL_TIME;
+export function defaultScope(_scopes: ScopeOption[], _rows: DiaryRow[], _today = localToday()): ScopeOption {
+  return ALL_TIME;
 }
 
 /** Is a plain "YYYY-MM-DD" inside this scope? Undated rows are never in scope. */

@@ -116,9 +116,9 @@ export default function WatchedScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user, isAuthenticated, loading: authLoading, showSignIn } = useAuth();
-  const { reviews, getAllReviews, deleteReview, loading: reviewsLoading } = useUserReviews(user?.id || null);
+  const { reviews, getAllReviews, deleteReview, loading: reviewsLoading, error: reviewsError, invalidateCache } = useUserReviews(user?.id || null);
   const { watchlist, getWatchlist, removeFromWatchlist, loading: watchlistLoading } = useWatchlist(user?.id || null);
-  const { shows } = useShows();
+  const { shows, isLoading: showsLoading } = useShows();
   const { showToast } = useToastSafe();
 
   const handleMissingShow = useCallback(() => {
@@ -416,7 +416,7 @@ export default function WatchedScreen() {
             {item.date_seen && (
               <Text style={styles.cardDate}>
                 {new Date(item.date_seen + 'T00:00:00').toLocaleDateString('en-US', {
-                  month: 'short', day: 'numeric', year: 'numeric',
+                  month: 'short', day: 'numeric', ...(showYearGroups ? {} : { year: 'numeric' }),
                 })}
               </Text>
             )}
@@ -469,10 +469,12 @@ export default function WatchedScreen() {
         {/* Name above date (beta feedback 2026-07-25: date sat between image
             and name; web order is name → date) */}
         <Text style={styles.gridTitle} numberOfLines={2}>{title}</Text>
+        {/* Year dropped when a year header already frames the group (beta
+            feedback 2026-07-26: "Seen shows don't need the year"). */}
         <Text style={styles.gridDateText}>
           {item.date_seen
             ? new Date(item.date_seen + 'T00:00:00').toLocaleDateString('en-US', {
-                month: 'short', day: 'numeric', year: 'numeric',
+                month: 'short', day: 'numeric', ...(showYearGroups ? {} : { year: 'numeric' }),
               })
             : ' '}
         </Text>
@@ -787,6 +789,13 @@ export default function WatchedScreen() {
              theaters or the season tile. */
           reviews={pastReviews}
           shows={shows}
+          /* Stats must never paint from a partial world: without these gates a
+             pre-catalog render showed "0 of 42 houses" then every number
+             jumped, and a failed diary fetch rendered the empty-diary ghost to
+             a 107-entry user (build-61 audit #6/#9). */
+          loading={showsLoading || reviewsLoading}
+          error={reviewsError}
+          onRetry={() => { invalidateCache(); getAllReviews(); }}
           bottomPad={listBottomPad}
           onRateShow={() => setShowSearchModal(true)}
           refreshing={refreshing}

@@ -26,6 +26,7 @@ export function ScopePill({
   onChange: (s: ScopeOption) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const currentSeason = scopes.find((s) => s.kind === 'season' && s.inProgress) ?? null;
 
   return (
     <>
@@ -47,7 +48,7 @@ export function ScopePill({
             <Path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
           </Svg>
         </Pressable>
-        {active.kind !== 'all' && (
+        {active.kind !== 'all' ? (
           <Pressable
             testID="stats-scope-clear"
             onPress={() => {
@@ -62,6 +63,24 @@ export function ScopePill({
           >
             <Text style={styles.clearText}>All time</Text>
           </Pressable>
+        ) : (
+          // Symmetric quick toggle: under All time the shortcut flips BACK to
+          // the current season. Build-61 owner report: with only the vanishing
+          // "All time" button, tapping it made the season option "disappear".
+          currentSeason && (
+            <Pressable
+              testID="stats-scope-season"
+              onPress={() => {
+                haptics.tap();
+                onChange(currentSeason);
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={`Scope to ${currentSeason.label}`}
+              style={({ pressed }) => [styles.clear, pressed && styles.pressed]}
+            >
+              <Text style={styles.clearText}>{currentSeason.label}</Text>
+            </Pressable>
+          )
         )}
       </View>
 
