@@ -1,0 +1,172 @@
+/**
+ * Module 2 — Shows per year (owner priority 4, spec §3.2).
+ *
+ * Bars are plain Views in single-hue brand gold (spec §9: no chart library, no
+ * chart-specific colour). Tapping a bar scopes the WHOLE screen to that year —
+ * which is what makes the months breakdown appear, because a year-scoped diary
+ * has one bar per month instead of per year.
+ *
+ * Records strip beneath: busiest month, current streak, longest drought. Each
+ * pill taps to the shows behind it (spec §3.2, absorbing the cut Habits module).
+ */
+
+import React, { useMemo } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Colors, FontSize, Spacing } from '@/constants/theme';
+import * as haptics from '@/lib/haptics';
+import type { ScopeOption } from '@/lib/stats-scope';
+import type { StatsBundle } from '@/hooks/useStatsData';
+import { STATS_LAYOUT } from '@/lib/stats-layout';
+import { GoldBar, ModuleHeader, RecordPill, StatsCard, TABULAR } from './StatsPrimitives';
+
+const MONTH_ABBR = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
+
+/** "2025-10" → "October 2025" */
+export function formatMonth(key: string): string {
+  const [y, m] = key.split('-');
+  const d = new Date(Number(y), Number(m) - 1, 1);
+  return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+}
+
+/** "2025-10" → "Oct" */
+function shortMonth(key: string): string {
+  const m = parseInt(key.slice(5, 7), 10);
+  return MONTH_ABBR[m - 1] ?? '?';
+}
+
+export interface ShowsPerYearProps {
+  bundle: StatsBundle;
+  scope: ScopeOption;
+  /** Scope the screen to a calendar year (bar tap). */
+  onSelectYear: (year: number) => void;
+  onOpenMonth: (monthKey: string) => void;
+  onOpenRecord: (kind: 'busiest' | 'streak' | 'drought') => void;
+}
+
+export function ShowsPerYear({ bundle, scope, onSelectYear, onOpenMonth, onOpenRecord }: ShowsPerYearProps) {
+  const { diary } = bundle;
+  const marquee = STATS_LAYOUT === 'marquee';
+
+  // Under a dated scope the diary spans months, not years — so the chart
+  // becomes the months breakdown the spec asks for after a bar tap.
+  const byMonths = scope.kind !== 'all';
+  const bars = useMemo(() => {
+    if (byMonths) {
+      return diary.byMonth.map((b) => ({
+        key: b.month,
+        count: b.count,
+        label: shortMonth(b.month),
+        onPress: b.count > 0 ? () => onOpenMonth(b.month) : undefined,
+        a11y: `${formatMonth(b.month)}: ${b.count} ${b.count === 1 ? 'show' : 'shows'}`,
+      }));
+    }
+    return diary.byYear.map((b) => ({
+      key: String(b.year),
+      count: b.count,
+      label: `’${String(b.year).slice(2)}`,
+      onPress: () => onSelectYear(b.year),
+      a11y: `${b.year}: ${b.count} ${b.count === 1 ? 'show' : 'shows'}. Scopes to ${b.year}.`,
+    }));
+  }, [byMonths, diary.byMonth, diary.byYear, onOpenMonth, onSelectYear]);
+
+  const max = bars.reduce((m, b) => Math.max(m, b.count), 0);
+  const peak = bars.find((b) => b.count === max && max > 0);
+
+  if (!bars.length) return null;
+
+  // Wide diaries scroll horizontally rather than shrinking bars to slivers.
+  const scrolls = bars.length > 14;
+
+  const chart = (
+    <View style={[styles.chart, scrolls && { minWidth: bars.length * 34 }]}>
+      {bars.map((b) => (
+        <Pressable
+          key={b.key}
+          testID={`stats-bar-${b.key}`}
+          onPress={
+            b.onPress
+              ? () => {
+                  haptics.tap();
+                  b.onPress?.();
+                }
+              : undefined
+          }
+          disabled={!b.onPress}
+          accessibilityRole="button"
+          accessibilityLabel={b.a11y}
+          style={({ pressed }) => [styles.barSlot, scrolls && styles.barSlotFixed, pressed && styles.pressed]}
+        >
+          {/* Selective labelling: only the peak bar carries its count, so the
+              axis stays readable (spec §3.2). */}
+          <Text style={[styles.barCount, TABULAR, b.key !== peak?.key && styles.barCountHidden]}>{b.count}</Text>
+          <View style={styles.barTrack}>
+            <GoldBar heightPct={max > 0 ? b.count / max : 0} selected={b.key === peak?.key} />
+          </View>
+          <Text style={styles.barLabel} numberOfLines={1}>
+            {b.label}
+          </Text>
+        </Pressable>
+      ))}
+    </View>
+  );
+
+  return (
+    <StatsCard flush={marquee}>
+      <ModuleHeader
+        title={byMonths ? 'Month by month' : 'Shows per year'}
+        caption={byMonths ? scope.label : 'Tap a year to scope everything below'}
+      />
+      {scrolls ? (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          {chart}
+        </ScrollView>
+      ) : (
+        chart
+      )}
+
+      <View style={styles.records}>
+        {diary.busiestMonth && (
+          <RecordPill
+            testID="stats-record-busiest"
+            label="Busiest month"
+            value={`${formatMonth(diary.busiestMonth.month)} · ${diary.busiestMonth.count}`}
+            onPress={() => onOpenRecord('busiest')}
+          />
+        )}
+        {diary.currentStreak > 0 && (
+          <RecordPill
+            testID="stats-record-streak"
+            label="Current streak"
+            value={`${diary.currentStreak} ${diary.currentStreak === 1 ? 'month' : 'months'}`}
+            onPress={() => onOpenRecord('streak')}
+          />
+        )}
+        {diary.longestDrought && (
+          <RecordPill
+            testID="stats-record-drought"
+            label="Longest drought"
+            value={`${diary.longestDrought.months} ${diary.longestDrought.months === 1 ? 'month' : 'months'}`}
+            onPress={() => onOpenRecord('drought')}
+          />
+        )}
+      </View>
+    </StatsCard>
+  );
+}
+
+const styles = StyleSheet.create({
+  chart: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 4,
+    height: 148,
+  },
+  barSlot: { flex: 1, minWidth: 0, height: '100%', justifyContent: 'flex-end', alignItems: 'center' },
+  barSlotFixed: { flex: 0, width: 30 },
+  barTrack: { width: '78%', flex: 1, justifyContent: 'flex-end' },
+  barCount: { color: Colors.text.secondary, fontSize: FontSize.xs, fontWeight: '700', marginBottom: 2 },
+  barCountHidden: { opacity: 0 },
+  barLabel: { color: Colors.text.muted, fontSize: FontSize.xs, marginTop: Spacing.xs },
+  records: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm, marginTop: Spacing.lg },
+  pressed: { opacity: 0.7 },
+});

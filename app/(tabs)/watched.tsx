@@ -42,10 +42,29 @@ import type { Show } from '@/lib/types';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
 import { Skeleton } from '@/components/Skeleton';
 import { ShowSearchModal } from '@/components/ShowSearchModal';
+import { StatsScreen } from '@/components/stats/StatsScreen';
 import * as haptics from '@/lib/haptics';
 
 type DiarySort = 'date-desc' | 'date-asc' | 'rating-desc';
-type ViewMode = 'list' | 'grid';
+/**
+ * Profile segments (spec §2 — the Mezzanine mental model users already have):
+ *   grid  → the poster wall
+ *   list  → "Feed", the diary timeline. Sprint 4 turns this into the photo
+ *           scrapbook; until then the segment shows the existing timeline
+ *           rather than an empty promise.
+ *   stats → the Scorecard.
+ */
+type ViewMode = 'list' | 'grid' | 'stats';
+
+const VIEW_MODES: ViewMode[] = ['grid', 'list', 'stats'];
+const SEGMENT_LABELS: Record<ViewMode, string> = { grid: 'Grid', list: 'Feed', stats: 'Stats' };
+// Existing e2e/screenshot flows tap diary-grid-view-toggle / diary-list-view-toggle;
+// those ids stay put so the segmented control is a drop-in for the old pair.
+const SEGMENT_TEST_IDS: Record<ViewMode, string> = {
+  grid: 'diary-grid-view-toggle',
+  list: 'diary-list-view-toggle',
+  stats: 'diary-stats-view-toggle',
+};
 
 const VIEW_MODE_KEY = '@bsc:diary_view_mode';
 
@@ -136,7 +155,7 @@ export default function WatchedScreen() {
   // Restore the user's last view mode (web parity — persisted, not reset per session).
   useEffect(() => {
     AsyncStorage.getItem(VIEW_MODE_KEY).then(stored => {
-      if (stored === 'list' || stored === 'grid') setViewModeState(stored);
+      if (VIEW_MODES.includes(stored as ViewMode)) setViewModeState(stored as ViewMode);
     }).catch(() => {});
   }, []);
 
@@ -720,45 +739,58 @@ export default function WatchedScreen() {
         </View>
       </View>
 
-      {/* Controls — sort + view toggle only; per-section headers already
-          carry their own counts, so a top stats line just pushed content
-          down (web parity, owner 2026-07-17). */}
-      <View style={styles.controlsRow}>
-        <Text style={styles.showsSeenLabel}>{showsSeen} {showsSeen === 1 ? 'show' : 'shows'} seen</Text>
-        <View style={styles.controlsRight}>
-          <Pressable style={styles.sortButton} onPress={cycleDiarySort}>
-            <Text style={styles.sortText}>{sortLabel}</Text>
-            <Svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke={Colors.text.muted} strokeWidth={2}>
-              <Path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-            </Svg>
-          </Pressable>
-          <View style={styles.viewToggleContainer}>
+      {/* Segmented control — Grid · Feed · Stats (spec §2). Its own row rather
+          than a corner toggle: this switches MODE, not just card density, and
+          three text segments don't fit beside the sort control on an SE. */}
+      <View style={styles.segmentedRow}>
+        <View style={styles.segmented}>
+          {VIEW_MODES.map(mode => (
             <Pressable
-              testID="diary-grid-view-toggle"
-              style={[styles.viewToggleButton, viewMode === 'grid' && styles.viewToggleActive]}
-              onPress={() => { haptics.tap(); setViewMode('grid'); }}
-              hitSlop={4}
+              key={mode}
+              testID={SEGMENT_TEST_IDS[mode]}
+              style={[styles.segment, viewMode === mode && styles.segmentActive]}
+              onPress={() => { haptics.tap(); setViewMode(mode); }}
+              accessibilityRole="button"
+              accessibilityState={{ selected: viewMode === mode }}
+              accessibilityLabel={`${SEGMENT_LABELS[mode]} view`}
             >
-              <Svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke={viewMode === 'grid' ? Colors.text.primary : Colors.text.muted} strokeWidth={2}>
-                <Path strokeLinecap="round" strokeLinejoin="round" d="M4 5h6v6H4zM14 5h6v6h-6zM4 15h6v6H4zM14 15h6v6h-6z" />
-              </Svg>
+              <Text style={[styles.segmentText, viewMode === mode && styles.segmentTextActive]}>
+                {SEGMENT_LABELS[mode]}
+              </Text>
             </Pressable>
-            <Pressable
-              testID="diary-list-view-toggle"
-              style={[styles.viewToggleButton, viewMode === 'list' && styles.viewToggleActive]}
-              onPress={() => { haptics.tap(); setViewMode('list'); }}
-              hitSlop={4}
-            >
-              <Svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke={viewMode === 'list' ? Colors.text.primary : Colors.text.muted} strokeWidth={2}>
-                <Path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+          ))}
+        </View>
+      </View>
+
+      {/* Controls — sort only; per-section headers already carry their own
+          counts, so a top stats line just pushed content down (web parity,
+          owner 2026-07-17). Hidden in Stats, which has its own scope pill. */}
+      {viewMode !== 'stats' && (
+        <View style={styles.controlsRow}>
+          <Text style={styles.showsSeenLabel}>{showsSeen} {showsSeen === 1 ? 'show' : 'shows'} seen</Text>
+          <View style={styles.controlsRight}>
+            <Pressable style={styles.sortButton} onPress={cycleDiarySort}>
+              <Text style={styles.sortText}>{sortLabel}</Text>
+              <Svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke={Colors.text.muted} strokeWidth={2}>
+                <Path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
               </Svg>
             </Pressable>
           </View>
         </View>
-      </View>
+      )}
 
       {/* Diary content */}
-      {isDiaryEmpty ? (
+      {viewMode === 'stats' ? (
+        <StatsScreen
+          /* pastReviews, not sortedReviews: a future-dated entry is a show you
+             have not sat through yet, so it must not count toward hours,
+             theaters or the season tile. */
+          reviews={pastReviews}
+          shows={shows}
+          bottomPad={listBottomPad}
+          onRateShow={() => setShowSearchModal(true)}
+        />
+      ) : isDiaryEmpty ? (
         <EmptyState
           emoji="🎭"
           title="Your diary is empty"
@@ -818,16 +850,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.sm, paddingVertical: 6,
   },
   sortText: { color: Colors.text.secondary, fontSize: FontSize.xs, fontWeight: '500' },
-  viewToggleContainer: {
-    flexDirection: 'row', backgroundColor: Colors.surface.overlay, borderRadius: 8,
-    overflow: 'hidden',
+  // Grid · Feed · Stats segmented control.
+  segmentedRow: { paddingHorizontal: Spacing.lg, paddingBottom: Spacing.sm },
+  segmented: {
+    flexDirection: 'row', backgroundColor: Colors.surface.overlay,
+    borderRadius: BorderRadius.sm, overflow: 'hidden', padding: 2,
   },
-  viewToggleButton: {
-    minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center',
+  segment: {
+    flex: 1, minHeight: 44, alignItems: 'center', justifyContent: 'center',
+    borderRadius: 6,
   },
-  viewToggleActive: {
-    backgroundColor: 'rgba(255,255,255,0.1)',
-  },
+  segmentActive: { backgroundColor: 'rgba(255,255,255,0.1)' },
+  segmentText: { color: Colors.text.muted, fontSize: FontSize.xs, fontWeight: '600' },
+  segmentTextActive: { color: Colors.text.primary, fontWeight: '700' },
   // Section headers (Upcoming / year groups / All Rated) — full-width bands so
   // year boundaries read at a glance (beta feedback 2026-07-25).
   sectionHeaderRow: {
