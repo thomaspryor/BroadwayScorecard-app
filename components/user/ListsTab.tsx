@@ -6,7 +6,7 @@
  * Inline search to add shows. Create/Edit modal for list metadata.
  */
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -15,6 +15,7 @@ import {
   TextInput,
   Modal,
   Alert,
+  RefreshControl,
   StyleSheet,
   ActivityIndicator,
   Switch,
@@ -30,6 +31,8 @@ import Fuse from 'fuse.js';
 import { useUserLists } from '@/hooks/useUserLists';
 import { useShows } from '@/lib/data-context';
 import { getImageUrl } from '@/lib/images';
+import { humanizeShowId } from '@/lib/show-format';
+import { useToastSafe } from '@/lib/toast-context';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
 import * as haptics from '@/lib/haptics';
 import { trackListCreated, trackListDeleted, trackShowAddedToList, trackShowRemovedFromList, trackListReordered } from '@/lib/analytics';
@@ -55,10 +58,25 @@ export default function ListsTab({ userId, showMap, createTrigger }: ListsTabPro
     addToList, removeFromList, reorderList,
   } = useUserLists(userId);
   const { shows } = useShows();
+  const { showToast } = useToastSafe();
+
+  const handleMissingShow = useCallback(() => {
+    showToast("This show isn't in the current catalog yet.", 'info');
+  }, [showToast]);
 
   // Load lists on mount
   useEffect(() => {
     getLists();
+  }, [getLists]);
+
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await getLists();
+    } finally {
+      setRefreshing(false);
+    }
   }, [getLists]);
 
   const [activeListId, setActiveListId] = useState<string | null>(null);
@@ -239,6 +257,7 @@ export default function ListsTab({ userId, showMap, createTrigger }: ListsTabPro
           data={lists}
           keyExtractor={l => l.id}
           contentContainerStyle={styles.listContent}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.text.secondary} />}
           renderItem={({ item: list }) => (
             <Pressable
               style={styles.listCard}
@@ -353,7 +372,7 @@ export default function ListsTab({ userId, showMap, createTrigger }: ListsTabPro
                 <Pressable
                   style={[styles.itemRow, isActive && styles.itemRowDragging]}
                   onLongPress={drag}
-                  onPress={() => show && router.push(`/show/${show.slug}`)}
+                  onPress={() => show ? router.push(`/show/${show.slug}`) : handleMissingShow()}
                 >
                   {/* Rank number */}
                   <Text style={styles.rankNumber}>{idx + 1}</Text>
@@ -378,7 +397,7 @@ export default function ListsTab({ userId, showMap, createTrigger }: ListsTabPro
                   {/* Title */}
                   <View style={styles.itemInfo}>
                     <Text style={styles.itemTitle} numberOfLines={1}>
-                      {show?.title || item.show_id}
+                      {show?.title || humanizeShowId(item.show_id)}
                     </Text>
                     {show?.venue && (
                       <Text style={styles.itemVenue} numberOfLines={1}>{show.venue}</Text>
@@ -418,7 +437,7 @@ export default function ListsTab({ userId, showMap, createTrigger }: ListsTabPro
             return (
               <Pressable
                 style={styles.itemRow}
-                onPress={() => show && router.push(`/show/${show.slug}`)}
+                onPress={() => show ? router.push(`/show/${show.slug}`) : handleMissingShow()}
               >
                 {show ? (
                   <Image

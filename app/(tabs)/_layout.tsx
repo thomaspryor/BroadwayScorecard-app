@@ -44,7 +44,12 @@ export default function TabLayout() {
         <NativeTabs.Trigger.Icon sf="list.bullet" />
         <NativeTabs.Trigger.Label>Lists</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="browse" role="search">
+      {/* role="search" detaches this trigger into an unlabeled right-hand
+          capsule on iOS 26+ NativeTabs — Browse is a full grid/filter screen,
+          not a pure search field, so it renders as a normal tab (2026-07-26
+          Tier-1 assessment: 3/4 reviewers flagged the detached capsule as
+          confusing/"broken-looking"). */}
+      <NativeTabs.Trigger name="browse">
         <NativeTabs.Trigger.Icon sf={{ default: 'square.grid.2x2', selected: 'square.grid.2x2.fill' }} />
         <NativeTabs.Trigger.Label>Browse</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>

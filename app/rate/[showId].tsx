@@ -62,7 +62,7 @@ export default function RateModal() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { user, showSignIn } = useAuth();
-  const { getReviewsForShow, deleteReview, invalidateCache } = useUserReviews(user?.id || null);
+  const { getReviewsForShow, deleteReview, saveReview, invalidateCache } = useUserReviews(user?.id || null);
   const { watchlist, getWatchlist, removeFromWatchlist } = useWatchlist(user?.id || null);
   const { shows } = useShows();
   const { showToast } = useToastSafe();
@@ -305,9 +305,12 @@ export default function RateModal() {
 
   const handleDelete = useCallback(() => {
     if (!reviewId) return;
+    // Snapshot the current form values so a same-session Undo can recreate
+    // the rating — deleting a rating you just made was previously permanent.
+    const deletedSnapshot = { rating: currentRating, reviewText, dateSeen };
     Alert.alert(
       'Delete this rating?',
-      'This removes it from your diary. This can\'t be undone.',
+      'This removes it from your diary.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -320,7 +323,18 @@ export default function RateModal() {
               haptics.action();
               isDirty.current = false;
               router.back();
-              showToast('Rating deleted.', 'info');
+              showToast('Rating deleted.', 'info', {
+                actionLabel: 'Undo',
+                onAction: () => {
+                  if (deletedSnapshot.rating === null) return;
+                  saveReview({
+                    showId,
+                    rating: deletedSnapshot.rating,
+                    reviewText: deletedSnapshot.reviewText,
+                    dateSeen: deletedSnapshot.dateSeen,
+                  }).catch(() => showToast('Undo failed. Please re-rate the show.', 'error'));
+                },
+              });
             } catch (e) {
               const detail = e instanceof Error ? e.message : 'Unknown error';
               showToast(`Delete failed: ${detail}`, 'error');
@@ -329,7 +343,7 @@ export default function RateModal() {
         },
       ],
     );
-  }, [reviewId, deleteReview, invalidateCache, router, showToast]);
+  }, [reviewId, currentRating, reviewText, dateSeen, showId, deleteReview, saveReview, invalidateCache, router, showToast]);
 
   // If showId is missing, bail
   if (!showId) {

@@ -10,6 +10,7 @@ import { ShowListSkeleton } from '@/components/Skeleton';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useShows } from '@/lib/data-context';
+import { useMarket } from '@/lib/market-context';
 import { ShowCard } from '@/components/ShowCard';
 import { AnimatedListItem } from '@/components/AnimatedListItem';
 import { MarketPicker, Market, filterByMarketCategory } from '@/components/MarketPicker';
@@ -90,7 +91,7 @@ export default function BrowseScreen() {
   const { shows, isLoading, refresh, error } = useShows();
   const [refreshing, setRefreshing] = useState(false);
   const insets = useSafeAreaInsets();
-  const [market, setMarket] = useState<Market>('nyc');
+  const { market, setMarket } = useMarket();
   const [scoreMode, setScoreMode] = useState<ScoreMode>('critics');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('open');
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
@@ -170,7 +171,7 @@ export default function BrowseScreen() {
   const handleMarketChange = useCallback((m: Market) => {
     setMarket(m);
     trackMarketChanged(m, 'browse');
-  }, []);
+  }, [setMarket]);
 
   const handleScoreModeChange = useCallback((m: ScoreMode) => {
     setScoreMode(m);
@@ -410,7 +411,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
   },
   filterGroup: {
-    flexShrink: 1,
+    flex: 1,
+    // RN Yoga defaults flex items to a content-based minWidth like web
+    // flexbox — without this, flexShrink never kicks in and the pill
+    // ScrollView's full content width overlaps the ScoreToggle sibling
+    // (2026-07-26 Tier-1 assessment: "Previews" pill sliced in half).
+    minWidth: 0,
   },
   sortDivider: {
     width: 1,

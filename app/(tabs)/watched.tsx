@@ -13,6 +13,7 @@ import {
   Text,
   FlatList,
   Pressable,
+  RefreshControl,
   StyleSheet,
   Alert,
 } from 'react-native';
@@ -31,6 +32,8 @@ import { useWatchlist } from '@/hooks/useWatchlist';
 import { useShows } from '@/lib/data-context';
 import { getImageUrl } from '@/lib/images';
 import { toLocalYMD } from '@/lib/date-utils';
+import { humanizeShowId } from '@/lib/show-format';
+import { useToastSafe } from '@/lib/toast-context';
 import { featureFlags } from '@/lib/feature-flags';
 import StarRating from '@/components/user/StarRating';
 import MiniStars from '@/components/user/MiniStars';
@@ -97,6 +100,21 @@ export default function WatchedScreen() {
   const { reviews, getAllReviews, deleteReview, loading: reviewsLoading } = useUserReviews(user?.id || null);
   const { watchlist, getWatchlist, removeFromWatchlist, loading: watchlistLoading } = useWatchlist(user?.id || null);
   const { shows } = useShows();
+  const { showToast } = useToastSafe();
+
+  const handleMissingShow = useCallback(() => {
+    showToast("This show isn't in the current catalog yet.", 'info');
+  }, [showToast]);
+
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([getAllReviews(), getWatchlist()]);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [getAllReviews, getWatchlist]);
 
   const [diarySort, setDiarySort] = useState<DiarySort>('date-desc');
   const [viewMode, setViewModeState] = useState<ViewMode>('grid');
@@ -243,7 +261,7 @@ export default function WatchedScreen() {
   const handleDeleteDiaryItem = useCallback((review: UserReview) => {
     haptics.action();
     const show = showMap[review.show_id];
-    const title = show?.title || review.show_id;
+    const title = show?.title || humanizeShowId(review.show_id);
     Alert.alert(
       'Delete Rating',
       `Delete your ${review.rating.toFixed(1)}★ rating for ${title}?`,
@@ -332,7 +350,7 @@ export default function WatchedScreen() {
   // ─── List row (shared by To Be Rated is separate; this is for rated diary entries) ────
   const renderDiaryListRow = (item: UserReview) => {
     const show = showMap[item.show_id];
-    const title = show?.title || item.show_id;
+    const title = show?.title || humanizeShowId(item.show_id);
     const posterUrl = show?.images ? (getImageUrl(show.images.poster) || getImageUrl(show.images.thumbnail)) : null;
 
     return (
@@ -347,7 +365,7 @@ export default function WatchedScreen() {
       >
         <Pressable
           style={({ pressed }) => [styles.card, styles.cardSwipeable, pressed && styles.pressed]}
-          onPress={() => show && guardedPush(item.id, () => router.push(`/show/${show.slug}`))}
+          onPress={() => show ? guardedPush(item.id, () => router.push(`/show/${show.slug}`)) : handleMissingShow()}
           onLongPress={() => handleDeleteDiaryItem(item)}
         >
           {posterUrl ? (
@@ -390,23 +408,38 @@ export default function WatchedScreen() {
   // ─── Grid card (shared by To Be Rated is separate; this is for rated diary entries) ────
   const renderDiaryGridCard = (item: UserReview) => {
     const show = showMap[item.show_id];
-    const title = show?.title || item.show_id;
+    const title = show?.title || humanizeShowId(item.show_id);
     const posterUrl = show?.images ? (getImageUrl(show.images.poster) || getImageUrl(show.images.thumbnail)) : null;
 
     return (
       <Pressable
         key={item.id}
         style={({ pressed }) => [styles.gridCardFixed, pressed && styles.pressed]}
-        onPress={() => show && router.push(`/show/${show.slug}`)}
+        onPress={() => show ? router.push(`/show/${show.slug}`) : handleMissingShow()}
         onLongPress={() => handleDeleteDiaryItem(item)}
       >
-        {posterUrl ? (
-          <Image source={{ uri: posterUrl }} style={styles.gridPoster} contentFit="cover" transition={200} />
-        ) : (
-          <View style={[styles.gridPoster, styles.cardPosterPlaceholder]}>
-            <Text style={styles.placeholderText}>{title.charAt(0)}</Text>
-          </View>
-        )}
+        <View style={styles.gridPosterWrap}>
+          {posterUrl ? (
+            <Image source={{ uri: posterUrl }} style={styles.gridPoster} contentFit="cover" transition={200} />
+          ) : (
+            <View style={[styles.gridPoster, styles.cardPosterPlaceholder]}>
+              <Text style={styles.placeholderText}>{title.charAt(0)}</Text>
+            </View>
+          )}
+          {/* Visible delete affordance — grid cards were long-press-only with
+              no hint that a delete gesture existed (2026-07-26 Tier-1 assessment). */}
+          <Pressable
+            style={styles.gridDeleteButton}
+            onPress={() => handleDeleteDiaryItem(item)}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={`Delete your rating for ${title}`}
+          >
+            <Svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth={2.5}>
+              <Path strokeLinecap="round" strokeLinejoin="round" d="M18 6L6 18M6 6l12 12" />
+            </Svg>
+          </Pressable>
+        </View>
         <Pressable
           style={styles.gridCardInfo}
           onPress={() => router.push({
@@ -435,7 +468,7 @@ export default function WatchedScreen() {
 
   const renderUpcomingRow = (entry: WatchlistEntry) => {
     const show = showMap[entry.show_id];
-    const title = show?.title || entry.show_id;
+    const title = show?.title || humanizeShowId(entry.show_id);
     const posterUrl = show?.images ? (getImageUrl(show.images.poster) || getImageUrl(show.images.thumbnail)) : null;
     const daysUntil = entry.planned_date
       ? Math.ceil((new Date(entry.planned_date + 'T00:00:00').getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
@@ -450,7 +483,7 @@ export default function WatchedScreen() {
       <Pressable
         key={entry.id}
         style={({ pressed }) => [styles.card, pressed && styles.pressed]}
-        onPress={() => show && router.push(`/show/${show.slug}`)}
+        onPress={() => show ? router.push(`/show/${show.slug}`) : handleMissingShow()}
         onLongPress={() => handleRemoveUpcoming(entry)}
       >
         {posterUrl ? (
@@ -496,13 +529,13 @@ export default function WatchedScreen() {
           <View style={styles.toBeRatedGrid}>
             {toBeRated.map(item => {
               const show = showMap[item.show_id];
-              const title = show?.title || item.show_id;
+              const title = show?.title || humanizeShowId(item.show_id);
               const posterUrl = show?.images ? (getImageUrl(show.images.poster) || getImageUrl(show.images.thumbnail)) : null;
               return (
                 <Pressable
                   key={item.id}
                   style={({ pressed }) => [styles.gridCardFixed, pressed && styles.pressed]}
-                  onPress={() => show && router.push({
+                  onPress={() => router.push({
                     pathname: '/rate/[showId]' as any,
                     params: { showId: item.show_id, showTitle: title, suggestedDate: item.planned_date || '' },
                   })}
@@ -540,7 +573,7 @@ export default function WatchedScreen() {
             <View style={styles.toBeRatedGrid}>
               {upcomingWatchlistEntries.map(entry => {
                 const show = showMap[entry.show_id];
-                const title = show?.title || entry.show_id;
+                const title = show?.title || humanizeShowId(entry.show_id);
                 const posterUrl = show?.images ? (getImageUrl(show.images.poster) || getImageUrl(show.images.thumbnail)) : null;
                 const formattedDate = entry.planned_date
                   ? new Date(entry.planned_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
@@ -549,7 +582,7 @@ export default function WatchedScreen() {
                   <Pressable
                     key={entry.id}
                     style={({ pressed }) => [styles.gridCardFixed, pressed && styles.pressed]}
-                    onPress={() => show && router.push(`/show/${show.slug}`)}
+                    onPress={() => show ? router.push(`/show/${show.slug}`) : handleMissingShow()}
                     onLongPress={() => handleRemoveUpcoming(entry)}
                   >
                     {posterUrl ? (
@@ -734,6 +767,7 @@ export default function WatchedScreen() {
           data={['content']}
           keyExtractor={() => 'content'}
           renderItem={() => diaryContent}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.text.secondary} />}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={[styles.gridContainer, { paddingBottom: listBottomPad }]}
         />
@@ -857,9 +891,16 @@ const styles = StyleSheet.create({
   // flex:1 card inside flexWrap stretches unevenly on partial rows, so these
   // use the same fixed-percentage convention as the To Watch tab's grid.
   gridCardFixed: { width: '23%', alignItems: 'center' },
+  gridPosterWrap: { width: '100%' },
   gridPoster: {
     width: '100%', aspectRatio: 2 / 3, borderRadius: BorderRadius.md,
     backgroundColor: Colors.surface.overlay,
+  },
+  gridDeleteButton: {
+    position: 'absolute', top: 4, right: 4,
+    width: 22, height: 22, borderRadius: 11,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    alignItems: 'center', justifyContent: 'center',
   },
   gridCardInfo: { marginTop: 4, alignItems: 'center' },
   gridTitle: {

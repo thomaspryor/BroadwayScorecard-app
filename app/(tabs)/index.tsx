@@ -11,6 +11,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import Svg, { Path, Circle } from 'react-native-svg';
 import { useShows } from '@/lib/data-context';
+import { useMarket } from '@/lib/market-context';
 import { useAuth } from '@/lib/auth-context';
 import { useWatchlist } from '@/hooks/useWatchlist';
 import { useMyRatingsMap } from '@/hooks/useMyRatingsMap';
@@ -19,7 +20,6 @@ import { AnimatedListItem } from '@/components/AnimatedListItem';
 import { FeaturedCarousel } from '@/components/FeaturedCarousel';
 import { ClosingSoon } from '@/components/ClosingSoon';
 import { filterByMarketCategory } from '@/components/MarketPicker';
-import type { Market } from '@/components/MarketPicker';
 import { Show } from '@/lib/types';
 import { StaleBanner } from '@/components/StaleBanner';
 import { Colors, Spacing, FontSize } from '@/constants/theme';
@@ -29,7 +29,7 @@ export default function HomeScreen() {
   const { shows, isLoading, error, refresh } = useShows();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const [market] = useState<Market>('nyc');
+  const { market } = useMarket();
   const [refreshing, setRefreshing] = useState(false);
   const { user, isAuthenticated, showSignIn } = useAuth();
   const { watchlist, addToWatchlist, removeFromWatchlist } = useWatchlist(user?.id || null);
@@ -165,7 +165,10 @@ export default function HomeScreen() {
     return marketShows
       .filter(s => {
         if (!s.closingDate || s.status === 'closed') return false;
-        const d = new Date(s.closingDate);
+        // Bare `new Date(s.closingDate)` parses YYYY-MM-DD as UTC midnight —
+        // in ET that's always earlier than local midnight `now`, so a show
+        // closing today silently drops off the shelf.
+        const d = new Date(s.closingDate + 'T00:00:00');
         return d >= now && d <= cutoff;
       })
       .sort((a, b) => (a.closingDate ?? '').localeCompare(b.closingDate ?? ''));

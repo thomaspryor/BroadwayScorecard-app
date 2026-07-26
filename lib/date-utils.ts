@@ -15,12 +15,17 @@ export function nowMs(): number {
   return Date.now();
 }
 
-/** True when a closing date is within the next four weeks (and not already past). */
+/** True when a closing date is within the next four weeks (today counts as "soon"). */
 export function isClosingSoonDate(closingDate: string): boolean {
-  const closing = new Date(closingDate);
+  // Bare `new Date(dateStr)` parses YYYY-MM-DD as UTC midnight — in ET that
+  // rolls a show closing "today" into the past, dropping it off the shelf.
+  // Compare local-midnight-to-local-midnight (matches daysUntilDate) so a
+  // show closing today is still >= today, not excluded.
+  const closing = new Date(closingDate + 'T00:00:00');
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
   const fourWeeks = 28 * 24 * 60 * 60 * 1000;
-  const now = Date.now();
-  return closing.getTime() - now < fourWeeks && closing.getTime() > now;
+  return closing.getTime() - now.getTime() < fourWeeks && closing.getTime() >= now.getTime();
 }
 
 /**

@@ -11,8 +11,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
 import { useShows } from '@/lib/data-context';
+import { useMarket } from '@/lib/market-context';
 import { useAuth } from '@/lib/auth-context';
 import { clearUserCache } from '@/lib/user-cache';
+import { useToastSafe } from '@/lib/toast-context';
 import { featureFlags } from '@/lib/feature-flags';
 import { MarketPicker, Market } from '@/components/MarketPicker';
 import { Colors, Spacing, FontSize } from '@/constants/theme';
@@ -21,14 +23,14 @@ import * as haptics from '@/lib/haptics';
 
 const WEB = 'https://broadwayscorecard.com';
 
-function SettingsRow({ label, value, onPress }: { label: string; value?: string; onPress?: () => void }) {
+function SettingsRow({ label, value, onPress, destructive }: { label: string; value?: string; onPress?: () => void; destructive?: boolean }) {
   return (
     <Pressable
       style={({ pressed }) => [styles.row, onPress && pressed && styles.rowPressed]}
       onPress={onPress}
       disabled={!onPress}
     >
-      <Text style={[styles.rowLabel, onPress && styles.rowLink]}>{label}</Text>
+      <Text style={[styles.rowLabel, onPress && styles.rowLink, destructive && styles.rowDestructive]}>{label}</Text>
       {value && <Text style={styles.rowValue}>{value}</Text>}
     </Pressable>
   );
@@ -38,15 +40,17 @@ export default function SettingsScreen() {
   const { lastUpdated, refresh, shows } = useShows();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const [market, setMarket] = useState<Market>('nyc');
+  const { market, setMarket } = useMarket();
   const handleMarketChange = useCallback((m: Market) => {
     setMarket(m);
     trackMarketChanged(m, 'settings');
-  }, []);
+  }, [setMarket]);
 
   // Auth hooks — always called (React rules), but UI gated by feature flag
   const auth = useAuth();
-  const { user, profile, isAuthenticated, signOut, showSignIn } = auth;
+  const { user, profile, isAuthenticated, signOut, deleteAccount, showSignIn } = auth;
+  const [deletingAccount, setDeletingAccount] = useState(false);
+  const { showToast } = useToastSafe();
 
   const handleRefresh = async () => {
     haptics.tap();
@@ -108,6 +112,46 @@ export default function SettingsScreen() {
     ]);
   };
 
+  const handleDeleteAccount = () => {
+    haptics.action();
+    Alert.alert(
+      'Delete Account',
+      'This permanently deletes your account, ratings, watchlist, and lists. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete Account',
+          style: 'destructive',
+          onPress: () => {
+            Alert.alert(
+              'Are you absolutely sure?',
+              'All your data will be permanently erased.',
+              [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                  text: 'Delete Everything',
+                  style: 'destructive',
+                  onPress: async () => {
+                    setDeletingAccount(true);
+                    try {
+                      if (user?.id) await clearUserCache(user.id);
+                      await deleteAccount();
+                      router.replace('/(tabs)');
+                    } catch {
+                      showToast('Could not delete your account. Please try again.', 'error');
+                    } finally {
+                      setDeletingAccount(false);
+                    }
+                  },
+                },
+              ],
+            );
+          },
+        },
+      ],
+    );
+  };
+
   const appVersion = Constants.expoConfig?.version ?? '1.0.0';
 
   const lastUpdatedText = lastUpdated
@@ -158,6 +202,11 @@ export default function SettingsScreen() {
                 </View>
               </View>
               <SettingsRow label="Sign Out" onPress={handleSignOut} />
+              <SettingsRow
+                label={deletingAccount ? 'Deleting Account…' : 'Delete Account'}
+                onPress={deletingAccount ? undefined : handleDeleteAccount}
+                destructive
+              />
             </>
           ) : (
             <SettingsRow label="Sign In" onPress={() => showSignIn()} />
@@ -244,6 +293,9 @@ const styles = StyleSheet.create({
   },
   rowLink: {
     color: Colors.brand,
+  },
+  rowDestructive: {
+    color: Colors.score.red,
   },
   rowValue: {
     color: Colors.text.secondary,

@@ -40,7 +40,7 @@ export default function ShowPageRating({
   closingDate,
 }: ShowPageRatingProps) {
   const { user, isAuthenticated, showSignIn } = useAuth();
-  const { reviews, getReviewsForShow, deleteReview, invalidateCache } = useUserReviews(user?.id || null);
+  const { reviews, getReviewsForShow, deleteReview, saveReview, invalidateCache } = useUserReviews(user?.id || null);
   const {
     isWatchlisted,
     addToWatchlist,
@@ -160,11 +160,24 @@ export default function ShowPageRating({
 
   const handleDelete = useCallback(
     async (reviewId: string) => {
+      // Snapshot before deleting so Undo can recreate the same rating.
+      const deleted = reviews.find(r => r.id === reviewId);
       try {
         await deleteReview(reviewId);
         await invalidateCache();
         haptics.action();
-        showToast('Rating deleted.', 'info');
+        showToast('Rating deleted.', 'info', deleted ? {
+          actionLabel: 'Undo',
+          onAction: () => {
+            saveReview({
+              showId: deleted.show_id,
+              rating: deleted.rating,
+              reviewText: deleted.review_text,
+              dateSeen: deleted.date_seen,
+            }).then(() => getReviewsForShow(showId))
+              .catch(() => showToast('Undo failed. Please re-rate the show.', 'error'));
+          },
+        } : undefined);
         setConfirmDeleteId(null);
         await getReviewsForShow(showId);
       } catch (e) {
@@ -172,7 +185,7 @@ export default function ShowPageRating({
         showToast(`Delete failed: ${detail}`, 'error');
       }
     },
-    [deleteReview, invalidateCache, showToast, showId, getReviewsForShow],
+    [reviews, deleteReview, saveReview, invalidateCache, showToast, showId, getReviewsForShow],
   );
 
   const handleToggleWatchlist = useCallback(async () => {

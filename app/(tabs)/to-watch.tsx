@@ -11,6 +11,7 @@ import {
   Text,
   FlatList,
   Pressable,
+  RefreshControl,
   StyleSheet,
   Alert,
   Platform,
@@ -28,6 +29,8 @@ import { useWatchlist } from '@/hooks/useWatchlist';
 import { useShows } from '@/lib/data-context';
 import { getImageUrl } from '@/lib/images';
 import { daysUntilDate, isClosingSoonDate, toLocalYMD } from '@/lib/date-utils';
+import { humanizeShowId } from '@/lib/show-format';
+import { useToastSafe } from '@/lib/toast-context';
 import { getStatusInfo } from '@/lib/score-utils';
 import { featureFlags } from '@/lib/feature-flags';
 import type { WatchlistEntry } from '@/lib/user-types';
@@ -98,6 +101,21 @@ export default function ToWatchScreen() {
   const { reviews, getAllReviews } = useUserReviews(user?.id || null);
   const { watchlist, getWatchlist, addToWatchlist, removeFromWatchlist, updatePlannedDate, loading: watchlistLoading } = useWatchlist(user?.id || null);
   const { shows } = useShows();
+  const { showToast } = useToastSafe();
+
+  const handleMissingShow = useCallback(() => {
+    showToast("This show isn't in the current catalog yet.", 'info');
+  }, [showToast]);
+
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([getWatchlist(), getAllReviews()]);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [getWatchlist, getAllReviews]);
 
   const [watchlistSort, setWatchlistSort] = useState<WatchlistSort>('added-desc');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -257,7 +275,7 @@ export default function ToWatchScreen() {
 
   const renderUpcomingItem = (item: WatchlistEntry) => {
     const show = showMap[item.show_id];
-    const title = show?.title || item.show_id;
+    const title = show?.title || humanizeShowId(item.show_id);
     const posterUrl = show?.images ? (getImageUrl(show.images.poster) || getImageUrl(show.images.thumbnail)) : null;
     const daysUntil = item.planned_date ? daysUntilDate(item.planned_date) : null;
 
@@ -265,7 +283,7 @@ export default function ToWatchScreen() {
       <Pressable
         key={item.id}
         style={({ pressed }) => [styles.gridCard, pressed && styles.pressed]}
-        onPress={() => show && router.push(`/show/${show.slug}`)}
+        onPress={() => show ? router.push(`/show/${show.slug}`) : handleMissingShow()}
         onLongPress={() => { setPendingDate(new Date()); setDatePickingShowId(item.show_id); }}
       >
         {posterUrl ? (
@@ -293,14 +311,14 @@ export default function ToWatchScreen() {
 
   const renderWatchlistGridItem = (item: WatchlistEntry) => {
     const show = showMap[item.show_id];
-    const title = show?.title || item.show_id;
+    const title = show?.title || humanizeShowId(item.show_id);
     const posterUrl = show?.images ? (getImageUrl(show.images.poster) || getImageUrl(show.images.thumbnail)) : null;
 
     return (
       <View key={item.id} style={styles.gridCard}>
         <Pressable
           style={({ pressed }) => pressed && styles.pressed}
-          onPress={() => show && router.push(`/show/${show.slug}`)}
+          onPress={() => show ? router.push(`/show/${show.slug}`) : handleMissingShow()}
           onLongPress={() => showWatchlistActionSheet(item, title)}
         >
           <View>
@@ -323,14 +341,14 @@ export default function ToWatchScreen() {
 
   const renderWatchlistListItem = (item: WatchlistEntry) => {
     const show = showMap[item.show_id];
-    const title = show?.title || item.show_id;
+    const title = show?.title || humanizeShowId(item.show_id);
     const posterUrl = show?.images ? (getImageUrl(show.images.poster) || getImageUrl(show.images.thumbnail)) : null;
 
     return (
       <Pressable
         key={item.id}
         style={({ pressed }) => [styles.listRow, pressed && styles.pressed]}
-        onPress={() => show && router.push(`/show/${show.slug}`)}
+        onPress={() => show ? router.push(`/show/${show.slug}`) : handleMissingShow()}
         onLongPress={() => showWatchlistActionSheet(item, title)}
       >
         {posterUrl ? (
@@ -418,6 +436,7 @@ export default function ToWatchScreen() {
         <FlatList
           data={['content']}
           keyExtractor={() => 'content'}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.text.secondary} />}
           renderItem={() => (
             <View>
               {/* Upcoming section */}

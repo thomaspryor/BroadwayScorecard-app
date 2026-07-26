@@ -54,6 +54,8 @@ interface AuthContextValue {
   signInWithGoogle: () => Promise<void>;
   signInWithEmail: (email: string, password: string) => Promise<{ error?: string } | void>;
   signOut: () => Promise<void>;
+  /** Permanently deletes the account and all associated data (App Store 5.1.1(v)) */
+  deleteAccount: () => Promise<void>;
   /** Show sign-in sheet with context */
   showSignIn: (context?: SignInContext) => void;
   /** Dev-only email/password sign-in for simulator testing */
@@ -356,6 +358,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setProfile(null);
   }, []);
 
+  // ─── Permanent account deletion (App Store Guideline 5.1.1(v)) ──────────
+  const deleteAccount = useCallback(async () => {
+    const client = getSupabaseClient();
+    if (!client) throw new Error('Not signed in.');
+
+    const { data, error } = await client.functions.invoke<{ ok: boolean; error?: string }>('delete-account');
+    if (error || !data?.ok) {
+      throw new Error('Could not delete your account. Please try again.');
+    }
+
+    await client.auth.signOut();
+    setUser(null);
+    setProfile(null);
+  }, []);
+
   // ─── Show Sign-In Sheet ──────────────────────────────────
   const showSignIn = useCallback((context: SignInContext = 'generic') => {
     setSheetContext(context);
@@ -396,6 +413,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signInWithGoogle,
         signInWithEmail,
         signOut,
+        deleteAccount,
         showSignIn,
         devSignIn,
       }}
@@ -430,6 +448,7 @@ const DEFAULT_AUTH: AuthContextValue = {
   signInWithGoogle: async () => {},
   signInWithEmail: async () => {},
   signOut: async () => {},
+  deleteAccount: async () => {},
   showSignIn: () => {},
   devSignIn: async () => {},
 };
