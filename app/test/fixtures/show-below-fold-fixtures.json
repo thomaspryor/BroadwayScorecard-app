@@ -1,0 +1,1638 @@
+{
+  "hamilton": {
+    "id": "hamilton-2015",
+    "slug": "hamilton",
+    "title": "Hamilton",
+    "category": "broadway",
+    "type": "musical",
+    "venue": "Richard Rodgers Theatre",
+    "status": "open",
+    "synopsis": "The story of America's Founding Father Alexander Hamilton, an immigrant from the West Indies who became George Washington's right-hand man and the nation's first Treasury Secretary.",
+    "creativeTeam": [
+      {
+        "name": "Lin-Manuel Miranda",
+        "role": "Book"
+      },
+      {
+        "name": "Lin-Manuel Miranda",
+        "role": "Music & Lyrics"
+      },
+      {
+        "name": "Thomas Kail",
+        "role": "Director"
+      },
+      {
+        "name": "Andy Blankenbuehler",
+        "role": "Choreographer"
+      }
+    ],
+    "currentCast": [
+      {
+        "name": "Amina Faye",
+        "role": "Peggy Schuyler/Maria Reynolds",
+        "flags": [
+          "Broadway debut"
+        ],
+        "tony": null
+      },
+      {
+        "name": "David Guzman",
+        "role": "John Laurens/Philip Hamilton",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Marcus John",
+        "role": "Alexander Hamilton",
+        "flags": [
+          "Broadway debut"
+        ],
+        "tony": null
+      },
+      {
+        "name": "Isaiah Johnson",
+        "role": "George Washington",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Lencia Kebede",
+        "role": "Angelica Schuyler",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Simon Longnight",
+        "role": "Marquis de Lafayette/Thomas Jefferson",
+        "flags": [
+          "Broadway debut"
+        ],
+        "tony": null
+      },
+      {
+        "name": "Lauren Mariasoosay",
+        "role": "Eliza Hamilton",
+        "flags": [
+          "Broadway debut"
+        ],
+        "tony": null
+      },
+      {
+        "name": "Jarrod Spector",
+        "role": "King George",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Ebrin R. Stanley",
+        "role": "Hercules Mulligan/James Madison",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Donald Webber, Jr.",
+        "role": "Aaron Burr",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Jonathan Butler-Duplessis",
+        "role": "Ensemble",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Lauren Celentano",
+        "role": "Ensemble",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Daniel Gaymon",
+        "role": "Ensemble",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Jennifer Geller",
+        "role": "Ensemble",
+        "flags": [
+          "Broadway debut"
+        ],
+        "tony": null
+      },
+      {
+        "name": "Cyndal Gilmore",
+        "role": "Ensemble",
+        "flags": [
+          "Broadway debut"
+        ],
+        "tony": null
+      },
+      {
+        "name": "Neil Haskell",
+        "role": "Samuel Seabury",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Dharon Jones",
+        "role": "George Eacker",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Ashley Merritt",
+        "role": "Ensemble",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Erin Ramirez",
+        "role": "Ensemble",
+        "flags": [
+          "Broadway debut"
+        ],
+        "tony": null
+      },
+      {
+        "name": "Rixey Terry",
+        "role": "Charles Lee",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Christian Thompson",
+        "role": "Philip Schuyler/James Reynolds/Doctor",
+        "flags": [],
+        "tony": null
+      }
+    ],
+    "openingNightCast": [
+      {
+        "name": "Daveed Diggs",
+        "role": "Marquis de Lafayette/Thomas Jefferson",
+        "flags": [
+          "Broadway debut"
+        ],
+        "tony": {
+          "nominated": true,
+          "won": true,
+          "categories": [
+            "Best Featured Actor in a Musical"
+          ]
+        }
+      },
+      {
+        "name": "Renée Elise Goldsberry",
+        "role": "Angelica Schuyler",
+        "flags": [],
+        "tony": {
+          "nominated": true,
+          "won": true,
+          "categories": [
+            "Best Featured Actress in a Musical"
+          ]
+        }
+      },
+      {
+        "name": "Jonathan Groff",
+        "role": "King George",
+        "flags": [],
+        "tony": {
+          "nominated": true,
+          "won": false,
+          "categories": [
+            "Best Featured Actor in a Musical"
+          ]
+        }
+      },
+      {
+        "name": "Christopher Jackson",
+        "role": "George Washington",
+        "flags": [],
+        "tony": {
+          "nominated": true,
+          "won": false,
+          "categories": [
+            "Best Featured Actor in a Musical"
+          ]
+        }
+      },
+      {
+        "name": "Jasmine Cephas Jones",
+        "role": "Peggy Schuyler/Maria Reynolds",
+        "flags": [
+          "Broadway debut"
+        ],
+        "tony": null
+      },
+      {
+        "name": "Lin-Manuel Miranda",
+        "role": "Alexander Hamilton",
+        "flags": [],
+        "tony": {
+          "nominated": true,
+          "won": true,
+          "categories": [
+            "Best Book of a Musical",
+            "Best Original Score",
+            "Best Actor in a Musical"
+          ]
+        }
+      },
+      {
+        "name": "Javier Muñoz",
+        "role": "Alexander Hamilton",
+        "flags": [
+          "at some performances",
+          "Alternate"
+        ],
+        "tony": null
+      },
+      {
+        "name": "Leslie Odom, Jr.",
+        "role": "Aaron Burr",
+        "flags": [],
+        "tony": {
+          "nominated": true,
+          "won": true,
+          "categories": [
+            "Best Actor in a Musical"
+          ]
+        }
+      },
+      {
+        "name": "Okieriete Onaodowan",
+        "role": "Hercules Mulligan/James Madison",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Anthony Ramos",
+        "role": "John Laurens/Philip Hamilton",
+        "flags": [
+          "Broadway debut"
+        ],
+        "tony": null
+      },
+      {
+        "name": "Phillipa Soo",
+        "role": "Eliza Hamilton",
+        "flags": [
+          "Broadway debut"
+        ],
+        "tony": {
+          "nominated": true,
+          "won": false,
+          "categories": [
+            "Best Actress in a Musical"
+          ]
+        }
+      },
+      {
+        "name": "Carleigh Bettiol",
+        "role": "Ensemble",
+        "flags": [
+          "Broadway debut"
+        ],
+        "tony": null
+      },
+      {
+        "name": "Ariana DeBose",
+        "role": "Ensemble",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Sydney James Harcourt",
+        "role": "Ensemble",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Sasha Hutchings",
+        "role": "Ensemble",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Thayne Jasperson",
+        "role": "Ensemble",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Emmy Raver-Lampman",
+        "role": "Ensemble",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Jon Rua",
+        "role": "Ensemble",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Austin Smith",
+        "role": "Ensemble",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Seth Stewart",
+        "role": "Ensemble",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Betsy Struxness",
+        "role": "Ensemble",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Ephraim Sykes",
+        "role": "Ensemble",
+        "flags": [],
+        "tony": null
+      }
+    ],
+    "replacements": [
+      {
+        "name": "Jisel Soleil Ayon",
+        "role": "Angelica Schuyler",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Denée Benton",
+        "role": "Eliza Hamilton",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Daniel Breaker",
+        "role": "Aaron Burr",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Krystal Joy Brown",
+        "role": "Eliza Hamilton",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Bryson Bruce",
+        "role": "Marquis de Lafayette/Thomas Jefferson",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Andrew Call",
+        "role": "King George",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Rubén J. Carbajal",
+        "role": "John Laurens/Philip Hamilton",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Miguel Cervantes",
+        "role": "Alexander Hamilton",
+        "flags": [
+          "Alternate"
+        ],
+        "tony": null
+      },
+      {
+        "name": "Nicholas Christopher",
+        "role": "George Washington",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Bryan Terrell Clark",
+        "role": "George Washington",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Trey Curtis",
+        "role": "Alexander Hamilton",
+        "flags": [
+          "Broadway debut"
+        ],
+        "tony": null
+      },
+      {
+        "name": "Alysha Deslorieux",
+        "role": "Peggy Schuyler/Maria Reynolds",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Brandon Victor Dixon",
+        "role": "Aaron Burr",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Jared Dixon",
+        "role": "Aaron Burr",
+        "flags": [
+          "Broadway debut"
+        ],
+        "tony": null
+      },
+      {
+        "name": "Julia Estrada",
+        "role": "Peggy Schuyler/Maria Reynolds",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Amina Faye",
+        "role": "Peggy Schuyler/Maria Reynolds",
+        "flags": [
+          "Broadway debut"
+        ],
+        "tony": null
+      },
+      {
+        "name": "Jordan Fisher",
+        "role": "John Laurens/Philip Hamilton",
+        "flags": [
+          "Broadway debut"
+        ],
+        "tony": null
+      },
+      {
+        "name": "Mandy Gonzalez",
+        "role": "Angelica Schuyler",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Tamar Greene",
+        "role": "George Washington",
+        "flags": [
+          "Broadway debut"
+        ],
+        "tony": null
+      },
+      {
+        "name": "Jonathan Groff",
+        "role": "King George",
+        "flags": [],
+        "tony": {
+          "nominated": true,
+          "won": false,
+          "categories": [
+            "Best Featured Actor in a Musical"
+          ]
+        }
+      },
+      {
+        "name": "David Guzman",
+        "role": "John Laurens/Philip Hamilton",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Jacob Guzman",
+        "role": "John Laurens/Philip Hamilton",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Jin Ha",
+        "role": "Aaron Burr",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Sydney James Harcourt",
+        "role": "Aaron Burr",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Marja Harmon",
+        "role": "Angelica Schuyler",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Jennie Harney-Fleming",
+        "role": "Angelica Schuyler",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "James Monroe Iglehart",
+        "role": "Marquis de Lafayette/Thomas Jefferson",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Christopher Jackson",
+        "role": "George Washington",
+        "flags": [],
+        "tony": {
+          "nominated": true,
+          "won": false,
+          "categories": [
+            "Best Featured Actor in a Musical"
+          ]
+        }
+      },
+      {
+        "name": "Brian d'Arcy James",
+        "role": "King George",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Jimmie 'JJ' Jeter",
+        "role": "Alexander Hamilton",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Marcus John",
+        "role": "Alexander Hamilton",
+        "flags": [
+          "Broadway debut"
+        ],
+        "tony": null
+      },
+      {
+        "name": "Isaiah Johnson",
+        "role": "George Washington",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "J. Quinton Johnson",
+        "role": "Hercules Mulligan/James Madison",
+        "flags": [
+          "Broadway debut"
+        ],
+        "tony": null
+      },
+      {
+        "name": "Joanna A. Jones",
+        "role": "Peggy Schuyler/Maria Reynolds",
+        "flags": [
+          "Broadway debut"
+        ],
+        "tony": null
+      },
+      {
+        "name": "Elizabeth Judd",
+        "role": "Peggy Schuyler/Maria Reynolds",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Lencia Kebede",
+        "role": "Angelica Schuyler",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Taran Killam",
+        "role": "King George",
+        "flags": [
+          "Broadway debut"
+        ],
+        "tony": null
+      },
+      {
+        "name": "Lexi Lawson",
+        "role": "Eliza Hamilton",
+        "flags": [
+          "Broadway debut"
+        ],
+        "tony": null
+      },
+      {
+        "name": "Carvens Lissaint",
+        "role": "George Washington",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Simon Longnight",
+        "role": "Marquis de Lafayette/Thomas Jefferson",
+        "flags": [
+          "Broadway debut"
+        ],
+        "tony": null
+      },
+      {
+        "name": "Michael Luwoye",
+        "role": "Alexander Hamilton",
+        "flags": [
+          "Alternate"
+        ],
+        "tony": null
+      },
+      {
+        "name": "Lauren Mariasoosay",
+        "role": "Eliza Hamilton",
+        "flags": [
+          "Broadway debut"
+        ],
+        "tony": null
+      },
+      {
+        "name": "Jevon McFerrin",
+        "role": "Alexander Hamilton",
+        "flags": [
+          "during Javier Munoz's hiatus"
+        ],
+        "tony": null
+      },
+      {
+        "name": "Anthony Lee Medina",
+        "role": "John Laurens/Philip Hamilton",
+        "flags": [
+          "Broadway debut"
+        ],
+        "tony": null
+      },
+      {
+        "name": "Euan Morton",
+        "role": "King George",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Javier Muñoz",
+        "role": "Alexander Hamilton",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Leslie Odom, Jr.",
+        "role": "Aaron Burr",
+        "flags": [],
+        "tony": {
+          "nominated": true,
+          "won": true,
+          "categories": [
+            "Best Actor in a Musical"
+          ]
+        }
+      },
+      {
+        "name": "Rory O'Malley",
+        "role": "King George",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Stephanie Jae Park",
+        "role": "Eliza Hamilton",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Yana Perrault",
+        "role": "Peggy Schuyler/Maria Reynolds",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Fergie L. Philippe",
+        "role": "Hercules Mulligan/James Madison",
+        "flags": [
+          "Broadway debut"
+        ],
+        "tony": null
+      },
+      {
+        "name": "Andrew Rannells",
+        "role": "King George",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Kyle Scatliffe",
+        "role": "Marquis de Lafayette/Thomas Jefferson",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Austin Scott",
+        "role": "Alexander Hamilton",
+        "flags": [
+          "Broadway debut"
+        ],
+        "tony": null
+      },
+      {
+        "name": "Wallace Smith",
+        "role": "Hercules Mulligan/James Madison",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Jarrod Spector",
+        "role": "King George",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Ebrin R. Stanley",
+        "role": "Hercules Mulligan/James Madison",
+        "flags": [
+          "Broadway debut"
+        ],
+        "tony": null
+      },
+      {
+        "name": "Seth Stewart",
+        "role": "Marquis de Lafayette/Thomas Jefferson",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Cherry Torres",
+        "role": "Peggy Schuyler/Maria Reynolds",
+        "flags": [
+          "Broadway debut"
+        ],
+        "tony": null
+      },
+      {
+        "name": "Stephanie Umoh",
+        "role": "Angelica Schuyler",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Edred Utomi",
+        "role": "Alexander Hamilton",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Ryan Vasquez",
+        "role": "Alexander Hamilton",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Nik Walker",
+        "role": "Aaron Burr",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Donald Webber, Jr.",
+        "role": "Aaron Burr",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Aubin Wise",
+        "role": "Peggy Schuyler/Maria Reynolds",
+        "flags": [
+          "Broadway debut"
+        ],
+        "tony": null
+      },
+      {
+        "name": "Morgan Anita Wood",
+        "role": "Eliza Hamilton",
+        "flags": [
+          "Broadway debut"
+        ],
+        "tony": null
+      },
+      {
+        "name": "Daniel Yearwood",
+        "role": "John Laurens/Philip Hamilton",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Deejay Young",
+        "role": "Aaron Burr",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Reanne Acasio",
+        "role": "Ensemble",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Aaron J. Albano",
+        "role": "Charles Lee",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Gerald Avery",
+        "role": "Ensemble",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Giuseppe Bausilio",
+        "role": "Ensemble",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Raymond Baynard",
+        "role": "Ensemble",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Lauren Boyd",
+        "role": "Ensemble",
+        "flags": [
+          "Broadway debut"
+        ],
+        "tony": null
+      },
+      {
+        "name": "Justin Bryant",
+        "role": "Ensemble",
+        "flags": [
+          "Broadway debut"
+        ],
+        "tony": null
+      },
+      {
+        "name": "Jonathan Butler-Duplessis",
+        "role": "Ensemble",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Lauren Celentano",
+        "role": "Ensemble",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Erin Clemons",
+        "role": "Ensemble",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Eean S. Cochran",
+        "role": "Ensemble",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Phil Colgan",
+        "role": "Charles Lee",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Trey Curtis",
+        "role": "Philip Schuyler/James Reynolds/Doctor",
+        "flags": [
+          "Broadway debut"
+        ],
+        "tony": null
+      },
+      {
+        "name": "Marc delaCruz",
+        "role": "Philip Schuyler/James Reynolds/Doctor",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Karli Dinardo",
+        "role": "Ensemble",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Hope Easterbrook",
+        "role": "Ensemble",
+        "flags": [
+          "Broadway debut"
+        ],
+        "tony": null
+      },
+      {
+        "name": "Julia Estrada",
+        "role": "Ensemble",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Alexander Ferguson",
+        "role": "Ensemble",
+        "flags": [
+          "Broadway debut"
+        ],
+        "tony": null
+      },
+      {
+        "name": "John Michael Fiumara",
+        "role": "Charles Lee",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Lili Froehlich",
+        "role": "Ensemble",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Lexi Garcia",
+        "role": "Ensemble",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Daniel Gaymon",
+        "role": "Ensemble",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Jennifer Geller",
+        "role": "Ensemble",
+        "flags": [
+          "Broadway debut"
+        ],
+        "tony": null
+      },
+      {
+        "name": "Cyndal Gilmore",
+        "role": "Ensemble",
+        "flags": [
+          "Broadway debut"
+        ],
+        "tony": null
+      },
+      {
+        "name": "Shonica Gooden",
+        "role": "Ensemble",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Deon'te Goodman",
+        "role": "Ensemble",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Sean Green, Jr.",
+        "role": "Ensemble",
+        "flags": [
+          "Broadway debut"
+        ],
+        "tony": null
+      },
+      {
+        "name": "Sydney James Harcourt",
+        "role": "Philip Schuyler/James Reynolds/Doctor",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Neil Haskell",
+        "role": "Ensemble",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Sasha Hollinger",
+        "role": "Ensemble",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Sabrina Imamura",
+        "role": "Ensemble",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Abby Jaros",
+        "role": "Ensemble",
+        "flags": [
+          "Broadway debut"
+        ],
+        "tony": null
+      },
+      {
+        "name": "Thayne Jasperson",
+        "role": "Samuel Seabury",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Dharon Jones",
+        "role": "George Eacker",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Sean Harrison Jones",
+        "role": "Ensemble",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Elizabeth Judd",
+        "role": "Ensemble",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Roddy Kennedy",
+        "role": "Ensemble",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Malik Shabazz Kitchen",
+        "role": "Ensemble",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Eddy Lee",
+        "role": "Ensemble",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Tyler McKenzie",
+        "role": "Ensemble",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Ashley Merritt",
+        "role": "Ensemble",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Justice Moore",
+        "role": "Ensemble",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Preston Mui",
+        "role": "George Eacker",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Alex Nicholson",
+        "role": "Ensemble",
+        "flags": [
+          "Broadway debut"
+        ],
+        "tony": null
+      },
+      {
+        "name": "JJ Niemann",
+        "role": "Charles Lee",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Eliza Ohman",
+        "role": "Ensemble",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Erin Ramirez",
+        "role": "Ensemble",
+        "flags": [
+          "Broadway debut"
+        ],
+        "tony": null
+      },
+      {
+        "name": "Jon Rua",
+        "role": "Charles Lee",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Nick Sanchez",
+        "role": "Ensemble",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Willie Smith III",
+        "role": "Ensemble",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Avery Sobczak",
+        "role": "Charles Lee",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Terrance Spencer",
+        "role": "Ensemble",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Ephraim Sykes",
+        "role": "George Eacker",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Kim Taylor",
+        "role": "Ensemble",
+        "flags": [
+          "Broadway debut"
+        ],
+        "tony": null
+      },
+      {
+        "name": "Rixey Terry",
+        "role": "Charles Lee",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Raven Thomas",
+        "role": "Ensemble",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Christian Thompson",
+        "role": "Philip Schuyler/James Reynolds/Doctor",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Cherry Torres",
+        "role": "Ensemble",
+        "flags": [
+          "Broadway debut"
+        ],
+        "tony": null
+      },
+      {
+        "name": "Rickey Tripp",
+        "role": "Ensemble",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Kamille Upshaw",
+        "role": "Ensemble",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Kamille Upshaw-Darrington",
+        "role": "Ensemble",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Ryan Vasquez",
+        "role": "Philip Schuyler/James Reynolds/Doctor",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Tanairi Sade Vazquez",
+        "role": "Ensemble",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Voltaire Wade-Green",
+        "role": "Ensemble",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Nik Walker",
+        "role": "Ensemble",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Daniel J. Watts",
+        "role": "Ensemble",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Donald Webber, Jr.",
+        "role": "Ensemble",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Zelig Williams",
+        "role": "Ensemble",
+        "flags": [
+          "Broadway debut"
+        ],
+        "tony": null
+      },
+      {
+        "name": "Ta-Tynsia Wilson",
+        "role": "Ensemble",
+        "flags": [
+          "Broadway debut"
+        ],
+        "tony": null
+      },
+      {
+        "name": "Ricardo A. Zayas",
+        "role": "Ensemble",
+        "flags": [],
+        "tony": null
+      }
+    ],
+    "audience": {
+      "score": 95.2,
+      "designation": "Loving",
+      "sources": {
+        "ss": {
+          "s": 96,
+          "c": 16001
+        },
+        "mz": {
+          "s": 93,
+          "c": 6222,
+          "sr": 4.7
+        },
+        "rd": {
+          "s": 80,
+          "c": 310,
+          "tp": 854,
+          "sent": {
+            "enthusiastic": 0.14,
+            "positive": 0.56,
+            "mixed": 0.1,
+            "negative": 0.18,
+            "neutral": 0.02
+          }
+        },
+        "th": {
+          "s": 96,
+          "c": 4387
+        },
+        "bc": {
+          "s": 96,
+          "c": 600,
+          "sr": 4.8
+        }
+      }
+    }
+  },
+  "deathOfASalesman": {
+    "id": "death-of-a-salesman-2026",
+    "slug": "death-of-a-salesman",
+    "title": "Death of a Salesman",
+    "category": "broadway",
+    "type": "play",
+    "venue": "Winter Garden Theatre",
+    "status": "open",
+    "synopsis": "Arthur Miller's Pulitzer Prize-winning masterpiece about Willy Loman, a traveling salesman grappling with the collapse of the American Dream as his career and family life unravel. This 2026 revival at the Winter Garden Theatre is directed by Joe Mantello.",
+    "creativeTeam": [
+      {
+        "name": "Arthur Miller",
+        "role": "Playwright"
+      },
+      {
+        "name": "Joe Mantello",
+        "role": "Director"
+      },
+      {
+        "name": "Caroline Shaw",
+        "role": "Original Score"
+      },
+      {
+        "name": "Chloe Lamford",
+        "role": "Scenic Design"
+      },
+      {
+        "name": "Rudy Mance",
+        "role": "Costume Design"
+      },
+      {
+        "name": "Jack Knowles",
+        "role": "Lighting Design"
+      },
+      {
+        "name": "Mikaal Sulaiman",
+        "role": "Sound Design"
+      }
+    ],
+    "currentCast": [
+      {
+        "name": "Nathan Lane",
+        "role": "Willy Loman",
+        "flags": [],
+        "tony": {
+          "nominated": true,
+          "won": false,
+          "categories": [
+            "Best Actor in a Play"
+          ]
+        }
+      },
+      {
+        "name": "Laurie Metcalf",
+        "role": "Linda",
+        "flags": [],
+        "tony": {
+          "nominated": true,
+          "won": true,
+          "categories": [
+            "Best Featured Actress in a Play"
+          ]
+        }
+      },
+      {
+        "name": "Christopher Abbott",
+        "role": "Biff",
+        "flags": [],
+        "tony": {
+          "nominated": true,
+          "won": false,
+          "categories": [
+            "Best Featured Actor in a Play"
+          ]
+        }
+      },
+      {
+        "name": "Ben Ahlers",
+        "role": "Happy",
+        "flags": [
+          "Broadway debut"
+        ],
+        "tony": null
+      },
+      {
+        "name": "K. Todd Freeman",
+        "role": "Charley",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Jonathan Cake",
+        "role": "Uncle Ben",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "John Drea",
+        "role": "Howard Wagner",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Michael Benjamin Washington",
+        "role": "Bernard",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Joaquin Consuelos",
+        "role": "Young Biff",
+        "flags": [
+          "Broadway debut"
+        ],
+        "tony": null
+      },
+      {
+        "name": "Karl Green",
+        "role": "Young Bernard",
+        "flags": [
+          "Broadway debut"
+        ],
+        "tony": null
+      },
+      {
+        "name": "Tasha Lawrence",
+        "role": "The Woman",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Mary Neely",
+        "role": "Letta",
+        "flags": [
+          "Broadway debut"
+        ],
+        "tony": null
+      },
+      {
+        "name": "Katherine Romans",
+        "role": "Miss Forsythe",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Jake Silbermann",
+        "role": "Stanley",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Jake Termine",
+        "role": "Young Happy",
+        "flags": [
+          "Broadway debut"
+        ],
+        "tony": null
+      }
+    ],
+    "openingNightCast": [
+      {
+        "name": "Nathan Lane",
+        "role": "Willy Loman",
+        "flags": [],
+        "tony": {
+          "nominated": true,
+          "won": false,
+          "categories": [
+            "Best Actor in a Play"
+          ]
+        }
+      },
+      {
+        "name": "Laurie Metcalf",
+        "role": "Linda",
+        "flags": [],
+        "tony": {
+          "nominated": true,
+          "won": true,
+          "categories": [
+            "Best Featured Actress in a Play"
+          ]
+        }
+      },
+      {
+        "name": "Christopher Abbott",
+        "role": "Biff",
+        "flags": [],
+        "tony": {
+          "nominated": true,
+          "won": false,
+          "categories": [
+            "Best Featured Actor in a Play"
+          ]
+        }
+      },
+      {
+        "name": "Ben Ahlers",
+        "role": "Happy",
+        "flags": [
+          "Broadway debut"
+        ],
+        "tony": null
+      },
+      {
+        "name": "K. Todd Freeman",
+        "role": "Charley",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Jonathan Cake",
+        "role": "Uncle Ben",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "John Drea",
+        "role": "Howard Wagner",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Michael Benjamin Washington",
+        "role": "Bernard",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Joaquin Consuelos",
+        "role": "Young Biff",
+        "flags": [
+          "Broadway debut"
+        ],
+        "tony": null
+      },
+      {
+        "name": "Karl Green",
+        "role": "Young Bernard",
+        "flags": [
+          "Broadway debut"
+        ],
+        "tony": null
+      },
+      {
+        "name": "Tasha Lawrence",
+        "role": "The Woman",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Mary Neely",
+        "role": "Letta",
+        "flags": [
+          "Broadway debut"
+        ],
+        "tony": null
+      },
+      {
+        "name": "Katherine Romans",
+        "role": "Miss Forsythe",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Jake Silbermann",
+        "role": "Stanley",
+        "flags": [],
+        "tony": null
+      },
+      {
+        "name": "Jake Termine",
+        "role": "Young Happy",
+        "flags": [
+          "Broadway debut"
+        ],
+        "tony": null
+      }
+    ],
+    "replacements": [],
+    "audience": {
+      "score": 92.82,
+      "designation": "Loving",
+      "sources": {
+        "ss": {
+          "s": 95,
+          "c": 2628
+        },
+        "mz": {
+          "s": 87,
+          "c": 939,
+          "sr": 4.3
+        },
+        "rd": {
+          "s": 87,
+          "c": 288,
+          "tp": 165,
+          "sent": {
+            "enthusiastic": 0.24,
+            "positive": 0.52,
+            "mixed": 0.12,
+            "negative": 0.08,
+            "neutral": 0.04
+          }
+        },
+        "th": {
+          "s": 91,
+          "c": 598
+        },
+        "bc": {
+          "s": 96,
+          "c": 337,
+          "sr": 4.8
+        }
+      }
+    }
+  }
+}
