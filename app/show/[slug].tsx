@@ -299,17 +299,15 @@ export default function ShowDetailScreen() {
                 <ProductionPill isRevival={show.isRevival} />
                 <StatusBadge status={show.status} />
                 <CategoryBadge category={show.category} />
-                {show.openingDate && (
-                  <View style={styles.dateChip}>
-                    <Text style={styles.dateChipText} numberOfLines={1}>
-                      {show.status === 'previews' ? 'Opens' : 'Opened'} {formatDateShort(show.openingDate)}
-                    </Text>
-                  </View>
-                )}
               </View>
               <Text style={styles.title} numberOfLines={2}>{show.title}</Text>
               <Text style={styles.meta} numberOfLines={1}>{show.venue}</Text>
               {show.runtime && <Text style={styles.meta} numberOfLines={1}>{show.runtime}</Text>}
+              {show.openingDate && (
+                <Text style={styles.meta} numberOfLines={1}>
+                  {show.status === 'previews' ? 'Opens' : 'Opened'} {formatDateShort(show.openingDate)}
+                </Text>
+              )}
               {show.closingDate && (
                 <Text style={styles.meta} numberOfLines={1}>
                   {show.status === 'closed' ? 'Closed' : 'Closes'} {formatDate(show.closingDate)}
@@ -1649,7 +1647,8 @@ const styles = StyleSheet.create({
   meta: {
     color: Colors.text.secondary,
     fontSize: FontSize.sm,
-    marginTop: 2,
+    marginTop: 4,
+    lineHeight: 20,
   },
   pills: {
     flexDirection: 'row',
@@ -1658,20 +1657,6 @@ const styles = StyleSheet.create({
     marginBottom: 4,
     alignItems: 'center',
   },
-  dateChip: {
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 3,
-    borderRadius: BorderRadius.pill,
-    backgroundColor: Colors.surface.overlay,
-    borderWidth: 1,
-    borderColor: Colors.border.subtle,
-  },
-  dateChipText: {
-    fontSize: FontSize.xs,
-    fontWeight: '600',
-    color: Colors.text.secondary,
-  },
-
   // Breakdown bar
   breakdownContainer: {
   },
