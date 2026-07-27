@@ -83,6 +83,20 @@
       "expo-image",
       "expo-status-bar",
       "expo-web-browser",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Broadway Scorecard uses your photo library to attach photos to your diary entries."
+        }
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Broadway Scorecard can suggest photos taken the night of a show you rated, and save exported diary photos back to your library.",
+          "savePhotosPermission": "Broadway Scorecard saves exported diary photos to your photo library.",
+          "isAccessMediaLocationEnabled": false
+        }
+      ],
       "./plugins/withPodfileModularHeaders.js"
     ],
     "experiments": {

@@ -1,0 +1,24 @@
+# My Shows — Photo Feed privacy affordances (task #571)
+# Verifies: Feed segment shows "Only you" lock pill + Timeline/Photo wall toggle.
+# Cross-account RLS enforcement is proven separately (blocking, API-level) by
+# tests/security/photo-rls-adversarial.test.mjs — this flow only checks that
+# the UI's privacy affordances actually render for a signed-in user.
+
+appId: com.broadwayscorecard.app
+---
+- launchApp
+- openLink: broadwayscorecard:///my-shows
+- tapOn:
+    text: "Open"
+    optional: true
+
+- tapOn:
+    id: "diary-list-view-toggle"
+
+- assertVisible: "Only you"
+- assertVisible: "Timeline"
+- assertVisible: "Photo wall"
+
+- tapOn: "Photo wall"
+- assertVisible:
+    id: "photo-feed-wall-toggle"

@@ -43,6 +43,10 @@ import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
 import { Skeleton } from '@/components/Skeleton';
 import { ShowSearchModal } from '@/components/ShowSearchModal';
 import { StatsScreen } from '@/components/stats/StatsScreen';
+import { FeedModeToggle, type FeedMode } from '@/components/user/FeedModeToggle';
+import { PhotoFeedTimeline } from '@/components/user/PhotoFeedTimeline';
+import { PhotoWallGrid } from '@/components/user/PhotoWallGrid';
+import { usePhotoFeed } from '@/hooks/usePhotoFeed';
 import * as haptics from '@/lib/haptics';
 
 type DiarySort = 'date-desc' | 'date-asc' | 'rating-desc';
@@ -124,6 +128,11 @@ export default function WatchedScreen() {
   const handleMissingShow = useCallback(() => {
     showToast("This show isn't in the current catalog yet.", 'info');
   }, [showToast]);
+
+  // Feed segment (Sprint 4) — private photo scrapbook, own sub-toggle.
+  const [feedMode, setFeedMode] = useState<FeedMode>('timeline');
+  const { monthGroups, allPhotosFlat, signedUrls: photoSignedUrls, dismissNudge, refresh: refreshPhotoFeed } =
+    usePhotoFeed(user?.id || null, reviews);
 
   const [refreshing, setRefreshing] = useState(false);
   const onRefresh = useCallback(async () => {
@@ -766,8 +775,9 @@ export default function WatchedScreen() {
 
       {/* Controls — sort only; per-section headers already carry their own
           counts, so a top stats line just pushed content down (web parity,
-          owner 2026-07-17). Hidden in Stats, which has its own scope pill. */}
-      {viewMode !== 'stats' && (
+          owner 2026-07-17). Hidden in Stats + Feed, which have their own
+          scope pill / sub-toggle. */}
+      {viewMode !== 'stats' && viewMode !== 'list' && (
         <View style={styles.controlsRow}>
           <Text style={styles.showsSeenLabel}>{showsSeen} {showsSeen === 1 ? 'show' : 'shows'} seen</Text>
           <View style={styles.controlsRight}>
@@ -781,8 +791,39 @@ export default function WatchedScreen() {
         </View>
       )}
 
-      {/* Diary content */}
-      {viewMode === 'stats' ? (
+      {/* Feed — private photo scrapbook (task #571). Own screen: the
+          mockup's screen 3 has no Upcoming/To-Be-Rated sections, and this
+          is the segment's dedicated identity now, not the placeholder
+          timeline it used to fall back to. */}
+      {viewMode === 'list' ? (
+        <>
+          <View style={styles.feedHeaderRow}>
+            <View style={styles.lockPill}>
+              <Text style={styles.lockPillText}>🔒 Only you</Text>
+            </View>
+            <FeedModeToggle mode={feedMode} onChange={setFeedMode} />
+          </View>
+          <FlatList
+            data={['content']}
+            keyExtractor={() => 'content'}
+            renderItem={() => (
+              feedMode === 'timeline' ? (
+                <PhotoFeedTimeline
+                  monthGroups={monthGroups}
+                  signedUrls={photoSignedUrls}
+                  showMap={showMap}
+                  onDismissNudge={dismissNudge}
+                />
+              ) : (
+                <PhotoWallGrid photos={allPhotosFlat} signedUrls={photoSignedUrls} />
+              )
+            )}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { onRefresh(); refreshPhotoFeed(); }} tintColor={Colors.text.secondary} />}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={[styles.gridContainer, { paddingBottom: listBottomPad }]}
+          />
+        </>
+      ) : viewMode === 'stats' ? (
         <StatsScreen
           /* pastReviews, not sortedReviews: a future-dated entry is a show you
              have not sat through yet, so it must not count toward hours,
@@ -992,4 +1033,14 @@ const styles = StyleSheet.create({
   },
   ctaButtonText: { color: '#0d0d1a', fontSize: FontSize.md, fontWeight: '700' },
   loadingContainer: { paddingTop: Spacing.lg },
+  // Feed (photo scrapbook, task #571)
+  feedHeaderRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: Spacing.lg, paddingBottom: Spacing.sm,
+  },
+  lockPill: {
+    backgroundColor: Colors.surface.overlay, borderRadius: BorderRadius.pill,
+    paddingHorizontal: Spacing.sm, paddingVertical: 4,
+  },
+  lockPillText: { fontSize: FontSize.xs, fontWeight: '600', color: Colors.text.muted },
 });

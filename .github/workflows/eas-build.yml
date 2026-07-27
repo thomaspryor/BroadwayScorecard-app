@@ -14,6 +14,50 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  photo-security-gate:
+    # BLOCKING (task #571) — runs on every trigger, including manual
+    # workflow_dispatch (the TestFlight drift `gate` job below is
+    # schedule-only per the 2026-07-27 auto-ship decision, but a brand-new
+    # private-photo feature's RLS proof must never be skippable that way).
+    name: Photo Feed security gate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Unit-test photo storage path (RLS-relevant pure logic)
+        run: node --experimental-strip-types --test tests/unit/photo-path.test.mjs
+
+      - name: Seed two-account photo RLS fixtures
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          FIXTURE_PHOTO_A_PASSWORD: ${{ secrets.FIXTURE_PHOTO_A_PASSWORD }}
+          FIXTURE_PHOTO_B_PASSWORD: ${{ secrets.FIXTURE_PHOTO_B_PASSWORD }}
+        run: node scripts/seed-photo-test-accounts.js
+
+      - name: BLOCKING — two-account adversarial RLS test
+        env:
+          CI: 'true'
+          EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+          EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
+          FIXTURE_PHOTO_A_PASSWORD: ${{ secrets.FIXTURE_PHOTO_A_PASSWORD }}
+          FIXTURE_PHOTO_B_PASSWORD: ${{ secrets.FIXTURE_PHOTO_B_PASSWORD }}
+        run: node --test tests/security/photo-rls-adversarial.test.mjs
+
+      - name: BLOCKING — diary-photos bucket must be Private
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: node scripts/verify-photo-bucket-private.js
+
   gate:
     name: TestFlight drift gate
     if: github.event_name == 'schedule'
@@ -59,8 +103,8 @@ jobs:
 
   build:
     name: EAS Build (iOS)
-    needs: [gate]
-    if: ${{ !cancelled() && (github.event_name == 'workflow_dispatch' || needs.gate.outputs.should_build == 'true') }}
+    needs: [photo-security-gate, gate]
+    if: ${{ !cancelled() && needs.photo-security-gate.result == 'success' && (github.event_name == 'workflow_dispatch' || needs.gate.outputs.should_build == 'true') }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
