@@ -15,18 +15,22 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import {
+  alignCritics,
   buildHouseIndex,
   canonProgress,
   computeDiaryStats,
   ratingsHistogram,
   seasonWindows,
   theaterCompletion,
+  type AlignCriticsResult,
   type DiaryRow,
   type HouseIndex,
   type ShowMetaIndex,
   type StatsCanon,
+  type StatsReviews,
 } from '@/lib/stats';
 import { EMPTY_CANON, HOUSE_NAMES, THEATER_HOUSES, loadStatsCanon } from '@/lib/stats-canon-source';
+import { loadStatsReviews } from '@/lib/stats-reviews-source';
 import {
   buildScopes,
   defaultScope,
@@ -81,6 +85,24 @@ export interface StatsBundle {
   distinctShows: number;
   /** True when the Hours tile must drop out of the hero (spec §3.1, >25%). */
   demoteHours: boolean;
+  /**
+   * stats-reviews.json, once the background fetch resolves — null while
+   * loading/offline-with-no-cache. Aisle Mates / Your Paper of Record (spec
+   * §5.1) need the raw artifact (not just `aisleMates`) for the per-critic
+   * drill-down sheet (lib/stats-aisle-mates.ts).
+   */
+  statsReviews: StatsReviews | null;
+  /** True only on the very first, cache-less load — used for the module's
+   *  brief loading state, never for the whole-screen canon-style gate. */
+  statsReviewsLoading: boolean;
+  /**
+   * Aisle Mates / Your Paper of Record ranking, computed over the FULL diary
+   * (allRows) — lifetime, like gold/canon/audience (build-61 fix pass): a
+   * season-scoped "critics you align with" would silently shrink shared-show
+   * counts below the volume floor for anyone browsing a thin scope.
+   * Null until statsReviews resolves.
+   */
+  aisleMates: AlignCriticsResult | null;
 }
 
 /** mobile-shows `Show[]` → the index shape the vendored reducers expect. */
@@ -176,11 +198,44 @@ export function useStatsCanon(): { canon: StatsCanon; loading: boolean } {
   return { canon, loading };
 }
 
+/**
+ * Background loader for stats-reviews.json (Aisle Mates / Your Paper of
+ * Record, spec §5.1). Unlike useStatsCanon this never gates the Stats
+ * screen's first paint — the artifact is ~290KB and the module it feeds is
+ * below the fold, so a slow/offline first load just means the module shows
+ * its own brief loading card while the rest of the screen is already usable.
+ */
+export function useStatsReviews(): { statsReviews: StatsReviews | null; loading: boolean } {
+  const [statsReviews, setStatsReviews] = useState<StatsReviews | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    loadStatsReviews()
+      .then((r) => {
+        if (!cancelled) setStatsReviews(r);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return { statsReviews, loading };
+}
+
 export interface UseStatsDataArgs {
   reviews: UserReview[];
   shows: Show[];
   canon: StatsCanon;
   scope: ScopeOption | null;
+  /** stats-reviews.json, from useStatsReviews() — null while it's still
+   *  loading. Owned by the screen (not fetched here) so its background
+   *  fetch survives scope changes without re-triggering. */
+  statsReviews?: StatsReviews | null;
+  statsReviewsLoading?: boolean;
   /** Overridable for deterministic tests/screenshots. */
   today?: string;
 }
@@ -207,7 +262,15 @@ export const HOUSE_INDEX: HouseIndex = buildHouseIndex(
   ),
 );
 
-export function useStatsData({ reviews, shows, canon, scope, today }: UseStatsDataArgs): StatsBundle {
+export function useStatsData({
+  reviews,
+  shows,
+  canon,
+  scope,
+  statsReviews = null,
+  statsReviewsLoading = false,
+  today,
+}: UseStatsDataArgs): StatsBundle {
   const day = today ?? localToday();
 
   const showMeta = useMemo(() => buildShowMeta(shows), [shows]);
@@ -271,6 +334,13 @@ export function useStatsData({ reviews, shows, canon, scope, today }: UseStatsDa
   );
   const gold = useMemo(() => goldCoverage(allRows, openShows), [allRows, openShows]);
 
+  // Aisle Mates / Your Paper of Record — lifetime like gold/canon/audience
+  // above, computed from the vendored engine once stats-reviews.json resolves.
+  const aisleMates = useMemo(
+    () => (statsReviews ? alignCritics(allRows, statsReviews) : null),
+    [allRows, statsReviews],
+  );
+
   return {
     allRows,
     rows,
@@ -290,5 +360,8 @@ export function useStatsData({ reviews, shows, canon, scope, today }: UseStatsDa
     distinctShows,
     gold,
     demoteHours: diary.runtimeFallbackShare > 0.25,
+    statsReviews,
+    statsReviewsLoading,
+    aisleMates,
   };
 }
