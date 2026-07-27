@@ -19,6 +19,7 @@ import { MarketPicker, Market } from '@/components/MarketPicker';
 import { Colors, Spacing, FontSize } from '@/constants/theme';
 import { trackDataRefreshed, trackCacheCleared, trackMarketChanged } from '@/lib/analytics';
 import * as haptics from '@/lib/haptics';
+import { exportAndDeleteAllPhotos } from '@/lib/photo-export';
 
 const WEB = 'https://broadwayscorecard.com';
 
@@ -48,6 +49,7 @@ export default function SettingsScreen() {
   const auth = useAuth();
   const { user, profile, isAuthenticated, signOut, deleteAccount, showSignIn } = auth;
   const [deletingAccount, setDeletingAccount] = useState(false);
+  const [exportingPhotos, setExportingPhotos] = useState(false);
   const { showToast } = useToastSafe();
 
   const handleRefresh = async () => {
@@ -150,6 +152,53 @@ export default function SettingsScreen() {
     );
   };
 
+  const handleExportDeletePhotos = () => {
+    if (!user?.id) return;
+    haptics.action();
+    Alert.alert(
+      'Export & Delete All Photos',
+      'Every photo you’ve added to your diary will be saved to a "Broadway Scorecard Export" album in Photos, then permanently removed from your diary. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Export & Delete',
+          style: 'destructive',
+          onPress: () => {
+            Alert.alert(
+              'Are you absolutely sure?',
+              'This deletes every diary photo after exporting it. Your ratings and notes are not affected.',
+              [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                  text: 'Export & Delete Everything',
+                  style: 'destructive',
+                  onPress: async () => {
+                    setExportingPhotos(true);
+                    try {
+                      const result = await exportAndDeleteAllPhotos(user.id);
+                      haptics.success();
+                      showToast(
+                        result.exportedCount === 0
+                          ? 'No photos to export.'
+                          : `Exported and deleted ${result.deletedCount} photo${result.deletedCount === 1 ? '' : 's'}.`,
+                        'success',
+                      );
+                    } catch (e) {
+                      const detail = e instanceof Error ? e.message : 'Please try again.';
+                      showToast(`Export failed: ${detail}`, 'error');
+                    } finally {
+                      setExportingPhotos(false);
+                    }
+                  },
+                },
+              ],
+            );
+          },
+        },
+      ],
+    );
+  };
+
   const appVersion = Constants.expoConfig?.version ?? '1.0.0';
 
   const lastUpdatedText = lastUpdated
@@ -220,6 +269,13 @@ export default function SettingsScreen() {
         <SettingsRow label="Last updated" value={lastUpdatedText} />
         <SettingsRow label="Refresh data" onPress={handleRefresh} />
         <SettingsRow label="Clear cache" onPress={handleClearCache} />
+        {featureFlags.userAccounts && isAuthenticated && (
+          <SettingsRow
+            label={exportingPhotos ? 'Exporting…' : 'Export & delete all photos'}
+            onPress={exportingPhotos ? undefined : handleExportDeletePhotos}
+            destructive
+          />
+        )}
       </View>
 
       <View style={styles.section}>

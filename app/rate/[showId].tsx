@@ -41,6 +41,7 @@ import { toLocalYMD } from '@/lib/date-utils';
 import { savePendingAction, getPendingAction, clearPendingAction } from '@/lib/deferred-auth';
 import * as haptics from '@/lib/haptics';
 import StarRating from '@/components/user/StarRating';
+import { PhotoPickerRow } from '@/components/user/PhotoPickerRow';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
 
 const MAX_CHARS = 2000;
@@ -515,6 +516,12 @@ export default function RateModal() {
                   {charsRemaining.toLocaleString()} characters remaining
                 </Text>
               </View>
+
+              {/* Photos (task #571) — attaches to a saved review, so a brand
+                  new (unsaved) entry shows a hint instead until reviewId
+                  exists (Save always closes this sheet immediately, so
+                  photos are added on a subsequent edit visit). */}
+              <PhotoPickerRow reviewId={reviewId ?? null} userId={user?.id ?? null} dateSeen={dateSeen || null} />
 
               {/* Privacy note */}
               <View style={styles.privacyRow}>
