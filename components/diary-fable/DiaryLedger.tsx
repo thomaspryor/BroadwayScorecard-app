@@ -164,7 +164,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface.raised,
   },
   sectionMonth: { color: Colors.brand, fontSize: 12, letterSpacing: 1, fontWeight: '700' },
-  sectionMeta: { color: Colors.text.muted, fontSize: 12, ...TABULAR },
+  sectionMeta: { color: Colors.text.secondary, fontSize: 12, ...TABULAR },
   row: {
     flexDirection: 'row', alignItems: 'center', gap: Spacing.md,
     paddingHorizontal: Spacing.lg, paddingVertical: 7,

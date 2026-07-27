@@ -85,7 +85,9 @@ export default function DiaryMarquee({ reviews, showMap, topInset, embedded }: P
                 </View>
                 {critic !== null && (
                   <View style={styles.criticBlock}>
-                    <Text style={[styles.criticNum, { color: tierColor(critic) }]}>{critic}</Text>
+                    <View style={[styles.criticChip, { backgroundColor: tierColor(critic) }]}>
+                      <Text style={styles.criticNum}>{critic}</Text>
+                    </View>
                     <Text style={styles.criticLabel}>CRITICS</Text>
                   </View>
                 )}
@@ -152,8 +154,11 @@ const styles = StyleSheet.create({
   scoreRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.lg },
   youBlock: { gap: 3 },
   youLabel: { color: Colors.text.secondary, fontSize: 12, fontWeight: '600', letterSpacing: 0.5 },
-  criticBlock: { alignItems: 'center' },
-  criticNum: { fontSize: 24, lineHeight: 27, fontWeight: '800', ...TABULAR },
+  criticBlock: { alignItems: 'center', gap: 3 },
+  criticChip: {
+    borderRadius: BorderRadius.sm, paddingHorizontal: 8, paddingVertical: 2,
+  },
+  criticNum: { fontSize: 18, lineHeight: 24, fontWeight: '800', color: Colors.text.inverse, ...TABULAR },
   criticLabel: { color: Colors.text.muted, fontSize: 12, fontWeight: '600', letterSpacing: 0.5 },
   deltaBlock: { flex: 1, alignItems: 'flex-end' },
   deltaText: { color: Colors.text.muted, fontSize: 13, fontWeight: '600', ...TABULAR },
