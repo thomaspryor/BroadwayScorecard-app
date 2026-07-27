@@ -1,0 +1,98 @@
+# Screenshot capture for show-page below-the-fold design proposals (#595).
+# Each block re-opens the deep link fresh (resets scroll to top) before
+# tapping its target variant, avoiding a flaky scroll-back-to-top-then-tap.
+appId: com.broadwayscorecard.app
+---
+- launchApp
+- tapOn:
+    text: "Open"
+    optional: true
+
+# ── Hamilton: Cast Current ──
+- openLink: broadwayscorecard:///test/show-below-fold-variants
+- extendedWaitUntil:
+    visible:
+      id: "bf-cast-variant-current"
+    timeout: 20000
+- takeScreenshot: "01-hamilton-cast-current"
+
+# ── Hamilton: Cast Option A ──
+- tapOn:
+    id: "bf-cast-variant-a"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: "02-hamilton-cast-a"
+- scroll
+- takeScreenshot: "03-hamilton-cast-a-scroll1"
+
+# ── Hamilton: Cast Option B (fresh reload) ──
+- openLink: broadwayscorecard:///test/show-below-fold-variants
+- extendedWaitUntil:
+    visible:
+      id: "bf-cast-variant-current"
+    timeout: 20000
+- tapOn:
+    id: "bf-cast-variant-b"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: "05-hamilton-cast-b"
+- scroll
+- takeScreenshot: "06-hamilton-cast-b-scroll1"
+- scroll
+- takeScreenshot: "07-hamilton-cast-b-scroll2"
+
+# ── Hamilton: Audience (fresh reload, scroll down to it) ──
+- openLink: broadwayscorecard:///test/show-below-fold-variants
+- extendedWaitUntil:
+    visible:
+      id: "bf-cast-variant-current"
+    timeout: 20000
+- scrollUntilVisible:
+    element:
+      id: "bf-audience-variant-current"
+    direction: DOWN
+    timeout: 15000
+- takeScreenshot: "08-hamilton-audience-current"
+- tapOn:
+    id: "bf-audience-variant-grid"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: "09-hamilton-audience-grid"
+
+# ── Death of a Salesman: Cast Current ──
+- openLink: broadwayscorecard:///test/show-below-fold-variants
+- extendedWaitUntil:
+    visible:
+      id: "bf-cast-variant-current"
+    timeout: 20000
+- tapOn:
+    id: "bf-show-tab-deathOfASalesman"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: "10-dos-cast-current"
+
+# ── Death of a Salesman: Cast Option A ──
+- tapOn:
+    id: "bf-cast-variant-a"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: "11-dos-cast-a"
+
+# ── Death of a Salesman: Cast Option B ──
+- tapOn:
+    id: "bf-cast-variant-b"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: "12-dos-cast-b"
+
+# ── Death of a Salesman: Audience grid ──
+- scrollUntilVisible:
+    element:
+      id: "bf-audience-variant-current"
+    direction: DOWN
+    timeout: 15000
+- tapOn:
+    id: "bf-audience-variant-grid"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: "13-dos-audience-grid"

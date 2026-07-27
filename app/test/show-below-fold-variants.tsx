@@ -108,10 +108,10 @@ function CastGroupA({ title, members }: { title: string; members: CastMember[] }
         <View key={i} style={styles.creditRow}>
           <View style={{ flex: 1 }}>
             <View style={styles.castNameRow}>
-              <Text style={styles.creditName}>{m.name}</Text>
+              <Text style={styles.castMemberName}>{m.name}</Text>
               <TonyPill tony={m.tony} />
             </View>
-            <Text style={styles.creditRole}>{m.role}</Text>
+            <Text style={styles.castMemberRole}>{m.role}</Text>
             {m.flags.length > 0 && <Text style={styles.castFlagText}>{m.flags.join(' · ')}</Text>}
           </View>
         </View>
@@ -151,9 +151,9 @@ function CastCardB({ member, accent }: { member: CastMember; accent: string }) {
   return (
     <View style={[styles.castCard, { borderLeftColor: accent }]}>
       <View style={styles.castCardTop}>
-        <Text style={styles.castCardName} numberOfLines={1}>{member.name}</Text>
-        <TonyPill tony={member.tony} />
+        <Text style={styles.castCardName} numberOfLines={2}>{member.name}</Text>
       </View>
+      <TonyPill tony={member.tony} />
       <Text style={styles.castCardRole} numberOfLines={2}>{member.role}</Text>
       {member.flags.length > 0 && <Text style={styles.castFlagText}>{member.flags.join(' · ')}</Text>}
     </View>
@@ -346,8 +346,8 @@ const styles = StyleSheet.create({
 
   sectionTitle: { color: Colors.text.primary, fontSize: FontSize.lg, fontWeight: '700', marginTop: Spacing.lg, marginBottom: Spacing.md },
   creditRow: { flexDirection: 'row', paddingVertical: Spacing.sm, borderBottomWidth: 1, borderBottomColor: Colors.border.subtle },
-  creditRole: { color: Colors.text.muted, fontSize: FontSize.sm },
-  creditName: { color: Colors.text.primary, fontSize: FontSize.sm, fontWeight: '600' },
+  creditRole: { color: Colors.text.muted, fontSize: FontSize.sm, width: 120 },
+  creditName: { color: Colors.text.primary, fontSize: FontSize.sm, fontWeight: '600', flex: 1 },
   showAllButton: {
     alignSelf: 'center', paddingVertical: Spacing.sm, paddingHorizontal: Spacing.lg, marginTop: Spacing.md,
     backgroundColor: Colors.brand, borderRadius: 999,
@@ -358,6 +358,8 @@ const styles = StyleSheet.create({
   castGroup: { marginBottom: Spacing.lg },
   castGroupLabel: { color: Colors.text.muted, fontSize: FontSize.xs, fontWeight: '700', letterSpacing: 0.8, marginBottom: Spacing.xs, textTransform: 'uppercase' },
   castNameRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs },
+  castMemberName: { color: Colors.text.primary, fontSize: FontSize.sm, fontWeight: '600' },
+  castMemberRole: { color: Colors.text.muted, fontSize: FontSize.sm, marginTop: 1 },
   castFlagText: { color: Colors.brand, fontSize: 11, marginTop: 2 },
   tonyPill: {
     flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 999,
