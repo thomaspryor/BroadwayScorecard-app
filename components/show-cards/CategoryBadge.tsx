@@ -5,7 +5,7 @@
 
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { FontSize, BorderRadius } from '@/constants/theme';
+import { BorderRadius } from '@/constants/theme';
 
 interface CategoryBadgeProps {
   category: string;
@@ -29,15 +29,15 @@ export function CategoryBadge({ category }: CategoryBadgeProps) {
 
 const styles = StyleSheet.create({
   pill: {
-    paddingHorizontal: 10,
-    paddingVertical: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
     borderRadius: BorderRadius.pill,
     borderWidth: 1,
     alignSelf: 'flex-start',
   },
   label: {
-    fontSize: FontSize.xs,
+    fontSize: 12,
     fontWeight: '600',
-    letterSpacing: 0.5,
+    letterSpacing: 0.4,
   },
 });

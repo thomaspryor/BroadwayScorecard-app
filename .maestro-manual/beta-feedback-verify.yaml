@@ -1,0 +1,119 @@
+# Verification screenshots for the 2026-07-25 beta-feedback fixes (13 items).
+# LOCAL-ONLY TOOL — outside .maestro/ so CI's glob never runs it.
+# Pre-req: Release sim build installed, EXPO_PUBLIC_DEV_AUTO_SIGNIN handled by
+# the dev-test sign-in fallback below.
+# Run: maestro test .maestro-manual/beta-feedback-verify.yaml
+
+appId: com.broadwayscorecard.app
+---
+- launchApp:
+    clearState: false
+
+- extendedWaitUntil:
+    visible:
+      text: "Broadway Scorecard"
+    timeout: 30000
+
+- runFlow:
+    when:
+      visible: "Skip"
+    commands:
+      - tapOn: "Skip"
+      - tapOn: "Skip"
+      - tapOn: "Skip"
+
+# Sign in if needed (dev-test account)
+- openLink: broadwayscorecard:///watched
+- tapOn:
+    text: "Open"
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 5000
+- runFlow:
+    when:
+      visible: "Sign In to Get Started"
+    commands:
+      - tapOn: "Sign In to Get Started"
+      - extendedWaitUntil:
+          visible: "Sign in with email"
+          timeout: 10000
+      - tapOn: "Sign in with email"
+      - extendedWaitUntil:
+          visible:
+            text: "Email"
+          timeout: 5000
+      - tapOn:
+          text: "Email"
+      - inputText: "dev-test@broadwayscorecard.com"
+      - tapOn:
+          text: "Password"
+      - inputText: "dev-test-local-only-2024"
+      - hideKeyboard
+      - tapOn:
+          text: "^Sign In$"
+      - extendedWaitUntil:
+          notVisible: "Sign In to Get Started"
+          timeout: 25000
+      - runFlow:
+          when:
+            visible: "Save Password"
+          commands:
+            - tapOn: "Not Now"
+
+# ── Watched tab: items 7 (import icon), 9 (year bands), 11-13 (card sizes/order)
+- openLink: broadwayscorecard:///watched
+- tapOn:
+    text: "Open"
+    optional: true
+- waitForAnimationToEnd
+- takeScreenshot: /tmp/bwsc-beta-verify/01-watched-grid-top
+- swipe:
+    direction: UP
+- waitForAnimationToEnd
+- takeScreenshot: /tmp/bwsc-beta-verify/02-watched-grid-years
+- swipe:
+    direction: UP
+- waitForAnimationToEnd
+- takeScreenshot: /tmp/bwsc-beta-verify/03-watched-list
+
+# ── To Watch tab: item 10 (no empty stars, no booked-shelf pills, compact pills)
+- openLink: broadwayscorecard:///to-watch
+- tapOn:
+    text: "Open"
+    optional: true
+- waitForAnimationToEnd
+- takeScreenshot: /tmp/bwsc-beta-verify/04-to-watch-grid
+
+# ── Home: items 6 (Closing Soon score overlay) + Invalid Date fix
+- openLink: broadwayscorecard:///
+- tapOn:
+    text: "Open"
+    optional: true
+- waitForAnimationToEnd
+- swipe:
+    direction: UP
+- swipe:
+    direction: UP
+- waitForAnimationToEnd
+- takeScreenshot: /tmp/bwsc-beta-verify/05-home-shelves
+
+# ── Browse: items 1 (bookmark corner), 2 (audience pill), 3 (Off-Bway first), 5 (small chips)
+- openLink: broadwayscorecard:///browse
+- tapOn:
+    text: "Open"
+    optional: true
+- waitForAnimationToEnd
+- takeScreenshot: /tmp/bwsc-beta-verify/06-browse-critics
+- tapOn:
+    text: "AUDIENCE"
+    optional: true
+- waitForAnimationToEnd
+- takeScreenshot: /tmp/bwsc-beta-verify/07-browse-audience
+
+# ── Settings: item 4 (back label)
+- openLink: broadwayscorecard:///settings
+- tapOn:
+    text: "Open"
+    optional: true
+- waitForAnimationToEnd
+- takeScreenshot: /tmp/bwsc-beta-verify/08-settings-back-label

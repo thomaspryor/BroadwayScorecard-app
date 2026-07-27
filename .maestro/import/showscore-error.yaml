@@ -1,0 +1,30 @@
+# My Shows Import — Show Score error-path coverage (task #436 what-else follow-up)
+# The Mezzanine flow in this same suite covers the shared preview/import code,
+# but nothing exercised the Show Score error copy (lib/show-import.ts
+# SHOW_SCORE_ERROR_COPY). "not-a-valid-profile-url" matches the proxy's slug
+# shape regex ([a-z0-9-]+), so it round-trips through the real network call
+# instead of failing client-side. Normally that hits a genuine not_found from
+# show-score.com; the proxy's ledger also counts failed lookups against the
+# per-user rate limit (by design — otherwise garbage slugs bypass the cap),
+# so a run sharing the hour with other Show Score calls (local iteration,
+# manual testing) can instead see rate_limited. Both are real, both are
+# regression guards against a raw error code reaching the user, so accept
+# either — this is the CI/local-determinism tradeoff, not a bug.
+
+appId: com.broadwayscorecard.app
+---
+- launchApp
+- openLink: broadwayscorecard:///import
+- tapOn:
+    text: "Open"
+    optional: true
+- assertVisible: "Import your shows"
+- tapOn:
+    text: "show-score.com/member/your-name"
+- inputText: "not-a-valid-profile-url"
+- hideKeyboard
+- tapOn:
+    text: "^Import$"
+- extendedWaitUntil:
+    visible: ".*(couldn't find that Show Score member|hit the import limit).*"
+    timeout: 15000

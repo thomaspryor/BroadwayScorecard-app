@@ -11,14 +11,15 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import Svg, { Path, Circle } from 'react-native-svg';
 import { useShows } from '@/lib/data-context';
+import { useMarket } from '@/lib/market-context';
 import { useAuth } from '@/lib/auth-context';
 import { useWatchlist } from '@/hooks/useWatchlist';
+import { useMyRatingsMap } from '@/hooks/useMyRatingsMap';
 import { ShowCard } from '@/components/ShowCard';
 import { AnimatedListItem } from '@/components/AnimatedListItem';
 import { FeaturedCarousel } from '@/components/FeaturedCarousel';
 import { ClosingSoon } from '@/components/ClosingSoon';
 import { filterByMarketCategory } from '@/components/MarketPicker';
-import type { Market } from '@/components/MarketPicker';
 import { Show } from '@/lib/types';
 import { StaleBanner } from '@/components/StaleBanner';
 import { Colors, Spacing, FontSize } from '@/constants/theme';
@@ -28,11 +29,12 @@ export default function HomeScreen() {
   const { shows, isLoading, error, refresh } = useShows();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const [market] = useState<Market>('nyc');
+  const { market } = useMarket();
   const [refreshing, setRefreshing] = useState(false);
   const { user, isAuthenticated, showSignIn } = useAuth();
   const { watchlist, addToWatchlist, removeFromWatchlist } = useWatchlist(user?.id || null);
   const watchlistSet = useMemo(() => new Set(watchlist.map(w => w.show_id)), [watchlist]);
+  const ratingsMap = useMyRatingsMap(user?.id || null);
   const toggleWatchlist = useCallback(async (showId: string) => {
     if (!isAuthenticated) { showSignIn('watchlist'); return; }
     try {
@@ -61,8 +63,12 @@ export default function HomeScreen() {
     const rows: { title: string; shows: Show[]; getSubtitle?: (show: Show) => string | undefined }[] = [];
     const now = new Date();
     const shortDate = (d: string) => {
-      try { return new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); }
-      catch { return null; }
+      // new Date('T12:00:00') doesn't throw — it yields Invalid Date, whose
+      // toLocaleDateString is the literal string "Invalid Date" (beta feedback
+      // 2026-07-25: "Opens Invalid Date" on the Starting Soon shelf).
+      const parsed = new Date(d + 'T12:00:00');
+      if (isNaN(parsed.getTime())) return null;
+      return parsed.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     };
     const isOpen = (s: Show) => s.status === 'open' || s.status === 'previews';
     const byScore = (a: Show, b: Show) => (b.compositeScore ?? 0) - (a.compositeScore ?? 0);
@@ -159,7 +165,10 @@ export default function HomeScreen() {
     return marketShows
       .filter(s => {
         if (!s.closingDate || s.status === 'closed') return false;
-        const d = new Date(s.closingDate);
+        // Bare `new Date(s.closingDate)` parses YYYY-MM-DD as UTC midnight —
+        // in ET that's always earlier than local midnight `now`, so a show
+        // closing today silently drops off the shelf.
+        const d = new Date(s.closingDate + 'T00:00:00');
         return d >= now && d <= cutoff;
       })
       .sort((a, b) => (a.closingDate ?? '').localeCompare(b.closingDate ?? ''));
@@ -180,9 +189,9 @@ export default function HomeScreen() {
 
   const renderItem = useCallback(({ item, index }: { item: Show; index: number }) => (
     <AnimatedListItem index={index}>
-      <ShowCard show={item} hideStatus isWatchlisted={watchlistSet.has(item.id)} onToggleWatchlist={() => toggleWatchlist(item.id)} />
+      <ShowCard show={item} hideStatus isWatchlisted={watchlistSet.has(item.id)} onToggleWatchlist={() => toggleWatchlist(item.id)} myRating={ratingsMap.get(item.id) ?? null} />
     </AnimatedListItem>
-  ), [watchlistSet, toggleWatchlist]);
+  ), [watchlistSet, toggleWatchlist, ratingsMap]);
 
   const handleProfilePress = useCallback(() => {
     router.push('/settings');
@@ -253,7 +262,7 @@ export default function HomeScreen() {
             {featuredRows.map((row, i) => (
               <View key={i}>
                 <Text style={styles.sectionTitle}>{row.title}</Text>
-                <FeaturedCarousel shows={row.shows} watchlistSet={watchlistSet} onToggleWatchlist={toggleWatchlist} getSubtitle={row.getSubtitle} />
+                <FeaturedCarousel shows={row.shows} watchlistSet={watchlistSet} onToggleWatchlist={toggleWatchlist} getSubtitle={row.getSubtitle} ratingsMap={ratingsMap} />
               </View>
             ))}
 
@@ -271,7 +280,7 @@ export default function HomeScreen() {
             </View>
           ) : null
         }
-        contentContainerStyle={styles.list}
+        contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 72 }]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl

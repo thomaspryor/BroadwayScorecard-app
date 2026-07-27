@@ -10,6 +10,7 @@ import { ShowListSkeleton } from '@/components/Skeleton';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useShows } from '@/lib/data-context';
+import { useMarket } from '@/lib/market-context';
 import { ShowCard } from '@/components/ShowCard';
 import { AnimatedListItem } from '@/components/AnimatedListItem';
 import { MarketPicker, Market, filterByMarketCategory } from '@/components/MarketPicker';
@@ -18,8 +19,11 @@ import { Show } from '@/lib/types';
 import { StaleBanner } from '@/components/StaleBanner';
 import { useAuth } from '@/lib/auth-context';
 import { useWatchlist } from '@/hooks/useWatchlist';
+import { useMyRatingsMap } from '@/hooks/useMyRatingsMap';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
 import { trackFilterChanged, trackScoreModeToggled, trackMarketChanged, trackDataRefreshed } from '@/lib/analytics';
+import { AdvancedFiltersSheet } from '@/components/AdvancedFiltersSheet';
+import { applyAdvancedFilters, countActiveSelections, toggleSelection, AdvancedSelections } from '@/lib/advanced-filters';
 
 // Grade ordering: A+ is best (0), then A (1), A- (2), B+ (3), etc.
 const GRADE_ORDER: Record<string, number> = {
@@ -89,18 +93,21 @@ export default function BrowseScreen() {
   const { shows, isLoading, refresh, error } = useShows();
   const [refreshing, setRefreshing] = useState(false);
   const insets = useSafeAreaInsets();
-  const [market, setMarket] = useState<Market>('nyc');
+  const { market, setMarket } = useMarket();
   const [scoreMode, setScoreMode] = useState<ScoreMode>('critics');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('open');
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
   const [sortBy, setSortBy] = useState<SortOption>('score');
   const [includeOB, setIncludeOB] = useState(false);
+  const [advancedSelections, setAdvancedSelections] = useState<AdvancedSelections>({});
+  const [filtersSheetOpen, setFiltersSheetOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const searchInputRef = useRef<TextInput>(null);
   const isWestEnd = market === 'london';
   const { user, isAuthenticated, showSignIn } = useAuth();
   const { watchlist, addToWatchlist, removeFromWatchlist } = useWatchlist(user?.id || null);
   const watchlistSet = useMemo(() => new Set(watchlist.map(w => w.show_id)), [watchlist]);
+  const ratingsMap = useMyRatingsMap(user?.id || null);
   const toggleWatchlist = useCallback(async (showId: string) => {
     if (!isAuthenticated) { showSignIn('watchlist'); return; }
     try {
@@ -128,6 +135,7 @@ export default function BrowseScreen() {
     if (typeFilter !== 'all') {
       result = result.filter(s => s.type === typeFilter);
     }
+    result = applyAdvancedFilters(result, advancedSelections);
 
     switch (sortBy) {
       case 'score':
@@ -152,7 +160,21 @@ export default function BrowseScreen() {
     }
 
     return result;
-  }, [shows, market, includeOB, statusFilter, typeFilter, sortBy, scoreMode]);
+  }, [shows, market, includeOB, statusFilter, typeFilter, sortBy, scoreMode, advancedSelections]);
+
+  const advancedCount = countActiveSelections(advancedSelections);
+
+  // Functional updates: rapid consecutive pill taps compose instead of the
+  // second tap clobbering the first (ship-check adversarial review 2026-07-26).
+  const handleAdvancedToggle = useCallback((groupKey: string, optionId: string) => {
+    setAdvancedSelections(prev => toggleSelection(prev, groupKey, optionId));
+    trackFilterChanged('advanced', `${groupKey}:${optionId}`, 'browse');
+  }, []);
+
+  const handleAdvancedClearAll = useCallback(() => {
+    setAdvancedSelections({});
+    trackFilterChanged('advanced', 'clear_all', 'browse');
+  }, []);
 
   const totalForMarket = useMemo(
     () => shows.filter(s => filterByMarketCategory(s.category, market, includeOB)).length,
@@ -161,14 +183,14 @@ export default function BrowseScreen() {
 
   const renderItem = useCallback(({ item, index }: { item: Show; index: number }) => (
     <AnimatedListItem index={index}>
-      <ShowCard show={item} scoreMode={scoreMode} hideStatus={statusFilter === 'open'} isWatchlisted={watchlistSet.has(item.id)} onToggleWatchlist={() => toggleWatchlist(item.id)} />
+      <ShowCard show={item} scoreMode={scoreMode} hideStatus={statusFilter === 'open'} isWatchlisted={watchlistSet.has(item.id)} onToggleWatchlist={() => toggleWatchlist(item.id)} myRating={ratingsMap.get(item.id) ?? null} />
     </AnimatedListItem>
-  ), [scoreMode, statusFilter, watchlistSet, toggleWatchlist]);
+  ), [scoreMode, statusFilter, watchlistSet, toggleWatchlist, ratingsMap]);
 
   const handleMarketChange = useCallback((m: Market) => {
     setMarket(m);
     trackMarketChanged(m, 'browse');
-  }, []);
+  }, [setMarket]);
 
   const handleScoreModeChange = useCallback((m: ScoreMode) => {
     setScoreMode(m);
@@ -278,9 +300,31 @@ export default function BrowseScreen() {
             </View>
 
             }
-            {/* Type + Sort + OB toggle */}
+            {/* Type + Sort + OB toggle + Advanced filters */}
             {!searchResults && <View style={styles.filterRowInline}>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterGroup}>
+                {/* Advanced filters entry point — desktop parity
+                    (beta feedback 2026-07-26). */}
+                <FilterPill
+                  label={advancedCount > 0 ? `Filters · ${advancedCount}` : 'Filters'}
+                  active={advancedCount > 0}
+                  onPress={() => setFiltersSheetOpen(true)}
+                />
+                <View style={styles.sortDivider} />
+                {/* Market-scope toggle FIRST so it's visible without scrolling
+                    (beta feedback 2026-07-25: owner couldn't find Off-Bway —
+                    it was stranded past the sort pills at the scroll end). */}
+                {market === 'nyc' && (
+                  <>
+                    <FilterPill
+                      label="Off-Bway"
+                      active={includeOB}
+                      onPress={handleOBToggle}
+                      color="#14b8a6"
+                    />
+                    <View style={styles.sortDivider} />
+                  </>
+                )}
                 {TYPE_OPTIONS.map(opt => (
                   <FilterPill
                     key={opt.key}
@@ -298,23 +342,12 @@ export default function BrowseScreen() {
                     onPress={() => handleSortChange(opt.key)}
                   />
                 ))}
-                {market === 'nyc' && (
-                  <>
-                    <View style={styles.sortDivider} />
-                    <FilterPill
-                      label="Off-Bway"
-                      active={includeOB}
-                      onPress={handleOBToggle}
-                      color="#14b8a6"
-                    />
-                  </>
-                )}
               </ScrollView>
             </View>}
           </View>
           </View>
         }
-        contentContainerStyle={styles.list}
+        contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 72 }]}
         showsVerticalScrollIndicator={false}
         windowSize={5}
         maxToRenderPerBatch={8}
@@ -334,6 +367,14 @@ export default function BrowseScreen() {
             </View>
           ) : null
         }
+      />
+      <AdvancedFiltersSheet
+        visible={filtersSheetOpen}
+        selections={advancedSelections}
+        matchCount={filteredShows.length}
+        onToggle={handleAdvancedToggle}
+        onClearAll={handleAdvancedClearAll}
+        onClose={() => setFiltersSheetOpen(false)}
       />
     </View>
   );
@@ -405,7 +446,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
   },
   filterGroup: {
-    flexShrink: 1,
+    flex: 1,
+    // RN Yoga defaults flex items to a content-based minWidth like web
+    // flexbox — without this, flexShrink never kicks in and the pill
+    // ScrollView's full content width overlaps the ScoreToggle sibling
+    // (2026-07-26 Tier-1 assessment: "Previews" pill sliced in half).
+    minWidth: 0,
   },
   sortDivider: {
     width: 1,

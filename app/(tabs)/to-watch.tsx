@@ -11,6 +11,7 @@ import {
   Text,
   FlatList,
   Pressable,
+  RefreshControl,
   StyleSheet,
   Alert,
   Platform,
@@ -27,7 +28,10 @@ import { useUserReviews } from '@/hooks/useUserReviews';
 import { useWatchlist } from '@/hooks/useWatchlist';
 import { useShows } from '@/lib/data-context';
 import { getImageUrl } from '@/lib/images';
-import { daysUntilDate } from '@/lib/date-utils';
+import { daysUntilDate, isClosingSoonDate, toLocalYMD } from '@/lib/date-utils';
+import { humanizeShowId } from '@/lib/show-format';
+import { useToastSafe } from '@/lib/toast-context';
+import { getStatusInfo } from '@/lib/score-utils';
 import { featureFlags } from '@/lib/feature-flags';
 import type { WatchlistEntry } from '@/lib/user-types';
 import type { Show } from '@/lib/types';
@@ -37,6 +41,41 @@ import { ShowSearchModal } from '@/components/ShowSearchModal';
 import * as haptics from '@/lib/haptics';
 
 type WatchlistSort = 'added-desc' | 'alphabetical' | 'closing-soon';
+
+/**
+ * Poster-corner status label (web parity: WatchlistCard bookabilityLabel).
+ * Closing Soon wins over the raw status; upcoming shows say when they open,
+ * or "Tix on sale" once tickets are bookable.
+ */
+function statusOverlay(show?: Show): { label: string; color: string } | null {
+  if (!show) return null;
+  if (show.status === 'closed') return getStatusInfo('closed');
+  if (show.closingDate && isClosingSoonDate(show.closingDate)) {
+    return { label: 'CLOSING SOON', color: '#f59e0b' };
+  }
+  if (show.status === 'open' || show.status === 'previews') return getStatusInfo(show.status);
+  if (show.status === 'upcoming' || show.status === 'announced') {
+    if (show.ticketsOnSale) {
+      return { label: 'TIX ON SALE', color: Colors.status.open };
+    }
+    if (show.openingDate) {
+      const opens = new Date(show.openingDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      return { label: `OPENS ${opens.toUpperCase()}`, color: getStatusInfo('upcoming').color };
+    }
+    return getStatusInfo('upcoming');
+  }
+  return null;
+}
+
+function StatusOverlayPill({ show }: { show?: Show }) {
+  const info = statusOverlay(show);
+  if (!info) return null;
+  return (
+    <View style={[styles.statusPill, { backgroundColor: 'rgba(0,0,0,0.72)' }]}>
+      <Text style={[styles.statusPillText, { color: info.color }]}>{info.label}</Text>
+    </View>
+  );
+}
 
 function EmptyState({ emoji, title, subtitle, actionLabel, onAction }: {
   emoji: string; title: string; subtitle: string; actionLabel?: string; onAction?: () => void;
@@ -62,6 +101,21 @@ export default function ToWatchScreen() {
   const { reviews, getAllReviews } = useUserReviews(user?.id || null);
   const { watchlist, getWatchlist, addToWatchlist, removeFromWatchlist, updatePlannedDate, loading: watchlistLoading } = useWatchlist(user?.id || null);
   const { shows } = useShows();
+  const { showToast } = useToastSafe();
+
+  const handleMissingShow = useCallback(() => {
+    showToast("This show isn't in the current catalog yet.", 'info');
+  }, [showToast]);
+
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([getWatchlist(), getAllReviews()]);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [getWatchlist, getAllReviews]);
 
   const [watchlistSort, setWatchlistSort] = useState<WatchlistSort>('added-desc');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -92,7 +146,7 @@ export default function ToWatchScreen() {
   );
 
   const loading = authLoading || watchlistLoading;
-  const today = new Date().toISOString().split('T')[0];
+  const today = toLocalYMD(new Date());
   const reviewedShowIds = useMemo(() => new Set(reviews.map(r => r.show_id)), [reviews]);
 
   // Split: upcoming (future planned dates), regular (no date or no planned date)
@@ -145,13 +199,20 @@ export default function ToWatchScreen() {
     }
   }, [removeFromWatchlist]);
 
+  const showWatchlistActionSheet = useCallback((item: WatchlistEntry, title: string) => {
+    Alert.alert(title, undefined, [
+      { text: 'Set date', onPress: () => { setPendingDate(new Date()); setDatePickingShowId(item.show_id); } },
+      { text: 'Remove', style: 'destructive', onPress: () => handleRemove(item.show_id) },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  }, [handleRemove]);
+
   const handleDateChange = useCallback((_event: unknown, selectedDate?: Date) => {
     if (Platform.OS === 'android') {
       // Android: picker dismisses on selection, save immediately
       setDatePickingShowId(null);
       if (selectedDate && datePickingShowId) {
-        const isoDate = selectedDate.toISOString().split('T')[0];
-        updatePlannedDate(datePickingShowId, isoDate);
+        updatePlannedDate(datePickingShowId, toLocalYMD(selectedDate));
       }
     } else if (selectedDate) {
       // iOS inline: just store the selection, save on "Done" tap
@@ -214,7 +275,7 @@ export default function ToWatchScreen() {
 
   const renderUpcomingItem = (item: WatchlistEntry) => {
     const show = showMap[item.show_id];
-    const title = show?.title || item.show_id;
+    const title = show?.title || humanizeShowId(item.show_id);
     const posterUrl = show?.images ? (getImageUrl(show.images.poster) || getImageUrl(show.images.thumbnail)) : null;
     const daysUntil = item.planned_date ? daysUntilDate(item.planned_date) : null;
 
@@ -222,7 +283,7 @@ export default function ToWatchScreen() {
       <Pressable
         key={item.id}
         style={({ pressed }) => [styles.gridCard, pressed && styles.pressed]}
-        onPress={() => show && router.push(`/show/${show.slug}`)}
+        onPress={() => show ? router.push(`/show/${show.slug}`) : handleMissingShow()}
         onLongPress={() => { setPendingDate(new Date()); setDatePickingShowId(item.show_id); }}
       >
         {posterUrl ? (
@@ -232,6 +293,10 @@ export default function ToWatchScreen() {
             <Text style={styles.placeholderText}>{title.charAt(0)}</Text>
           </View>
         )}
+        {/* No status pill here — these are booked (beta feedback 2026-07-25:
+            "TIX ON SALE on the Upcoming shelf" is noise once you have tickets).
+            Name above date, matching web. */}
+        <Text style={styles.gridTitle} numberOfLines={2}>{title}</Text>
         {item.planned_date && (
           <Text style={styles.posterDate}>
             {new Date(item.planned_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
@@ -240,56 +305,51 @@ export default function ToWatchScreen() {
             )}
           </Text>
         )}
-        <Text style={styles.gridTitle} numberOfLines={2}>{title}</Text>
       </Pressable>
     );
   };
 
   const renderWatchlistGridItem = (item: WatchlistEntry) => {
     const show = showMap[item.show_id];
-    const title = show?.title || item.show_id;
+    const title = show?.title || humanizeShowId(item.show_id);
     const posterUrl = show?.images ? (getImageUrl(show.images.poster) || getImageUrl(show.images.thumbnail)) : null;
 
     return (
-      <Pressable
-        key={item.id}
-        style={({ pressed }) => [styles.gridCard, pressed && styles.pressed]}
-        onPress={() => show && router.push(`/show/${show.slug}`)}
-        onLongPress={() => {
-          Alert.alert('Remove from Watchlist', `Remove ${title}?`, [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Remove', style: 'destructive', onPress: () => handleRemove(item.show_id) },
-          ]);
-        }}
-      >
-        {posterUrl ? (
-          <Image source={{ uri: posterUrl }} style={styles.gridPoster} contentFit="cover" transition={200} />
-        ) : (
-          <View style={[styles.gridPoster, styles.cardPosterPlaceholder]}>
-            <Text style={styles.placeholderText}>{title.charAt(0)}</Text>
+      <View key={item.id} style={styles.gridCard}>
+        <Pressable
+          style={({ pressed }) => pressed && styles.pressed}
+          onPress={() => show ? router.push(`/show/${show.slug}`) : handleMissingShow()}
+          onLongPress={() => showWatchlistActionSheet(item, title)}
+        >
+          <View>
+            {posterUrl ? (
+              <Image source={{ uri: posterUrl }} style={styles.gridPoster} contentFit="cover" transition={200} />
+            ) : (
+              <View style={[styles.gridPoster, styles.cardPosterPlaceholder]}>
+                <Text style={styles.placeholderText}>{title.charAt(0)}</Text>
+              </View>
+            )}
+            <StatusOverlayPill show={show} />
+            {/* No persistent empty-star strip (beta feedback 2026-07-25) —
+                rating lives on the show page / long-press action sheet. */}
           </View>
-        )}
-        <Text style={styles.gridTitle} numberOfLines={2}>{title}</Text>
-      </Pressable>
+          <Text style={styles.gridTitle} numberOfLines={2}>{title}</Text>
+        </Pressable>
+      </View>
     );
   };
 
   const renderWatchlistListItem = (item: WatchlistEntry) => {
     const show = showMap[item.show_id];
-    const title = show?.title || item.show_id;
+    const title = show?.title || humanizeShowId(item.show_id);
     const posterUrl = show?.images ? (getImageUrl(show.images.poster) || getImageUrl(show.images.thumbnail)) : null;
 
     return (
       <Pressable
         key={item.id}
         style={({ pressed }) => [styles.listRow, pressed && styles.pressed]}
-        onPress={() => show && router.push(`/show/${show.slug}`)}
-        onLongPress={() => {
-          Alert.alert('Remove from Watchlist', `Remove ${title}?`, [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Remove', style: 'destructive', onPress: () => handleRemove(item.show_id) },
-          ]);
-        }}
+        onPress={() => show ? router.push(`/show/${show.slug}`) : handleMissingShow()}
+        onLongPress={() => showWatchlistActionSheet(item, title)}
       >
         {posterUrl ? (
           <Image source={{ uri: posterUrl }} style={styles.listPoster} contentFit="cover" transition={200} />
@@ -301,6 +361,10 @@ export default function ToWatchScreen() {
         <View style={styles.listInfo}>
           <Text style={styles.listTitle} numberOfLines={1}>{title}</Text>
           {show?.venue && <Text style={styles.listVenue} numberOfLines={1}>{show.venue}</Text>}
+          {(() => {
+            const info = statusOverlay(show);
+            return info ? <Text style={[styles.listStatus, { color: info.color }]}>{info.label}</Text> : null;
+          })()}
         </View>
       </Pressable>
     );
@@ -372,6 +436,7 @@ export default function ToWatchScreen() {
         <FlatList
           data={['content']}
           keyExtractor={() => 'content'}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.text.secondary} />}
           renderItem={() => (
             <View>
               {/* Upcoming section */}
@@ -383,6 +448,22 @@ export default function ToWatchScreen() {
                   </View>
                   <View style={styles.posterGrid}>
                     {upcomingWatchlist.map(renderUpcomingItem)}
+                    {/* Dashed add tile on this shelf too (beta feedback
+                        2026-07-26) — search modal prompts for a date after
+                        adding, so the new entry lands here directly. */}
+                    <View style={styles.gridCard}>
+                      <Pressable
+                        style={({ pressed }) => [styles.addShowCard, pressed && styles.pressed]}
+                        onPress={() => setShowSearchModal(true)}
+                        accessibilityRole="button"
+                        accessibilityLabel="Add an upcoming show"
+                      >
+                        <Svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke={Colors.text.muted} strokeWidth={2}>
+                          <Path strokeLinecap="round" d="M12 5v14M5 12h14" />
+                        </Svg>
+                        <Text style={styles.addShowLabel}>Add Show</Text>
+                      </Pressable>
+                    </View>
                   </View>
                 </View>
               )}
@@ -391,7 +472,7 @@ export default function ToWatchScreen() {
               {sortedWatchlist.length > 0 && (
                 <View>
                   <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionTitle}>Watchlist</Text>
+                    <Text style={styles.sectionTitle}>Not Yet Booked</Text>
                     <Text style={styles.sectionCount}>{sortedWatchlist.length} shows</Text>
                   </View>
                   {viewMode === 'grid' ? (
@@ -429,7 +510,7 @@ export default function ToWatchScreen() {
             </View>
           )}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: Spacing.xxl }}
+          contentContainerStyle={{ paddingBottom: insets.bottom + 72 }}
         />
       )}
 
@@ -439,10 +520,12 @@ export default function ToWatchScreen() {
           <View style={styles.datePickerCard}>
             <View style={styles.datePickerHeader}>
               <Text style={styles.datePickerTitle}>When are you going?</Text>
+              <Pressable onPress={() => setDatePickingShowId(null)} hitSlop={8}>
+                <Text style={styles.datePickerSkip}>Skip</Text>
+              </Pressable>
               <Pressable onPress={() => {
                 if (datePickingShowId) {
-                  const isoDate = pendingDate.toISOString().split('T')[0];
-                  updatePlannedDate(datePickingShowId, isoDate);
+                  updatePlannedDate(datePickingShowId, toLocalYMD(pendingDate));
                 }
                 setDatePickingShowId(null);
               }} hitSlop={8}>
@@ -454,7 +537,6 @@ export default function ToWatchScreen() {
               mode="date"
               display={Platform.OS === 'ios' ? 'inline' : 'default'}
               onChange={handleDateChange}
-              minimumDate={new Date()}
               themeVariant="dark"
             />
           </View>
@@ -472,6 +554,10 @@ export default function ToWatchScreen() {
           try {
             await addToWatchlist(show.id);
             await getWatchlist();
+            // Web parity: prompt "when are you going?" right after adding
+            // instead of hiding the planned date behind a long-press.
+            setPendingDate(new Date());
+            setDatePickingShowId(show.id);
           } catch {
             // Hook sets error state
           }
@@ -508,12 +594,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.sm, paddingVertical: 6,
   },
   sortText: { color: Colors.text.secondary, fontSize: FontSize.xs, fontWeight: '500' },
+  // Full-width band matching Watched's year headers (beta feedback 2026-07-26:
+  // "sub headings here aren't the same format as on the Watched tab").
   sectionHeader: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: Spacing.lg, paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.lg, paddingVertical: 8,
+    marginBottom: Spacing.sm,
+    backgroundColor: Colors.surface.raised,
+    borderTopWidth: 1, borderBottomWidth: 1, borderColor: Colors.border.subtle,
   },
-  sectionTitle: { color: Colors.text.primary, fontSize: FontSize.lg, fontWeight: '600' },
-  sectionCount: { color: Colors.text.muted, fontSize: FontSize.xs },
+  sectionTitle: { color: Colors.text.primary, fontSize: 13, fontWeight: '700', letterSpacing: 0.6, textTransform: 'uppercase' },
+  sectionCount: { color: Colors.text.muted, fontSize: 12 },
   posterGrid: {
     flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm,
     paddingHorizontal: Spacing.lg,
@@ -526,9 +617,21 @@ const styles = StyleSheet.create({
   cardPosterPlaceholder: { alignItems: 'center', justifyContent: 'center' },
   placeholderText: { color: Colors.text.muted, fontSize: 18, fontWeight: '600' },
   posterDate: { color: Colors.text.secondary, fontSize: 12, fontWeight: '500', textAlign: 'center', marginTop: 4 },
+  // Small overlay label (beta feedback 2026-07-26: the 12pt bordered pills
+  // still read "ugly and too large" — shrink to a plain dark scrim tag).
+  statusPill: {
+    position: 'absolute', top: 4, left: 4, zIndex: 10,
+    paddingHorizontal: 5, paddingVertical: 2,
+    borderRadius: 4,
+  },
+  statusPillText: { fontSize: 12, fontWeight: '700', letterSpacing: 0.3 },
+  listStatus: { fontSize: 12, fontWeight: '600', marginTop: 2, letterSpacing: 0.3 },
   gridTitle: {
     color: Colors.text.secondary, fontSize: 12, fontWeight: '500',
     textAlign: 'center', lineHeight: 15, marginTop: 2,
+    // Reserve both title lines so dates below align across cards
+    // (beta feedback 2026-07-26).
+    minHeight: 30,
   },
   addShowCard: {
     width: '100%', aspectRatio: 2 / 3, borderRadius: BorderRadius.md,
@@ -569,6 +672,7 @@ const styles = StyleSheet.create({
   },
   datePickerTitle: { color: Colors.text.secondary, fontSize: FontSize.sm, fontWeight: '500' },
   datePickerDone: { color: Colors.brand, fontSize: FontSize.sm, fontWeight: '600' },
+  datePickerSkip: { color: Colors.text.muted, fontSize: FontSize.sm, fontWeight: '500', marginLeft: 'auto', marginRight: Spacing.lg },
   quickAddBar: {
     flexDirection: 'row', alignItems: 'center', gap: Spacing.sm,
     marginHorizontal: Spacing.lg, marginTop: Spacing.lg,

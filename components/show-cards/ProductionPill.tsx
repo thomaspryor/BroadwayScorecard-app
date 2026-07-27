@@ -5,7 +5,7 @@
 
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { FontSize, BorderRadius } from '@/constants/theme';
+import { BorderRadius } from '@/constants/theme';
 
 interface ProductionPillProps {
   isRevival: boolean;
@@ -29,14 +29,14 @@ export function ProductionPill({ isRevival }: ProductionPillProps) {
 
 const styles = StyleSheet.create({
   pill: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
     borderRadius: BorderRadius.pill,
     alignSelf: 'flex-start',
   },
   label: {
     fontSize: 12,
     fontWeight: '600',
-    letterSpacing: 0.3,
+    letterSpacing: 0.4,
   },
 });

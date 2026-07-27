@@ -21,6 +21,7 @@ export interface MobileShow {
   cat?: string;   // category: broadway (default) | off-broadway | west-end
   od?: string;    // openingDate (ISO date)
   cd?: string;    // closingDate (ISO date)
+  tx?: number;    // 1 = tickets on sale for a not-yet-open show
   img?: {
     th?: string;  // thumbnail path
     po?: string;  // poster path
@@ -65,6 +66,8 @@ export interface Show {
   category: string;
   openingDate: string | null;
   closingDate: string | null;
+  /** Tickets on sale for a not-yet-open show (watchlist bookability label) */
+  ticketsOnSale: boolean;
   images: {
     thumbnail: string | null;
     poster: string | null;
@@ -344,6 +347,7 @@ export function mapMobileShow(raw: MobileShow): Show {
     category: raw.cat ?? 'broadway',
     openingDate: raw.od ?? null,
     closingDate: raw.cd ?? null,
+    ticketsOnSale: raw.tx === 1,
     images: {
       thumbnail: raw.img?.th ?? null,
       poster: raw.img?.po ?? null,

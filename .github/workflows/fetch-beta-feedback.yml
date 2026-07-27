@@ -1,0 +1,53 @@
+name: Fetch Beta Feedback
+# Pulls TestFlight beta feedback via the App Store Connect API and uploads it
+# ENCRYPTED to the caller-supplied RSA public key (this repo is public — raw
+# feedback contains the tester's email/device info and account screenshots).
+on:
+  workflow_dispatch:
+    inputs:
+      pubkey_b64:
+        description: 'base64 of an RSA public key PEM; the feedback tarball is encrypted to it'
+        required: true
+        type: string
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install jsonwebtoken
+        run: npm install --no-save jsonwebtoken@9
+
+      - name: Fetch feedback from App Store Connect
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_API_KEY_ISSUER_ID }}
+          ASC_APP_ID: '6760090370'
+        run: |
+          echo "${{ secrets.ASC_API_KEY_P8 }}" > /tmp/AuthKey.p8
+          ASC_KEY_PATH=/tmp/AuthKey.p8 node scripts/fetch-beta-feedback.js
+
+      - name: Encrypt output to caller pubkey
+        run: |
+          echo "${{ inputs.pubkey_b64 }}" | base64 -d > /tmp/pub.pem
+          tar czf /tmp/feedback.tar.gz -C feedback-out .
+          openssl rand 32 > /tmp/sym.key
+          openssl enc -aes-256-cbc -pbkdf2 -in /tmp/feedback.tar.gz -out feedback.enc -pass file:/tmp/sym.key
+          openssl pkeyutl -encrypt -pubin -inkey /tmp/pub.pem -in /tmp/sym.key -out symkey.enc
+          rm -rf feedback-out /tmp/feedback.tar.gz /tmp/sym.key
+
+      - name: Upload encrypted artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: beta-feedback-encrypted
+          path: |
+            feedback.enc
+            symkey.enc
+          retention-days: 3

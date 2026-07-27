@@ -1,0 +1,81 @@
+name: Secret Scan (gitleaks)
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+    paths:
+      - 'app/**'
+      - 'components/**'
+      - 'hooks/**'
+      - 'lib/**'
+      - 'scripts/**'
+      - 'plugins/**'
+      - 'constants/**'
+      - '.github/**'
+      - 'app.json'
+      - 'eas.json'
+      - 'index.js'
+      - 'package.json'
+      - 'tsconfig.json'
+      - '.gitleaks.toml'
+  schedule:
+    - cron: '0 7 * * 1'  # Mondays at 7 AM UTC
+  workflow_dispatch:
+
+concurrency:
+  group: gitleaks-${{ github.ref }}
+  # Cancel superseded PR runs, but never cancel on main — a secret scan that gets
+  # cancelled by the next commit reports nothing and looks identical to a clean run.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    # A CI checkout never has node_modules/ios/dist/.expo on disk (all
+    # gitignored), so this scan is fast regardless. Locally, `--source .`
+    # would otherwise walk those dirs and never finish (~7.7GB ios/ +
+    # ~1GB node_modules/) — that's what .gitleaks.toml's [allowlist] paths
+    # (mirroring .gitignore) are for. Do NOT remove those path entries;
+    # they're load-bearing for the local pre-push acceptance check, not
+    # just tidiness. Measured: 13MB / <1s locally with them in place.
+    timeout-minutes: 10
+    steps:
+      # Shallow ON PURPOSE — see Broadwayscore's gitleaks.yml for the
+      # fetch-depth: 0 incident this avoids. There's no history-scan step
+      # here anyway (see NOTE below), so a full fetch buys nothing.
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 1
+
+      - name: Install gitleaks
+        run: |
+          VERSION=8.21.2
+          curl -sL "https://github.com/gitleaks/gitleaks/releases/download/v${VERSION}/gitleaks_${VERSION}_linux_x64.tar.gz" \
+            | tar -xz -C /tmp gitleaks
+          sudo mv /tmp/gitleaks /usr/local/bin/gitleaks
+          gitleaks version
+
+      # Scan 1 — what is in the code RIGHT NOW, regardless of when it landed.
+      - name: Scan working tree
+        run: |
+          gitleaks detect --no-git --source . \
+            --config .gitleaks.toml --no-banner --redact \
+            --report-format sarif --report-path gitleaks-tree.sarif \
+            --exit-code 1
+
+      # NOTE: there is deliberately NO git-history scan step here, same
+      # reasoning as Broadwayscore's gitleaks.yml — introduction-time coverage
+      # is handled by the pre-commit hook (scripts/hooks/pre-commit, active via
+      # core.hooksPath) running `gitleaks protect --staged` before a secret can
+      # ever be committed.
+
+      - name: Upload SARIF report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gitleaks-sarif
+          path: gitleaks-*.sarif
+          if-no-files-found: ignore

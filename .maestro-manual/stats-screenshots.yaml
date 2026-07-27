@@ -1,0 +1,124 @@
+# Capture the Stats-screen design proposal shots from the REAL app.
+#
+# LOCAL-ONLY TOOL — deliberately outside .maestro/ so maestro-e2e.yml's
+# `.maestro/**/*.yaml` glob for suite=all doesn't sweep it in: it writes to an
+# absolute ~/Documents path that doesn't exist on CI runners.
+#
+# Per app CLAUDE.md "Design Proposals" #1 (fidelity honesty): a proposal shown
+# to the owner must be rendered by the real product and captured from the
+# simulator. This flow drives the shipped Release build; there is no mockup
+# anywhere in the pipeline.
+#
+# Pre-reqs: app installed, EXPO_PUBLIC_DEV_AUTO_SIGNIN=1 in .env.local at bundle
+# time (dev-test@broadwayscorecard.com — 52 real diary entries, 2022–2026).
+#
+# Paths are absolute: Maestro does NOT expand `~`, it creates a literal "~"
+# directory in the working tree (learned the hard way 2026-07-26).
+#
+# Run per variant/device:
+#   maestro --device <udid> test -e SHOT=<prefix> .maestro-manual/stats-screenshots.yaml
+
+appId: com.broadwayscorecard.app
+env:
+  OUT: /Users/tompryor/Documents/claude-outputs/show-stats-ios-options
+---
+- launchApp
+
+- tapOn:
+    text: "Open"
+    optional: true
+
+# Fresh install shows the welcome carousel; each Skip is individually optional
+# because the carousel length is not fixed.
+- tapOn:
+    text: "Skip"
+    optional: true
+- tapOn:
+    text: "Skip"
+    optional: true
+- tapOn:
+    text: "Skip"
+    optional: true
+- extendedWaitUntil:
+    visible: "Broadway Scorecard"
+    timeout: 45000
+
+- openLink: broadwayscorecard:///watched
+- tapOn:
+    text: "Open"
+    optional: true
+- extendedWaitUntil:
+    visible: "My Watched Shows"
+    timeout: 45000
+
+- tapOn:
+    id: "diary-stats-view-toggle"
+- extendedWaitUntil:
+    visible:
+      id: "stats-scope-pill"
+    timeout: 40000
+- waitForAnimationToEnd:
+    timeout: 8000
+
+# ── 01 Hero tiles + shows-per-year ─────────────────────────────────────
+- takeScreenshot: ${OUT}/${SHOT}-01-hero-and-years
+
+# ── 02-06 One screen per scroll — a continuous filmstrip of the modules.
+# Deliberately NOT scrollUntilVisible: the tall modules mean a target can
+# already satisfy the visibility check without scrolling at all, which
+# silently produced two identical screenshots on the first run.
+- scroll
+- waitForAnimationToEnd:
+    timeout: 4000
+- takeScreenshot: ${OUT}/${SHOT}-02-theater-ring-checklist
+
+- scroll
+- waitForAnimationToEnd:
+    timeout: 4000
+- takeScreenshot: ${OUT}/${SHOT}-03-house-records-and-critics
+
+- scroll
+- waitForAnimationToEnd:
+    timeout: 4000
+- takeScreenshot: ${OUT}/${SHOT}-04-critical-gold
+
+- scroll
+- waitForAnimationToEnd:
+    timeout: 4000
+- takeScreenshot: ${OUT}/${SHOT}-05-tony-canon
+
+- scroll
+- waitForAnimationToEnd:
+    timeout: 4000
+- takeScreenshot: ${OUT}/${SHOT}-06-ratings-histogram
+
+# ── 07 Drill-down sheet — proves "every number is a door" ──────────────
+- scrollUntilVisible:
+    element:
+      id: "stats-tile-shows"
+    direction: UP
+    visibilityPercentage: 50
+    timeout: 30000
+- tapOn:
+    id: "stats-tile-shows"
+- extendedWaitUntil:
+    visible:
+      id: "stats-drilldown-sheet"
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+- takeScreenshot: ${OUT}/${SHOT}-07-drilldown
+- tapOn:
+    id: "stats-drilldown-close"
+- waitForAnimationToEnd:
+    timeout: 4000
+
+# ── 08 Scope picker ────────────────────────────────────────────────────
+- tapOn:
+    id: "stats-scope-pill"
+- extendedWaitUntil:
+    visible: "SEASONS"
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+- takeScreenshot: ${OUT}/${SHOT}-08-scope-picker

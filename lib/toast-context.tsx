@@ -14,10 +14,18 @@ interface ToastMessage {
   text: string;
   type: ToastType;
   linkRoute?: string;
+  actionLabel?: string;
+  onAction?: () => void;
+}
+
+interface ToastOptions {
+  linkRoute?: string;
+  actionLabel?: string;
+  onAction?: () => void;
 }
 
 interface ToastContextValue {
-  showToast: (text: string, type?: ToastType, linkRoute?: string) => void;
+  showToast: (text: string, type?: ToastType, linkRouteOrOptions?: string | ToastOptions) => void;
   toast: ToastMessage | null;
   dismissToast: () => void;
 }
@@ -28,17 +36,22 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const [toast, setToast] = useState<ToastMessage | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const showToast = useCallback((text: string, type: ToastType = 'success', linkRoute?: string) => {
+  const showToast = useCallback((text: string, type: ToastType = 'success', linkRouteOrOptions?: string | ToastOptions) => {
     // Clear existing timer
     if (timerRef.current) clearTimeout(timerRef.current);
 
-    const id = Date.now().toString();
-    setToast({ id, text, type, linkRoute });
+    const options: ToastOptions = typeof linkRouteOrOptions === 'string'
+      ? { linkRoute: linkRouteOrOptions }
+      : linkRouteOrOptions || {};
 
-    // Auto-dismiss after 3 seconds
+    const id = Date.now().toString();
+    setToast({ id, text, type, ...options });
+
+    // Give undo actions more time to be seen and tapped than a plain toast.
+    const duration = options.onAction ? 5000 : 3000;
     timerRef.current = setTimeout(() => {
       setToast(null);
-    }, 3000);
+    }, duration);
   }, []);
 
   const dismissToast = useCallback(() => {

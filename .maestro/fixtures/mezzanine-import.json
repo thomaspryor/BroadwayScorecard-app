@@ -1,0 +1,29 @@
+{
+  "appVersion": "3.2.1",
+  "data": {
+    "diaryEntries": [
+      {
+        "show": { "name": "Titanique", "id": "mezz-ci-titanique-001" },
+        "rating": 4,
+        "date": "2026-05-05T00:00:00.000Z",
+        "review": "CI fixture — real Mezzanine import regression coverage (task #436).",
+        "production": { "theater": { "name": "St. James Theatre", "location": "New York, NY" } }
+      },
+      {
+        "show": { "name": "Zorbatron: A New Musical", "id": "mezz-ci-zorbatron-001" },
+        "rating": 3,
+        "date": "2026-03-01T00:00:00.000Z",
+        "review": "CI fixture — deliberately not on Broadway Scorecard, exercises the unmatched-row + unmatched_imports path.",
+        "production": null
+      }
+    ],
+    "lists": [
+      {
+        "name": "Want to See",
+        "shows": [
+          { "name": "Buena Vista Social Club", "id": "mezz-ci-bvsc-001" }
+        ]
+      }
+    ]
+  }
+}

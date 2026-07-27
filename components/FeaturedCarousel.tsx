@@ -18,9 +18,11 @@ interface FeaturedCarouselProps {
   watchlistSet?: Set<string>;
   onToggleWatchlist?: (showId: string) => void;
   getSubtitle?: (show: Show) => string | undefined;
+  /** show_id → signed-in user's star rating; rated shows get a ★ chip instead of the bookmark */
+  ratingsMap?: Map<string, number>;
 }
 
-const FeaturedCard = memo(function FeaturedCard({ show, cardWidth, isWatchlisted, onToggle, subtitle }: { show: Show; cardWidth: number; isWatchlisted?: boolean; onToggle?: () => void; subtitle?: string }) {
+const FeaturedCard = memo(function FeaturedCard({ show, cardWidth, isWatchlisted, onToggle, subtitle, myRating }: { show: Show; cardWidth: number; isWatchlisted?: boolean; onToggle?: () => void; subtitle?: string; myRating?: number | null }) {
   const router = useRouter();
   const posterUrl = getImageUrl(show.images.poster) || getImageUrl(show.images.thumbnail);
   const cardHeight = cardWidth * 1.5;
@@ -49,9 +51,9 @@ const FeaturedCard = memo(function FeaturedCard({ show, cardWidth, isWatchlisted
           </View>
         )}
 
-        {/* Bookmark — rendered AFTER image so it's on top (z-order) */}
+        {/* Bookmark / rating chip — rendered AFTER image so it's on top (z-order) */}
         {isWatchlisted !== undefined && onToggle && (
-          <BookmarkOverlay isWatchlisted={isWatchlisted} onToggle={onToggle} />
+          <BookmarkOverlay isWatchlisted={isWatchlisted} onToggle={onToggle} myRating={myRating} />
         )}
 
         {/* Score badge — bottom-right, overlapping the image edge */}
@@ -71,7 +73,7 @@ const FeaturedCard = memo(function FeaturedCard({ show, cardWidth, isWatchlisted
   );
 });
 
-export function FeaturedCarousel({ shows, watchlistSet, onToggleWatchlist, getSubtitle }: FeaturedCarouselProps) {
+export function FeaturedCarousel({ shows, watchlistSet, onToggleWatchlist, getSubtitle, ratingsMap }: FeaturedCarouselProps) {
   const { width } = useWindowDimensions();
   if (shows.length === 0) return null;
 
@@ -91,6 +93,7 @@ export function FeaturedCarousel({ shows, watchlistSet, onToggleWatchlist, getSu
             isWatchlisted={watchlistSet?.has(item.id)}
             onToggle={onToggleWatchlist ? () => onToggleWatchlist(item.id) : undefined}
             subtitle={getSubtitle?.(item)}
+            myRating={ratingsMap?.get(item.id) ?? null}
           />
         )}
         showsHorizontalScrollIndicator={false}

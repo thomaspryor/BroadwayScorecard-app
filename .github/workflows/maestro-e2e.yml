@@ -12,16 +12,18 @@ on:
           - show-rating
           - my-shows
           - tabs
+          - import
 
 jobs:
   e2e:
     name: Maestro E2E (${{ inputs.suite }})
     runs-on: macos-26
-    timeout-minutes: 75
+    timeout-minutes: 120
     env:
       EXPO_PUBLIC_DEV_AUTO_SIGNIN: '1'
       EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
       EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
       SENTRY_DISABLE_AUTO_UPLOAD: 'true'
     steps:
       - name: Checkout
@@ -125,6 +127,39 @@ jobs:
           path: /tmp/app-screenshot.png
           retention-days: 3
 
+      - name: Fixture canary (fast __DEV__/env-gate check)
+        # Only show-rating/*.yaml exercises show-rating-fixture.tsx — scoped
+        # to suites that actually use it so an unrelated regression here can't
+        # fail my-shows/tabs runs (the exact false-coupling this canary exists
+        # to prevent, just inverted).
+        if: ${{ inputs.suite == 'all' || inputs.suite == 'show-rating' }}
+        run: |
+          if ! maestro test .maestro/ci-canary-show-rating-fixture.yaml; then
+            echo "::error::show-rating-fixture route did not render — may indicate __DEV__/EXPO_PUBLIC_DEV_AUTO_SIGNIN gating regressed (task #432/#403), but could also be an unrelated routing/render issue"
+            exit 1
+          fi
+
+      - name: Serve import fixture (real Safari download for the document picker)
+        # Simulators don't pick up a raw filesystem copy into Downloads — only
+        # a genuine Safari-initiated download registers with the document
+        # picker's FileProvider index (verified live, task #436). Content-
+        # Disposition forces Safari to prompt "Download" instead of rendering
+        # the JSON inline.
+        if: ${{ inputs.suite == 'all' || inputs.suite == 'import' }}
+        run: |
+          cat > /tmp/fixture_server.py <<'PY'
+          import http.server, socketserver
+          class Handler(http.server.SimpleHTTPRequestHandler):
+              def end_headers(self):
+                  self.send_header('Content-Disposition', 'attachment; filename="mezzanine-import.json"')
+                  super().end_headers()
+          with socketserver.TCPServer(("", 8931), Handler) as httpd:
+              httpd.serve_forever()
+          PY
+          cd .maestro/fixtures && nohup python3 /tmp/fixture_server.py > /tmp/fixture_server.log 2>&1 &
+          sleep 1
+          curl -sf http://localhost:8931/mezzanine-import.json > /dev/null
+
       - name: Run Maestro tests
         run: |
           case "${{ inputs.suite }}" in
@@ -132,6 +167,7 @@ jobs:
             show-rating)  PATTERN=".maestro/show-rating/*.yaml" ;;
             my-shows)     PATTERN=".maestro/my-shows/*.yaml" ;;
             tabs)         PATTERN=".maestro/tabs/*.yaml" ;;
+            import)       PATTERN=".maestro/import/*.yaml" ;;
           esac
 
           FAILED=0
@@ -155,3 +191,16 @@ jobs:
           name: maestro-test-results
           path: ~/.maestro/tests/
           retention-days: 7
+
+      - name: Clean up import-fixture review row
+        # reviews has no unique constraint (multiple viewings per show are
+        # allowed by design — task #436) so a repeat "Titanique" insert every
+        # run would pile up duplicate rows on the shared dev-test account
+        # forever. Delete by show_id + the fixture's exact date_seen, so a
+        # real dev-test Titanique review on any other date survives.
+        if: always() && (inputs.suite == 'all' || inputs.suite == 'import')
+        run: |
+          curl -s -X DELETE \
+            "${EXPO_PUBLIC_SUPABASE_URL}/rest/v1/reviews?show_id=eq.titanique-2026&date_seen=eq.2026-05-05" \
+            -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" \
+            -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" || true

@@ -1,0 +1,130 @@
+# Stats tab smoke — segmented control nav + one tap-through.
+#
+# Covers the two things that break silently: the Grid · Feed · Stats segmented
+# control reaching the new screen at all, and a stat actually opening its
+# filtered show list (spec §1 "every number is a door"). A white-screened Stats
+# tab or a drilldown that renders nothing both fail here.
+#
+# Lives in my-shows/ so it runs under the `my-shows` suite and under `all`.
+# Requires the dev-test account (EXPO_PUBLIC_DEV_AUTO_SIGNIN=1), same as every
+# other signed-in flow in this directory.
+#
+# STATE HYGIENE: the diary's view mode persists, so leaving the app on Stats
+# leaks into whatever flow runs next. The tail of this flow taps back to Grid —
+# but a tail step never runs when an earlier step fails, which is exactly when
+# the app is left on Stats. So this flow ALSO resets to Grid at the start and
+# does not depend on its own clean exit.
+
+appId: com.broadwayscorecard.app
+---
+- launchApp
+
+# iOS "Open in" dialog, when a deep link was used to launch.
+- tapOn:
+    text: "Open"
+    optional: true
+
+- extendedWaitUntil:
+    visible: "Broadway Scorecard"
+    timeout: 45000
+
+- openLink: broadwayscorecard:///watched
+- tapOn:
+    text: "Open"
+    optional: true
+
+# Auto sign-in can lag a cold start; the diary header is the ready signal.
+- extendedWaitUntil:
+    visible: "My Watched Shows"
+    timeout: 30000
+
+# ── Start-of-flow reset ────────────────────────────────────────────────
+# Land on Grid regardless of what a previously-failed flow left behind.
+# optional: true because on a genuinely cold launch we are already on Grid and
+# the toggle may not have laid out yet — this is hygiene, not an assertion.
+- tapOn:
+    id: "diary-grid-view-toggle"
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 5000
+
+# ── Segmented control → Stats ──────────────────────────────────────────
+- tapOn:
+    id: "diary-stats-view-toggle"
+- waitForAnimationToEnd:
+    timeout: 5000
+
+# The scope pill is pinned under the header on the Stats screen and nowhere
+# else, so its presence proves we're on Stats and it rendered past first paint.
+- extendedWaitUntil:
+    visible:
+      id: "stats-scope-pill"
+    timeout: 20000
+
+- assertVisible:
+    id: "stats-tile-shows"
+
+# ── Tap-through: a hero tile opens its filtered diary list ─────────────
+- tapOn:
+    id: "stats-tile-shows"
+- extendedWaitUntil:
+    visible:
+      id: "stats-drilldown-sheet"
+    timeout: 10000
+- assertVisible:
+    id: "stats-drilldown-row"
+- tapOn:
+    id: "stats-drilldown-close"
+- waitForAnimationToEnd:
+    timeout: 5000
+
+# ── Tap-through: a theater chip opens the house detail sheet ───────────
+# The checklist starts below the fold, so scroll it into view first —
+# assertVisible/tapOn only see what is actually on screen.
+- scrollUntilVisible:
+    element:
+      id: "stats-house-grid"
+    direction: DOWN
+    visibilityPercentage: 20
+    timeout: 30000
+- assertVisible:
+    id: "stats-house-grid"
+- tapOn:
+    id: "stats-house-chip"
+    index: 0
+- extendedWaitUntil:
+    visible:
+      id: "stats-drilldown-sheet"
+    timeout: 10000
+- tapOn:
+    id: "stats-drilldown-close"
+- waitForAnimationToEnd:
+    timeout: 5000
+
+# ── Scope pill opens and applies ───────────────────────────────────────
+- tapOn:
+    id: "stats-scope-pill"
+- extendedWaitUntil:
+    visible: "SEASONS"
+    timeout: 10000
+- tapOn:
+    id: "stats-scope-option-all"
+- waitForAnimationToEnd:
+    timeout: 5000
+# The screen is still scrolled down at the checklist, so come back up before
+# asserting the hero survived the scope change.
+- scrollUntilVisible:
+    element:
+      id: "stats-tile-shows"
+    direction: UP
+    visibilityPercentage: 40
+    timeout: 30000
+- assertVisible:
+    id: "stats-tile-shows"
+
+# ── Back to Grid — the segmented control still works both ways ─────────
+- tapOn:
+    id: "diary-grid-view-toggle"
+- waitForAnimationToEnd:
+    timeout: 5000
+- assertVisible: "My Watched Shows"

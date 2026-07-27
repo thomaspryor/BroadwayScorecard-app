@@ -5,6 +5,12 @@
 ### 1. NEVER Ask User to Run Local Commands
 User is **non-technical, often on phone**. Automate everything. Push to Git, use EAS Build / GitHub Actions.
 
+### 1b. TestFlight Ships Without Pre-Review (owner decision 2026-07-27)
+TestFlight builds auto-submit on merge — the owner LIKES this: the TestFlight
+push notification is their signal to go review the live build. Never block a
+TestFlight submit on owner approval or screenshot sign-off; design-review
+gates apply to feature direction and App Store releases, not beta builds.
+
 ### 2. Git Workflow
 - **Main branch only** — no PRs, no feature branches (matches web project).
 - **BRANCH CHECK:** `git branch --show-current` before ANY commit/push.
@@ -98,7 +104,7 @@ The source web project lives at: `~/Broadwayscore/` (repo: `thomaspryor/Broadway
 
 ## Deployment (EAS Build)
 - **Dev:** `npx expo start` → Expo Go on iPhone
-- **TestFlight:** EAS Build → TestFlight (automated via GitHub Actions)
+- **TestFlight:** NOT automatic. Merging to main ships NOTHING — `eas-build.yml` is `workflow_dispatch`-only. After merging user-visible work, run `gh workflow run eas-build.yml --ref main` (production build, autoIncrement, --auto-submit to TestFlight) and verify with `npx eas-cli build:list` that the new production build FINISHED. A session ending "merged + pushed" without dispatching this left the owner on a stale build (2026-07-24, build 54).
 - **App Store:** EAS Submit (future)
 
 ## File Hygiene
@@ -106,7 +112,8 @@ CLAUDE.md (**limit: 100 lines**). Keep it concise. Detailed notes → `memory/{t
 
 ## Design Proposals (principles — owner feedback 2026-07-20/21)
 1. **Fidelity honesty.** Anything presented to the owner as "the proposed design" must be rendered by the real product (variant in a worktree → simulator → `simctl io screenshot`) or composited onto real captures. Rough sketches are allowed for private exploration only, must be labeled as sketches, and are never the deliverable — two incidents of HTML re-creations shown as designs were rejected as fake.
-2. **Venue: confirm, don't assume.** Ask once per project where the owner reviews design work. Confirmed 2026-07-22 (owner picked "Design (Labs)" in their claude.ai sidebar): a DEDICATED DesignSync project, **"iOS App — Proposed Designs"** (projectId `d21b75cc-0388-4721-81f5-d886f744919f`), separate from "Broadway Scorecard Design System" (`469cbecf-df92-424c-bffd-f3441d1f745e`) — proposals are not design-system content, don't write them back into that project. Artifact link as fallback: `https://claude.ai/code/artifact/708007ba-4153-4d88-bb06-581e3388e8c9`. **Access still owner-unverified** (2026-07-21 incident: API reported `isOwned:true` for the design-system project but the owner's browser got "no permission" — likely a claude.ai account/org mismatch between the DesignSync authorization and the owner's default org). Before trusting either project link again, get the owner to actually click it and confirm — API success is not proof.
+2. **Venue (owner-confirmed 2026-07-21):** Claude Design — the dedicated DesignSync project **"iOS App — Proposed Designs"** (projectId d21b75cc-0388-4721-81f5-d886f744919f). CRITICAL ROUTING NUANCE: the owner opens it via **claude.ai/design → "Design systems" tab** (confirmed working); direct `claude.ai/project/<id>` URLs show no-permission for the owner — NEVER hand the owner a raw project URL, always the design-pane path. Do not write proposals into "Broadway Scorecard Design System" (tokens only). Artifact https://claude.ai/code/artifact/708007ba-4153-4d88-bb06-581e3388e8c9 is the fallback copy. (A 2026-07-21 session wrongly concluded Claude Design was unusable after testing only direct URLs — that conclusion is superseded by the owner's confirmed pane access.)
 3. **Options where real.** Render 2-3 variants when direction is genuinely contested; one when it's obvious. Don't manufacture options for compliance.
 4. **Verify before showing.** Open the deliverable yourself first: every image sharp (embed from original PNGs, ≥900px, no re-compress/upscale), every section populated, no placeholders.
 Pipeline gotchas + full recipe: web repo memory `feedback_ios_design_conservative_real_tokens.md` (dev-client vs production build trap, Maestro launchApp/point-taps).
+**Owner link format (proven 2026-07-21):** `https://claude.ai/design/<projectId>` — opens with commenting. NEVER `claude.ai/project/<id>` (no-permission for the owner). Proposals live under ios-design-proposals/ in the ORIGINAL project the owner can provably open: https://claude.ai/design/469cbecf-df92-424c-bffd-f3441d1f745e (restored 2026-07-21 after the relocated project d21b75cc proved owner-invisible — projects created by session auth may not be visible to the owner; only 469cbecf has owner-confirmed access, so ALL proposal publishing goes there)

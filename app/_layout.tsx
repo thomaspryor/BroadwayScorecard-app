@@ -13,6 +13,7 @@ import { DataProvider } from '@/lib/data-context';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { Onboarding, hasSeenOnboarding } from '@/components/Onboarding';
 import { AuthProvider } from '@/lib/auth-context';
+import { MarketProvider } from '@/lib/market-context';
 import { ToastProvider } from '@/lib/toast-context';
 import Toast from '@/components/Toast';
 import { featureFlags, loadFeatureFlagOverrides } from '@/lib/feature-flags';
@@ -183,6 +184,9 @@ function RootLayout() {
       screenOptions={{
         animation: 'slide_from_right',
         animationDuration: 250,
+        // Pushed screens otherwise inherit the previous ROUTE name as the back
+        // label — Settings showed "(tabs)" (beta feedback 2026-07-25).
+        headerBackTitle: 'Back',
       }}
     >
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
@@ -199,7 +203,27 @@ function RootLayout() {
         }}
       />
       <Stack.Screen
+        name="settings"
+        options={{
+          headerShown: true,
+          title: 'Settings',
+          headerBackTitle: 'Back',
+          headerStyle: { backgroundColor: Colors.surface.default },
+          headerTintColor: Colors.brand,
+          headerTitleStyle: { color: Colors.text.primary },
+          animation: 'slide_from_right',
+        }}
+      />
+      <Stack.Screen
         name="rate/[showId]"
+        options={{
+          presentation: 'modal',
+          headerShown: false,
+          animation: 'slide_from_bottom',
+        }}
+      />
+      <Stack.Screen
+        name="import"
         options={{
           presentation: 'modal',
           headerShown: false,
@@ -214,6 +238,7 @@ function RootLayout() {
     {wrapWithPostHog(
     <ThemeProvider value={BroadwayDark}>
       <ToastProvider>
+      <MarketProvider>
       <DataProvider>
         {featureFlags.userAccounts ? (
           <AuthProvider>{appContent}</AuthProvider>
@@ -222,6 +247,7 @@ function RootLayout() {
         )}
         <StatusBar style="light" />
       </DataProvider>
+      </MarketProvider>
       <Toast />
       </ToastProvider>
     </ThemeProvider>

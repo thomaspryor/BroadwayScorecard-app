@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# Pre-commit hook (version-controlled — active via core.hooksPath=scripts/hooks).
+#
+# Blocks commits that introduce new secrets (gitleaks, staged diff only ~1s).
+# Ported from thomaspryor/Broadwayscore (PR #483, 2026-07-26) after a live
+# BUFFER_TOKEN sat in that public repo ~4 months with nothing scanning for it.
+# This repo (BroadwayScorecard-app) is also public and had zero secret scanning.
+
+REPO_ROOT=$(git rev-parse --show-toplevel)
+
+if command -v gitleaks >/dev/null 2>&1; then
+  GITLEAKS_CONFIG_ARG=()
+  if [ -f "$REPO_ROOT/.gitleaks.toml" ]; then
+    GITLEAKS_CONFIG_ARG=(--config "$REPO_ROOT/.gitleaks.toml")
+  fi
+  if ! gitleaks protect --staged --no-banner --redact "${GITLEAKS_CONFIG_ARG[@]}"; then
+    echo "" >&2
+    echo "❌ gitleaks found a potential secret in staged changes." >&2
+    echo "" >&2
+    echo "Options:" >&2
+    echo "  1. Remove the secret. (Preferred.)" >&2
+    echo "  2. If it's a verified false positive, add an entry to .gitleaks.toml" >&2
+    echo "     [allowlist] regexes/paths and re-stage." >&2
+    echo "  3. Emergency bypass: git commit --no-verify" >&2
+    echo "" >&2
+    exit 1
+  fi
+else
+  echo "⚠️  gitleaks not installed — skipping secret scan (brew install gitleaks)." >&2
+fi

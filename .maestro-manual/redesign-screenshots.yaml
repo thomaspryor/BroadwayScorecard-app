@@ -1,6 +1,13 @@
 # Take after-screenshots of redesigned Watched / To Watch / Lists tabs
 # Pre-req: app already installed, EXPO_PUBLIC_DEV_AUTO_SIGNIN=1 in .env.local
 # Skips onboarding (handled by dev flag), does dev sign-in, screenshots each tab.
+#
+# LOCAL-ONLY TOOL — deliberately outside .maestro/ so maestro-e2e.yml's
+# `.maestro/**/*.yaml` glob for suite=all doesn't sweep it in. It writes
+# screenshots to a local ~/Documents path that doesn't exist on CI runners,
+# and its list-view-toggle tap targets To Watch's control while the flow is
+# still on the Watched screen (no such control there) — never actually
+# passed in CI. Run manually: maestro test .maestro-manual/redesign-screenshots.yaml
 
 appId: com.broadwayscorecard.app
 ---
@@ -24,6 +31,9 @@ appId: com.broadwayscorecard.app
 
 # Navigate to Watched (will show sign-in CTA if not authed)
 - openLink: broadwayscorecard:///watched
+- tapOn:
+    text: "Open"
+    optional: true
 - waitForAnimationToEnd:
     timeout: 5000
 
@@ -61,6 +71,9 @@ appId: com.broadwayscorecard.app
 
 # Re-navigate to Watched (now authed)
 - openLink: broadwayscorecard:///watched
+- tapOn:
+    text: "Open"
+    optional: true
 - waitForAnimationToEnd
 - takeScreenshot: ~/Documents/claude-outputs/bwsc-my-shows-mocks/ios-after-pass1/maestro-01-watched-grid
 
@@ -77,11 +90,17 @@ appId: com.broadwayscorecard.app
 
 # Navigate to To Watch
 - openLink: broadwayscorecard:///to-watch
+- tapOn:
+    text: "Open"
+    optional: true
 - waitForAnimationToEnd
 - takeScreenshot: ~/Documents/claude-outputs/bwsc-my-shows-mocks/ios-after-pass1/maestro-02-to-watch
 
 # Navigate to Lists
 - openLink: broadwayscorecard:///lists
+- tapOn:
+    text: "Open"
+    optional: true
 - waitForAnimationToEnd
 - takeScreenshot: ~/Documents/claude-outputs/bwsc-my-shows-mocks/ios-after-pass1/maestro-03-lists
 

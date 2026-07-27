@@ -6,7 +6,7 @@
  * Inline search to add shows. Create/Edit modal for list metadata.
  */
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -15,6 +15,7 @@ import {
   TextInput,
   Modal,
   Alert,
+  RefreshControl,
   StyleSheet,
   ActivityIndicator,
   Switch,
@@ -30,6 +31,8 @@ import Fuse from 'fuse.js';
 import { useUserLists } from '@/hooks/useUserLists';
 import { useShows } from '@/lib/data-context';
 import { getImageUrl } from '@/lib/images';
+import { humanizeShowId } from '@/lib/show-format';
+import { useToastSafe } from '@/lib/toast-context';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
 import * as haptics from '@/lib/haptics';
 import { trackListCreated, trackListDeleted, trackShowAddedToList, trackShowRemovedFromList, trackListReordered } from '@/lib/analytics';
@@ -55,10 +58,25 @@ export default function ListsTab({ userId, showMap, createTrigger }: ListsTabPro
     addToList, removeFromList, reorderList,
   } = useUserLists(userId);
   const { shows } = useShows();
+  const { showToast } = useToastSafe();
+
+  const handleMissingShow = useCallback(() => {
+    showToast("This show isn't in the current catalog yet.", 'info');
+  }, [showToast]);
 
   // Load lists on mount
   useEffect(() => {
     getLists();
+  }, [getLists]);
+
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await getLists();
+    } finally {
+      setRefreshing(false);
+    }
   }, [getLists]);
 
   const [activeListId, setActiveListId] = useState<string | null>(null);
@@ -168,10 +186,20 @@ export default function ListsTab({ userId, showMap, createTrigger }: ListsTabPro
 
   const handleRemoveShow = async (showId: string) => {
     if (!activeListId) return;
-    haptics.action();
-    await removeFromList(activeListId, showId);
-    trackShowRemovedFromList(activeListId, showId);
-    setListItems(prev => prev.filter(i => i.show_id !== showId));
+    const title = showMap[showId]?.title || 'this show';
+    Alert.alert('Remove from list', `Remove ${title} from this list?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Remove',
+        style: 'destructive',
+        onPress: async () => {
+          haptics.action();
+          await removeFromList(activeListId, showId);
+          trackShowRemovedFromList(activeListId, showId);
+          setListItems(prev => prev.filter(i => i.show_id !== showId));
+        },
+      },
+    ]);
   };
 
   const handleDragEnd = async (data: ListItem[]) => {
@@ -229,6 +257,7 @@ export default function ListsTab({ userId, showMap, createTrigger }: ListsTabPro
           data={lists}
           keyExtractor={l => l.id}
           contentContainerStyle={styles.listContent}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.text.secondary} />}
           renderItem={({ item: list }) => (
             <Pressable
               style={styles.listCard}
@@ -318,6 +347,8 @@ export default function ListsTab({ userId, showMap, createTrigger }: ListsTabPro
         <Text style={styles.detailTitle}>{activeList?.name}</Text>
         {activeList?.is_ranked && <Text style={styles.rankedBadgeLarge}># Ranked</Text>}
       </View>
+      {/* Count line — web parity (ListDetailView "N Shows"). */}
+      <Text style={styles.detailCount}>{listItems.length} {listItems.length === 1 ? 'show' : 'shows'}</Text>
       {activeList?.description && (
         <Text style={styles.detailDescription}>{activeList.description}</Text>
       )}
@@ -341,7 +372,7 @@ export default function ListsTab({ userId, showMap, createTrigger }: ListsTabPro
                 <Pressable
                   style={[styles.itemRow, isActive && styles.itemRowDragging]}
                   onLongPress={drag}
-                  onPress={() => show && router.push(`/show/${show.slug}`)}
+                  onPress={() => show ? router.push(`/show/${show.slug}`) : handleMissingShow()}
                 >
                   {/* Rank number */}
                   <Text style={styles.rankNumber}>{idx + 1}</Text>
@@ -366,7 +397,7 @@ export default function ListsTab({ userId, showMap, createTrigger }: ListsTabPro
                   {/* Title */}
                   <View style={styles.itemInfo}>
                     <Text style={styles.itemTitle} numberOfLines={1}>
-                      {show?.title || item.show_id}
+                      {show?.title || humanizeShowId(item.show_id)}
                     </Text>
                     {show?.venue && (
                       <Text style={styles.itemVenue} numberOfLines={1}>{show.venue}</Text>
@@ -406,7 +437,7 @@ export default function ListsTab({ userId, showMap, createTrigger }: ListsTabPro
             return (
               <Pressable
                 style={styles.itemRow}
-                onPress={() => show && router.push(`/show/${show.slug}`)}
+                onPress={() => show ? router.push(`/show/${show.slug}`) : handleMissingShow()}
               >
                 {show ? (
                   <Image
@@ -421,7 +452,7 @@ export default function ListsTab({ userId, showMap, createTrigger }: ListsTabPro
                 )}
                 <View style={styles.itemInfo}>
                   <Text style={styles.itemTitle} numberOfLines={1}>
-                    {show?.title || item.show_id}
+                    {show?.title || humanizeShowId(item.show_id)}
                   </Text>
                   {show?.venue && (
                     <Text style={styles.itemVenue} numberOfLines={1}>{show.venue}</Text>
@@ -763,14 +794,18 @@ const styles = StyleSheet.create({
   previewPlaceholderText: {
     fontSize: 14,
   },
+  // Sized to match real list rows (minHeight 90) so the affordance reads as
+  // "the next list", not a stray button.
   createButton: {
     marginTop: Spacing.lg,
+    minHeight: 90,
     paddingVertical: Spacing.md,
     borderRadius: BorderRadius.md,
     borderWidth: 1,
     borderColor: Colors.border.subtle,
     borderStyle: 'dashed',
     alignItems: 'center',
+    justifyContent: 'center',
   },
   createButtonText: {
     color: Colors.text.muted,
@@ -819,6 +854,12 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     borderRadius: 6,
     overflow: 'hidden',
+  },
+  detailCount: {
+    color: Colors.text.muted,
+    fontSize: FontSize.xs,
+    paddingHorizontal: Spacing.lg,
+    paddingBottom: Spacing.xs,
   },
   detailDescription: {
     color: Colors.text.muted,

@@ -14,6 +14,7 @@ import type { UserProfile } from './user-types';
 import SignInSheet from '@/components/SignInSheet';
 import { trackSignInStarted, trackSignInCompleted, trackSignOut as trackSignOutEvent, identifyUser, resetAnalyticsUser } from '@/lib/analytics';
 import { setSentryUser, clearSentryUser } from '@/lib/sentry';
+import { clearPendingAction } from '@/lib/deferred-auth';
 
 // Lazy-load native auth modules — they crash at import time if native modules
 // aren't registered (e.g. dev client built without the plugin, or Expo Go).
@@ -53,6 +54,8 @@ interface AuthContextValue {
   signInWithGoogle: () => Promise<void>;
   signInWithEmail: (email: string, password: string) => Promise<{ error?: string } | void>;
   signOut: () => Promise<void>;
+  /** Permanently deletes the account and all associated data (App Store 5.1.1(v)) */
+  deleteAccount: () => Promise<void>;
   /** Show sign-in sheet with context */
   showSignIn: (context?: SignInContext) => void;
   /** Dev-only email/password sign-in for simulator testing */
@@ -355,6 +358,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setProfile(null);
   }, []);
 
+  // ─── Permanent account deletion (App Store Guideline 5.1.1(v)) ──────────
+  const deleteAccount = useCallback(async () => {
+    const client = getSupabaseClient();
+    if (!client) throw new Error('Not signed in.');
+
+    const { data, error } = await client.functions.invoke<{ ok: boolean; error?: string }>('delete-account');
+    if (error || !data?.ok) {
+      throw new Error('Could not delete your account. Please try again.');
+    }
+
+    await client.auth.signOut();
+    setUser(null);
+    setProfile(null);
+  }, []);
+
   // ─── Show Sign-In Sheet ──────────────────────────────────
   const showSignIn = useCallback((context: SignInContext = 'generic') => {
     setSheetContext(context);
@@ -395,6 +413,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signInWithGoogle,
         signInWithEmail,
         signOut,
+        deleteAccount,
         showSignIn,
         devSignIn,
       }}
@@ -402,7 +421,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       {children}
       <SignInSheet
         visible={sheetOpen}
-        onClose={() => setSheetOpen(false)}
+        onClose={() => {
+          setSheetOpen(false);
+          // Dismissing without signing in leaves the draft action stale — clear
+          // it so a LATER sign-in (different flow) can't silently resurrect and
+          // auto-save it over whatever the user has open by then.
+          clearPendingAction();
+        }}
         onSignIn={handleSheetSignIn}
         onEmailSignIn={handleSheetEmailSignIn}
         onDevSignIn={__DEV__ ? devSignIn : undefined}
@@ -423,6 +448,7 @@ const DEFAULT_AUTH: AuthContextValue = {
   signInWithGoogle: async () => {},
   signInWithEmail: async () => {},
   signOut: async () => {},
+  deleteAccount: async () => {},
   showSignIn: () => {},
   devSignIn: async () => {},
 };

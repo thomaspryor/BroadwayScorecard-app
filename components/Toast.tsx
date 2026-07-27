@@ -76,6 +76,20 @@ export default function Toast() {
         <Text style={styles.text} numberOfLines={2}>
           {toast.text}
         </Text>
+        {toast.onAction && (
+          <Pressable
+            style={styles.actionButton}
+            hitSlop={8}
+            onPress={() => {
+              toast.onAction?.();
+              dismissToast();
+            }}
+            accessibilityRole="button"
+            accessibilityLabel={toast.actionLabel || 'Undo'}
+          >
+            <Text style={styles.actionText}>{toast.actionLabel || 'Undo'}</Text>
+          </Pressable>
+        )}
       </Pressable>
     </Animated.View>
   );
@@ -98,12 +112,26 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   inner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.md,
+    gap: Spacing.md,
   },
   text: {
+    flex: 1,
+    minWidth: 0,
     color: Colors.text.primary,
     fontSize: FontSize.md,
     fontWeight: '500',
+  },
+  actionButton: {
+    flexShrink: 0,
+  },
+  actionText: {
+    color: Colors.brand,
+    fontSize: FontSize.md,
+    fontWeight: '700',
   },
 });

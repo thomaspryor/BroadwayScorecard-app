@@ -27,6 +27,8 @@ interface ShowCardProps {
   hideStatus?: boolean;
   isWatchlisted?: boolean;
   onToggleWatchlist?: () => void;
+  /** Signed-in user's own rating; shows a ★ chip instead of the bookmark */
+  myRating?: number | null;
 }
 
 const MARKET_LABELS: Record<string, string> = {
@@ -72,7 +74,7 @@ function getClosingInfo(closingDate: string | null, status: string): string | nu
   return null;
 }
 
-export const ShowCard = memo(function ShowCard({ show, scoreMode = 'critics', hideStatus = false, isWatchlisted, onToggleWatchlist }: ShowCardProps) {
+export const ShowCard = memo(function ShowCard({ show, scoreMode = 'critics', hideStatus = false, isWatchlisted, onToggleWatchlist, myRating }: ShowCardProps) {
   const router = useRouter();
   const imageUrl = getImageUrl(show.images.poster ?? show.images.thumbnail);
   const scoreText = show.compositeScore ? `Score ${Math.round(show.compositeScore)}` : 'No score';
@@ -112,7 +114,7 @@ export const ShowCard = memo(function ShowCard({ show, scoreMode = 'critics', hi
         )}
         {/* Bookmark — rendered AFTER image so it's on top (z-order) */}
         {isWatchlisted !== undefined && onToggleWatchlist && (
-          <BookmarkOverlay isWatchlisted={isWatchlisted} onToggle={onToggleWatchlist} />
+          <BookmarkOverlay isWatchlisted={isWatchlisted} onToggle={onToggleWatchlist} myRating={myRating} />
         )}
       </View>
 
