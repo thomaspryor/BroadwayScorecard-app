@@ -1,0 +1,127 @@
+# Screenshot capture for two-model UX review (#573) — not a CI assertion flow.
+appId: com.broadwayscorecard.app
+---
+- launchApp
+- tapOn:
+    text: "Open"
+    optional: true
+- extendedWaitUntil:
+    visible: "Broadway Scorecard"
+    timeout: 45000
+- openLink: broadwayscorecard:///watched
+- tapOn:
+    text: "Open"
+    optional: true
+- extendedWaitUntil:
+    visible: "My Watched Shows"
+    timeout: 30000
+
+# ── Watched / Diary grid (first paint before Stats) ──
+- tapOn:
+    id: "diary-grid-view-toggle"
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 5000
+- takeScreenshot: "01-diary-grid"
+
+# ── Stats tab: first paint ──
+- tapOn:
+    id: "diary-stats-view-toggle"
+- waitForAnimationToEnd:
+    timeout: 5000
+- extendedWaitUntil:
+    visible:
+      id: "stats-scope-pill"
+    timeout: 20000
+- takeScreenshot: "02-stats-first-paint"
+
+# ── Hero tile drilldown ──
+- tapOn:
+    id: "stats-tile-shows"
+- extendedWaitUntil:
+    visible:
+      id: "stats-drilldown-sheet"
+    timeout: 10000
+- takeScreenshot: "03-stats-drilldown-shows"
+- tapOn:
+    id: "stats-drilldown-close"
+- waitForAnimationToEnd:
+    timeout: 5000
+
+# ── Scroll through all Stats modules, screenshotting along the way ──
+- takeScreenshot: "04-stats-scroll-top"
+- scroll
+- takeScreenshot: "05-stats-scroll-1"
+- scroll
+- takeScreenshot: "06-stats-scroll-2"
+- scroll
+- takeScreenshot: "07-stats-scroll-3"
+- scroll
+- takeScreenshot: "08-stats-scroll-4"
+- scroll
+- takeScreenshot: "09-stats-scroll-5"
+- scroll
+- takeScreenshot: "10-stats-scroll-6"
+- scroll
+- takeScreenshot: "11-stats-scroll-7"
+- scroll
+- takeScreenshot: "12-stats-scroll-bottom"
+
+# ── House grid / theater chip drilldown ──
+- scrollUntilVisible:
+    element:
+      id: "stats-house-grid"
+    direction: DOWN
+    visibilityPercentage: 20
+    timeout: 30000
+- takeScreenshot: "13-stats-house-grid"
+- tapOn:
+    id: "stats-house-chip"
+    index: 0
+- extendedWaitUntil:
+    visible:
+      id: "stats-drilldown-sheet"
+    timeout: 10000
+- takeScreenshot: "14-stats-drilldown-house"
+- tapOn:
+    id: "stats-drilldown-close"
+- waitForAnimationToEnd:
+    timeout: 5000
+
+# ── Scope pill: switch to All-time ──
+- scrollUntilVisible:
+    element:
+      id: "stats-scope-pill"
+    direction: UP
+    visibilityPercentage: 40
+    timeout: 30000
+- tapOn:
+    id: "stats-scope-pill"
+- extendedWaitUntil:
+    visible: "SEASONS"
+    timeout: 10000
+- takeScreenshot: "15-stats-scope-sheet"
+- tapOn:
+    id: "stats-scope-option-all"
+- waitForAnimationToEnd:
+    timeout: 5000
+- takeScreenshot: "16-stats-scope-all-time"
+
+# ── Watched grid + To Watch (for comparison context) ──
+- scrollUntilVisible:
+    element:
+      id: "stats-tile-shows"
+    direction: UP
+    visibilityPercentage: 40
+    timeout: 30000
+- tapOn:
+    id: "diary-grid-view-toggle"
+- waitForAnimationToEnd:
+    timeout: 5000
+- takeScreenshot: "17-watched-grid"
+- tapOn:
+    id: "diary-feed-view-toggle"
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 5000
+- takeScreenshot: "18-watched-feed"
