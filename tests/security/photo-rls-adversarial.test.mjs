@@ -4,25 +4,35 @@
 // in with the anon key, exactly as the app does — no service-role shortcuts.
 //
 // Run: node --test tests/security/photo-rls-adversarial.test.mjs
-// Requires: EXPO_PUBLIC_SUPABASE_URL, EXPO_PUBLIC_SUPABASE_ANON_KEY env vars.
-// Skips (not fails) if fixture accounts aren't seeded yet — CI seeds them
-// first via seed-photo-test-accounts.js.
+// Requires: EXPO_PUBLIC_SUPABASE_URL, EXPO_PUBLIC_SUPABASE_ANON_KEY,
+// FIXTURE_PHOTO_A_PASSWORD, FIXTURE_PHOTO_B_PASSWORD env vars.
+// Local runs without these skip (so `node --test` doesn't fail for a dev who
+// hasn't set them up); in CI (CI=true) this is a hard failure, not a skip —
+// this is the blocking gate, so a missing/renamed secret must not read green.
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { Buffer } from 'node:buffer';
 import { createClient } from '@supabase/supabase-js';
 
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 
-const ACCOUNT_A = {
-  email: 'fixture-photo-a@broadwayscorecard.com',
-  password: process.env.FIXTURE_PHOTO_A_PASSWORD || 'BwayPhotoFixtureA2026!',
-};
-const ACCOUNT_B = {
-  email: 'fixture-photo-b@broadwayscorecard.com',
-  password: process.env.FIXTURE_PHOTO_B_PASSWORD || 'BwayPhotoFixtureB2026!',
-};
+// No hardcoded fallback passwords — see scripts/seed-photo-test-accounts.js
+// for why (security review, 2026-07-27: a committed default in this PUBLIC
+// repo would hand out valid production credentials).
+const REQUIRED_VARS = [
+  'EXPO_PUBLIC_SUPABASE_URL', 'EXPO_PUBLIC_SUPABASE_ANON_KEY',
+  'FIXTURE_PHOTO_A_PASSWORD', 'FIXTURE_PHOTO_B_PASSWORD',
+];
+const missing = REQUIRED_VARS.filter(v => !process.env[v]);
+if (missing.length > 0 && process.env.CI) {
+  console.error(`FATAL: missing required env var(s) in CI: ${missing.join(', ')} — refusing to silently skip a BLOCKING security gate.`);
+  process.exit(1);
+}
+
+const ACCOUNT_A = { email: 'fixture-photo-a@broadwayscorecard.com', password: process.env.FIXTURE_PHOTO_A_PASSWORD };
+const ACCOUNT_B = { email: 'fixture-photo-b@broadwayscorecard.com', password: process.env.FIXTURE_PHOTO_B_PASSWORD };
 
 // A minimal 1x1 JPEG so the test doesn't depend on any asset file.
 const TINY_JPEG_BASE64 =
@@ -38,8 +48,8 @@ async function signIn(client, account) {
 }
 
 test('two-account photo RLS adversarial test', async (t) => {
-  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-    t.skip('EXPO_PUBLIC_SUPABASE_URL / EXPO_PUBLIC_SUPABASE_ANON_KEY not set — skipping live RLS test');
+  if (missing.length > 0) {
+    t.skip(`${missing.join(', ')} not set — skipping live RLS test (local dev only; CI fails closed above)`);
     return;
   }
 

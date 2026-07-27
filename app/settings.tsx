@@ -180,8 +180,10 @@ export default function SettingsScreen() {
                       showToast(
                         result.exportedCount === 0
                           ? 'No photos to export.'
-                          : `Exported and deleted ${result.deletedCount} photo${result.deletedCount === 1 ? '' : 's'}.`,
-                        'success',
+                          : result.complete
+                            ? `Exported and deleted ${result.deletedCount} photo${result.deletedCount === 1 ? '' : 's'}.`
+                            : `Exported and deleted ${result.deletedCount} photo${result.deletedCount === 1 ? '' : 's'} — some couldn't be reached, tap again to finish.`,
+                        result.complete ? 'success' : 'info',
                       );
                     } catch (e) {
                       const detail = e instanceof Error ? e.message : 'Please try again.';

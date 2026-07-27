@@ -7,9 +7,18 @@ const https = require('https');
 
 const SUPABASE_URL = 'https://tcbkoevwfemkicrwpypb.supabase.co';
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+// No hardcoded fallback passwords — these accounts are real, signed-in-able
+// rows on the production project. A committed default in a PUBLIC repo would
+// hand out valid production credentials (security review finding, 2026-07-27).
+// Set FIXTURE_PHOTO_A_PASSWORD / FIXTURE_PHOTO_B_PASSWORD as GitHub secrets.
+if (!process.env.FIXTURE_PHOTO_A_PASSWORD || !process.env.FIXTURE_PHOTO_B_PASSWORD) {
+  console.error('Missing FIXTURE_PHOTO_A_PASSWORD / FIXTURE_PHOTO_B_PASSWORD env vars — refusing to seed with a hardcoded password.');
+  process.exit(1);
+}
 const ACCOUNTS = [
-  { key: 'A', email: 'fixture-photo-a@broadwayscorecard.com', password: process.env.FIXTURE_PHOTO_A_PASSWORD || 'BwayPhotoFixtureA2026!' },
-  { key: 'B', email: 'fixture-photo-b@broadwayscorecard.com', password: process.env.FIXTURE_PHOTO_B_PASSWORD || 'BwayPhotoFixtureB2026!' },
+  { key: 'A', email: 'fixture-photo-a@broadwayscorecard.com', password: process.env.FIXTURE_PHOTO_A_PASSWORD },
+  { key: 'B', email: 'fixture-photo-b@broadwayscorecard.com', password: process.env.FIXTURE_PHOTO_B_PASSWORD },
 ];
 const FIXTURE_SHOW_ID = 'death-of-a-salesman-2026';
 
@@ -100,7 +109,8 @@ async function ensureReview(userId) {
     const userId = await ensureUser(account.email, account.password);
     await ensureProfile(userId, account.email);
     const reviewId = await ensureReview(userId);
-    out[account.key] = { userId, reviewId, email: account.email, password: account.password };
+    // Never include password — CI logs on a public repo are world-readable.
+    out[account.key] = { userId, reviewId, email: account.email };
     console.log(`  ✓ user=${userId} review=${reviewId}`);
   }
   console.log('\n' + JSON.stringify(out, null, 2));

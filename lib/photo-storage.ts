@@ -128,24 +128,3 @@ export async function deletePhoto(photoId: string, storagePath: string): Promise
   if (rowError) throw rowError;
 }
 
-/** Bulk delete for "Export & delete all photos" — deletes in storage-path batches of 100. */
-export async function deleteAllPhotosForUser(userId: string): Promise<void> {
-  const client = getSupabaseClient();
-  if (!client) throw new Error('Not signed in.');
-
-  const photos = await getAllPhotosForUser(userId);
-  if (photos.length === 0) return;
-
-  const BATCH = 100;
-  for (let i = 0; i < photos.length; i += BATCH) {
-    const batch = photos.slice(i, i + BATCH);
-    const { error: storageError } = await client.storage.from(BUCKET).remove(batch.map(p => p.storage_path));
-    if (storageError) throw storageError;
-
-    const { error: rowError } = await client
-      .from('user_review_photos')
-      .delete()
-      .in('id', batch.map(p => p.id));
-    if (rowError) throw rowError;
-  }
-}

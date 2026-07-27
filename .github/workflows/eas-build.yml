@@ -40,12 +40,17 @@ jobs:
       - name: Seed two-account photo RLS fixtures
         env:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          FIXTURE_PHOTO_A_PASSWORD: ${{ secrets.FIXTURE_PHOTO_A_PASSWORD }}
+          FIXTURE_PHOTO_B_PASSWORD: ${{ secrets.FIXTURE_PHOTO_B_PASSWORD }}
         run: node scripts/seed-photo-test-accounts.js
 
       - name: BLOCKING — two-account adversarial RLS test
         env:
+          CI: 'true'
           EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
           EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
+          FIXTURE_PHOTO_A_PASSWORD: ${{ secrets.FIXTURE_PHOTO_A_PASSWORD }}
+          FIXTURE_PHOTO_B_PASSWORD: ${{ secrets.FIXTURE_PHOTO_B_PASSWORD }}
         run: node --test tests/security/photo-rls-adversarial.test.mjs
 
       - name: BLOCKING — diary-photos bucket must be Private
