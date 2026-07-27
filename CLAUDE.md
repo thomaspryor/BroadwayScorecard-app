@@ -5,6 +5,12 @@
 ### 1. NEVER Ask User to Run Local Commands
 User is **non-technical, often on phone**. Automate everything. Push to Git, use EAS Build / GitHub Actions.
 
+### 1b. TestFlight Ships Without Pre-Review (owner decision 2026-07-27)
+TestFlight builds auto-submit on merge — the owner LIKES this: the TestFlight
+push notification is their signal to go review the live build. Never block a
+TestFlight submit on owner approval or screenshot sign-off; design-review
+gates apply to feature direction and App Store releases, not beta builds.
+
 ### 2. Git Workflow
 - **Main branch only** — no PRs, no feature branches (matches web project).
 - **BRANCH CHECK:** `git branch --show-current` before ANY commit/push.
