@@ -42,6 +42,18 @@ export interface DrilldownPayload {
   facts?: DrilldownFact[];
   /** Copy shown when both lists are empty. */
   emptyText?: string;
+  /**
+   * Per-show score to render on the row INSTEAD of the show's composite —
+   * Aisle Mates / Your Paper of Record (spec §5.1) show one reviewer's own
+   * score, not the site's aggregate, so the number matches "their pick: 94".
+   */
+  scoreOverrides?: Record<string, number>;
+  /**
+   * Label shown as a divider before the `shows` group, when BOTH `reviews`
+   * and `shows` are present in the same payload — e.g. "Their picks you
+   * haven't seen" after a critic's shared-show agreement history.
+   */
+  showsLabel?: string;
 }
 
 function formatDate(dateSeen: string | null): string {
@@ -55,7 +67,8 @@ function formatDate(dateSeen: string | null): string {
 
 type Row =
   | { kind: 'review'; key: string; review: UserReview; show?: Show }
-  | { kind: 'show'; key: string; show: Show };
+  | { kind: 'show'; key: string; show: Show }
+  | { kind: 'divider'; key: string; label: string };
 
 export function StatsDrilldownSheet({
   payload,
@@ -74,7 +87,13 @@ export function StatsDrilldownSheet({
     for (const r of payload.reviews ?? []) {
       out.push({ kind: 'review', key: `r:${r.id}`, review: r, show: showsById[r.show_id] });
     }
-    for (const s of payload.shows ?? []) {
+    const shows = payload.shows ?? [];
+    // Divider only when both groups are present — a single-group payload
+    // (every other drilldown caller) never shows a label.
+    if (shows.length > 0 && (payload.reviews?.length ?? 0) > 0 && payload.showsLabel) {
+      out.push({ kind: 'divider', key: 'divider', label: payload.showsLabel });
+    }
+    for (const s of shows) {
       out.push({ kind: 'show', key: `s:${s.id}`, show: s });
     }
     return out;
@@ -87,7 +106,16 @@ export function StatsDrilldownSheet({
   };
 
   const renderRow = ({ item }: { item: Row }) => {
-    const show = item.kind === 'review' ? item.show : item.show;
+    if (item.kind === 'divider') {
+      return (
+        <Text style={styles.sectionLabel} testID="stats-drilldown-divider">
+          {item.label}
+        </Text>
+      );
+    }
+
+    const show = item.show;
+    const showId = item.kind === 'review' ? item.review.show_id : item.show.id;
     const title =
       show?.title ?? (item.kind === 'review' ? humanizeShowId(item.review.show_id) : 'Unknown show');
     const posterUrl = show?.images
@@ -104,6 +132,9 @@ export function StatsDrilldownSheet({
           ]
             .filter(Boolean)
             .join(' · ');
+    // Reviewer-specific score (Aisle Mates / Paper of Record) beats the
+    // show's composite when the caller supplies one for this show.
+    const score = payload?.scoreOverrides?.[showId] ?? show?.compositeScore;
 
     return (
       <Pressable
@@ -137,7 +168,7 @@ export function StatsDrilldownSheet({
           )}
         </View>
         {/* Score tier colours appear only here, as a semantic score chip. */}
-        <ScoreBadge score={show?.compositeScore} category={show?.category} size="small" />
+        <ScoreBadge score={score} category={show?.category} size="small" />
       </Pressable>
     );
   };
@@ -237,6 +268,14 @@ const styles = StyleSheet.create({
   rowText: { flex: 1, minWidth: 0 },
   rowTitle: { color: Colors.text.primary, fontSize: FontSize.sm, fontWeight: '600' },
   rowSubtitle: { color: Colors.text.muted, fontSize: FontSize.xs, marginTop: 2 },
+  sectionLabel: {
+    color: Colors.text.muted,
+    fontSize: FontSize.xs,
+    fontWeight: '700',
+    letterSpacing: 0.6,
+    marginTop: Spacing.md,
+    marginBottom: Spacing.sm,
+  },
   rowStars: { marginTop: 4 },
   pressed: { opacity: 0.7 },
   empty: {

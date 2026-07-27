@@ -15,11 +15,12 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Colors, FontSize, Spacing } from '@/constants/theme';
-import { useStatsCanon, useStatsData, MIN_ENTRIES_FOR_STATS } from '@/hooks/useStatsData';
+import { useStatsCanon, useStatsData, useStatsReviews, MIN_ENTRIES_FOR_STATS } from '@/hooks/useStatsData';
 import { localToday, scopeSuffix, type ScopeOption } from '@/lib/stats-scope';
 import { ScopePill } from './ScopePill';
 import type { CanonEntry, HouseVisit } from '@/lib/stats';
 import { matchVenueToHouse } from '@/lib/stats';
+import { reviewerDetail, type Reviewer } from '@/lib/stats-aisle-mates';
 import type { Show } from '@/lib/types';
 import type { UserReview } from '@/lib/user-types';
 import { GhostState, ModuleHeader, StatsCard } from './StatsPrimitives';
@@ -27,6 +28,7 @@ import { HeroTiles, formatHours } from './HeroTiles';
 import { ShowsPerYear, formatMonth } from './ShowsPerYear';
 import { TheaterTracker, houseShortName } from './TheaterTracker';
 import { YouVsCritics } from './YouVsCritics';
+import { AisleMates } from './AisleMates';
 import { CanonChecklists } from './CanonChecklists';
 import { RatingsModule } from './RatingsModule';
 import { StatsDrilldownSheet, type DrilldownPayload } from './StatsDrilldownSheet';
@@ -60,13 +62,16 @@ export function StatsScreen({
 }: StatsScreenProps) {
   const today = localToday();
   const { canon, loading: canonLoading } = useStatsCanon();
+  // Background fetch, never gates first paint (unlike the canon above) — see
+  // lib/stats-reviews-source.ts.
+  const { statsReviews, loading: statsReviewsLoading } = useStatsReviews();
   const [scope, setScope] = useState<ScopeOption | null>(null);
   const [drilldown, setDrilldown] = useState<DrilldownPayload | null>(null);
 
   // Scopes and the default scope are owned by the hook — computing them here
   // too meant two `defaultScope()` calls that could disagree, and
   // `bundle.scopes` was never read.
-  const bundle = useStatsData({ reviews, shows, canon, scope, today });
+  const bundle = useStatsData({ reviews, shows, canon, scope, statsReviews, statsReviewsLoading, today });
   const { allRows, scopes, scope: active, houseIndex, reviewsInScope, showsById } = bundle;
 
   /** Diary rows behind a set of show ids, newest first — the drill-down list. */
@@ -295,6 +300,41 @@ export function StatsScreen({
     });
   };
 
+  const openReviewer = (who: Reviewer, label: string) => {
+    if (!bundle.statsReviews) return;
+    // Lifetime, like Aisle Mates itself — the diary passed to reviewerDetail
+    // must match what alignCritics ranked this reviewer against (allRows).
+    const detail = reviewerDetail(bundle.allRows, bundle.statsReviews, who);
+    const scoreOverrides: Record<string, number> = {};
+    for (const s of detail.shared) scoreOverrides[s.showId] = s.theirScore;
+    for (const u of detail.unseen) scoreOverrides[u.showId] = u.theirScore;
+    const facts =
+      detail.biggestAgreementShowId || detail.biggestFightShowId
+        ? [
+            detail.biggestAgreementShowId
+              ? { label: 'Biggest agreement', value: showsById[detail.biggestAgreementShowId]?.title ?? '—' }
+              : null,
+            detail.biggestFightShowId
+              ? { label: 'Biggest fight', value: showsById[detail.biggestFightShowId]?.title ?? '—' }
+              : null,
+          ].filter((f): f is { label: string; value: string } => f !== null)
+        : undefined;
+    setDrilldown({
+      title: label,
+      caption: `${detail.shared.length} shared shows`,
+      // Lifetime history, not scoped — reads from the full diary, not reviewsInScope.
+      reviews: reviewsFor(
+        detail.shared.map((s) => s.showId),
+        reviews,
+      ),
+      shows: detail.unseen.slice(0, 10).map((u) => showsById[u.showId]).filter((s): s is Show => !!s),
+      showsLabel: 'Their picks you haven’t seen',
+      scoreOverrides,
+      facts,
+      emptyText: 'No shared shows yet.',
+    });
+  };
+
   const openGold = (which: 'seen' | 'unseen') => {
     if (which === 'seen') {
       setDrilldown({
@@ -436,6 +476,7 @@ export function StatsScreen({
             </Pressable>
           </StatsCard>
         )}
+        <AisleMates bundle={bundle} onOpenReviewer={openReviewer} />
         <CanonChecklists bundle={bundle} scope={active} onOpenList={openCanonList} onOpenEntry={openCanonEntry} />
         <RatingsModule bundle={bundle} onOpenBucket={openBucket} onOpenUnrated={openUnrated} />
 
