@@ -18,6 +18,8 @@ type Props = {
   reviews: UserReview[]; // newest → oldest
   showMap: Record<string, Show>;
   topInset: number;
+  /** Rendered inside the real Watched screen (header + segments above). */
+  embedded?: boolean;
 };
 
 type MonthCell = { key: string; year: number; month: number; items: UserReview[] };
@@ -28,7 +30,7 @@ const DOW = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 const CELL_W = Math.floor((Dimensions.get('window').width - Spacing.lg * 2 - 6 * 4) / 7);
 const CELL_H = Math.round(CELL_W / 0.86);
 
-export default function DiaryCalendar({ reviews, showMap, topInset }: Props) {
+export default function DiaryCalendar({ reviews, showMap, topInset, embedded }: Props) {
   const stats = seasonStats(reviews, showMap);
 
   // Build month buckets, newest first, from the reviews themselves.
@@ -46,22 +48,27 @@ export default function DiaryCalendar({ reviews, showMap, topInset }: Props) {
   }
   const months = monthOrder.map(k => monthMap[k]);
 
-  // Heatmap ribbon runs oldest → newest so the season reads left to right.
-  const ribbon = [...months].reverse();
-  const maxCount = Math.max(...months.map(m => m.items.length), 1);
-  const busiest = months.length
-    ? months.reduce((a, b) => (b.items.length > a.items.length ? b : a), months[0])
+  // Heatmap ribbon: trailing 12 months only (a 13-year diary would explode
+  // into unreadable slivers), oldest → newest so the year reads left to right.
+  const ribbonWindow = months.slice(0, 12);
+  const ribbon = [...ribbonWindow].reverse();
+  const maxCount = Math.max(...ribbonWindow.map(m => m.items.length), 1);
+  const busiest = ribbonWindow.length
+    ? ribbonWindow.reduce((a, b) => (b.items.length > a.items.length ? b : a), ribbonWindow[0])
     : null;
 
   return (
     <ScrollView style={styles.root} contentContainerStyle={{ paddingBottom: Spacing.xxl * 2 }} showsVerticalScrollIndicator={false}>
-      {/* Season header */}
-      <View style={[styles.header, { paddingTop: topInset + Spacing.md }]}>
-        <Text style={styles.eyebrow}>2025–26 SEASON</Text>
-        <Text style={styles.h1}>Diary</Text>
-        <Text style={styles.statLine}>
-          <Text style={styles.statNum}>{stats.viewings}</Text> nights · <Text style={styles.statNum}>{stats.shows}</Text> shows · <Text style={styles.statNum}>{stats.venues}</Text> theatres · avg <Text style={styles.statNum}>★{stats.avg.toFixed(1)}</Text>
-        </Text>
+      {/* Season header (the shipped screen header replaces this when embedded) */}
+      <View style={[styles.header, { paddingTop: embedded ? Spacing.sm : topInset + Spacing.md }]}>
+        {!embedded && <Text style={styles.eyebrow}>2025–26 SEASON</Text>}
+        {!embedded && <Text style={styles.h1}>Diary</Text>}
+        {/* Aggregate line only standalone — embedded, the Stats segment owns aggregates. */}
+        {!embedded && (
+          <Text style={styles.statLine}>
+            <Text style={styles.statNum}>{stats.viewings}</Text> nights · <Text style={styles.statNum}>{stats.shows}</Text> shows · <Text style={styles.statNum}>{stats.venues}</Text> theatres · avg <Text style={styles.statNum}>★{stats.avg.toFixed(1)}</Text>
+          </Text>
+        )}
       </View>
 
       {/* Heatmap ribbon — the season at a glance */}
@@ -92,7 +99,7 @@ export default function DiaryCalendar({ reviews, showMap, topInset }: Props) {
         </View>
         {busiest && (
           <Text style={styles.ribbonCaption}>
-            Busiest month — {MONTHS_LONG[busiest.month]} ({busiest.items.length} shows)
+            Busiest month, last 12 — {MONTHS_LONG[busiest.month]} ({busiest.items.length} shows)
           </Text>
         )}
       </View>

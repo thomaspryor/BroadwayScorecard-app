@@ -48,6 +48,19 @@ import { PhotoFeedTimeline } from '@/components/user/PhotoFeedTimeline';
 import { PhotoWallGrid } from '@/components/user/PhotoWallGrid';
 import { usePhotoFeed } from '@/hooks/usePhotoFeed';
 import * as haptics from '@/lib/haptics';
+import DiaryCalendar from '@/components/diary-fable/DiaryCalendar';
+import DiaryMarquee from '@/components/diary-fable/DiaryMarquee';
+import DiaryLedger from '@/components/diary-fable/DiaryLedger';
+import { FABLE_REVIEWS } from '@/constants/diary-fable-fixture';
+
+// DESIGN ROUND ONLY (task #300): when not 'off', the Grid segment's body is
+// replaced by one of the FABLE Diary directions (D/E/F) — the real header,
+// segmented control and Stats/Feed segments stay live, so captures show how
+// each direction coexists with the shipped screen. Uses the signed-in user's
+// real diary when present, else the design fixture.
+const FABLE_DIARY_VARIANT = 'off' as 'off' | 'D' | 'E' | 'F';
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+if (FABLE_DIARY_VARIANT !== 'off') require('react-native').LogBox.ignoreAllLogs(true);
 
 type DiarySort = 'date-desc' | 'date-asc' | 'rating-desc';
 /**
@@ -842,6 +855,16 @@ export default function WatchedScreen() {
           refreshing={refreshing}
           onRefresh={onRefresh}
         />
+      ) : FABLE_DIARY_VARIANT !== 'off' ? (
+        (() => {
+          const variantReviews = (reviews.length >= 8 ? [...reviews] : [...FABLE_REVIEWS])
+            .filter(r => r.date_seen)
+            .sort((a, b) => (b.date_seen || '').localeCompare(a.date_seen || ''));
+          const props = { reviews: variantReviews, showMap, topInset: 0, embedded: true };
+          if (FABLE_DIARY_VARIANT === 'D') return <DiaryCalendar {...props} />;
+          if (FABLE_DIARY_VARIANT === 'E') return <DiaryMarquee {...props} />;
+          return <DiaryLedger {...props} />;
+        })()
       ) : isDiaryEmpty ? (
         <EmptyState
           emoji="🎭"

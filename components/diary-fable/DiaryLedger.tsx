@@ -20,9 +20,11 @@ type Props = {
   reviews: UserReview[]; // newest → oldest
   showMap: Record<string, Show>;
   topInset: number;
+  /** Rendered inside the real Watched screen (header + segments above). */
+  embedded?: boolean;
 };
 
-export default function DiaryLedger({ reviews, showMap, topInset }: Props) {
+export default function DiaryLedger({ reviews, showMap, topInset, embedded }: Props) {
   const stats = seasonStats(reviews, showMap);
 
   // Group into month sections, newest first.
@@ -50,20 +52,26 @@ export default function DiaryLedger({ reviews, showMap, topInset }: Props) {
   return (
     <ScrollView style={styles.root} contentContainerStyle={{ paddingBottom: Spacing.xxl * 2 }} showsVerticalScrollIndicator={false}>
       {/* Masthead */}
-      <View style={[styles.header, { paddingTop: topInset + Spacing.md }]}>
+      <View style={[styles.header, { paddingTop: embedded ? Spacing.sm : topInset + Spacing.md }]}>
         <View style={styles.headerTop}>
-          <Text style={styles.h1}>Diary</Text>
-          <View style={styles.yearTabs}>
-            {years.map((y, i) => (
-              <View key={y} style={[styles.yearTab, i === 0 && styles.yearTabActive]}>
-                <Text style={[styles.yearTabText, i === 0 && styles.yearTabTextActive]}>{y}</Text>
-              </View>
-            ))}
-          </View>
+          {!embedded && <Text style={styles.h1}>Diary</Text>}
+          {/* Horizontal scroll: a long diary can span a dozen years. */}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.yearTabsScroll}>
+            <View style={styles.yearTabs}>
+              {years.map((y, i) => (
+                <View key={y} style={[styles.yearTab, i === 0 && styles.yearTabActive]}>
+                  <Text style={[styles.yearTabText, i === 0 && styles.yearTabTextActive]}>{y}</Text>
+                </View>
+              ))}
+            </View>
+          </ScrollView>
         </View>
-        <Text style={styles.ledgerLine}>
-          NO. OF ENTRIES {String(stats.viewings).padStart(3, '0')} · SHOWS {String(stats.shows).padStart(2, '0')} · AVG ★{stats.avg.toFixed(1)}
-        </Text>
+        {/* Aggregate line only standalone — embedded, the Stats segment owns aggregates. */}
+        {!embedded && (
+          <Text style={styles.ledgerLine}>
+            NO. OF ENTRIES {String(stats.viewings).padStart(3, '0')} · SHOWS {String(stats.shows).padStart(2, '0')} · AVG ★{stats.avg.toFixed(1)}
+          </Text>
+        )}
       </View>
 
       {groups.map(g => {
@@ -139,7 +147,8 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.sm,
   },
   h1: { color: Colors.text.primary, fontSize: FontSize.xxl, fontWeight: '700' },
-  yearTabs: { flexDirection: 'row', gap: 6, marginRight: 56 },
+  yearTabsScroll: { marginLeft: Spacing.md, marginRight: 56 },
+  yearTabs: { flexDirection: 'row', gap: 6 },
   yearTab: {
     paddingHorizontal: 12, paddingVertical: 5, borderRadius: BorderRadius.pill,
     backgroundColor: Colors.surface.raised,

@@ -20,9 +20,11 @@ type Props = {
   reviews: UserReview[]; // newest → oldest
   showMap: Record<string, Show>;
   topInset: number;
+  /** Rendered inside the real Watched screen (header + segments above). */
+  embedded?: boolean;
 };
 
-export default function DiaryMarquee({ reviews, showMap, topInset }: Props) {
+export default function DiaryMarquee({ reviews, showMap, topInset, embedded }: Props) {
   const stats = seasonStats(reviews, showMap);
 
   // Count viewings per show so rewatches get a ×N lamp.
@@ -32,12 +34,14 @@ export default function DiaryMarquee({ reviews, showMap, topInset }: Props) {
 
   return (
     <ScrollView style={styles.root} contentContainerStyle={{ paddingBottom: Spacing.xxl * 2 }} showsVerticalScrollIndicator={false}>
-      <View style={[styles.header, { paddingTop: topInset + Spacing.md }]}>
-        <Text style={styles.h1}>Diary</Text>
-        <Text style={styles.headerMeta}>
-          {stats.viewings} nights · {stats.shows} shows
-        </Text>
-      </View>
+      {!embedded && (
+        <View style={[styles.header, { paddingTop: topInset + Spacing.md }]}>
+          <Text style={styles.h1}>Diary</Text>
+          <Text style={styles.headerMeta}>
+            {stats.viewings} nights · {stats.shows} shows
+          </Text>
+        </View>
+      )}
 
       {reviews.map(r => {
         const show = showMap[r.show_id];
@@ -86,9 +90,9 @@ export default function DiaryMarquee({ reviews, showMap, topInset }: Props) {
                   </View>
                 )}
                 <View style={styles.deltaBlock}>
-                  {critic !== null && (
+                  {critic !== null && toHundred(r.rating) !== critic && (
                     <Text style={styles.deltaText}>
-                      {toHundred(r.rating) >= critic ? '+' : '−'}
+                      {toHundred(r.rating) > critic ? '+' : '−'}
                       {Math.abs(toHundred(r.rating) - critic)}
                     </Text>
                   )}
