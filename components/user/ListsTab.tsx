@@ -34,6 +34,7 @@ import { getImageUrl } from '@/lib/images';
 import { humanizeShowId } from '@/lib/show-format';
 import { useToastSafe } from '@/lib/toast-context';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
+import { ContextMenu } from '@/components/user/ContextMenu';
 import * as haptics from '@/lib/haptics';
 import { trackListCreated, trackListDeleted, trackShowAddedToList, trackShowRemovedFromList, trackListReordered } from '@/lib/analytics';
 import type { UserList, ListItem } from '@/lib/user-types';
@@ -86,6 +87,7 @@ export default function ListsTab({ userId, showMap, createTrigger }: ListsTabPro
   const [editingList, setEditingList] = useState<UserList | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
+  const [showListMenu, setShowListMenu] = useState(false);
 
   // Open create modal from parent trigger
   useEffect(() => {
@@ -272,19 +274,21 @@ export default function ListsTab({ userId, showMap, createTrigger }: ListsTabPro
                   {list.item_count || 0} {(list.item_count || 0) === 1 ? 'show' : 'shows'}
                 </Text>
               </View>
-              {/* Poster previews */}
+              {/* Poster previews — overlapping stack (Round 2, Option A), not
+                  a flat row, so each list reads as its own identity. */}
               <View style={styles.previewRow}>
-                {(list.preview_show_ids || []).slice(0, 4).map(sid => {
+                {(list.preview_show_ids || []).slice(0, 4).map((sid, i) => {
                   const show = showMap[sid];
+                  const overlapStyle = { marginLeft: i === 0 ? 0 : -22, zIndex: 4 - i };
                   return show ? (
                     <Image
                       key={sid}
                       source={{ uri: getImageUrl(show.images?.poster) || getImageUrl(show.images?.thumbnail) || undefined }}
-                      style={styles.previewPoster}
+                      style={[styles.previewPoster, overlapStyle]}
                       contentFit="cover"
                     />
                   ) : (
-                    <View key={sid} style={[styles.previewPoster, styles.previewPlaceholder]}>
+                    <View key={sid} style={[styles.previewPoster, styles.previewPlaceholder, overlapStyle]}>
                       <Text style={styles.previewPlaceholderText}>🎭</Text>
                     </View>
                   );
@@ -322,26 +326,24 @@ export default function ListsTab({ userId, showMap, createTrigger }: ListsTabPro
         <Pressable onPress={() => { haptics.tap(); setActiveListId(null); }} hitSlop={12}>
           <Text style={styles.backText}>← Lists</Text>
         </Pressable>
-        <Pressable
-          onPress={() => {
-            Alert.alert(activeList?.name || 'List', undefined, [
-              {
-                text: 'Edit',
-                onPress: () => { setEditingList(activeList); setShowModal('edit'); },
-              },
-              {
-                text: 'Delete',
-                style: 'destructive',
-                onPress: () => activeList && handleDeleteList(activeList.id, activeList.name),
-              },
-              { text: 'Cancel', style: 'cancel' },
-            ]);
-          }}
-          hitSlop={12}
-        >
+        <Pressable onPress={() => { haptics.action(); setShowListMenu(true); }} hitSlop={12}>
           <Text style={styles.moreButton}>•••</Text>
         </Pressable>
       </View>
+
+      <ContextMenu
+        visible={showListMenu}
+        title={activeList?.name || 'List'}
+        onClose={() => setShowListMenu(false)}
+        actions={[
+          { label: 'Edit', onPress: () => { setEditingList(activeList); setShowModal('edit'); } },
+          {
+            label: 'Delete',
+            destructive: true,
+            onPress: () => activeList && handleDeleteList(activeList.id, activeList.name),
+          },
+        ]}
+      />
 
       <View style={styles.detailTitleRow}>
         <Text style={styles.detailTitle}>{activeList?.name}</Text>
@@ -779,12 +781,13 @@ const styles = StyleSheet.create({
   },
   previewRow: {
     flexDirection: 'row',
-    gap: 3,
   },
   previewPoster: {
     width: 40,
     height: 54,
     borderRadius: 4,
+    borderWidth: 2,
+    borderColor: Colors.surface.default,
   },
   previewPlaceholder: {
     backgroundColor: Colors.surface.overlay,

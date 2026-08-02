@@ -13,7 +13,6 @@ import {
   Pressable,
   RefreshControl,
   StyleSheet,
-  Alert,
   Platform,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -38,6 +37,7 @@ import type { Show } from '@/lib/types';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
 import { Skeleton } from '@/components/Skeleton';
 import { ShowSearchModal } from '@/components/ShowSearchModal';
+import { ContextMenu } from '@/components/user/ContextMenu';
 import * as haptics from '@/lib/haptics';
 
 type WatchlistSort = 'added-desc' | 'alphabetical' | 'closing-soon';
@@ -122,6 +122,7 @@ export default function ToWatchScreen() {
   const [datePickingShowId, setDatePickingShowId] = useState<string | null>(null);
   const [pendingDate, setPendingDate] = useState<Date>(new Date());
   const [showSearchModal, setShowSearchModal] = useState(false);
+  const [menuEntry, setMenuEntry] = useState<{ item: WatchlistEntry; title: string } | null>(null);
 
   const showMap = useMemo(() => {
     const map: Record<string, Show> = {};
@@ -200,12 +201,9 @@ export default function ToWatchScreen() {
   }, [removeFromWatchlist]);
 
   const showWatchlistActionSheet = useCallback((item: WatchlistEntry, title: string) => {
-    Alert.alert(title, undefined, [
-      { text: 'Set date', onPress: () => { setPendingDate(new Date()); setDatePickingShowId(item.show_id); } },
-      { text: 'Remove', style: 'destructive', onPress: () => handleRemove(item.show_id) },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
-  }, [handleRemove]);
+    haptics.action();
+    setMenuEntry({ item, title });
+  }, []);
 
   const handleDateChange = useCallback((_event: unknown, selectedDate?: Date) => {
     if (Platform.OS === 'android') {
@@ -542,6 +540,32 @@ export default function ToWatchScreen() {
           </View>
         </View>
       )}
+
+      {/* Long-press context menu — replaces native Alert.alert (Round 2, Option B) */}
+      <ContextMenu
+        visible={!!menuEntry}
+        title={menuEntry?.title}
+        onClose={() => setMenuEntry(null)}
+        actions={menuEntry ? [
+          {
+            label: 'View show',
+            onPress: () => {
+              const show = showMap[menuEntry.item.show_id];
+              if (show) router.push(`/show/${show.slug}`);
+              else handleMissingShow();
+            },
+          },
+          {
+            label: 'Set reminder date',
+            onPress: () => { setPendingDate(new Date()); setDatePickingShowId(menuEntry.item.show_id); },
+          },
+          {
+            label: 'Remove from Watchlist',
+            destructive: true,
+            onPress: () => handleRemove(menuEntry.item.show_id),
+          },
+        ] : []}
+      />
 
       {/* Search modal — select show → auto-add to watchlist */}
       <ShowSearchModal

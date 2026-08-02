@@ -57,12 +57,12 @@ const styles = StyleSheet.create({
   },
   failedText: {
     color: Colors.text.primary,
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: '700',
   },
   uploadingText: {
     color: Colors.text.primary,
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: '600',
   },
 });

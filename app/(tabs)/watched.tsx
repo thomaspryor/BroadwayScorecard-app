@@ -42,10 +42,12 @@ import type { Show } from '@/lib/types';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
 import { Skeleton } from '@/components/Skeleton';
 import { ShowSearchModal } from '@/components/ShowSearchModal';
+import { ContextMenu } from '@/components/user/ContextMenu';
 import { StatsScreen } from '@/components/stats/StatsScreen';
 import { FeedModeToggle, type FeedMode } from '@/components/user/FeedModeToggle';
 import { PhotoFeedTimeline } from '@/components/user/PhotoFeedTimeline';
 import { PhotoWallGrid } from '@/components/user/PhotoWallGrid';
+import { DiaryCalendarView } from '@/components/user/DiaryCalendarView';
 import { usePhotoFeed } from '@/hooks/usePhotoFeed';
 import * as haptics from '@/lib/haptics';
 
@@ -104,6 +106,30 @@ function EmptyState({ emoji, title, subtitle, actionLabel, onAction }: {
   );
 }
 
+// ─── Grid poster + date overlay (Round 2, Grid Direction B modified) ──
+// Venue text dropped entirely; the date moves off the text block and onto
+// the poster as a small low-alpha corner scrim instead (title + stars stay
+// as plain text below). Callers pass a pre-formatted label so the
+// year-omission logic (showYearGroups) stays with the caller.
+function GridPoster({ posterUrl, title, dateLabel }: { posterUrl: string | null; title: string; dateLabel?: string | null }) {
+  return (
+    <View style={styles.gridPosterWrap}>
+      {posterUrl ? (
+        <Image source={{ uri: posterUrl }} style={styles.gridPoster} contentFit="cover" transition={200} />
+      ) : (
+        <View style={[styles.gridPoster, styles.cardPosterPlaceholder]}>
+          <Text style={styles.placeholderText}>{title.charAt(0)}</Text>
+        </View>
+      )}
+      {!!dateLabel && (
+        <View style={styles.gridDateOverlay}>
+          <Text style={styles.gridDateOverlayText} numberOfLines={1}>{dateLabel}</Text>
+        </View>
+      )}
+    </View>
+  );
+}
+
 // ─── Add show card (grid footer) ──────────────────────
 function AddShowCard({ label, onPress, fixedWidth }: { label: string; onPress: () => void; fixedWidth?: boolean }) {
   return (
@@ -146,7 +172,17 @@ export default function WatchedScreen() {
 
   const [diarySort, setDiarySort] = useState<DiarySort>('date-desc');
   const [viewMode, setViewModeState] = useState<ViewMode>('grid');
+  // Calendar toggle inside Grid (Round 2, Direction D as a secondary view,
+  // not the main driver — owner's pick). Session-only, not persisted.
+  const [gridSubView, setGridSubView] = useState<'poster' | 'calendar'>('poster');
   const [showSearchModal, setShowSearchModal] = useState(false);
+  // Long-press context menu for poster grids — replaces raw Alert.alert
+  // confirms (Round 2, Option B pattern extended from To Watch).
+  const [gridMenu, setGridMenu] = useState<
+    | { kind: 'review'; review: UserReview }
+    | { kind: 'upcoming'; entry: WatchlistEntry }
+    | null
+  >(null);
 
   // Guards nested-Pressable rows (card + its rating chip) against a rapid
   // double-tap firing two router.push calls for the SAME row (e.g. a
@@ -446,23 +482,24 @@ export default function WatchedScreen() {
         key={item.id}
         style={({ pressed }) => [styles.gridCardFixed, pressed && styles.pressed]}
         onPress={() => show ? router.push(`/show/${show.slug}`) : handleMissingShow()}
-        onLongPress={() => handleDeleteDiaryItem(item)}
-        accessibilityHint="Long press to delete this rating"
+        onLongPress={() => { haptics.action(); setGridMenu({ kind: 'review', review: item }); }}
+        accessibilityHint="Long press for more actions"
         accessibilityActions={[{ name: 'delete', label: 'Delete rating' }]}
         onAccessibilityAction={(e) => { if (e.nativeEvent.actionName === 'delete') handleDeleteDiaryItem(item); }}
       >
-        <View style={styles.gridPosterWrap}>
-          {posterUrl ? (
-            <Image source={{ uri: posterUrl }} style={styles.gridPoster} contentFit="cover" transition={200} />
-          ) : (
-            <View style={[styles.gridPoster, styles.cardPosterPlaceholder]}>
-              <Text style={styles.placeholderText}>{title.charAt(0)}</Text>
-            </View>
-          )}
-          {/* No corner delete button — owner reverted the Tier-1 sweep's X
-              (beta feedback 2026-07-26: "Removing isn't a common action.
-              They can long press or click in to delete instead"). */}
-        </View>
+        {/* No corner delete button — owner reverted the Tier-1 sweep's X
+            (beta feedback 2026-07-26: "Removing isn't a common action.
+            They can long press or click in to delete instead"). Date now
+            lives on the poster as a corner overlay, not below it (Round 2). */}
+        <GridPoster
+          posterUrl={posterUrl}
+          title={title}
+          dateLabel={item.date_seen
+            ? new Date(item.date_seen + 'T00:00:00').toLocaleDateString('en-US', {
+                month: 'short', day: 'numeric', ...(showYearGroups ? {} : { year: 'numeric' }),
+              })
+            : null}
+        />
         <Pressable
           style={styles.gridCardInfo}
           onPress={() => router.push({
@@ -475,18 +512,7 @@ export default function WatchedScreen() {
         >
           {item.rating > 0 && <MiniStars rating={item.rating} />}
         </Pressable>
-        {/* Name above date (beta feedback 2026-07-25: date sat between image
-            and name; web order is name → date) */}
         <Text style={styles.gridTitle} numberOfLines={2}>{title}</Text>
-        {/* Year dropped when a year header already frames the group (beta
-            feedback 2026-07-26: "Seen shows don't need the year"). */}
-        <Text style={styles.gridDateText}>
-          {item.date_seen
-            ? new Date(item.date_seen + 'T00:00:00').toLocaleDateString('en-US', {
-                month: 'short', day: 'numeric', ...(showYearGroups ? {} : { year: 'numeric' }),
-              })
-            : ' '}
-        </Text>
       </Pressable>
     );
   };
@@ -565,19 +591,14 @@ export default function WatchedScreen() {
                     params: { showId: item.show_id, showTitle: title, suggestedDate: item.planned_date || '' },
                   })}
                 >
-                  {posterUrl ? (
-                    <Image source={{ uri: posterUrl }} style={styles.gridPoster} contentFit="cover" transition={200} />
-                  ) : (
-                    <View style={[styles.gridPoster, styles.cardPosterPlaceholder]}>
-                      <Text style={styles.placeholderText}>{title.charAt(0)}</Text>
-                    </View>
-                  )}
-                  <Text style={styles.gridTitle} numberOfLines={2}>{title}</Text>
-                  <Text style={styles.toBeRatedPosterDate}>
-                    {item.planned_date ? new Date(item.planned_date + 'T00:00:00').toLocaleDateString('en-US', {
+                  <GridPoster
+                    posterUrl={posterUrl}
+                    title={title}
+                    dateLabel={item.planned_date ? new Date(item.planned_date + 'T00:00:00').toLocaleDateString('en-US', {
                       month: 'short', day: 'numeric',
                     }) : 'Rate'}
-                  </Text>
+                  />
+                  <Text style={styles.gridTitle} numberOfLines={2}>{title}</Text>
                 </Pressable>
               );
             })}
@@ -612,20 +633,13 @@ export default function WatchedScreen() {
                     key={entry.id}
                     style={({ pressed }) => [styles.gridCardFixed, pressed && styles.pressed]}
                     onPress={() => show ? router.push(`/show/${show.slug}`) : handleMissingShow()}
-                    onLongPress={() => handleRemoveUpcoming(entry)}
-                    accessibilityHint="Long press to remove from watchlist"
+                    onLongPress={() => { haptics.action(); setGridMenu({ kind: 'upcoming', entry }); }}
+                    accessibilityHint="Long press for more actions"
                     accessibilityActions={[{ name: 'delete', label: 'Remove from watchlist' }]}
                     onAccessibilityAction={(e) => { if (e.nativeEvent.actionName === 'delete') handleRemoveUpcoming(entry); }}
                   >
-                    {posterUrl ? (
-                      <Image source={{ uri: posterUrl }} style={styles.gridPoster} contentFit="cover" transition={200} />
-                    ) : (
-                      <View style={[styles.gridPoster, styles.cardPosterPlaceholder]}>
-                        <Text style={styles.placeholderText}>{title.charAt(0)}</Text>
-                      </View>
-                    )}
+                    <GridPoster posterUrl={posterUrl} title={title} dateLabel={formattedDate} />
                     <Text style={styles.gridTitle} numberOfLines={2}>{title}</Text>
-                    {formattedDate && <Text style={styles.toBeRatedPosterDate}>{formattedDate}</Text>}
                   </Pressable>
                 );
               })}
@@ -787,6 +801,26 @@ export default function WatchedScreen() {
                 <Path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
               </Svg>
             </Pressable>
+            {/* Calendar toggle — secondary view inside Grid (Round 2). */}
+            <Pressable
+              testID="diary-calendar-view-toggle"
+              style={styles.calendarToggle}
+              onPress={() => { haptics.tap(); setGridSubView(prev => prev === 'poster' ? 'calendar' : 'poster'); }}
+              accessibilityRole="button"
+              accessibilityState={{ selected: gridSubView === 'calendar' }}
+              accessibilityLabel={gridSubView === 'calendar' ? 'Switch to poster grid' : 'Switch to calendar view'}
+              hitSlop={4}
+            >
+              {gridSubView === 'calendar' ? (
+                <Svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={Colors.text.primary} strokeWidth={2}>
+                  <Path strokeLinecap="round" strokeLinejoin="round" d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z" />
+                </Svg>
+              ) : (
+                <Svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={Colors.text.primary} strokeWidth={2}>
+                  <Path strokeLinecap="round" strokeLinejoin="round" d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V6a2 2 0 012-2z" />
+                </Svg>
+              )}
+            </Pressable>
           </View>
         </View>
       )}
@@ -842,6 +876,17 @@ export default function WatchedScreen() {
           refreshing={refreshing}
           onRefresh={onRefresh}
         />
+      ) : gridSubView === 'calendar' ? (
+        <FlatList
+          data={['content']}
+          keyExtractor={() => 'content'}
+          renderItem={() => (
+            <DiaryCalendarView reviews={pastReviews} showMap={showMap} onMissingShow={handleMissingShow} />
+          )}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.text.secondary} />}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={[styles.gridContainer, { paddingBottom: listBottomPad }]}
+        />
       ) : isDiaryEmpty ? (
         <EmptyState
           emoji="🎭"
@@ -860,6 +905,43 @@ export default function WatchedScreen() {
           contentContainerStyle={[styles.gridContainer, { paddingBottom: listBottomPad }]}
         />
       )}
+      {/* Long-press context menu — replaces raw Alert.alert confirms (Round 2,
+          Option B pattern extended from To Watch to the diary/upcoming grids). */}
+      <ContextMenu
+        visible={!!gridMenu}
+        title={
+          gridMenu
+            ? (showMap[gridMenu.kind === 'review' ? gridMenu.review.show_id : gridMenu.entry.show_id]?.title
+              || humanizeShowId(gridMenu.kind === 'review' ? gridMenu.review.show_id : gridMenu.entry.show_id))
+            : undefined
+        }
+        onClose={() => setGridMenu(null)}
+        actions={(() => {
+          if (!gridMenu) return [];
+          if (gridMenu.kind === 'review') {
+            const { review } = gridMenu;
+            const show = showMap[review.show_id];
+            return [
+              { label: 'View show', onPress: () => (show ? router.push(`/show/${show.slug}`) : handleMissingShow()) },
+              {
+                label: 'Edit rating',
+                onPress: () => router.push({
+                  pathname: '/rate/[showId]' as any,
+                  params: { showId: review.show_id, showTitle: show?.title || '', reviewId: review.id },
+                }),
+              },
+              { label: 'Delete rating', destructive: true, onPress: () => handleDeleteDiaryItem(review) },
+            ];
+          }
+          const { entry } = gridMenu;
+          const show = showMap[entry.show_id];
+          return [
+            { label: 'View show', onPress: () => (show ? router.push(`/show/${show.slug}`) : handleMissingShow()) },
+            { label: 'Remove from Watchlist', destructive: true, onPress: () => handleRemoveUpcoming(entry) },
+          ];
+        })()}
+      />
+
       {/* Search modal — select show → rate it immediately */}
       <ShowSearchModal
         visible={showSearchModal}
@@ -902,6 +984,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.sm, paddingVertical: 6,
   },
   sortText: { color: Colors.text.secondary, fontSize: FontSize.xs, fontWeight: '500' },
+  calendarToggle: {
+    width: 44, height: 44, borderRadius: 8,
+    backgroundColor: Colors.surface.overlay,
+    alignItems: 'center', justifyContent: 'center',
+  },
   // Grid · Feed · Stats segmented control.
   segmentedRow: { paddingHorizontal: Spacing.lg, paddingBottom: Spacing.sm },
   segmented: {
@@ -948,9 +1035,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm,
     paddingHorizontal: Spacing.lg,
   },
-  toBeRatedPosterDate: {
-    color: '#fcd34d', fontSize: 12, fontWeight: '600', textAlign: 'center', marginTop: 4,
-  },
   // Cards (list view)
   card: {
     flexDirection: 'row', alignItems: 'center',
@@ -976,16 +1060,22 @@ const styles = StyleSheet.create({
   pastGrid: {
     flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm,
   },
-  gridDateText: { color: Colors.text.muted, fontSize: 12, marginTop: 2 },
-  // Fixed-width card for the flexWrap sections (Upcoming/Past-by-year) — a
-  // flex:1 card inside flexWrap stretches unevenly on partial rows, so these
-  // use the same fixed-percentage convention as the To Watch tab's grid.
-  gridCardFixed: { width: '23%', alignItems: 'center' },
-  gridPosterWrap: { width: '100%' },
+  // 3-up enriched grid (Round 2, Grid Direction B modified) — was 4-up/23%;
+  // wider cards give the poster + overlay date room to breathe.
+  gridCardFixed: { width: '31%', alignItems: 'center' },
+  gridPosterWrap: { width: '100%', position: 'relative', borderRadius: BorderRadius.md, overflow: 'hidden' },
   gridPoster: {
     width: '100%', aspectRatio: 2 / 3, borderRadius: BorderRadius.md,
     backgroundColor: Colors.surface.overlay,
   },
+  // Date lives on the poster now, not the text block below (venue dropped
+  // entirely) — small low-alpha corner scrim, unobtrusive by design.
+  gridDateOverlay: {
+    position: 'absolute', left: 6, bottom: 6,
+    paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+  },
+  gridDateOverlayText: { color: '#fff', fontSize: 12, fontWeight: '700' },
   gridCardInfo: { marginTop: 4, alignItems: 'center' },
   gridTitle: {
     color: Colors.text.secondary, fontSize: 12, fontWeight: '500',
@@ -1000,7 +1090,7 @@ const styles = StyleSheet.create({
     borderWidth: 2, borderStyle: 'dashed', borderColor: Colors.surface.overlay,
     alignItems: 'center', justifyContent: 'center', gap: 4,
   },
-  addShowCardFixed: { flex: undefined, width: '23%' },
+  addShowCardFixed: { flex: undefined, width: '31%' },
   addShowLabel: { color: Colors.text.muted, fontSize: 12, fontWeight: '500' },
   // Swipe
   swipeDelete: {
