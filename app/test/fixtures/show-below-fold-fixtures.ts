@@ -21,6 +21,19 @@ export type CreativeMember = { name: string; role: string };
 
 export type AudienceSource = { s: number; c: number; sr?: number; tp?: number };
 
+export type ReviewFixture = {
+  criticName: string;
+  outlet: string;
+  score: number;
+  bucket: 'Rave' | 'Positive' | 'Mixed' | 'Negative';
+  tier: 1 | 2 | 3 | 4;
+  url: string | null;
+  publishDate: string;
+  quote: string;
+};
+
+export type TicketLinkFixture = { p: string; u: string };
+
 export type ShowFixture = {
   id: string;
   slug: string;
@@ -39,6 +52,11 @@ export type ShowFixture = {
     designation: string;
     sources: Record<string, AudienceSource>;
   } | null;
+  reviews: ReviewFixture[];
+  reviewCount: number;
+  criticsTake: { text: string; reviewCount: number };
+  ticketLinks: TicketLinkFixture[];
+  officialUrl: string;
 };
 
 type FixtureFile = { hamilton: ShowFixture; deathOfASalesman: ShowFixture };

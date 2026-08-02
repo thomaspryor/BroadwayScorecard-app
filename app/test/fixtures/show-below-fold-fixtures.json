@@ -1316,7 +1316,109 @@
           "sr": 4.8
         }
       }
-    }
+    },
+    "reviews": [
+      {
+        "criticName": "Alex Gale",
+        "outlet": "Billboard",
+        "score": 100,
+        "bucket": "Rave",
+        "tier": 2,
+        "url": "https://www.billboard.com/music/music-news/hamilton-original-broadway-cast-recording-album-review-6715240/",
+        "publishDate": "2015-10-01",
+        "quote": "2015's best rap album isn't by Drake, Kendrick Lamar or Dr. Dre — it's the cast recording of Hamilton, a vital companion to the most creative, most talked-about musical to hit Broadway this millennium."
+      },
+      {
+        "criticName": "Adam Feldman",
+        "outlet": "Time Out New York",
+        "score": 97,
+        "bucket": "Rave",
+        "tier": 1,
+        "url": "http://www.timeout.com/newyork/theater/hamilton-1",
+        "publishDate": "2015-08-06",
+        "quote": "Lyrical drama, never forget, is a wondrously compact yet expansive form that can spring across years and lifetimes in the twist of a couplet."
+      },
+      {
+        "criticName": "Elysa Gardner",
+        "outlet": "USA Today",
+        "score": 97,
+        "bucket": "Rave",
+        "tier": 2,
+        "url": "http://www.usatoday.com/story/life/theater/2015/08/06/hamilton-win-hearts-and-minds/31104087/?utm_source=feedblitz&utm_medium=FeedBlitzRss&utm_campaign=usatoday-lifetopstories",
+        "publishDate": "2015-08-06",
+        "quote": "There has been nothing on Broadway in the past 20 years to rival the riveting, exhilarating and haunting Hamilton (**** out of four stars), which premiered at the Public Theater last winter to wild acclaim, and opened Thursday at the Theatre, its vitality and ingenuity fully intact."
+      },
+      {
+        "criticName": "Peter Marks",
+        "outlet": "The Washington Post",
+        "score": 96,
+        "bucket": "Rave",
+        "tier": 1,
+        "url": "http://www.washingtonpost.com/entertainment/theater_dance/hamilton-making-ecstatic-history/2015/08/06/6bc85fb4-3b72-11e5-8e98-115a3cf7d7ae_story.html",
+        "publishDate": "2015-08-06",
+        "quote": "“Hamilton,” which had its official opening Thursday night at Broadway’s Theatre, is a captivating mirror of the man whose life it surveys: blazingly original, restlessly innovative, magnetic from start to finish."
+      },
+      {
+        "criticName": "Doug Marino",
+        "outlet": "Act Three: The Reviews",
+        "score": 96,
+        "bucket": "Rave",
+        "tier": 3,
+        "url": "https://dougmarino.blogspot.com/2017/04/hamilton.html",
+        "publishDate": "2017-04-25",
+        "quote": "It's a bona-fide hit and I am incredibly thankful for the ticket and will treasure my experience even more because of it."
+      },
+      {
+        "criticName": "David Finkle",
+        "outlet": "The Clyde Fitch Report",
+        "score": 96,
+        "bucket": "Rave",
+        "tier": 3,
+        "url": "https://www.clydefitchreport.com/2015/08/hamilton-broadway-musical/",
+        "publishDate": "2015-08-07",
+        "quote": "That a musical — a musical! — should recount a gritty slice of American history so beautifully is singularly moving."
+      },
+      {
+        "criticName": "Jil Picariello",
+        "outlet": "Zeal NYC",
+        "score": 96,
+        "bucket": "Rave",
+        "tier": 3,
+        "url": "https://zealnyc.com/hamilton-review-genius-yeah-i-said-it-genius/",
+        "publishDate": "2015-08-07",
+        "quote": "I’m so pleased to say it’s even better than I remembered."
+      },
+      {
+        "criticName": "Jeremy Gerard",
+        "outlet": "Deadline",
+        "score": 95,
+        "bucket": "Rave",
+        "tier": 1,
+        "url": "http://deadline.com/2015/08/hamilton-broadway-opening-review-1201492933/",
+        "publishDate": "2015-08-06",
+        "quote": "Hamilton is accessible without pandering and inspirational in sneaky ways that permeate a skeptic’s shell."
+      }
+    ],
+    "reviewCount": 40,
+    "criticsTake": {
+      "text": "Critics hail Hamilton as a groundbreaking masterpiece that revolutionizes the Broadway musical through hip-hop storytelling. Miranda's audacious, electrifying work about the Founding Father earns near-unanimous raves for its innovation and artistry.",
+      "reviewCount": 43
+    },
+    "ticketLinks": [
+      {
+        "p": "TodayTix",
+        "u": "https://www.todaytix.com/nyc/shows/384-hamilton"
+      },
+      {
+        "p": "Ticketmaster",
+        "u": "https://www.ticketmaster.com/hamilton-ny-tickets/artist/2095830"
+      },
+      {
+        "p": "StubHub",
+        "u": "https://www.stubhub.com/search?q=Hamilton"
+      }
+    ],
+    "officialUrl": "https://hamiltonmusical.com"
   },
   "deathOfASalesman": {
     "id": "death-of-a-salesman-2026",
@@ -1633,6 +1735,108 @@
           "sr": 4.8
         }
       }
-    }
+    },
+    "reviews": [
+      {
+        "criticName": "Johnny Oleksinski",
+        "outlet": "New York Post",
+        "score": 99,
+        "bucket": "Rave",
+        "tier": 1,
+        "url": "https://nypost.com/2026/04/09/entertainment/death-of-a-salesman-review-nathan-lane-and-laurie-metcalf-star-in-a-triumphant-broadway-revival/",
+        "publishDate": "2026-04-10",
+        "quote": "That was the best “Death of a Salesman” I have ever seen."
+      },
+      {
+        "criticName": "Adam Feldman",
+        "outlet": "Time Out New York",
+        "score": 99,
+        "bucket": "Rave",
+        "tier": 1,
+        "url": "https://www.timeout.com/newyork/news/broadway-review-death-of-a-salesman-to-die-for-041426",
+        "publishDate": "2026-04-15",
+        "quote": "This shattering new production cannot be overlooked."
+      },
+      {
+        "criticName": "Frank Scheck",
+        "outlet": "New York Stage Review",
+        "score": 97,
+        "bucket": "Rave",
+        "tier": 2,
+        "url": "https://nystagereview.com/2026/04/09/death-of-a-salesman-more-relevant-than-ever/",
+        "publishDate": "2026-04-10",
+        "quote": "You have a revival of Arthur Miller's Death of a Salesman that represents a highlight of the theater season."
+      },
+      {
+        "criticName": "David Finkle",
+        "outlet": "New York Stage Review",
+        "score": 96,
+        "bucket": "Rave",
+        "tier": 2,
+        "url": "https://nystagereview.com/2026/04/09/death-of-a-salesman-nathan-lane-makes-big-deal-in-miller-classic/",
+        "publishDate": "2026-04-10",
+        "quote": "The last undeniable Death of a Salesman irony for this revival: Once again Arthur Milller’s monumental script proves deathless."
+      },
+      {
+        "criticName": "Matthew Wexler",
+        "outlet": "1 Minute Critic",
+        "score": 96,
+        "bucket": "Rave",
+        "tier": 3,
+        "url": "https://1minutecritic.com/death-of-a-salesman-broadway-review-nathan-lane/",
+        "publishDate": "2026-04-10",
+        "quote": "In contrast, Metcalf’s Linda stretches beyond the role of capable homemaker. Her devout commitment to her unraveling husband, and to keeping the peace between Willy and their sons, Biff (Christopher Abbott) and Happy (Ben Ahlers), nearly reaches a tipping point. Mantello further amplifies the play’s..."
+      },
+      {
+        "criticName": "Pete Hempstead",
+        "outlet": "TheaterMania",
+        "score": 95,
+        "bucket": "Rave",
+        "tier": 2,
+        "url": "https://www.theatermania.com/news/review-nathan-lane-and-laurie-metcalf-star-in-a-death-of-a-salesman-for-the-ages_1832181/",
+        "publishDate": "2026-04-10",
+        "quote": "This Death of a Salesman is one for the ages."
+      },
+      {
+        "criticName": "Helen Shaw",
+        "outlet": "The New York Times",
+        "score": 93,
+        "bucket": "Rave",
+        "tier": 1,
+        "url": "https://www.nytimes.com/2026/04/09/theater/death-of-a-salesman-review-broadway-lane-metcalf.html",
+        "publishDate": "2026-04-10",
+        "quote": "A gorgeously realized production, full of exquisitely calibrated performances."
+      },
+      {
+        "criticName": "Unknown",
+        "outlet": "Front Mezz Junkies",
+        "score": 93,
+        "bucket": "Rave",
+        "tier": 3,
+        "url": "https://frontmezzjunkies.com/2026/05/06/the-weight-of-arrival-death-of-a-salesman-on-broadway/",
+        "publishDate": "2026-05-06",
+        "quote": "The performances, particularly from Lane, Metcalf, and Ahlers, draw the pain closer than ever before, making it immediate and inescapable."
+      }
+    ],
+    "reviewCount": 33,
+    "criticsTake": {
+      "text": "Nathan Lane electrifies in Joe Mantello's stark, emotionally devastating revival that finds urgent new relevance in Miller's classic. Most critics praise the powerhouse performances and stripped-back staging, though some find it overwrought.",
+      "reviewCount": 33
+    },
+    "ticketLinks": [
+      {
+        "p": "TodayTix",
+        "u": "https://www.todaytix.com/nyc/shows/45916-death-of-a-salesman"
+      },
+      {
+        "p": "Telecharge",
+        "u": "https://www.telecharge.com/Broadway/Death-of-a-Salesman"
+      },
+      {
+        "p": "StubHub",
+        "u": "https://www.stubhub.com/death-of-a-salesman-tickets/performer/150422719"
+      }
+    ],
+    "officialUrl": "https://salesmanbroadway.com/"
   }
 }
