@@ -258,7 +258,27 @@ export default function ShowDetailScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: show.title }} />
+      <Stack.Screen
+        options={{
+          title: show.title,
+          // Header share button — owner ask 2026-07-31: "Screens like this
+          // need a Share button" (the Share Score Card CTA lives below the
+          // fold; this makes sharing reachable from the top of every show).
+          headerRight: () => (
+            <Pressable
+              onPress={handleShare}
+              hitSlop={10}
+              accessibilityRole="button"
+              accessibilityLabel="Share this show"
+              style={({ pressed }) => pressed && { opacity: 0.6 }}
+            >
+              <Svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke={Colors.text.primary} strokeWidth={2}>
+                <Path strokeLinecap="round" strokeLinejoin="round" d="M12 3v13m0-13l-4 4m4-4l4 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
+              </Svg>
+            </Pressable>
+          ),
+        }}
+      />
       <View style={styles.container}>
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
         {/* Header card — matches website: poster + info, score below */}

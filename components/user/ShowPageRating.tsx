@@ -398,15 +398,18 @@ export default function ShowPageRating({
                     ? new Date(watchlistEntry.planned_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
                     : 'Add date'}
                 </Text>
+                {watchlistEntry?.planned_date && (
+                  <Pressable
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      updatePlannedDate(showId, null).catch(() => showToast('Failed to clear date.', 'error'));
+                    }}
+                    hitSlop={8}
+                  >
+                    <Text style={styles.watchlistClearDate}>Clear</Text>
+                  </Pressable>
+                )}
               </Pressable>
-              {watchlistEntry?.planned_date && (
-                <Pressable
-                  onPress={() => updatePlannedDate(showId, null).catch(() => showToast('Failed to clear date.', 'error'))}
-                  hitSlop={8}
-                >
-                  <Text style={styles.watchlistClearDate}>Clear</Text>
-                </Pressable>
-              )}
             </View>
           )}
           <Pressable
@@ -485,9 +488,10 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   rightCol: {
-    paddingTop: Spacing.xl,
+    paddingTop: Spacing.lg,
     flexShrink: 0,
     alignItems: 'center',
+    gap: 2,
   },
   labelRow: {
     flexDirection: 'row',
@@ -578,8 +582,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 4,
-    marginTop: Spacing.sm,
-    minHeight: 44,
+    marginTop: 2,
+    minHeight: 32,
     paddingHorizontal: Spacing.sm,
   },
   listButtonText: {
@@ -594,15 +598,17 @@ const styles = StyleSheet.create({
     marginTop: 4,
     maxWidth: 160,
   },
+  // Compact stack — date + Clear share one row and rows are ~32pt with
+  // hitSlop making up the tap target (beta feedback 2026-07-31: "crazy
+  // spacing of the buttons here for the user rating").
   watchlistDateCol: {
     alignItems: 'center',
-    marginTop: 2,
   },
   watchlistDateButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    minHeight: 44,
+    gap: 6,
+    minHeight: 32,
     paddingHorizontal: Spacing.sm,
   },
   watchlistDateText: {
@@ -612,9 +618,7 @@ const styles = StyleSheet.create({
   watchlistClearDate: {
     color: Colors.text.muted,
     fontSize: FontSize.xs,
-    minHeight: 44,
-    textAlignVertical: 'center',
-    paddingVertical: Spacing.sm,
+    textDecorationLine: 'underline',
   },
   savedInfo: {
     marginTop: Spacing.md,

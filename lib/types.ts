@@ -264,7 +264,7 @@ export function mapShowDetail(raw: MobileShowDetail): ShowDetail {
       publishDate: r.d ?? null,
       pullQuote: r.q ?? null,
       designation: r.dg ?? null,
-    })),
+    })).sort((a, b) => (b.score ?? -1) - (a.score ?? -1)),
     audience: raw.au ? {
       score: raw.au.score,
       designation: raw.au.designation ?? null,

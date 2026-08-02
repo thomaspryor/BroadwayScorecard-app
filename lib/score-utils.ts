@@ -98,6 +98,24 @@ export function getMarketMinReviews(category?: string): number {
   }
 }
 
+/**
+ * Composite score gated by the market min-review threshold — the single
+ * predicate for "does this show have a displayable Critic Score?".
+ * Returns null when under threshold so badges render "—" and ranked
+ * shelves/sorts exclude the show (beta feedback 2026-08-01: The Gruffalo,
+ * 1 review, ranked #1 on the WE Home with a 98 badge while its own show
+ * page suppressed the score).
+ */
+export function getQualifiedScore(show: {
+  compositeScore: number | null;
+  category: string;
+  criticScore: { reviewCount: number } | null;
+}): number | null {
+  if (show.compositeScore == null) return null;
+  if ((show.criticScore?.reviewCount ?? 0) < getMarketMinReviews(show.category)) return null;
+  return show.compositeScore;
+}
+
 export function getScoreTier(score: number | null | undefined, category?: string): ScoreTier | null {
   if (score == null) return null;
   const rounded = Math.round(score);

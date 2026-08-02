@@ -10,6 +10,7 @@ import { useRouter } from 'expo-router';
 import { Show } from '@/lib/types';
 import { getImageUrl } from '@/lib/images';
 import { ScoreBadge } from '@/components/show-cards';
+import { getQualifiedScore } from '@/lib/score-utils';
 import { BookmarkOverlay } from '@/components/BookmarkOverlay';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
 
@@ -56,9 +57,9 @@ const FeaturedCard = memo(function FeaturedCard({ show, cardWidth, isWatchlisted
           <BookmarkOverlay isWatchlisted={isWatchlisted} onToggle={onToggle} myRating={myRating} />
         )}
 
-        {/* Score badge — bottom-right, overlapping the image edge */}
+        {/* Score badge — bottom-right; min-review gated so a 1-review show shows "—" */}
         <View style={styles.scoreOverlay}>
-          <ScoreBadge score={show.compositeScore} category={show.category} size="small" />
+          <ScoreBadge score={getQualifiedScore(show)} category={show.category} size="small" />
         </View>
       </View>
 

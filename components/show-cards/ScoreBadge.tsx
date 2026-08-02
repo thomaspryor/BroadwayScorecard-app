@@ -125,6 +125,8 @@ export function ScoreBadge({ score, category, size = 'medium', showLabel = false
         <Text
           style={[styles.tierLabel, { color: tier.color, fontSize: dim.labelFont }]}
           numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.75}
         >
           {tier.label}
         </Text>

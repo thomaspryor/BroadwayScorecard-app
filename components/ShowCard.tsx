@@ -16,7 +16,7 @@ import { useRouter } from 'expo-router';
 import { Show } from '@/lib/types';
 import { getImageUrl } from '@/lib/images';
 import { ScoreBadge, StatusBadge, FormatPill, ProductionPill, CategoryBadge, AudienceChip } from '@/components/show-cards';
-import { getContrastTextColor } from '@/lib/score-utils';
+import { getContrastTextColor, getQualifiedScore } from '@/lib/score-utils';
 import { BookmarkOverlay } from '@/components/BookmarkOverlay';
 import { Colors, Spacing, BorderRadius, FontSize } from '@/constants/theme';
 import type { ScoreMode } from '@/components/ScoreToggle';
@@ -77,7 +77,8 @@ function getClosingInfo(closingDate: string | null, status: string): string | nu
 export const ShowCard = memo(function ShowCard({ show, scoreMode = 'critics', hideStatus = false, isWatchlisted, onToggleWatchlist, myRating }: ShowCardProps) {
   const router = useRouter();
   const imageUrl = getImageUrl(show.images.poster ?? show.images.thumbnail);
-  const scoreText = show.compositeScore ? `Score ${Math.round(show.compositeScore)}` : 'No score';
+  const displayScore = getQualifiedScore(show);
+  const scoreText = displayScore ? `Score ${Math.round(displayScore)}` : 'No score';
   const accessLabel = `${show.title}, ${show.venue ?? 'Unknown venue'}, ${show.type}, ${scoreText}`;
   const runInfo = useMemo(
     () => getRunDuration(show.openingDate, show.status, show.category),
@@ -154,7 +155,7 @@ export const ShowCard = memo(function ShowCard({ show, scoreMode = 'critics', hi
         </View>
       ) : (
         <View style={styles.scoreColumn}>
-          <ScoreBadge score={show.compositeScore} category={show.category} size="medium" showLabel />
+          <ScoreBadge score={displayScore} category={show.category} size="medium" showLabel />
           {show.audienceGrade && (
             <AudienceChip
               grade={show.audienceGrade.grade}
@@ -227,7 +228,12 @@ const styles = StyleSheet.create({
     color: Colors.score.amber,
   },
   scoreColumn: {
+    // Fixed width so badges line up down the list — a wide tier label
+    // ("CRITICAL MISS") must not widen the column and shift its badge
+    // relative to neighboring cards (beta feedback 2026-08-02).
+    width: 84,
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 6,
   },
   audienceGradeBadge: {

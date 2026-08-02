@@ -21,6 +21,7 @@ import { FeaturedCarousel } from '@/components/FeaturedCarousel';
 import { ClosingSoon } from '@/components/ClosingSoon';
 import { filterByMarketCategory } from '@/components/MarketPicker';
 import { Show } from '@/lib/types';
+import { getQualifiedScore } from '@/lib/score-utils';
 import { StaleBanner } from '@/components/StaleBanner';
 import { Colors, Spacing, FontSize } from '@/constants/theme';
 import { trackDataRefreshed } from '@/lib/analytics';
@@ -71,16 +72,33 @@ export default function HomeScreen() {
       return parsed.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     };
     const isOpen = (s: Show) => s.status === 'open' || s.status === 'previews';
-    const byScore = (a: Show, b: Show) => (b.compositeScore ?? 0) - (a.compositeScore ?? 0);
+    // Ranked shelves only admit shows whose score clears the market min-review
+    // gate — a 1-review 98 must not top the shelf (Gruffalo, beta 2026-08-01).
+    const byScore = (a: Show, b: Show) => (getQualifiedScore(b) ?? 0) - (getQualifiedScore(a) ?? 0);
 
     // Top Shows (overall)
-    const top = marketShows.filter(s => isOpen(s) && s.compositeScore != null).sort(byScore).slice(0, 10);
+    const top = marketShows.filter(s => isOpen(s) && getQualifiedScore(s) != null).sort(byScore).slice(0, 10);
     if (top.length > 0) rows.push({ title: 'Top Shows', shows: top });
+
+    // Just Opened — second shelf, most recently opened first (owner ask 2026-08-01)
+    const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const justOpened = marketShows
+      .filter(s => s.status === 'open' && s.openingDate && s.openingDate >= sixtyDaysAgo && s.openingDate <= now.toISOString().slice(0, 10))
+      .sort((a, b) => (b.openingDate ?? '').localeCompare(a.openingDate ?? ''))
+      .slice(0, 10);
+    if (justOpened.length >= 2) rows.push({
+      title: 'Just Opened',
+      shows: justOpened,
+      getSubtitle: (s) => {
+        const d = shortDate(s.openingDate ?? '');
+        return d ? `Opened ${d}` : undefined;
+      },
+    });
 
     // Top Recent Shows (opened in last 12 months)
     const twelveMonthsAgo = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
     const recent = marketShows.filter(s =>
-      isOpen(s) && s.compositeScore != null && s.openingDate && s.openingDate >= twelveMonthsAgo
+      isOpen(s) && getQualifiedScore(s) != null && s.openingDate && s.openingDate >= twelveMonthsAgo
     ).sort(byScore).slice(0, 10);
     if (recent.length >= 3) rows.push({ title: 'Top Recent Shows', shows: recent });
 
@@ -93,11 +111,11 @@ export default function HomeScreen() {
     if (tonyWinners.length >= 2) rows.push({ title: 'Tony Award Winners', shows: tonyWinners });
 
     // Best Musicals
-    const musicals = marketShows.filter(s => isOpen(s) && s.type === 'musical' && s.compositeScore != null).sort(byScore).slice(0, 10);
+    const musicals = marketShows.filter(s => isOpen(s) && s.type === 'musical' && getQualifiedScore(s) != null).sort(byScore).slice(0, 10);
     if (musicals.length >= 3) rows.push({ title: 'Best Musicals', shows: musicals });
 
     // Best Plays
-    const plays = marketShows.filter(s => isOpen(s) && s.type === 'play' && s.compositeScore != null).sort(byScore).slice(0, 10);
+    const plays = marketShows.filter(s => isOpen(s) && s.type === 'play' && getQualifiedScore(s) != null).sort(byScore).slice(0, 10);
     if (plays.length >= 3) rows.push({ title: 'Best Plays', shows: plays });
 
     // Jukebox Musicals
@@ -124,7 +142,7 @@ export default function HomeScreen() {
     // Best Off-Broadway (NYC market only, separate from main Broadway filter)
     if (market === 'nyc') {
       const offBway = shows
-        .filter(s => s.category === 'off-broadway' && isOpen(s) && s.compositeScore != null)
+        .filter(s => s.category === 'off-broadway' && isOpen(s) && getQualifiedScore(s) != null)
         .sort(byScore).slice(0, 10);
       if (offBway.length >= 3) rows.push({ title: 'Best Off-Broadway', shows: offBway });
     }

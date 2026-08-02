@@ -16,6 +16,7 @@ import { AnimatedListItem } from '@/components/AnimatedListItem';
 import { MarketPicker, Market, filterByMarketCategory } from '@/components/MarketPicker';
 import { ScoreToggle, ScoreMode } from '@/components/ScoreToggle';
 import { Show } from '@/lib/types';
+import { getQualifiedScore } from '@/lib/score-utils';
 import { StaleBanner } from '@/components/StaleBanner';
 import { useAuth } from '@/lib/auth-context';
 import { useWatchlist } from '@/hooks/useWatchlist';
@@ -148,7 +149,8 @@ export default function BrowseScreen() {
             return (b.compositeScore ?? -1) - (a.compositeScore ?? -1);
           });
         } else {
-          result.sort((a, b) => (b.compositeScore ?? -1) - (a.compositeScore ?? -1));
+          // Min-review-gated score so a "—" badge can't outrank scored shows
+          result.sort((a, b) => (getQualifiedScore(b) ?? -1) - (getQualifiedScore(a) ?? -1));
         }
         break;
       case 'name':

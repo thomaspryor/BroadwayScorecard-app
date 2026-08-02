@@ -107,6 +107,20 @@ export function useWatchlist(userId: string | null) {
       };
 
       setError(null);
+      // Offline fast-path: don't wait for the insert to fail/hang — queue and
+      // apply optimistically so the bookmark responds instantly (beta feedback
+      // 2026-08-01: "can't hit the bookmark icon while offline").
+      if (!(await isOnline())) {
+        await enqueue({
+          table: 'watchlist',
+          action: 'insert',
+          data: { user_id: userId, show_id: showId },
+          filters: {},
+        });
+        mutationVersion.current++;
+        broadcastWatchlist([optimistic, ...sharedWatchlist]);
+        return;
+      }
       try {
         const { error: err } = await client.from('watchlist').insert({ user_id: userId, show_id: showId });
         if (err) throw err;
@@ -139,6 +153,17 @@ export function useWatchlist(userId: string | null) {
       if (!client || !userId) return;
 
       setError(null);
+      // Offline fast-path — mirror addToWatchlist
+      if (!(await isOnline())) {
+        await enqueue({
+          table: 'watchlist',
+          action: 'delete',
+          filters: { user_id: userId, show_id: showId },
+        });
+        mutationVersion.current++;
+        broadcastWatchlist(sharedWatchlist.filter(w => w.show_id !== showId));
+        return;
+      }
       try {
         const { error: err } = await client
           .from('watchlist')
@@ -178,6 +203,18 @@ export function useWatchlist(userId: string | null) {
       if (!client || !userId) return;
 
       setError(null);
+      // Offline fast-path — mirror addToWatchlist
+      if (!(await isOnline())) {
+        await enqueue({
+          table: 'watchlist',
+          action: 'update',
+          data: { planned_date: plannedDate },
+          filters: { user_id: userId, show_id: showId },
+        });
+        mutationVersion.current++;
+        broadcastWatchlist(sharedWatchlist.map(w => (w.show_id === showId ? { ...w, planned_date: plannedDate } : w)));
+        return;
+      }
       try {
         const { error: err } = await client
           .from('watchlist')
