@@ -623,9 +623,17 @@ export default function ShowDetailScreen() {
         )}
 
         {/* Showtimes */}
-        {detail?.showtimes && (
-          <ShowtimesSection data={detail.showtimes} />
-        )}
+        {detail?.showtimes && (() => {
+          const stTix = show.status !== 'closed'
+            ? show.ticketLinks?.find(l => /todaytix/i.test(l.platform)) ?? show.ticketLinks?.[0]
+            : undefined;
+          return (
+            <ShowtimesSection
+              data={detail.showtimes}
+              onTicketPress={stTix ? () => openTicketLink(stTix, 0, 'showtimes') : undefined}
+            />
+          );
+        })()}
 
         {/* Box Office Scorecard */}
         {detail?.boxOffice && (
@@ -649,7 +657,12 @@ export default function ShowDetailScreen() {
 
         {/* Theater Scorecard */}
         {detail?.venueScores && (
-          <TheaterScorecardSection scores={detail.venueScores} venueName={show.venue} />
+          <TheaterScorecardSection
+            scores={detail.venueScores}
+            venueName={show.venue}
+            accessibility={detail.accessibility}
+            links={detail.theaterLinks}
+          />
         )}
 
         {/* Synopsis */}
@@ -696,7 +709,7 @@ export default function ShowDetailScreen() {
 
         {/* Tony Awards */}
         {detail?.tonyAwards && detail.tonyAwards.length > 0 && (
-          <AwardsScorecardSection awards={detail.tonyAwards} />
+          <AwardsScorecardSection awards={detail.tonyAwards} awardScore={detail.awards} />
         )}
 
         {/* Video Reviews */}
@@ -1135,10 +1148,16 @@ function getWeekContext(wkKey: string): { todayIndex: number; isPastWeek: boolea
   } catch { return { todayIndex: -1, isPastWeek: false }; }
 }
 
-function ShowtimesSection({ data }: { data: NonNullable<ShowDetail['showtimes']> }) {
+function ShowtimesSection({ data, onTicketPress }: {
+  data: NonNullable<ShowDetail['showtimes']>;
+  onTicketPress?: () => void;
+}) {
   const range = formatWeekRange(data.week);
   const { todayIndex, isPastWeek } = getWeekContext(data.week);
   const rangeLabel = isPastWeek ? 'Last Week' : 'This Week';
+  // Times are the affiliate on-ramp: styled as links and tappable when a
+  // ticket link exists (owner request 2026-08-03 — this card drives revenue).
+  const timeStyle = onTicketPress ? styles.showtimesTimeLink : undefined;
   return (
     <SectionCard title="Showtimes" meta={range ? `${rangeLabel} (${range})` : undefined}>
       <View style={styles.showtimesGrid}>
@@ -1153,16 +1172,28 @@ function ShowtimesSection({ data }: { data: NonNullable<ShowDetail['showtimes']>
                 !hasShow && styles.showtimesDayEmpty,
                 isToday && styles.showtimesDayToday,
               ]}>{DAY_LABELS[i]}{isToday ? ' • TODAY' : ''}</Text>
-              <Text style={[styles.showtimesTimes, isToday && styles.showtimesTimesToday]}>
-                {day.matinee && <Text>{to12Hour(day.matinee)}</Text>}
+              <Text
+                style={[styles.showtimesTimes, isToday && styles.showtimesTimesToday]}
+                onPress={hasShow && onTicketPress ? onTicketPress : undefined}
+                suppressHighlighting
+              >
+                {day.matinee && <Text style={timeStyle}>{to12Hour(day.matinee)}</Text>}
                 {day.matinee && day.evening && <Text style={styles.showtimesDot}>  ·  </Text>}
-                {day.evening && <Text>{to12Hour(day.evening)}</Text>}
+                {day.evening && <Text style={timeStyle}>{to12Hour(day.evening)}</Text>}
                 {!hasShow && <Text style={styles.showtimesDayEmpty}>—</Text>}
               </Text>
             </View>
           );
         })}
       </View>
+      {onTicketPress && (
+        <Pressable
+          style={({ pressed }) => [styles.showtimesCta, pressed && styles.pressed]}
+          onPress={onTicketPress}
+        >
+          <Text style={styles.showtimesCtaText}>Get Tickets →</Text>
+        </Pressable>
+      )}
     </SectionCard>
   );
 }
@@ -1317,7 +1348,30 @@ function seasonLabel(ceremonyYear: number): string {
   return `${ceremonyYear - 1}-${String(ceremonyYear).slice(-2)}`;
 }
 
-function AwardsScorecardSection({ awards }: { awards: ShowDetail['tonyAwards'] }) {
+// Tier styling for the award-score badge, mirroring the site's AwardScoreBadge.
+const AWARD_BADGE_CONFIG: Record<string, { label: string; color: string }> = {
+  sweeper: { label: 'SWEEPER', color: '#FFD700' },
+  decorated: { label: 'DECORATED', color: '#f59e0b' },
+  honored: { label: 'HONORED', color: '#34d399' },
+  nominated: { label: 'NOMINATED', color: '#60a5fa' },
+  eligible: { label: 'ELIGIBLE', color: Colors.text.muted },
+};
+
+// Per-ceremony chip tints, mirroring the site's OTHER_CEREMONY_CONFIGS.
+const OTHER_AWARD_COLORS: Record<string, string> = {
+  'Lortel Award': '#a78bfa',
+  'Drama Desk': '#c084fc',
+  'Outer Critics': '#2dd4bf',
+  'Drama League': '#34d399',
+  'NY Drama Critics': '#fb7185',
+  'Obie Award': '#fbbf24',
+  'Olivier': '#60a5fa',
+};
+
+function AwardsScorecardSection({ awards, awardScore }: {
+  awards: ShowDetail['tonyAwards'];
+  awardScore: ShowDetail['awards'];
+}) {
   const [expanded, setExpanded] = useState(false);
   // Dedupe: the feed can repeat a category (e.g. Hamilton's Best Original
   // Score appears twice, once with and once without a nominee name).
@@ -1331,11 +1385,35 @@ function AwardsScorecardSection({ awards }: { awards: ShowDetail['tonyAwards'] }
   const wins = deduped.filter(a => a.won);
   const noms = deduped.filter(a => !a.won);
   const latestYear = Math.max(...deduped.map(a => ceremonyToYear(a.year)));
-  const season = seasonLabel(latestYear);
+  const season = awardScore?.season ?? seasonLabel(latestYear);
   const ordered = [...wins, ...noms];
+  const badge = awardScore ? AWARD_BADGE_CONFIG[awardScore.badge] ?? AWARD_BADGE_CONFIG.eligible : null;
 
   return (
     <SectionCard title="Awards Scorecard" meta={`${season} season`}>
+      {/* Award-score hero row — site parity (AwardScoreBadge + tier + sublabel) */}
+      {awardScore && badge && (
+        <View style={styles.awardsHeroRow}>
+          <View style={[styles.awardsScoreBadge, { borderColor: badge.color }]}>
+            <Text style={[styles.awardsScoreText, { color: badge.color }]}>{awardScore.score}</Text>
+          </View>
+          <View style={styles.awardsHeroInfo}>
+            <Text style={[styles.awardsTierLabel, { color: badge.color }]}>{badge.label}</Text>
+            {awardScore.sublabel && (
+              <Text style={styles.awardsSublabel}>{awardScore.sublabel}</Text>
+            )}
+          </View>
+        </View>
+      )}
+      {awardScore?.pulitzer && (
+        <View style={styles.awardsPulitzerRow}>
+          <IconSymbol name="bookmark.fill" size={16} color="#FFD700" />
+          <Text style={styles.awardsPulitzerText}>
+            Pulitzer Prize for Drama {awardScore.pulitzer.result}
+            {awardScore.pulitzer.year ? ` (${awardScore.pulitzer.year})` : ''}
+          </Text>
+        </View>
+      )}
       <View style={styles.awardsPanel}>
         <Text style={styles.awardsPanelLabel}>TONY AWARDS ({season})</Text>
         <View style={styles.awardsSummaryRow}>
@@ -1381,6 +1459,31 @@ function AwardsScorecardSection({ awards }: { awards: ShowDetail['tonyAwards'] }
           </View>
         ))}
       </View>
+      {/* Other Major Awards — per-ceremony chips, site parity */}
+      {awardScore && awardScore.other.length > 0 && (
+        <>
+          <Text style={styles.awardsOtherLabel}>
+            OTHER MAJOR AWARDS  ({awardScore.other.reduce((sum, o) => sum + o.wins, 0)} wins)
+          </Text>
+          <View style={styles.awardsOtherChips}>
+            {awardScore.other.map((o, i) => {
+              const color = OTHER_AWARD_COLORS[o.name] ?? Colors.text.secondary;
+              return (
+                <View
+                  key={i}
+                  style={[styles.awardsOtherChip, { borderColor: color + '66', backgroundColor: color + '14' }]}
+                >
+                  <Text style={[styles.awardsOtherChipName, { color }]}>{o.name}:</Text>
+                  <Text style={styles.awardsOtherChipCount}>
+                    {` ${o.wins} ${o.wins === 1 ? 'win' : 'wins'}`}
+                    {o.noms > o.wins ? ` / ${o.noms} noms` : ''}
+                  </Text>
+                </View>
+              );
+            })}
+          </View>
+        </>
+      )}
     </SectionCard>
   );
 }
@@ -1511,15 +1614,33 @@ function ScoreSquares({ score, color }: { score: number; color: string }) {
   );
 }
 
-function TheaterScorecardSection({ scores, venueName }: { scores: ShowDetail['venueScores']; venueName: string }) {
+const ACCESSIBILITY_PILLS: { key: 'wheelchair' | 'elevator' | 'hearingLoop' | 'assistiveListening'; label: string }[] = [
+  { key: 'wheelchair', label: 'Wheelchair' },
+  { key: 'elevator', label: 'Elevator' },
+  { key: 'hearingLoop', label: 'Hearing Loop' },
+  { key: 'assistiveListening', label: 'Assistive Listening' },
+];
+
+function TheaterScorecardSection({ scores, venueName, accessibility, links }: {
+  scores: ShowDetail['venueScores'];
+  venueName: string;
+  accessibility: ShowDetail['accessibility'];
+  links: ShowDetail['theaterLinks'];
+}) {
   if (!scores) return null;
   const dims = VENUE_DIMENSIONS.filter(d => scores[d.key] != null);
   if (dims.length === 0) return null;
   const avg = dims.reduce((sum, d) => sum + (scores[d.key] as number), 0) / dims.length;
+  const accPills = accessibility ? ACCESSIBILITY_PILLS.filter(p => accessibility[p.key]) : [];
+  const seatLinks = [
+    links?.seatplan ? { label: 'SeatPlan', url: links.seatplan } : null,
+    links?.aviewfrommyseat ? { label: 'A View From My Seat', url: links.aviewfrommyseat } : null,
+  ].filter(Boolean) as { label: string; url: string }[];
 
   return (
     <SectionCard title="Theater Scorecard" meta={`${avg.toFixed(1)}/5 overall`}>
       <Text style={styles.venueScorecardName}>{venueName}</Text>
+      {scores.summary && <Text style={styles.venueSummary}>{scores.summary}</Text>}
       {dims.map(d => {
         const score = scores[d.key] as number;
         // Venue dimensions are on a 1-5 scale
@@ -1532,6 +1653,38 @@ function TheaterScorecardSection({ scores, venueName }: { scores: ShowDetail['ve
           </View>
         );
       })}
+      {accPills.length > 0 && (
+        <>
+          <Text style={styles.venueSubheading}>ACCESSIBILITY</Text>
+          <View style={styles.venueAccPills}>
+            {accPills.map(p => (
+              <View key={p.key} style={styles.venueAccPill}>
+                <Text style={styles.venueAccPillText}>{p.label}</Text>
+              </View>
+            ))}
+          </View>
+          {accessibility?.note && <Text style={styles.venueAccNote}>{accessibility.note}</Text>}
+        </>
+      )}
+      {seatLinks.length > 0 && (
+        <>
+          <Text style={styles.venueSubheading}>FIND YOUR SEAT</Text>
+          <View style={styles.venueSeatLinks}>
+            {seatLinks.map(l => (
+              <Pressable
+                key={l.label}
+                style={({ pressed }) => [styles.venueSeatLink, pressed && styles.pressed]}
+                onPress={() => WebBrowser.openBrowserAsync(l.url)}
+              >
+                <Text style={styles.venueSeatLinkText}>{l.label} ↗</Text>
+              </Pressable>
+            ))}
+          </View>
+          <Text style={styles.venueFootnote}>
+            Venue ratings based on audience reviews from SeatPlan, A View From My Seat, and community feedback.
+          </Text>
+        </>
+      )}
     </SectionCard>
   );
 }
@@ -1544,6 +1697,10 @@ function VideoReviewsSection({ reviews }: { reviews: ShowDetail['videoReviews'] 
       {reviews.map((v, i) => {
         const bucketColor = v.bucket === 'Rave' || v.bucket === 'Positive' ? '#10b981'
           : v.bucket === 'Mixed' ? '#f59e0b' : '#ef4444';
+        // TikTok/Instagram stills are portrait (9:16); YouTube is landscape.
+        const isPortrait = v.platform === 'tiktok' || v.platform === 'instagram';
+        const thumbStyle = isPortrait ? styles.videoThumbPortrait : styles.videoThumb;
+        const score = v.score != null ? Math.round(v.score) : null;
         return (
           <Pressable
             key={i}
@@ -1551,9 +1708,9 @@ function VideoReviewsSection({ reviews }: { reviews: ShowDetail['videoReviews'] 
             onPress={() => WebBrowser.openBrowserAsync(v.url)}
           >
             {v.thumbnail ? (
-              <Image source={{ uri: v.thumbnail }} style={styles.videoThumb} contentFit="cover" transition={200} />
+              <Image source={{ uri: v.thumbnail }} style={thumbStyle} contentFit="cover" transition={200} />
             ) : (
-              <View style={[styles.videoThumb, styles.videoThumbPlaceholder]}>
+              <View style={[thumbStyle, styles.videoThumbPlaceholder]}>
                 <Text style={styles.videoThumbPlaceholderText}>▶</Text>
               </View>
             )}
@@ -1562,13 +1719,20 @@ function VideoReviewsSection({ reviews }: { reviews: ShowDetail['videoReviews'] 
                 {v.channelName || v.handle || 'Video Review'}
               </Text>
               {v.platform && <Text style={styles.videoPlatform}>{v.platform}</Text>}
-              {v.keyQuote && <Text style={styles.videoQuote} numberOfLines={2}>{'\u201C'}{v.keyQuote}{'\u201D'}</Text>}
+              {v.keyQuote && <Text style={styles.videoQuote} numberOfLines={3}>{'\u201C'}{v.keyQuote}{'\u201D'}</Text>}
             </View>
-            {v.bucket && (
-              <View style={[styles.videoBucket, { backgroundColor: bucketColor + '20' }]}>
-                <Text style={[styles.videoBucketText, { color: bucketColor }]}>{v.bucket}</Text>
-              </View>
-            )}
+            <View style={styles.videoScoreCol}>
+              {score != null && (
+                <View style={[styles.videoScoreChip, { backgroundColor: getScoreColor(score) }]}>
+                  <Text style={[styles.videoScoreChipText, { color: getContrastTextColor(getScoreColor(score)) }]}>{score}</Text>
+                </View>
+              )}
+              {v.bucket && (
+                <View style={[styles.videoBucket, { backgroundColor: bucketColor + '20' }]}>
+                  <Text style={[styles.videoBucketText, { color: bucketColor }]}>{v.bucket}</Text>
+                </View>
+              )}
+            </View>
           </Pressable>
         );
       })}
@@ -2153,6 +2317,20 @@ const styles = StyleSheet.create({
   showtimesDot: {
     color: Colors.text.muted,
   },
+  showtimesTimeLink: {
+    color: Colors.brand,
+    textDecorationLine: 'underline',
+    fontWeight: '600',
+  },
+  showtimesCta: {
+    alignSelf: 'flex-start',
+    marginTop: Spacing.md,
+  },
+  showtimesCtaText: {
+    color: Colors.brand,
+    fontSize: FontSize.md,
+    fontWeight: '700',
+  },
 
   // Box Office
   boSubheading: {
@@ -2240,6 +2418,79 @@ const styles = StyleSheet.create({
   },
 
   // Awards Scorecard
+  awardsHeroRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.lg,
+    marginBottom: Spacing.lg,
+  },
+  awardsScoreBadge: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.surface.overlay,
+  },
+  awardsScoreText: {
+    fontSize: FontSize.xl,
+    fontWeight: '800',
+    fontVariant: ['tabular-nums'],
+  },
+  awardsHeroInfo: {
+    flex: 1,
+  },
+  awardsTierLabel: {
+    fontSize: FontSize.lg,
+    fontWeight: '800',
+    letterSpacing: 1.2,
+  },
+  awardsSublabel: {
+    color: Colors.text.secondary,
+    fontSize: FontSize.sm,
+    marginTop: 2,
+  },
+  awardsPulitzerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    marginBottom: Spacing.lg,
+  },
+  awardsPulitzerText: {
+    color: '#FFD700',
+    fontSize: FontSize.sm,
+    fontWeight: '600',
+  },
+  awardsOtherLabel: {
+    color: Colors.text.muted,
+    fontSize: FontSize.xs,
+    fontWeight: '700',
+    letterSpacing: 0.8,
+    marginTop: Spacing.lg,
+    marginBottom: Spacing.md,
+  },
+  awardsOtherChips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.sm,
+  },
+  awardsOtherChip: {
+    flexDirection: 'row',
+    borderWidth: 1,
+    borderRadius: BorderRadius.sm,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 5,
+  },
+  awardsOtherChipName: {
+    fontSize: FontSize.xs,
+    fontWeight: '700',
+  },
+  awardsOtherChipCount: {
+    color: Colors.text.primary,
+    fontSize: FontSize.xs,
+    fontWeight: '600',
+  },
   awardsPanel: {
     backgroundColor: Colors.surface.overlay,
     borderWidth: 1,
@@ -2494,6 +2745,68 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     flexShrink: 0,
   },
+  venueSummary: {
+    color: Colors.text.secondary,
+    fontSize: FontSize.sm,
+    lineHeight: 21,
+    marginBottom: Spacing.lg,
+  },
+  venueSubheading: {
+    color: Colors.text.muted,
+    fontSize: FontSize.xs,
+    fontWeight: '700',
+    letterSpacing: 0.8,
+    marginTop: Spacing.lg,
+    marginBottom: Spacing.md,
+  },
+  venueAccPills: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.sm,
+  },
+  venueAccPill: {
+    backgroundColor: '#10b98122',
+    borderWidth: 1,
+    borderColor: '#10b98155',
+    borderRadius: BorderRadius.pill,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 5,
+  },
+  venueAccPillText: {
+    color: '#34d399',
+    fontSize: FontSize.xs,
+    fontWeight: '600',
+  },
+  venueAccNote: {
+    color: Colors.text.muted,
+    fontSize: FontSize.xs,
+    lineHeight: 17,
+    marginTop: Spacing.md,
+  },
+  venueSeatLinks: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.sm,
+  },
+  venueSeatLink: {
+    backgroundColor: Colors.surface.overlay,
+    borderWidth: 1,
+    borderColor: Colors.border.default,
+    borderRadius: BorderRadius.sm,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.sm,
+  },
+  venueSeatLinkText: {
+    color: Colors.text.primary,
+    fontSize: FontSize.sm,
+    fontWeight: '600',
+  },
+  venueFootnote: {
+    color: Colors.text.muted,
+    fontSize: 12,
+    lineHeight: 16,
+    marginTop: Spacing.md,
+  },
 
   // Video Reviews
   videoReviewRow: {
@@ -2508,7 +2821,29 @@ const styles = StyleSheet.create({
     width: 80,
     height: 52,
     borderRadius: BorderRadius.sm,
-    backgroundColor: Colors.surface.raised,
+    backgroundColor: Colors.surface.overlay,
+  },
+  videoThumbPortrait: {
+    width: 72,
+    height: 128,
+    borderRadius: BorderRadius.sm,
+    backgroundColor: Colors.surface.overlay,
+  },
+  videoScoreCol: {
+    alignItems: 'flex-end',
+    gap: 6,
+  },
+  videoScoreChip: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  videoScoreChipText: {
+    fontSize: FontSize.md,
+    fontWeight: '800',
+    fontVariant: ['tabular-nums'],
   },
   videoThumbPlaceholder: {
     alignItems: 'center',

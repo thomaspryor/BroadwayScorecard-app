@@ -128,6 +128,15 @@ export interface MobileShowDetail {
     };
   };
   tn?: { yr: number; cat: string; n: string | null; w?: true }[];  // Tony nominations
+  aw?: {                                                             // Awards Scorecard (site parity)
+    s: number;                     // award score 0-100
+    b: string;                     // badge: eligible|nominated|honored|decorated|sweeper
+    ip?: true;                     // season in progress
+    sub: string | null;            // sublabel, e.g. "Won Best Musical + 10 more"
+    sea: string | null;            // Tony season, e.g. "2015-16"
+    pz: { r: string; y: number | null } | null;  // Pulitzer result
+    oth?: { n: string; w: number; nm: number }[]; // other ceremonies
+  };
   cn?: { t: string; rc: number };                                    // Critics' Take
   sh?: { wk: string; days: { m: string | null; e: string | null }[] }; // Showtimes week
   bo?: {                                                             // Box Office
@@ -160,6 +169,15 @@ export interface MobileShowDetail {
     co: number | null;  // comfort
     am: number | null;  // ambiance
     fa: number | null;  // facilities
+    sum?: string | null; // editorial venue summary
+  };
+  acc?: {        // verified accessibility
+    wc?: true; el?: true; hl?: true; al?: true;
+    note: string | null;
+  };
+  tlk?: {        // find-your-seat links
+    sp?: string;   // SeatPlan
+    avs?: string;  // A View From My Seat
   };
   vr?: {         // video reviews
     ch: string | null;  // channel/creator name
@@ -203,6 +221,15 @@ export interface ShowDetail {
     };
   } | null;
   tonyAwards: { year: number; category: string; name: string | null; won: boolean }[];
+  awards: {
+    score: number;
+    badge: string;
+    inProgress: boolean;
+    sublabel: string | null;
+    season: string | null;
+    pulitzer: { result: string; year: number | null } | null;
+    other: { name: string; wins: number; noms: number }[];
+  } | null;
   criticsTake: { text: string; reviewCount: number } | null;
   showtimes: { week: string; days: { matinee: string | null; evening: string | null }[] } | null;
   boxOffice: {
@@ -235,7 +262,16 @@ export interface ShowDetail {
     comfort: number | null;
     ambiance: number | null;
     facilities: number | null;
+    summary: string | null;
   } | null;
+  accessibility: {
+    wheelchair: boolean;
+    elevator: boolean;
+    hearingLoop: boolean;
+    assistiveListening: boolean;
+    note: string | null;
+  } | null;
+  theaterLinks: { seatplan: string | null; aviewfrommyseat: string | null } | null;
   videoReviews: {
     channelName: string | null;
     handle: string | null;
@@ -279,6 +315,15 @@ export function mapShowDetail(raw: MobileShowDetail): ShowDetail {
       },
     } : null,
     tonyAwards: (raw.tn ?? []).map(t => ({ year: t.yr, category: t.cat, name: t.n ?? null, won: t.w === true })),
+    awards: raw.aw ? {
+      score: raw.aw.s,
+      badge: raw.aw.b,
+      inProgress: raw.aw.ip === true,
+      sublabel: raw.aw.sub ?? null,
+      season: raw.aw.sea ?? null,
+      pulitzer: raw.aw.pz ? { result: raw.aw.pz.r, year: raw.aw.pz.y ?? null } : null,
+      other: (raw.aw.oth ?? []).map(o => ({ name: o.n, wins: o.w, noms: o.nm })),
+    } : null,
     criticsTake: raw.cn ? { text: raw.cn.t, reviewCount: raw.cn.rc } : null,
     showtimes: raw.sh ? {
       week: raw.sh.wk,
@@ -317,6 +362,18 @@ export function mapShowDetail(raw: MobileShowDetail): ShowDetail {
       comfort: raw.vs.co,
       ambiance: raw.vs.am,
       facilities: raw.vs.fa,
+      summary: raw.vs.sum ?? null,
+    } : null,
+    accessibility: raw.acc ? {
+      wheelchair: raw.acc.wc === true,
+      elevator: raw.acc.el === true,
+      hearingLoop: raw.acc.hl === true,
+      assistiveListening: raw.acc.al === true,
+      note: raw.acc.note ?? null,
+    } : null,
+    theaterLinks: raw.tlk ? {
+      seatplan: raw.tlk.sp ?? null,
+      aviewfrommyseat: raw.tlk.avs ?? null,
     } : null,
     videoReviews: (raw.vr ?? []).map(v => ({
       channelName: v.ch,

@@ -9,7 +9,10 @@
 
 import { setCachedDetail, getCachedDetail } from './cache';
 
-const CDN_BASE = 'https://broadwayscorecard.com/data';
+// Dev override so a locally-generated data build can be previewed in the
+// simulator (e.g. EXPO_PUBLIC_DATA_BASE=http://localhost:8090). Baked at
+// bundle time; unset in production builds.
+const CDN_BASE = process.env.EXPO_PUBLIC_DATA_BASE || 'https://broadwayscorecard.com/data';
 const SHOWS_URL = `${CDN_BASE}/mobile-shows.json`;
 
 /**
