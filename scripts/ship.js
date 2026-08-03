@@ -188,10 +188,12 @@ function main() {
     ], { stdio: 'inherit' });
   } else {
     const message = commitSubject().slice(0, 100);
-    console.log(`\n$ eas update --branch production --message "${message}"`);
+    console.log(`\n$ eas update --branch production --environment production --message "${message}"`);
     run('npx', [
       'eas-cli', 'update',
       '--branch', 'production',
+      // Required from SDK 55 on; the CLI hard-errors without it.
+      '--environment', 'production',
       '--platform', 'ios',
       '--message', message,
       '--non-interactive',
