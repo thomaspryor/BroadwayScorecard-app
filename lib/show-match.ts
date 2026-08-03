@@ -67,9 +67,21 @@ export function dateSanity(candidate: MatchCandidate, dateSeen?: string | null):
   return 1;
 }
 
+/** Scored catalog entries sort ahead of diary-only ones so an exact title that
+ *  exists in both resolves to the production with a real show page. */
+function scoredFirst(a: MatchCandidate, b: MatchCandidate): number {
+  return Number(!!a.diaryOnly) - Number(!!b.diaryOnly);
+}
+
 /** Same title, multiple productions: pick the run the user's date falls
- *  inside, else the one that opened closest to it. Ties keep input order,
- *  which callers set scored-catalog-first. */
+ *  inside, else the one that opened closest to it.
+ *
+ *  Diary-catalog entries carry no closing date, so `distance` treats them as
+ *  still running and EVERY diary production that opened before the user's date
+ *  ties at 0 — three regional "Cats" would have been settled by catalog order
+ *  (ship-check, 2026-08-03). Ties now prefer the most recently opened run,
+ *  which is the one a date inside several windows most likely refers to;
+ *  input order (scored-catalog-first) remains the final tiebreak. */
 export function closestRun(candidates: MatchCandidate[], dateSeen?: string | null): MatchCandidate {
   if (!dateSeen || candidates.length < 2) return candidates[0];
   const seen = Date.parse(dateSeen);
@@ -81,20 +93,22 @@ export function closestRun(candidates: MatchCandidate[], dateSeen?: string | nul
     if (seen >= od && seen <= cd) return 0;
     return Math.min(Math.abs(seen - od), Number.isFinite(cd) ? Math.abs(seen - cd) : Number.MAX_SAFE_INTEGER);
   };
+  const opened = (s: MatchCandidate) => (s.openingDate ? Date.parse(s.openingDate) : -Infinity);
   return [...candidates]
     .map((c, i) => ({ c, i, d: distance(c) }))
-    .sort((a, b) => a.d - b.d || a.i - b.i)
+    // scoredFirst BEFORE recency: callers pre-sort scored-catalog-first so an
+    // exact title present in both catalogs resolves to the production with a
+    // real show page. Ranking recency above that sent "Chicago" seen in 2023
+    // to a 2019 regional diary entry instead of the Broadway run, at score
+    // 1.00 — auto-selected, and written into the user's diary as an unscored
+    // row with no show page (ship-check, 2026-08-03).
+    .sort((a, b) => a.d - b.d || scoredFirst(a.c, b.c) || opened(b.c) - opened(a.c) || a.i - b.i)
     .map(x => x.c)[0];
 }
 
 const normVenue = (v: string) =>
   v.toLowerCase().replace(/theatre|theater/gi, '').replace(/^the\s+/, '').trim();
 
-/** Scored catalog entries sort ahead of diary-only ones so an exact title that
- *  exists in both resolves to the production with a real show page. */
-function scoredFirst(a: MatchCandidate, b: MatchCandidate): number {
-  return Number(!!a.diaryOnly) - Number(!!b.diaryOnly);
-}
 
 const FUSE_OPTIONS: IFuseOptions<MatchCandidate> = {
   keys: [{ name: 'title', weight: 0.8 }, { name: 'venue', weight: 0.2 }],
@@ -103,9 +117,17 @@ const FUSE_OPTIONS: IFuseOptions<MatchCandidate> = {
   minMatchCharLength: 2,
 };
 
-/** Token key length for the fuzzy shortlist index. Four characters tolerates
- *  the typos Fuse exists to absorb ("hamiltonn" → "hami") while still cutting
- *  the candidate set by ~99%. */
+/** Token key length for the fuzzy shortlist index.
+ *
+ *  Four, not three. A typo inside the first four characters does put the query
+ *  in a different bucket from the real show ("Hamliton" → "haml", which holds
+ *  Hamlet but not Hamilton) — but that changes nothing the user sees, because
+ *  rank() only lets a fuzzy hit clear MATCH_THRESHOLD when one normalized
+ *  title CONTAINS the other, and "hamliton" contains neither. Both bucket
+ *  widths report it unmatched. Measured on the real 33.7k catalog, three
+ *  characters recovered exactly the same titles (798/840 on a fuzzy-path
+ *  self-recall sweep) while growing common buckets ~11x, so it was pure cost
+ *  (ship-check, 2026-08-03). */
 const TOKEN_KEY_LEN = 4;
 /** Buckets bigger than this are stop-word-ish ("the", "of") — only consulted
  *  when nothing rarer matched. */
@@ -129,6 +151,8 @@ export class ShowMatcher {
   private readonly norms: string[];
   private readonly byNormTitle: Map<string, MatchCandidate[]>;
   private readonly tokenIndex: Map<string, number[]>;
+  /** Built on demand — only rows the shortlist cannot resolve ever pay for it. */
+  private fullFuse: Fuse<MatchCandidate> | null = null;
 
   constructor(pool: MatchCandidate[]) {
     this.pool = pool;
@@ -186,6 +210,11 @@ export class ShowMatcher {
     return out;
   }
 
+  private searchFullPool(title: string) {
+    this.fullFuse ??= new Fuse(this.pool, FUSE_OPTIONS);
+    return this.fullFuse.search(title, { limit: 5 });
+  }
+
   match(title: string, venue: string | null, dateSeen: string | null): MatchResult {
     const nameNorm = normTitle(title);
     const withSanity = (match: MatchCandidate, raw: number): MatchResult => {
@@ -221,24 +250,38 @@ export class ShowMatcher {
       return withSanity(closestRun(exactAll, dateSeen), tierScore);
     }
 
-    const candidates = this.shortlist(nameNorm);
-    if (candidates.length === 0) return { match: null, score: 0, dateSuspect: false };
-    const results = new Fuse(candidates, FUSE_OPTIONS).search(title, { limit: 5 });
-    if (results.length === 0) return { match: null, score: 0, dateSuspect: false };
+    const rank = (results: { item: MatchCandidate; score?: number }[]): MatchResult | null => {
+      if (results.length === 0) return null;
+      if (venue) {
+        const venueNorm = venue.toLowerCase().replace(/theatre|theater/gi, '').trim();
+        const venueMatch = results.find(
+          r => r.item.venue && r.item.venue.toLowerCase().replace(/theatre|theater/gi, '').trim().includes(venueNorm),
+        );
+        if (venueMatch) return withSanity(venueMatch.item, 1 - (venueMatch.score || 0));
+      }
+      const best = results[0];
+      const score = 1 - (best.score || 0);
+      const matchNorm = normTitle(best.item.title);
+      const contained = nameNorm.includes(matchNorm) || matchNorm.includes(nameNorm);
+      return withSanity(best.item, contained ? score : score * 0.6);
+    };
 
-    if (venue) {
-      const venueNorm = venue.toLowerCase().replace(/theatre|theater/gi, '').trim();
-      const venueMatch = results.find(
-        r => r.item.venue && r.item.venue.toLowerCase().replace(/theatre|theater/gi, '').trim().includes(venueNorm),
-      );
-      if (venueMatch) return withSanity(venueMatch.item, 1 - (venueMatch.score || 0));
+    const candidates = this.shortlist(nameNorm);
+    if (candidates.length > 0) {
+      // A fuzzy hit only clears the bar when one normalized title CONTAINS the
+      // other (Fuse runs without includeScore, so every hit reads as 1.0 and
+      // the containment penalty is what actually discriminates). Containment
+      // implies shared leading tokens, so the shortlist cannot hide one —
+      // which is why there is no full-pool retry here: it would cost ~490ms
+      // per unmatched row to reach the same answer.
+      return rank(new Fuse(candidates, FUSE_OPTIONS).search(title, { limit: 5 }))
+        ?? { match: null, score: 0, dateSuspect: false };
     }
 
-    const best = results[0];
-    const score = 1 - (best.score || 0);
-    const matchNorm = normTitle(best.item.title);
-    const contained = nameNorm.includes(matchNorm) || matchNorm.includes(nameNorm);
-    return withSanity(best.item, contained ? score : score * 0.6);
+    // No bucket matched at all — every token was unknown or stop-word-ish.
+    // This is the one case where the shortlist has strictly less information
+    // than the full pool, so pay for the full scan rather than guess.
+    return rank(this.searchFullPool(title)) ?? { match: null, score: 0, dateSuspect: false };
   }
 }
 

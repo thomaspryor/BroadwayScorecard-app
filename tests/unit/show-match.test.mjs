@@ -124,3 +124,55 @@ test('an unknown title reports no match rather than a wrong one', () => {
   const m = new ShowMatcher(pool).match('Zzzqqx Nonexistent Production', null, null);
   assert.ok(isWeakMatch(m));
 });
+
+// ─── shortlist safety net (ship-check, 2026-08-03) ────────────────────────
+
+test('a typo is reported unmatched, never attached to a similar-looking show', () => {
+  // Fuse runs without includeScore, so a fuzzy hit only clears the 0.7 bar
+  // when one normalized title CONTAINS the other. "Hamliton" contains neither
+  // "Hamilton" nor "Hamlet", so it must come back unmatched — the safe answer.
+  // This is the contract both before and after the token shortlist; the point
+  // of the test is that shortlisting never turns "unmatched" into a confident
+  // WRONG show (ship-check, 2026-08-03).
+  const pool = [
+    scored('hamilton-2015', 'Hamilton', { venue: 'Richard Rodgers Theatre' }),
+    scored('hamlet-2025', 'Hamlet'),
+    scored('hadestown-2019', 'Hadestown'),
+  ];
+  const m = new ShowMatcher(pool).match('Hamliton', null, null);
+  assert.ok(isWeakMatch(m), `should be unmatched, got "${m.match?.title}" at ${m.score}`);
+});
+
+test('a trailing typo still resolves via containment', () => {
+  // "Hamilton!" normalizes to "hamilton" — an exact hit. "Hamilton The
+  // Musical" contains "Hamilton" and resolves through the prefix tier.
+  const pool = [scored('hamilton-2015', 'Hamilton'), scored('hamlet-2025', 'Hamlet')];
+  const matcher = new ShowMatcher(pool);
+  assert.equal(matcher.match('Hamilton!', null, null).match?.id, 'hamilton-2015');
+  assert.equal(matcher.match('Hamilton The Musical', null, null).match?.id, 'hamilton-2015');
+});
+
+test('diary productions with no closing date do not tie on catalog order', () => {
+  // Diary entries carry no closing date, so every run that opened before the
+  // date "contains" it. The most recent one wins, not whichever came first.
+  const pool = [
+    diaryEntryToCandidate({ id: 'cats-1998', title: 'Cats', venue: 'Playhouse A', od: '1998-05-01' }),
+    diaryEntryToCandidate({ id: 'cats-2019', title: 'Cats', venue: 'Playhouse B', od: '2019-05-01' }),
+    diaryEntryToCandidate({ id: 'cats-2008', title: 'Cats', venue: 'Playhouse C', od: '2008-05-01' }),
+  ];
+  const m = new ShowMatcher(pool).match('Cats', null, '2021-06-15');
+  assert.equal(m.match?.id, 'cats-2019');
+});
+
+test('a scored production still wins a date tie against a newer diary duplicate', () => {
+  // Long-running scored shows carry no closing date, so a diary production that
+  // opened later ALSO "contains" the date. Recency must not outrank the scored
+  // catalog: "Chicago" seen in 2023 belongs to the Broadway run, not to a 2019
+  // regional staging with no show page (ship-check, 2026-08-03).
+  const pool = [
+    scored('chicago-1996', 'Chicago', { venue: 'Ambassador Theatre', openingDate: '1996-11-14' }),
+    diaryEntryToCandidate({ id: 'chicago-regional-2019', title: 'Chicago', venue: 'Some Playhouse', od: '2019-03-01' }),
+  ];
+  const m = new ShowMatcher(pool).match('Chicago', null, '2023-05-01');
+  assert.equal(m.match?.id, 'chicago-1996', `matched ${m.match?.id} instead`);
+});
