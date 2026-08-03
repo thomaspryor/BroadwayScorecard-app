@@ -8,6 +8,7 @@
  */
 
 import type { Show } from '@/lib/types';
+import { getQualifiedScore } from '@/lib/score-utils';
 
 export type FilterPredicate = (show: Show) => boolean;
 
@@ -34,8 +35,11 @@ const hasTag = (tag: string): FilterPredicate =>
 // it displays as, not fall between closed ranges.
 const inScoreRange = (min: number, max: number): FilterPredicate =>
   (s) => {
-    if (s.compositeScore === null) return false;
-    const rounded = Math.round(s.compositeScore);
+    // Min-review-gated: a show whose badge renders "—" must not match a
+    // score-tier filter (getQualifiedScore, beta feedback 2026-08-01).
+    const score = getQualifiedScore(s);
+    if (score === null) return false;
+    const rounded = Math.round(score);
     return rounded >= min && rounded <= max;
   };
 

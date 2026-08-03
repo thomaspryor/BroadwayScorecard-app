@@ -398,23 +398,25 @@ export default function ShowPageRating({
                     ? new Date(watchlistEntry.planned_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
                     : 'Add date'}
                 </Text>
-                {watchlistEntry?.planned_date && (
-                  <Pressable
-                    onPress={(e) => {
-                      e.stopPropagation();
-                      updatePlannedDate(showId, null).catch(() => showToast('Failed to clear date.', 'error'));
-                    }}
-                    hitSlop={8}
-                  >
-                    <Text style={styles.watchlistClearDate}>Clear</Text>
-                  </Pressable>
-                )}
               </Pressable>
+              {/* Sibling, not nested — a nested Pressable is invisible to
+                  VoiceOver (parent Pressable is a single a11y element). */}
+              {watchlistEntry?.planned_date && (
+                <Pressable
+                  onPress={() => updatePlannedDate(showId, null).catch(() => showToast('Failed to clear date.', 'error'))}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel="Clear planned date"
+                >
+                  <Text style={styles.watchlistClearDate}>Clear</Text>
+                </Pressable>
+              )}
             </View>
           )}
           <Pressable
             style={styles.listButton}
             onPress={handleListPress}
+            hitSlop={6}
             accessibilityRole="button"
             accessibilityLabel="Add to list"
             testID="add-to-list-button"
@@ -585,6 +587,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
     minHeight: 32,
     paddingHorizontal: Spacing.sm,
+    // 32pt visual row; hitSlop on the Pressable restores the 44pt target
   },
   listButtonText: {
     color: Colors.text.muted,
@@ -602,7 +605,9 @@ const styles = StyleSheet.create({
   // hitSlop making up the tap target (beta feedback 2026-07-31: "crazy
   // spacing of the buttons here for the user rating").
   watchlistDateCol: {
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: Spacing.sm,
   },
   watchlistDateButton: {
     flexDirection: 'row',

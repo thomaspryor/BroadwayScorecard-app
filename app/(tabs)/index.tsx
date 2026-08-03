@@ -81,9 +81,13 @@ export default function HomeScreen() {
     if (top.length > 0) rows.push({ title: 'Top Shows', shows: top });
 
     // Just Opened — second shelf, most recently opened first (owner ask 2026-08-01)
-    const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    // Local-date strings, not toISOString (UTC): in the ET evening UTC is
+    // already tomorrow, which would show "Opened <tomorrow>".
+    const toLocalDateStr = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const todayLocal = toLocalDateStr(now);
+    const sixtyDaysAgo = toLocalDateStr(new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000));
     const justOpened = marketShows
-      .filter(s => s.status === 'open' && s.openingDate && s.openingDate >= sixtyDaysAgo && s.openingDate <= now.toISOString().slice(0, 10))
+      .filter(s => s.status === 'open' && s.openingDate && s.openingDate >= sixtyDaysAgo && s.openingDate <= todayLocal)
       .sort((a, b) => (b.openingDate ?? '').localeCompare(a.openingDate ?? ''))
       .slice(0, 10);
     if (justOpened.length >= 2) rows.push({

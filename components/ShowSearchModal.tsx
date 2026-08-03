@@ -22,6 +22,7 @@ import Fuse, { IFuseOptions } from 'fuse.js';
 import { useShows } from '@/lib/data-context';
 import { getImageUrl } from '@/lib/images';
 import { ScoreBadge } from '@/components/show-cards';
+import { getQualifiedScore } from '@/lib/score-utils';
 import type { Show } from '@/lib/types';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
 
@@ -159,7 +160,7 @@ export function ShowSearchModal({ visible, title, onSelect, onClose, excludeIds 
                       {item.category === 'west-end' ? ' · London' : item.category === 'off-broadway' ? ' · Off-Bway' : ''}
                     </Text>
                   </View>
-                  <ScoreBadge score={item.compositeScore} category={item.category} size="small" />
+                  <ScoreBadge score={getQualifiedScore(item)} category={item.category} size="small" />
                 </Pressable>
               );
             }}

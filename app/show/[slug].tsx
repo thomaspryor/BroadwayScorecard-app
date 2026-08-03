@@ -15,7 +15,7 @@ import { useShows } from '@/lib/data-context';
 import { fetchShowDetail, fetchSocialPulse } from '@/lib/api';
 import { getImageUrl } from '@/lib/images';
 import { nowMs } from '@/lib/date-utils';
-import { getScoreColor, getScoreTier, getContrastTextColor, getMarketMinReviews } from '@/lib/score-utils';
+import { getScoreColor, getScoreTier, getContrastTextColor, getMarketMinReviews, getQualifiedScore } from '@/lib/score-utils';
 import { Show, ShowDetail, MobileShowDetail, mapShowDetail } from '@/lib/types';
 import { ScoreBadge, StatusBadge, FormatPill, ProductionPill, CategoryBadge } from '@/components/show-cards';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
@@ -81,11 +81,12 @@ export default function ShowDetailScreen() {
         s.id !== show.id &&
         s.type === show.type &&
         s.category === show.category &&
-        s.compositeScore != null
+        getQualifiedScore(s) != null
       )
       .sort((a, b) => {
-        const aDiff = Math.abs((a.compositeScore ?? 0) - (show.compositeScore ?? 0));
-        const bDiff = Math.abs((b.compositeScore ?? 0) - (show.compositeScore ?? 0));
+        const ref = getQualifiedScore(show) ?? show.compositeScore ?? 0;
+        const aDiff = Math.abs((getQualifiedScore(a) ?? 0) - ref);
+        const bDiff = Math.abs((getQualifiedScore(b) ?? 0) - ref);
         return aDiff - bDiff;
       });
   }, [show, shows]);
@@ -254,7 +255,7 @@ export default function ShowDetailScreen() {
 
   // Market-aware minimum reviews before showing a composite (mirrors the website's gate)
   const hasEnoughReviews = (show.criticScore?.reviewCount ?? 0) >= getMarketMinReviews(show.category);
-  const displayScore = hasEnoughReviews ? show.compositeScore : null;
+  const displayScore = getQualifiedScore(show);
 
   return (
     <>
@@ -748,7 +749,7 @@ export default function ShowDetailScreen() {
                     <Text style={styles.relatedShowTitle} numberOfLines={1}>{prod.title}</Text>
                     <Text style={[styles.relatedShowVenue, { color: subtitleColor }]} numberOfLines={1}>{subtitle}</Text>
                   </View>
-                  <ScoreBadge score={prod.compositeScore} category={prod.category} size="small" />
+                  <ScoreBadge score={getQualifiedScore(prod)} category={prod.category} size="small" />
                 </Pressable>
               );
             })}
@@ -1053,7 +1054,7 @@ function RelatedShowRow({ show, onPress }: { show: Show; onPress: () => void }) 
         <Text style={styles.relatedShowTitle} numberOfLines={1}>{show.title}</Text>
         <Text style={styles.relatedShowVenue} numberOfLines={1}>{show.venue}</Text>
       </View>
-      <ScoreBadge score={show.compositeScore} category={show.category} size="small" />
+      <ScoreBadge score={getQualifiedScore(show)} category={show.category} size="small" />
     </Pressable>
   );
 }

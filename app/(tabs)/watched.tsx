@@ -47,7 +47,7 @@ import { StatsScreen } from '@/components/stats/StatsScreen';
 import { FeedModeToggle, type FeedMode } from '@/components/user/FeedModeToggle';
 import { PhotoFeedTimeline } from '@/components/user/PhotoFeedTimeline';
 import { PhotoWallGrid } from '@/components/user/PhotoWallGrid';
-import { DiaryCalendarView } from '@/components/user/DiaryCalendarView';
+import { DiaryCalendarMonth, buildDiaryCalendarMonths, buildReviewsByDate } from '@/components/user/DiaryCalendarView';
 import { usePhotoFeed } from '@/hooks/usePhotoFeed';
 import * as haptics from '@/lib/haptics';
 
@@ -313,6 +313,10 @@ export default function WatchedScreen() {
 
   const showsSeen = new Set(reviews.map(r => r.show_id)).size;
 
+  // Calendar sub-view data — months as FlatList items (virtualized above)
+  const calendarReviewsByDate = useMemo(() => buildReviewsByDate(pastReviews), [pastReviews]);
+  const calendarMonths = useMemo(() => buildDiaryCalendarMonths(calendarReviewsByDate), [calendarReviewsByDate]);
+
   // Sort cycling
   const cycleDiarySort = useCallback(() => {
     haptics.tap();
@@ -343,12 +347,12 @@ export default function WatchedScreen() {
     );
   }, [showMap, deleteReview]);
 
-  const handleRemoveUpcoming = useCallback((entry: WatchlistEntry) => {
+  const handleRemoveUpcoming = useCallback((entry: WatchlistEntry, alertTitle = 'Remove from Watchlist') => {
     haptics.action();
     const show = showMap[entry.show_id];
     const title = show?.title || 'this show';
     Alert.alert(
-      'Remove from Watchlist',
+      alertTitle,
       `Remove ${title} from your watchlist?`,
       [
         { text: 'Cancel', style: 'cancel' },
@@ -896,12 +900,22 @@ export default function WatchedScreen() {
           onRefresh={onRefresh}
         />
       ) : gridSubView === 'calendar' ? (
+        // Months are the FlatList items so the list can virtualize — a
+        // 3-year diary would otherwise mount ~1,300 cells at once.
         <FlatList
-          data={['content']}
-          keyExtractor={() => 'content'}
-          renderItem={() => (
-            <DiaryCalendarView reviews={pastReviews} showMap={showMap} onMissingShow={handleMissingShow} />
+          data={calendarMonths}
+          keyExtractor={m => `${m.year}-${m.month}`}
+          renderItem={({ item }) => (
+            <DiaryCalendarMonth
+              year={item.year}
+              month={item.month}
+              reviewsByDate={calendarReviewsByDate}
+              showMap={showMap}
+              onMissingShow={handleMissingShow}
+            />
           )}
+          windowSize={5}
+          initialNumToRender={3}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.text.secondary} />}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={[styles.gridContainer, { paddingBottom: listBottomPad }]}
@@ -964,7 +978,7 @@ export default function WatchedScreen() {
                 }),
               },
               { label: 'View show', onPress: () => (show ? router.push(`/show/${show.slug}`) : handleMissingShow()) },
-              { label: 'Didn’t see it — remove', destructive: true, onPress: () => handleRemoveUpcoming(entry) },
+              { label: 'Didn’t see it — remove', destructive: true, onPress: () => handleRemoveUpcoming(entry, 'Didn’t see it') },
             ];
           }
           return [

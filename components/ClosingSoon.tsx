@@ -12,6 +12,7 @@ import { useRouter } from 'expo-router';
 import { Show } from '@/lib/types';
 import { getImageUrl } from '@/lib/images';
 import { ScoreBadge } from '@/components/show-cards';
+import { getQualifiedScore } from '@/lib/score-utils';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
 
 interface ClosingSoonProps {
@@ -85,7 +86,7 @@ export function ClosingSoon({ shows }: ClosingSoonProps) {
                 {/* Score badge overlaid on the poster like every other shelf
                     (beta feedback 2026-07-25: it sat below the image here) */}
                 <View style={styles.scoreOverlay}>
-                  <ScoreBadge score={show.compositeScore} category={show.category} size="small" />
+                  <ScoreBadge score={getQualifiedScore(show)} category={show.category} size="small" />
                 </View>
               </View>
 

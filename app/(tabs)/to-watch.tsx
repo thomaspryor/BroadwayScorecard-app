@@ -284,7 +284,7 @@ export default function ToWatchScreen() {
         onPress={() => show ? router.push(`/show/${show.slug}`) : handleMissingShow()}
         onLongPress={() => { setPendingDate(new Date()); setDatePickingShowId(item.show_id); }}
       >
-        <View>
+        <View style={styles.upcomingPosterWrap}>
           {posterUrl ? (
             <Image source={{ uri: posterUrl }} style={styles.gridPoster} contentFit="cover" transition={200} />
           ) : (
@@ -650,6 +650,7 @@ const styles = StyleSheet.create({
   placeholderText: { color: Colors.text.muted, fontSize: 18, fontWeight: '600' },
   // Centered overlaid date tag for Upcoming posters — mirrors the Watched
   // tab's grid date scrim (beta feedback 2026-08-02).
+  upcomingPosterWrap: { width: '100%' },
   upcomingDateOverlayWrap: {
     position: 'absolute', left: 0, right: 0, bottom: 6,
     alignItems: 'center',
