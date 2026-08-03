@@ -1,6 +1,11 @@
 name: Build iOS App
 on:
   workflow_dispatch:
+    inputs:
+      force_build:
+        description: 'Force a native build even if only JavaScript changed (use when the owner should get a TestFlight notification to review)'
+        type: boolean
+        default: false
   schedule:
     # Every 6h: auto-build TestFlight when main has user-visible drift vs the
     # last production build (2026-07-24 build-54 incident: merged fixes sat
@@ -134,14 +139,21 @@ jobs:
           TESTFLIGHT_GATE_DISABLED: ${{ vars.TESTFLIGHT_GATE_DISABLED }}
         run: node scripts/check-testflight-drift.js
 
+  # Ships main to TestFlight the CHEAPEST correct way: a native EAS build only
+  # when the native fingerprint moved, otherwise a free over-the-air update.
+  # Builds 66-72 shared one fingerprint — six consecutive $1.85 builds that
+  # were JavaScript-only (owner, 2026-08-03: "this is getting expensive").
   build:
-    name: EAS Build (iOS)
+    name: Ship to TestFlight (build or OTA)
     needs: [photo-security-gate, logic-gate, gate]
     if: ${{ !cancelled() && needs.photo-security-gate.result == 'success' && needs.logic-gate.result == 'success' && (github.event_name == 'workflow_dispatch' || needs.gate.outputs.should_build == 'true') }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
+        # Full history: scripts/ship.js diffs against the last build's commit.
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -149,6 +161,8 @@ jobs:
           node-version: 20
           cache: npm
 
+      # Must run BEFORE the fingerprint is computed — it reflects installed
+      # native state, not package.json.
       - name: Install dependencies
         run: npm ci
 
@@ -161,9 +175,10 @@ jobs:
       - name: Write ASC API Key
         run: echo "${{ secrets.ASC_API_KEY_P8 }}" > /tmp/AuthKey.p8
 
-      - name: Build iOS & submit to TestFlight
+      - name: Ship (native build only if the fingerprint moved)
         env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
           EXPO_ASC_API_KEY_PATH: /tmp/AuthKey.p8
           EXPO_ASC_API_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
           EXPO_ASC_API_KEY_ISSUER_ID: ${{ secrets.ASC_API_KEY_ISSUER_ID }}
-        run: eas build --platform ios --profile production --non-interactive --auto-submit
+        run: node scripts/ship.js ${{ (github.event_name == 'workflow_dispatch' && inputs.force_build) && '--force-build' || '' }}

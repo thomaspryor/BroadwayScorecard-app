@@ -50,44 +50,11 @@ Check `memory/feature-parity.md` for P0/P1 web features not yet in app. Note rel
 ---
 
 ## Architecture
-
-### Stack
-**Expo SDK 54** / React Native 0.81 / TypeScript strict / Expo Router / expo-image / reanimated
-
-### Data Strategy
-The mobile app consumes pre-computed data from the web project. All scoring is done server-side.
-
-**Primary data source:** `https://broadwayscorecard.com/data/` (static JSON files baked at deploy time)
-- `search-shows.json` — lightweight show list for browse/search (~380KB)
-- Individual show data fetched on demand via show detail endpoint
-
-**Caching:** Cache JSON locally with TTL. Refresh on app foreground after 1 hour stale.
-
-### Key Types (match web project's `engine.ts`)
-```
-ComputedShow: { id, title, slug, venue, openingDate, closingDate, status, type, category,
-  images, synopsis, tags, creativeTeam, ticketLinks,
-  criticScore: { score, reviewCount, label, reviews[] },
-  audienceScore: { score, platforms[], totalReviewCount },
-  compositeScore, confidence }
-```
-
-**Score display rule:** `compositeScore` = critic-only (default). `blendedScore` = 50/50 critic + audience (Tony predictions only).
-
-### Navigation Structure
-```
-(tabs)/
-  ├── index.tsx          # Home — featured shows, best-of carousels
-  ├── browse.tsx         # Browse — filterable show list
-  ├── search.tsx         # Search shows
-  └── settings.tsx       # Settings, about
-show/[slug].tsx          # Show detail page
-```
-
-### Image URLs
-Show images served from web CDN: `https://broadwayscorecard.com/images/shows/{show-id}/thumbnail.webp`
-
----
+**Expo SDK 54** / React Native 0.81 / TypeScript strict / Expo Router / expo-image / reanimated.
+Data comes pre-computed from the web project (`https://broadwayscorecard.com/data/`);
+all scoring is server-side. Stack detail, the `ComputedShow` shape, the
+critic-vs-blended score rule, navigation structure and image URLs:
+`memory/architecture.md`.
 
 ## Repo Layout
 - **Web:** `~/Broadwayscore/` → GitHub: `thomaspryor/Broadwayscore`
@@ -102,18 +69,33 @@ The source web project lives at: `~/Broadwayscore/` (repo: `thomaspryor/Broadway
 
 ---
 
-## Deployment (EAS Build)
+## Deployment — EAS builds cost ~$1.85 each, so DO NOT reach for one by reflex
 - **Dev:** `npx expo start` → Expo Go on iPhone
-- **TestFlight:** NOT automatic. Merging to main ships NOTHING — `eas-build.yml` is `workflow_dispatch`-only. After merging user-visible work, run `gh workflow run eas-build.yml --ref main` (production build, autoIncrement, --auto-submit to TestFlight) and verify with `npx eas-cli build:list` that the new production build FINISHED. A session ending "merged + pushed" without dispatching this left the owner on a stale build (2026-07-24, build 54).
+- **Shipping:** `gh workflow run eas-build.yml --ref main`, then verify with
+  `npx eas-cli build:list`. The workflow runs `scripts/ship.js`, which picks a
+  native build ONLY when the native fingerprint moved and otherwise ships a free
+  OTA update. Check locally first with `node scripts/ship.js --dry-run`.
+- **ONE ship per session, at the end.** Builds 69-72 were four separate
+  dispatches in a single session (2026-08-03) that shared one fingerprint — the
+  first three were pure waste. Batch fixes, ship once. Ship-check findings are
+  part of the same batch, not a reason to re-dispatch.
+- **Only these change the fingerprint** (i.e. actually need a build): a native
+  dependency added/removed/upgraded, `app.json`/`app.config.*` native config, an
+  SDK bump, a config plugin, app icon/splash. Everything in `app/`,
+  `components/`, `lib/`, `hooks/` is JavaScript and goes OTA.
+- **`--force-build` when the owner must be pinged.** An OTA update produces no
+  TestFlight push notification (the app picks it up on next launch), and that
+  notification is the owner's review signal (rule 1b). Dispatch with
+  `-f force_build=true` when you want them to go look.
+- **Still never end "merged + pushed"** without shipping — a session that did
+  left the owner on a stale build (2026-07-24, build 54).
 - **App Store:** EAS Submit (future)
 
 ## File Hygiene
 CLAUDE.md (**limit: 100 lines**). Keep it concise. Detailed notes → `memory/{topic}.md`.
 
-## Design Proposals (principles — owner feedback 2026-07-20/21)
-1. **Fidelity honesty.** Anything presented to the owner as "the proposed design" must be rendered by the real product (variant in a worktree → simulator → `simctl io screenshot`) or composited onto real captures. Rough sketches are allowed for private exploration only, must be labeled as sketches, and are never the deliverable — two incidents of HTML re-creations shown as designs were rejected as fake.
-2. **Venue (owner-confirmed 2026-07-21):** Claude Design — the dedicated DesignSync project **"iOS App — Proposed Designs"** (projectId d21b75cc-0388-4721-81f5-d886f744919f). CRITICAL ROUTING NUANCE: the owner opens it via **claude.ai/design → "Design systems" tab** (confirmed working); direct `claude.ai/project/<id>` URLs show no-permission for the owner — NEVER hand the owner a raw project URL, always the design-pane path. Do not write proposals into "Broadway Scorecard Design System" (tokens only). Artifact https://claude.ai/code/artifact/708007ba-4153-4d88-bb06-581e3388e8c9 is the fallback copy. (A 2026-07-21 session wrongly concluded Claude Design was unusable after testing only direct URLs — that conclusion is superseded by the owner's confirmed pane access.)
-3. **Options where real.** Render 2-3 variants when direction is genuinely contested; one when it's obvious. Don't manufacture options for compliance.
-4. **Verify before showing.** Open the deliverable yourself first: every image sharp (embed from original PNGs, ≥900px, no re-compress/upscale), every section populated, no placeholders.
-Pipeline gotchas + full recipe: web repo memory `feedback_ios_design_conservative_real_tokens.md` (dev-client vs production build trap, Maestro launchApp/point-taps).
-**Owner link format (proven 2026-07-21):** `https://claude.ai/design/<projectId>` — opens with commenting. NEVER `claude.ai/project/<id>` (no-permission for the owner). Proposals live under ios-design-proposals/ in the ORIGINAL project the owner can provably open: https://claude.ai/design/469cbecf-df92-424c-bffd-f3441d1f745e (restored 2026-07-21 after the relocated project d21b75cc proved owner-invisible — projects created by session auth may not be visible to the owner; only 469cbecf has owner-confirmed access, so ALL proposal publishing goes there)
+## Design Proposals
+Fidelity rules, the owner-confirmed Claude Design venue + link format, and the
+publishing recipe live in `memory/design-proposals.md`. Read it before showing
+the owner any proposed design — HTML re-creations presented as designs have
+been rejected twice.
