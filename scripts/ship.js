@@ -188,13 +188,41 @@ function main() {
     ], { stdio: 'inherit' });
   } else {
     const message = commitSubject().slice(0, 100);
-    console.log(`\n$ eas update --branch production --environment production --message "${message}"`);
+
+    // Export ONCE, upload the source maps for that exact bundle, then publish
+    // that same directory. Letting `eas update` re-bundle would produce
+    // different debug IDs than the maps we uploaded, so Sentry would still
+    // show minified frames. Native builds already symbolicate (the Sentry
+    // config plugin runs at build time with SENTRY_AUTH_TOKEN from the EAS
+    // environment); without this step OTA'd JavaScript would silently lose
+    // that — the one real regression in moving to OTA (owner asked
+    // "any unintended consequences?", 2026-08-03).
+    console.log('\n$ expo export --platform ios');
+    run('npx', ['expo', 'export', '--platform', 'ios'], { stdio: 'inherit' });
+
+    if (process.env.SENTRY_AUTH_TOKEN) {
+      console.log('\n$ sentry expo-upload-sourcemaps dist');
+      try {
+        run('node', ['node_modules/@sentry/react-native/scripts/expo-upload-sourcemaps.js', 'dist'], {
+          stdio: 'inherit',
+        });
+      } catch (e) {
+        // A failed upload must not block delivery — it costs symbolication on
+        // this update, not the update itself.
+        console.warn(`WARNING: source-map upload failed (${e.message}). Crash reports from this update will be minified.`);
+      }
+    } else {
+      console.warn('WARNING: SENTRY_AUTH_TOKEN not set — crash reports from this update will be minified.');
+    }
+
+    console.log(`\n$ eas update --branch production --input-dir dist --message "${message}"`);
     run('npx', [
       'eas-cli', 'update',
       '--branch', 'production',
       // Required from SDK 55 on; the CLI hard-errors without it.
       '--environment', 'production',
       '--platform', 'ios',
+      '--input-dir', 'dist',
       '--message', message,
       '--non-interactive',
     ], { stdio: 'inherit' });
