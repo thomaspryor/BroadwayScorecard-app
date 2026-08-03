@@ -2,10 +2,15 @@
  * Fixture screen for the To Watch poster tags (owner directives 2026-08-02).
  *
  * Renders the SHIPPING components — PosterStatusPill and OutOfMarketChip — at
- * the real To Watch grid geometry (23%-wide cards, 2:3 posters) against fixed
- * show data, so a sim screenshot proves the web-parity chip and the
- * out-of-market city chip without depending on the signed-in account's
- * watchlist. Dev-only, same guard as the other test screens.
+ * the real To Watch grid geometry against fixed show data, so a sim screenshot
+ * proves the web-parity chip and the out-of-market city chip without depending
+ * on the signed-in account's watchlist. Dev-only, same guard as the other test
+ * screens.
+ *
+ * Geometry comes from usePosterGrid(3), the same hook the real tab uses. It was
+ * hardcoded to the old 4-up '23%' and silently kept showing the pre-2026-08-03
+ * layout after the tab moved to 3-up — a fixture that proves the wrong thing is
+ * worse than no fixture (/what-else sweep, 2026-08-03).
  */
 
 import React from 'react';
@@ -14,6 +19,7 @@ import { PosterStatusPill } from '@/components/show-cards/PosterStatusPill';
 import { OutOfMarketChip } from '@/components/show-cards/OutOfMarketChip';
 import type { Market } from '@/components/MarketPicker';
 import type { Show } from '@/lib/types';
+import { usePosterGrid } from '@/hooks/usePosterGrid';
 import { Colors, Spacing, BorderRadius } from '@/constants/theme';
 
 function fixture(partial: Partial<Show> & { id: string; title: string }): Show {
@@ -42,8 +48,9 @@ const CARDS: Show[] = [
 ];
 
 function Card({ show, market }: { show: Show; market: Market }) {
+  const grid = usePosterGrid(3);
   return (
-    <View style={styles.gridCard}>
+    <View style={[styles.gridCard, { width: grid.cardWidth }]}>
       <View>
         <View style={styles.gridPoster} />
         <PosterStatusPill show={show} />
@@ -82,8 +89,9 @@ const styles = StyleSheet.create({
   content: { padding: Spacing.lg, paddingTop: 60, gap: Spacing.xl },
   block: { gap: Spacing.md },
   heading: { color: Colors.text.primary, fontSize: 16, fontWeight: '700' },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 12 },
-  gridCard: { width: '23%', alignItems: 'center' },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm, rowGap: 12 },
+  // Width comes from usePosterGrid(3) at render time — see lib/poster-grid.ts.
+  gridCard: { alignItems: 'center' },
   gridPoster: {
     width: '100%', aspectRatio: 2 / 3, borderRadius: BorderRadius.md,
     backgroundColor: Colors.surface.overlay,
