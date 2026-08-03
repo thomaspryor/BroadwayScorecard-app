@@ -11,11 +11,15 @@
 // Every assertion below is a shape taken from that incident's real output.
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
 const {
   parseEnvList,
+  parseDotenv,
   auditUpdateCredentials,
   parseLoadedVars,
   parseRuntimeVersion,
@@ -112,6 +116,87 @@ test('parseRuntimeVersion finds the version needed to roll an update back', () =
   ].join('\n');
   assert.equal(parseRuntimeVersion(out), '07ce5a3f14d7a14b4aba1631b0f6ce040fe08ce3');
   assert.equal(parseRuntimeVersion('✔ Published!'), null);
+});
+
+// ── Hardening after adversarial review (Codex, 2026-08-03) ──────────────────
+// Every check below guards a way the first version of this guard could have
+// waved a broken update through.
+
+test('the pulled VALUES decide, not the visibility wording', () => {
+  // The real defence: `eas env:pull` returns what will actually be compiled
+  // in. An empty or absent value fails even when env:list looks healthy.
+  const envVars = parseEnvList(ENV_LIST_AFTER);
+  const resolved = new Map([
+    ['EXPO_PUBLIC_SUPABASE_URL', 'https://tcb.supabase.co'],
+    ['EXPO_PUBLIC_SUPABASE_ANON_KEY', ''],
+  ]);
+  const { errors } = auditUpdateCredentials(REQUIRED, envVars, resolved);
+  assert.equal(errors.length, 1);
+  assert.match(errors[0], /EXPO_PUBLIC_SUPABASE_ANON_KEY resolves to ''/);
+});
+
+test('a Secret variable is absent from the pull, and that is an error', () => {
+  // env:pull silently omits Secret variables — precisely the incident.
+  const { errors } = auditUpdateCredentials(
+    REQUIRED,
+    parseEnvList(ENV_LIST_BEFORE),
+    new Map(),
+  );
+  assert.equal(errors.length, 2);
+  assert.match(errors.join('\n'), /resolves to nothing/);
+  assert.match(errors.join('\n'), /--visibility sensitive/);
+});
+
+test('unrecognised masking wording is treated as Secret, not as plaintext', () => {
+  // If EAS rewords the hint, the guess that blocks a ship is the safe one.
+  const vars = parseEnvList(
+    'Environment: production\nEXPO_PUBLIC_SUPABASE_URL=***** (hidden for some new reason)\n',
+  );
+  assert.deepEqual(vars.get('EXPO_PUBLIC_SUPABASE_URL').visibilities, ['secret']);
+});
+
+test('output above the Environment: header cannot manufacture a variable', () => {
+  // yarn/eas print KEY=value-shaped noise; only the listing itself counts.
+  const vars = parseEnvList(
+    'NODE_OPTIONS=--max-old-space-size=4096\n' +
+    'EXPO_PUBLIC_SUPABASE_URL=https://spoofed.example\n' +
+    'Environment: production\n' +
+    'EXPO_PUBLIC_SENTRY_DSN=https://real@sentry.io/1\n',
+  );
+  assert.equal(vars.has('EXPO_PUBLIC_SUPABASE_URL'), false);
+  assert.equal(vars.has('NODE_OPTIONS'), false);
+  assert.equal(vars.has('EXPO_PUBLIC_SENTRY_DSN'), true);
+});
+
+test('parseDotenv reads the flat file eas env:pull writes', () => {
+  const values = parseDotenv(
+    '# comment\nEXPO_PUBLIC_SUPABASE_URL=https://tcb.supabase.co\n' +
+    'EXPO_PUBLIC_SUPABASE_ANON_KEY="ey.quoted.jwt"\nEMPTY=\n',
+  );
+  assert.equal(values.get('EXPO_PUBLIC_SUPABASE_URL'), 'https://tcb.supabase.co');
+  assert.equal(values.get('EXPO_PUBLIC_SUPABASE_ANON_KEY'), 'ey.quoted.jwt');
+  assert.equal(values.get('EMPTY'), '');
+});
+
+test('bracket and destructured reads of process.env are found too', () => {
+  // A credential read as process.env['X'] would otherwise never be checked —
+  // failing open, which is the direction that ships a broken app.
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ship-scan-'));
+  fs.mkdirSync(path.join(dir, 'lib'));
+  fs.writeFileSync(
+    path.join(dir, 'lib', 'a.ts'),
+    `const a = process.env['EXPO_PUBLIC_BRACKET'];\n` +
+    `const { EXPO_PUBLIC_DESTRUCTURED, EXPO_PUBLIC_ALSO } = process.env;\n` +
+    `const c = process.env.EXPO_PUBLIC_DOTTED;\n`,
+  );
+  const found = publicVarsUsedInSource(dir);
+  fs.rmSync(dir, { recursive: true, force: true });
+  assert.deepEqual(found, [
+    'EXPO_PUBLIC_ALSO',
+    'EXPO_PUBLIC_BRACKET',
+    'EXPO_PUBLIC_DESTRUCTURED',
+    'EXPO_PUBLIC_DOTTED',
+  ]);
 });
 
 test('the required list is derived from the app source, not a hand-kept list', () => {

@@ -49,6 +49,7 @@
 
 const { execFileSync } = require('child_process');
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 
 // Files that can change the native binary. Mirrors the reasoning in
@@ -173,8 +174,17 @@ function publicVarsUsedInSource(root = path.join(__dirname, '..')) {
         if (entry.name !== 'node_modules' && !entry.name.startsWith('.')) walk(full);
       } else if (SOURCE_EXTS.has(path.extname(entry.name))) {
         const src = fs.readFileSync(full, 'utf8');
+        // Dot access, bracket access, and destructuring off process.env are
+        // three spellings of the same read. Missing one fails OPEN — the
+        // variable is simply never checked — so all three are matched.
         for (const m of src.matchAll(/process\.env\.(EXPO_PUBLIC_[A-Z0-9_]+)/g)) {
           found.add(m[1]);
+        }
+        for (const m of src.matchAll(/process\.env\[\s*['"`](EXPO_PUBLIC_[A-Z0-9_]+)['"`]\s*\]/g)) {
+          found.add(m[1]);
+        }
+        for (const m of src.matchAll(/\{([^{}]*)\}\s*=\s*process\.env/g)) {
+          for (const n of m[1].matchAll(/(EXPO_PUBLIC_[A-Z0-9_]+)/g)) found.add(n[1]);
         }
       }
     }
@@ -184,21 +194,34 @@ function publicVarsUsedInSource(root = path.join(__dirname, '..')) {
 }
 
 /**
- * Parse `eas env:list --environment X`. Visibility is only ever stated in the
- * masked-value hint, so that hint IS the signal we need: "secret" means the
- * value exists on EAS and `eas update` will still bundle an empty string.
+ * Parse `eas env:list --environment X`. Only used to spot DUPLICATE names,
+ * which `eas env:pull` cannot show (it emits one line per name) — the values
+ * themselves come from the pull, not from reading this prose.
+ *
+ * Parsing starts after the "Environment:" header so CLI banners, upgrade
+ * notices and yarn warnings above it cannot manufacture an entry.
+ *
+ * Classification fails CLOSED: a value that is masked but carries no
+ * recognised "sensitive" wording is treated as secret. If EAS reworded the
+ * hint, the wrong guess must be the one that blocks a ship, not the one that
+ * publishes an app that cannot sign in.
  */
 function parseEnvList(text) {
   const vars = new Map();
-  for (const line of text.split('\n')) {
+  const lines = text.split('\n');
+  const start = lines.findIndex(l => /^Environment:/.test(l.trim()));
+  for (const line of start === -1 ? lines : lines.slice(start + 1)) {
     const m = line.match(/^([A-Z][A-Z0-9_]*)=(.*)$/);
     if (!m) continue;
     const [, name, rest] = m;
+    const masked = rest.trim().startsWith('*****');
     const visibility = /secret env variable/i.test(rest)
       ? 'secret'
       : /sensitive env variable/i.test(rest)
         ? 'sensitive'
-        : 'plaintext';
+        : masked
+          ? 'secret' // masked but unrecognised wording — assume the worst
+          : 'plaintext';
     const prev = vars.get(name);
     // A name can legitimately appear twice on EAS (it happened to
     // EXPO_PUBLIC_POSTHOG_API_KEY). Remember every visibility seen: if ANY
@@ -217,17 +240,33 @@ function parseEnvList(text) {
  * can print everything at once — a half-reported env problem sends you round
  * the loop twice.
  */
-function auditUpdateCredentials(required, envVars) {
+function auditUpdateCredentials(required, envVars, resolved) {
   const errors = [];
   const warnings = [];
 
   for (const name of required) {
+    // The pulled values are the authority: they are the same set `eas update`
+    // resolves, in a machine-readable format, so this checks what will
+    // actually be compiled in rather than inferring it from a visibility hint.
+    const value = resolved ? resolved.get(name) : undefined;
     const entry = envVars.get(name);
+
+    if (resolved && (value === undefined || value === '')) {
+      errors.push(
+        `${name} resolves to ${value === undefined ? 'nothing' : "''"} for this environment` +
+        (entry && entry.visibilities.includes('secret')
+          ? ' — it has visibility "Secret", which EAS only injects on a build ' +
+            'worker. Delete and re-create it with --visibility sensitive.'
+          : ' — an update would bundle an empty string.'),
+      );
+      continue;
+    }
+
     if (!entry) {
       errors.push(`${name} is not set in the EAS environment — an update would bundle ''`);
       continue;
     }
-    if (entry.visibilities.includes('secret')) {
+    if (!resolved && entry.visibilities.includes('secret')) {
       errors.push(
         `${name} has visibility "Secret" — EAS only injects Secret values on a ` +
         `build worker, so an update would bundle ''. Delete and re-create it ` +
@@ -250,6 +289,51 @@ function auditUpdateCredentials(required, envVars) {
   }
 
   return { errors, warnings };
+}
+
+/**
+ * The values `eas update` will actually compile in, read the only way that
+ * does not depend on CLI prose: `eas env:pull` writes them as a .env file.
+ * Secret-visibility variables are simply absent from it, which is exactly the
+ * condition that broke sign-in — so absence and emptiness are both failures.
+ *
+ * Pulled to a temp path, never the default .env.local: that file is a
+ * developer's local config and this script must not overwrite it.
+ */
+function resolvedEnvValues(environment) {
+  const target = path.join(
+    fs.mkdtempSync(path.join(os.tmpdir(), 'ship-env-')),
+    '.env',
+  );
+  try {
+    run('npx', [
+      'eas-cli', 'env:pull',
+      '--environment', environment,
+      '--path', target,
+      '--non-interactive',
+    ]);
+    return parseDotenv(fs.readFileSync(target, 'utf8'));
+  } finally {
+    fs.rmSync(path.dirname(target), { recursive: true, force: true });
+  }
+}
+
+/** Minimal .env reader — enough for the flat KEY=value EAS writes. */
+function parseDotenv(text) {
+  const values = new Map();
+  for (const line of text.split('\n')) {
+    const m = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/);
+    if (!m) continue;
+    let value = m[2].trim();
+    if (
+      (value.startsWith('"') && value.endsWith('"') && value.length > 1) ||
+      (value.startsWith("'") && value.endsWith("'") && value.length > 1)
+    ) {
+      value = value.slice(1, -1);
+    }
+    values.set(m[1], value);
+  }
+  return values;
 }
 
 /** The names `eas update` reports it actually loaded, from its own output. */
@@ -319,7 +403,10 @@ function main() {
     const envVars = parseEnvList(
       run('npx', ['eas-cli', 'env:list', '--environment', 'production']),
     );
-    const { errors, warnings } = auditUpdateCredentials(required, envVars);
+    // A failed pull is fatal, not a reason to fall back to reading prose:
+    // being unable to see the values is exactly when guessing is worst.
+    const resolved = resolvedEnvValues('production');
+    const { errors, warnings } = auditUpdateCredentials(required, envVars, resolved);
 
     console.log(`\nrequired EXPO_PUBLIC_*: ${required.join(', ') || '(none)'}`);
     warnings.forEach(w => console.log(`WARNING: ${w}`));
@@ -331,7 +418,7 @@ function main() {
         `cannot sign in (2026-08-03).`,
       );
     }
-    console.log('credentials pre-flight: OK — every required variable is readable off-worker');
+    console.log('credentials pre-flight: OK — every required variable resolves to a non-empty value');
   }
 
   if (DRY_RUN) {
@@ -368,16 +455,29 @@ function main() {
     const loaded = parseLoadedVars(out);
     const missing = loaded === null ? [] : required.filter(v => !loaded.includes(v));
     if (loaded === null) {
-      console.log(
-        'WARNING: eas update did not report which environment variables it loaded — ' +
-        'the pre-flight passed, but this publish is unverified.',
+      // Unverifiable is not the same as bad — the pre-flight read the actual
+      // values, so the update is very likely fine and rolling it back would
+      // undo good work over a CLI wording change. Leave it live, fail the job
+      // loudly, and make a human look.
+      throw new Error(
+        'eas update did not report which environment variables it loaded, so ' +
+        'this publish could not be verified. The update is LIVE and the ' +
+        'pre-flight passed — check it, then update parseLoadedVars() for the ' +
+        'new CLI output.',
       );
     } else if (missing.length) {
       // The bad update is already live. Undo it before failing: every launch
       // between now and a human noticing installs the credential-less bundle.
-      const runtime = parseRuntimeVersion(out);
+      // `local` is the fingerprint this update was published against, so the
+      // rollback does not depend on parsing it back out of the CLI output.
+      // Safe against clobbering a concurrent ship only because the workflow
+      // pins `concurrency: eas-build` with cancel-in-progress false — two
+      // publishes to this branch cannot overlap. Keep that group if this ever
+      // moves to another trigger.
+      const runtime = parseRuntimeVersion(out) || local;
       console.error(`\nPUBLISHED UPDATE IS MISSING: ${missing.join(', ')} — rolling back`);
-      if (runtime) {
+      let rolledBack = false;
+      try {
         run('npx', [
           'eas-cli', 'update:roll-back-to-embedded',
           '--branch', 'production',
@@ -386,10 +486,16 @@ function main() {
           '--message', `Automatic rollback: update lacked ${missing.join(', ')}`,
           '--non-interactive',
         ], { stdio: 'inherit' });
+        rolledBack = true;
+      } catch (rollbackErr) {
+        console.error(`rollback FAILED: ${rollbackErr.message}`);
       }
       throw new Error(
         `update published without ${missing.join(', ')}` +
-        (runtime ? ' — rolled back to the embedded bundle' : ' — ROLL BACK MANUALLY (no runtime version in the output)'),
+        (rolledBack
+          ? ' — rolled back to the embedded bundle'
+          : ` — ROLL BACK MANUALLY:\n  npx eas-cli update:roll-back-to-embedded ` +
+            `--branch production --platform ios --runtime-version ${runtime}`),
       );
     } else {
       console.log(`credentials verified in the published bundle: ${required.join(', ')}`);
@@ -412,4 +518,11 @@ if (require.main === module) {
   }
 }
 
-module.exports = { parseEnvList, auditUpdateCredentials, parseLoadedVars, parseRuntimeVersion, publicVarsUsedInSource };
+module.exports = {
+  parseEnvList,
+  parseDotenv,
+  auditUpdateCredentials,
+  parseLoadedVars,
+  parseRuntimeVersion,
+  publicVarsUsedInSource,
+};
