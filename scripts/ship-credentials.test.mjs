@@ -46,8 +46,15 @@ EXPO_PUBLIC_SUPABASE_URL=***** (This is a sensitive env variable. To access it, 
 
 const REQUIRED = ['EXPO_PUBLIC_SUPABASE_URL', 'EXPO_PUBLIC_SUPABASE_ANON_KEY'];
 
+// What `eas env:pull` writes when the environment is healthy.
+const RESOLVED_OK = new Map([
+  ['EXPO_PUBLIC_SUPABASE_URL', 'https://tcb.supabase.co'],
+  ['EXPO_PUBLIC_SUPABASE_ANON_KEY', 'ey.anon.jwt'],
+]);
+
 test('a Secret credential blocks the publish', () => {
-  const { errors } = auditUpdateCredentials(REQUIRED, parseEnvList(ENV_LIST_BEFORE));
+  // Secret variables are absent from the pull — that absence IS the signal.
+  const { errors } = auditUpdateCredentials(REQUIRED, parseEnvList(ENV_LIST_BEFORE), new Map());
   assert.equal(errors.length, 2, 'both Supabase variables must be reported');
   assert.match(errors.join('\n'), /EXPO_PUBLIC_SUPABASE_URL/);
   assert.match(errors.join('\n'), /EXPO_PUBLIC_SUPABASE_ANON_KEY/);
@@ -55,7 +62,7 @@ test('a Secret credential blocks the publish', () => {
 });
 
 test('the same variables at "sensitive" visibility pass', () => {
-  const { errors } = auditUpdateCredentials(REQUIRED, parseEnvList(ENV_LIST_AFTER));
+  const { errors } = auditUpdateCredentials(REQUIRED, parseEnvList(ENV_LIST_AFTER), RESOLVED_OK);
   assert.deepEqual(errors, []);
 });
 
@@ -63,16 +70,19 @@ test('a credential missing from EAS entirely blocks the publish', () => {
   const { errors } = auditUpdateCredentials(
     [...REQUIRED, 'EXPO_PUBLIC_NEWLY_ADDED'],
     parseEnvList(ENV_LIST_AFTER),
+    RESOLVED_OK,
   );
   assert.equal(errors.length, 1);
-  assert.match(errors[0], /EXPO_PUBLIC_NEWLY_ADDED is not set/);
+  assert.match(errors[0], /EXPO_PUBLIC_NEWLY_ADDED resolves to nothing/);
 });
 
 test('a duplicated required variable blocks; a duplicated optional one only warns', () => {
   // EXPO_PUBLIC_POSTHOG_API_KEY really is defined twice on this project, with
   // values that differ by one character. Analytics is not worth blocking a
   // ship over, but it must not pass in silence either.
-  const { errors, warnings } = auditUpdateCredentials(REQUIRED, parseEnvList(ENV_LIST_BEFORE));
+  const { errors, warnings } = auditUpdateCredentials(
+    REQUIRED, parseEnvList(ENV_LIST_BEFORE), new Map(),
+  );
   assert.ok(
     warnings.some(w => /POSTHOG/.test(w) && /2×/.test(w)),
     `expected a duplicate warning for PostHog, got: ${JSON.stringify(warnings)}`,
@@ -81,7 +91,8 @@ test('a duplicated required variable blocks; a duplicated optional one only warn
 
   const dupRequired = auditUpdateCredentials(
     ['EXPO_PUBLIC_POSTHOG_API_KEY'],
-    parseEnvList(`EXPO_PUBLIC_POSTHOG_API_KEY=a\nEXPO_PUBLIC_POSTHOG_API_KEY=b\n`),
+    parseEnvList(`Environment: production\nEXPO_PUBLIC_POSTHOG_API_KEY=a\nEXPO_PUBLIC_POSTHOG_API_KEY=b\n`),
+    new Map([['EXPO_PUBLIC_POSTHOG_API_KEY', 'a']]),
   );
   assert.equal(dupRequired.errors.length, 1);
   assert.match(dupRequired.errors[0], /2×/);
@@ -178,32 +189,57 @@ test('parseDotenv reads the flat file eas env:pull writes', () => {
   assert.equal(values.get('EMPTY'), '');
 });
 
-test('bracket and destructured reads of process.env are found too', () => {
-  // A credential read as process.env['X'] would otherwise never be checked —
-  // failing open, which is the direction that ships a broken app.
+test('bracket and destructured reads are reported as defects, not required', () => {
+  // babel-preset-expo only inlines the literal `process.env.EXPO_PUBLIC_X`
+  // member expression. The other two spellings read an object that does not
+  // exist on device — they are undefined however EAS is configured, so
+  // requiring the variable would hide the real bug.
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ship-scan-'));
   fs.mkdirSync(path.join(dir, 'lib'));
   fs.writeFileSync(
     path.join(dir, 'lib', 'a.ts'),
     `const a = process.env['EXPO_PUBLIC_BRACKET'];\n` +
-    `const { EXPO_PUBLIC_DESTRUCTURED, EXPO_PUBLIC_ALSO } = process.env;\n` +
+    `const { EXPO_PUBLIC_DESTRUCTURED } = process.env;\n` +
     `const c = process.env.EXPO_PUBLIC_DOTTED;\n`,
   );
-  const found = publicVarsUsedInSource(dir);
+  const scan = publicVarsUsedInSource(dir);
   fs.rmSync(dir, { recursive: true, force: true });
-  assert.deepEqual(found, [
-    'EXPO_PUBLIC_ALSO',
-    'EXPO_PUBLIC_BRACKET',
-    'EXPO_PUBLIC_DESTRUCTURED',
-    'EXPO_PUBLIC_DOTTED',
-  ]);
+
+  assert.deepEqual(scan.required, ['EXPO_PUBLIC_DOTTED']);
+  assert.equal(scan.unsupported.length, 2);
+  assert.match(scan.unsupported.join('\n'), /EXPO_PUBLIC_BRACKET/);
+  assert.match(scan.unsupported.join('\n'), /EXPO_PUBLIC_DESTRUCTURED/);
+});
+
+test('auditUpdateCredentials refuses to run without the pulled values', () => {
+  assert.throws(
+    () => auditUpdateCredentials(REQUIRED, parseEnvList(ENV_LIST_AFTER)),
+    /requires the resolved values/,
+  );
+});
+
+test('parseDotenv does not read a quoted-empty or commented value as present', () => {
+  // The direction that matters: mis-reading empty as non-empty ships a broken
+  // app, so these three shapes must all come back empty.
+  const values = parseDotenv(
+    'export EXPO_PUBLIC_A=\n' +
+    'EXPO_PUBLIC_B="" # placeholder\n' +
+    'EXPO_PUBLIC_C= # not set yet\n' +
+    'EXPO_PUBLIC_D="https://real.supabase.co" # prod\n',
+  );
+  assert.equal(values.get('EXPO_PUBLIC_A'), '');
+  assert.equal(values.get('EXPO_PUBLIC_B'), '');
+  assert.equal(values.get('EXPO_PUBLIC_C'), '');
+  assert.equal(values.get('EXPO_PUBLIC_D'), 'https://real.supabase.co');
 });
 
 test('the required list is derived from the app source, not a hand-kept list', () => {
   // A credential added to lib/ and forgotten here would otherwise ship empty.
-  const found = publicVarsUsedInSource();
-  assert.ok(found.includes('EXPO_PUBLIC_SUPABASE_URL'));
-  assert.ok(found.includes('EXPO_PUBLIC_SUPABASE_ANON_KEY'));
-  assert.ok(found.includes('EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID'));
-  assert.ok(found.every(v => v.startsWith('EXPO_PUBLIC_')));
+  const { required, unsupported } = publicVarsUsedInSource();
+  assert.ok(required.includes('EXPO_PUBLIC_SUPABASE_URL'));
+  assert.ok(required.includes('EXPO_PUBLIC_SUPABASE_ANON_KEY'));
+  assert.ok(required.includes('EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID'));
+  assert.ok(required.every(v => v.startsWith('EXPO_PUBLIC_')));
+  // The app's own source must never contain an un-inlinable read.
+  assert.deepEqual(unsupported, []);
 });

@@ -158,9 +158,21 @@ function nativePathsChangedSince(sha) {
   return [...files].filter(f => f.startsWith('(') || NATIVE_PATHS.some(re => re.test(f)));
 }
 
-/** Every EXPO_PUBLIC_* the shipped JavaScript actually reads. */
+/**
+ * Every EXPO_PUBLIC_* the shipped JavaScript actually reads, plus any read
+ * written in a form Expo cannot inline.
+ *
+ * babel-preset-expo substitutes EXPO_PUBLIC_* at bundle time by rewriting the
+ * literal member expression `process.env.EXPO_PUBLIC_X`. It does NOT rewrite
+ * `process.env['EXPO_PUBLIC_X']` or `const { EXPO_PUBLIC_X } = process.env` —
+ * those read an object that does not exist on the device and are `undefined`
+ * no matter how the variable is configured on EAS. So they are not "another
+ * spelling to also require": they are a defect, reported as `unsupported`.
+ * Returns { required, unsupported }.
+ */
 function publicVarsUsedInSource(root = path.join(__dirname, '..')) {
   const found = new Set();
+  const unsupported = [];
   const walk = (dir) => {
     let entries;
     try {
@@ -174,23 +186,23 @@ function publicVarsUsedInSource(root = path.join(__dirname, '..')) {
         if (entry.name !== 'node_modules' && !entry.name.startsWith('.')) walk(full);
       } else if (SOURCE_EXTS.has(path.extname(entry.name))) {
         const src = fs.readFileSync(full, 'utf8');
-        // Dot access, bracket access, and destructuring off process.env are
-        // three spellings of the same read. Missing one fails OPEN — the
-        // variable is simply never checked — so all three are matched.
+        const rel = path.relative(root, full);
         for (const m of src.matchAll(/process\.env\.(EXPO_PUBLIC_[A-Z0-9_]+)/g)) {
           found.add(m[1]);
         }
         for (const m of src.matchAll(/process\.env\[\s*['"`](EXPO_PUBLIC_[A-Z0-9_]+)['"`]\s*\]/g)) {
-          found.add(m[1]);
+          unsupported.push(`${rel}: process.env['${m[1]}']`);
         }
         for (const m of src.matchAll(/\{([^{}]*)\}\s*=\s*process\.env/g)) {
-          for (const n of m[1].matchAll(/(EXPO_PUBLIC_[A-Z0-9_]+)/g)) found.add(n[1]);
+          for (const n of m[1].matchAll(/(EXPO_PUBLIC_[A-Z0-9_]+)/g)) {
+            unsupported.push(`${rel}: destructured ${n[1]}`);
+          }
         }
       }
     }
   };
   SOURCE_DIRS.forEach(d => walk(path.join(root, d)));
-  return [...found].sort();
+  return { required: [...found].sort(), unsupported: unsupported.sort() };
 }
 
 /**
@@ -241,6 +253,12 @@ function parseEnvList(text) {
  * the loop twice.
  */
 function auditUpdateCredentials(required, envVars, resolved) {
+  if (!(resolved instanceof Map)) {
+    // Not defensive noise: an earlier version of this function inferred the
+    // answer from visibility wording when it had no values, and a caller that
+    // silently fell back to that path is exactly how a broken bundle ships.
+    throw new Error('auditUpdateCredentials requires the resolved values from eas env:pull');
+  }
   const errors = [];
   const warnings = [];
 
@@ -248,10 +266,10 @@ function auditUpdateCredentials(required, envVars, resolved) {
     // The pulled values are the authority: they are the same set `eas update`
     // resolves, in a machine-readable format, so this checks what will
     // actually be compiled in rather than inferring it from a visibility hint.
-    const value = resolved ? resolved.get(name) : undefined;
+    const value = resolved.get(name);
     const entry = envVars.get(name);
 
-    if (resolved && (value === undefined || value === '')) {
+    if (value === undefined || value === '') {
       errors.push(
         `${name} resolves to ${value === undefined ? 'nothing' : "''"} for this environment` +
         (entry && entry.visibilities.includes('secret')
@@ -264,14 +282,6 @@ function auditUpdateCredentials(required, envVars, resolved) {
 
     if (!entry) {
       errors.push(`${name} is not set in the EAS environment — an update would bundle ''`);
-      continue;
-    }
-    if (!resolved && entry.visibilities.includes('secret')) {
-      errors.push(
-        `${name} has visibility "Secret" — EAS only injects Secret values on a ` +
-        `build worker, so an update would bundle ''. Delete and re-create it ` +
-        `with --visibility sensitive.`,
-      );
       continue;
     }
     if (entry.count > 1) {
@@ -318,18 +328,34 @@ function resolvedEnvValues(environment) {
   }
 }
 
-/** Minimal .env reader — enough for the flat KEY=value EAS writes. */
+/**
+ * .env reader for what `eas env:pull` writes. Deliberately hand-rolled: the
+ * only `dotenv` in this tree is a transitive dependency of eas-cli, and adding
+ * a direct one would change package.json — which moves the native fingerprint
+ * and turns the next free OTA into a $1.85 build.
+ *
+ * The cases that matter are the ones where a sloppy parser reads a value as
+ * NON-empty when it is empty, because that is the direction that ships a
+ * broken app: an `export ` prefix, a quoted value, and a trailing comment.
+ */
 function parseDotenv(text) {
   const values = new Map();
   for (const line of text.split('\n')) {
-    const m = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/);
-    if (!m) continue;
+    const m = line.match(/^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/);
+    if (!m || line.trim().startsWith('#')) continue;
     let value = m[2].trim();
-    if (
-      (value.startsWith('"') && value.endsWith('"') && value.length > 1) ||
-      (value.startsWith("'") && value.endsWith("'") && value.length > 1)
-    ) {
-      value = value.slice(1, -1);
+
+    const quote = value[0] === '"' || value[0] === "'" ? value[0] : null;
+    if (quote) {
+      // Everything up to the matching close quote; anything after it (a
+      // trailing comment) is not part of the value.
+      const end = value.indexOf(quote, 1);
+      value = end === -1 ? value.slice(1) : value.slice(1, end);
+    } else {
+      // Unquoted: a # at the start, or after whitespace, begins a comment.
+      // `KEY= # not set yet` must read as empty, not as the comment text.
+      // A # with no space before it (a URL fragment) stays part of the value.
+      value = value.replace(/(^|\s+)#.*$/, '').trim();
     }
     values.set(m[1], value);
   }
@@ -399,7 +425,15 @@ function main() {
   // dry run is a real pre-flight, not just a decision preview.
   let required = [];
   if (mode === 'update') {
-    required = publicVarsUsedInSource().filter(v => !OPTIONAL_PUBLIC_VARS.has(v));
+    const scan = publicVarsUsedInSource();
+    if (scan.unsupported.length) {
+      throw new Error(
+        `these EXPO_PUBLIC_* reads are never inlined by Expo and are undefined ` +
+        `on the device regardless of EAS configuration — rewrite them as ` +
+        `process.env.EXPO_PUBLIC_X:\n  - ${scan.unsupported.join('\n  - ')}`,
+      );
+    }
+    required = scan.required.filter(v => !OPTIONAL_PUBLIC_VARS.has(v));
     const envVars = parseEnvList(
       run('npx', ['eas-cli', 'env:list', '--environment', 'production']),
     );
@@ -459,11 +493,13 @@ function main() {
       // values, so the update is very likely fine and rolling it back would
       // undo good work over a CLI wording change. Leave it live, fail the job
       // loudly, and make a human look.
+      // Note for whoever hits this: re-running the job republishes rather than
+      // retrying, so fix parseLoadedVars() before dispatching again.
       throw new Error(
         'eas update did not report which environment variables it loaded, so ' +
         'this publish could not be verified. The update is LIVE and the ' +
         'pre-flight passed — check it, then update parseLoadedVars() for the ' +
-        'new CLI output.',
+        'new CLI output. Do not simply re-run: that publishes a second update.',
       );
     } else if (missing.length) {
       // The bad update is already live. Undo it before failing: every launch
