@@ -29,6 +29,7 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { ceremonyToYear } from '@/lib/tony-utils';
 import { recordShowView } from '@/lib/store-review';
 import { ShareCardWithRef, ShareCardHandle } from '@/components/ShareCard';
+import { SectionCard } from '@/components/show-page/SectionCard';
 import { ShowDetailSkeleton } from '@/components/Skeleton';
 import { useAuth } from '@/lib/auth-context';
 import { useWatchlist } from '@/hooks/useWatchlist';
@@ -426,8 +427,14 @@ export default function ShowDetailScreen() {
 
         {/* Audience Scorecard — grade badge header + horizontal source cards */}
         {detail?.audience && show.audienceGrade && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Audience Grade</Text>
+          <SectionCard
+            title="Audience Scorecard"
+            meta={`${
+              (detail.audience.sources.showScore?.count ?? 0) +
+              (detail.audience.sources.mezzanine?.count ?? 0) +
+              (detail.audience.sources.reddit?.count ?? 0)
+            } audience reviews`}
+          >
             {/* Grade badge header card */}
             <View style={[styles.audienceHeader, { borderColor: show.audienceGrade.color + '40' }]}>
               <View style={[styles.audienceGradeBadge, { backgroundColor: show.audienceGrade.color }]}>
@@ -581,15 +588,12 @@ export default function ShowDetailScreen() {
                 )}
               </ScrollView>
             )}
-          </View>
+          </SectionCard>
         )}
 
         {/* Critic Reviews List — collapsed by default */}
         {detail?.reviews && detail.reviews.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>
-              Critic Reviews ({detail.reviews.length})
-            </Text>
+          <SectionCard title="Critic Scorecard" meta={`${detail.reviews.length} reviews`}>
             {(showAllReviews ? detail.reviews : detail.reviews.slice(0, 3)).map((review, i) => (
               <ReviewRow key={i} review={review} showId={show.id} category={show.category} />
             ))}
@@ -603,7 +607,7 @@ export default function ShowDetailScreen() {
                 </Text>
               </Pressable>
             )}
-          </View>
+          </SectionCard>
         )}
 
         {/* Loading skeleton for detail */}
@@ -638,17 +642,6 @@ export default function ShowDetailScreen() {
           <SocialScorecardSection sp={socialPulse} />
         )}
 
-        {/* Quick facts */}
-        <View style={styles.infoSection}>
-          {show.runtime && <InfoRow label="Runtime" value={show.runtime} />}
-          {show.ageRecommendation && (
-            <InfoRow label="Ages" value={show.ageRecommendation} />
-          )}
-          {detail?.theaterAddress && (
-            <InfoRow label="Theater" value={`${show.venue} · ${detail.theaterAddress}`} />
-          )}
-        </View>
-
         {/* Seating Guidance */}
         {detail?.seatingSections && detail.seatingSections.length > 0 && (
           <SeatingGuidanceSection sections={detail.seatingSections} />
@@ -661,18 +654,14 @@ export default function ShowDetailScreen() {
 
         {/* Synopsis */}
         {show.synopsis && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>About</Text>
+          <SectionCard title="About">
             <Text style={styles.synopsis}>{show.synopsis}</Text>
-          </View>
+          </SectionCard>
         )}
 
         {/* Cast — show first 6, expandable */}
         {detail?.cast && detail.cast.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>
-              Cast ({detail.cast.length})
-            </Text>
+          <SectionCard title="Cast" meta={`${detail.cast.length} members`}>
             {(showAllCast ? detail.cast : detail.cast.slice(0, 6)).map((member, i) => (
               <View key={i} style={styles.creditRow}>
                 <Text style={styles.creditRole}>{member.role}</Text>
@@ -689,26 +678,25 @@ export default function ShowDetailScreen() {
                 </Text>
               </Pressable>
             )}
-          </View>
+          </SectionCard>
         )}
 
         {/* Creative Team */}
         {show.creativeTeam?.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Creative Team</Text>
+          <SectionCard title="Creative Team">
             {show.creativeTeam.map((member, i) => (
               <View key={i} style={styles.creditRow}>
                 <Text style={styles.creditRole}>{member.role}</Text>
                 <Text style={styles.creditName}>{member.name}</Text>
               </View>
             ))}
-          </View>
+          </SectionCard>
         )}
 
 
         {/* Tony Awards */}
         {detail?.tonyAwards && detail.tonyAwards.length > 0 && (
-          <TonyAwardsSection awards={detail.tonyAwards} />
+          <AwardsScorecardSection awards={detail.tonyAwards} />
         )}
 
         {/* Video Reviews */}
@@ -718,8 +706,7 @@ export default function ShowDetailScreen() {
 
         {/* Other Productions of the same show */}
         {otherProductions.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Other Productions of {show.title}</Text>
+          <SectionCard title="Other Productions" meta={show.title}>
             {otherProductions.map(prod => {
               const prodPoster = getImageUrl(prod.images.poster) || getImageUrl(prod.images.thumbnail);
               const marketLabel = prod.category === 'west-end' ? 'West End'
@@ -753,35 +740,32 @@ export default function ShowDetailScreen() {
                 </Pressable>
               );
             })}
-          </View>
+          </SectionCard>
         )}
 
         {/* Open shows you might like */}
         {relatedShowsOpen.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Open Shows You Might Like</Text>
+          <SectionCard title="Open Shows You Might Like">
             {relatedShowsOpen.map(related => (
               <RelatedShowRow key={related.id} show={related} onPress={() => router.push(`/show/${related.slug}`)} />
             ))}
-          </View>
+          </SectionCard>
         )}
 
         {/* Closed shows you might like */}
         {relatedShowsClosed.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Closed Shows You Might Like</Text>
+          <SectionCard title="Closed Shows You Might Like">
             {relatedShowsClosed.map(related => (
               <RelatedShowRow key={related.id} show={related} onPress={() => router.push(`/show/${related.slug}`)} />
             ))}
-          </View>
+          </SectionCard>
         )}
 
         {/* Hidden share card for image capture */}
         <ShareCardWithRef ref={shareCardRef} show={show} />
 
         {/* Quick Facts — structured basics + Official Site (relocated from the hero ticket row) */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Quick Facts</Text>
+        <SectionCard title="Quick Facts">
           <View style={styles.qfCard}>
             <View style={styles.qfRow}>
               <Text style={styles.qfLabel}>Status</Text>
@@ -807,9 +791,17 @@ export default function ShowDetailScreen() {
                 <Text style={styles.qfValue}>{show.runtime}</Text>
               </View>
             )}
+            {show.ageRecommendation && (
+              <View style={styles.qfRow}>
+                <Text style={styles.qfLabel}>Ages</Text>
+                <Text style={styles.qfValue}>{show.ageRecommendation}</Text>
+              </View>
+            )}
             <View style={styles.qfRow}>
               <Text style={styles.qfLabel}>{show.category === 'west-end' ? 'Theatre' : 'Theater'}</Text>
-              <Text style={[styles.qfValue, styles.qfValueFlex]} numberOfLines={1}>{show.venue}</Text>
+              <Text style={[styles.qfValue, styles.qfValueFlex]} numberOfLines={1}>
+                {detail?.theaterAddress ? `${show.venue} · ${detail.theaterAddress}` : show.venue}
+              </Text>
             </View>
             {show.officialUrl && (
               <Pressable
@@ -821,7 +813,7 @@ export default function ShowDetailScreen() {
               </Pressable>
             )}
           </View>
-        </View>
+        </SectionCard>
 
         {/* Action buttons */}
         <View style={styles.actionButtons}>
@@ -1059,15 +1051,6 @@ function RelatedShowRow({ show, onPress }: { show: Show; onPress: () => void }) 
   );
 }
 
-function InfoRow({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={styles.infoRow}>
-      <Text style={styles.infoLabel}>{label}</Text>
-      <Text style={styles.infoValue}>{value}</Text>
-    </View>
-  );
-}
-
 function runLength(openingDate: string, closingDate: string): string {
   try {
     const open = new Date(openingDate + 'T12:00:00');
@@ -1157,9 +1140,7 @@ function ShowtimesSection({ data }: { data: NonNullable<ShowDetail['showtimes']>
   const { todayIndex, isPastWeek } = getWeekContext(data.week);
   const rangeLabel = isPastWeek ? 'Last Week' : 'This Week';
   return (
-    <View style={styles.section}>
-      <Text style={styles.sectionTitle}>Showtimes</Text>
-      {range && <Text style={styles.showtimesRange}>{rangeLabel} ({range})</Text>}
+    <SectionCard title="Showtimes" meta={range ? `${rangeLabel} (${range})` : undefined}>
       <View style={styles.showtimesGrid}>
         {data.days.slice(0, 7).map((day, i) => {
           const hasShow = day.matinee || day.evening;
@@ -1182,7 +1163,7 @@ function ShowtimesSection({ data }: { data: NonNullable<ShowDetail['showtimes']>
           );
         })}
       </View>
-    </View>
+    </SectionCard>
   );
 }
 
@@ -1212,8 +1193,7 @@ function BoxOfficeSection({ data }: { data: NonNullable<ShowDetail['boxOffice']>
   const capDelta = tw ? pctChange(tw.capacity, tw.capacityPrev) : null;
 
   return (
-    <View style={styles.section}>
-      <Text style={styles.sectionTitle}>Box Office Scorecard</Text>
+    <SectionCard title="Box Office Scorecard">
       {tw && (
         <>
           <Text style={styles.boSubheading}>This Week</Text>
@@ -1254,14 +1234,17 @@ function BoxOfficeSection({ data }: { data: NonNullable<ShowDetail['boxOffice']>
           </View>
         </>
       )}
-    </View>
+    </SectionCard>
   );
 }
 
 // ---------- Lottery / Rush ----------
 
+// Program names + tints match the web's Discount Tickets card
+// (web: LotteryRushCard.tsx — purple lottery, emerald rush, blue digital
+// rush, pink student rush, gray standing room).
 const LR_TYPE_CONFIG: Record<string, { label: string; color: string }> = {
-  lottery: { label: 'Lottery', color: '#a78bfa' },
+  lottery: { label: 'Digital Lottery', color: '#a78bfa' },
   rush: { label: 'Rush', color: '#34d399' },
   digitalRush: { label: 'Digital Rush', color: '#60a5fa' },
   studentRush: { label: 'Student Rush', color: '#f472b6' },
@@ -1275,25 +1258,37 @@ function LRCard({ type, data }: { type: keyof typeof LR_TYPE_CONFIG; data: LRWin
   const open = async () => {
     if (data.url) await WebBrowser.openBrowserAsync(data.url);
   };
-  const Wrapper: any = data.url ? Pressable : View;
-  return (
-    <Wrapper
-      style={({ pressed }: { pressed: boolean }) => [
-        styles.lrCard,
-        { backgroundColor: cfg.color + '26', borderColor: cfg.color + '40' },
-        pressed && styles.pressed,
-      ]}
-      onPress={data.url ? open : undefined}
-    >
+  const tint = { backgroundColor: cfg.color + '26', borderColor: cfg.color + '40' };
+  const inner = (
+    <>
       <View style={styles.lrHeader}>
         <Text style={[styles.lrLabel, { color: cfg.color }]}>{cfg.label}</Text>
         {data.price != null && <Text style={styles.lrPrice}>${data.price}</Text>}
       </View>
       {data.time && <Text style={styles.lrMeta}>{data.time}</Text>}
       {data.location && <Text style={styles.lrMeta}>{data.location}</Text>}
-      {data.instructions && <Text style={styles.lrInst} numberOfLines={3}>{data.instructions}</Text>}
-      {data.platform && <Text style={styles.lrPlatform}>via {data.platform}{data.url ? ' →' : ''}</Text>}
-    </Wrapper>
+      {data.instructions && <Text style={styles.lrInst}>{data.instructions}</Text>}
+      {data.platform && (
+        <Text style={[styles.lrPlatform, data.url && { color: cfg.color }]}>
+          {data.url
+            ? `${type === 'lottery' ? 'Enter' : 'Get'} on ${data.platform} →`
+            : `via ${data.platform}`}
+        </Text>
+      )}
+    </>
+  );
+  // NOTE: plain View must get a resolved style array — passing Pressable's
+  // function-style to a View silently drops ALL styling (the pre-redesign bug
+  // that unboxed this section for shows without a lottery URL).
+  return data.url ? (
+    <Pressable
+      style={({ pressed }) => [styles.lrCard, tint, pressed && styles.pressed]}
+      onPress={open}
+    >
+      {inner}
+    </Pressable>
+  ) : (
+    <View style={[styles.lrCard, tint]}>{inner}</View>
   );
 }
 
@@ -1307,59 +1302,85 @@ function LotteryRushSection({ data }: { data: NonNullable<ShowDetail['lotteryRus
   if (entries.length === 0) return null;
 
   return (
-    <View style={styles.section}>
-      <Text style={styles.sectionTitle}>Same-Day Tickets</Text>
+    <SectionCard title="Discount Tickets">
       {entries.map(([type, d]) => <LRCard key={type} type={type} data={d} />)}
       <Text style={styles.lrDisclosure}>Some links may earn us a commission at no extra cost to you.</Text>
-    </View>
+    </SectionCard>
   );
 }
 
-// ---------- Tony Awards ----------
+// ---------- Awards Scorecard ----------
 
-function TonyAwardsSection({ awards }: { awards: ShowDetail['tonyAwards'] }) {
-  const wins = awards.filter(a => a.won);
-  const noms = awards.filter(a => !a.won);
+/** "2016" ceremony → "2015-16" season label, matching the web's season meta. */
+function seasonLabel(ceremonyYear: number): string {
+  return `${ceremonyYear - 1}-${String(ceremonyYear).slice(-2)}`;
+}
+
+function AwardsScorecardSection({ awards }: { awards: ShowDetail['tonyAwards'] }) {
+  const [expanded, setExpanded] = useState(false);
+  // Dedupe: the feed can repeat a category (e.g. Hamilton's Best Original
+  // Score appears twice, once with and once without a nominee name).
+  const seen = new Set<string>();
+  const deduped = awards.filter(a => {
+    const key = `${a.category}|${a.won}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  const wins = deduped.filter(a => a.won);
+  const noms = deduped.filter(a => !a.won);
+  const latestYear = Math.max(...deduped.map(a => ceremonyToYear(a.year)));
+  const season = seasonLabel(latestYear);
+  const ordered = [...wins, ...noms];
+
   return (
-    <View style={styles.section}>
-      <Text style={styles.sectionTitle}>
-        Tony Awards {wins.length > 0 ? `· ${wins.length} Win${wins.length > 1 ? 's' : ''}` : ''}
-      </Text>
-      {wins.length > 0 && (
-        <>
-          <Text style={styles.tonyGroupLabel}>WINS</Text>
-          {wins.map((a, i) => (
-            <View key={i} style={styles.tonyRow}>
-              <View style={styles.tonyIconSlot}>
+    <SectionCard title="Awards Scorecard" meta={`${season} season`}>
+      <View style={styles.awardsPanel}>
+        <Text style={styles.awardsPanelLabel}>TONY AWARDS ({season})</Text>
+        <View style={styles.awardsSummaryRow}>
+          <IconSymbol name="trophy.fill" size={18} color="#FFD700" />
+          <Text style={styles.awardsSummaryNumber}>{wins.length}</Text>
+          <Text style={styles.awardsSummaryUnit}>{wins.length === 1 ? 'win' : 'wins'}</Text>
+          <Text style={styles.awardsSummaryOf}>of</Text>
+          <IconSymbol name="star" size={18} color={Colors.text.muted} />
+          <Text style={styles.awardsSummaryNumber}>{deduped.length}</Text>
+          <Text style={styles.awardsSummaryUnit}>{deduped.length === 1 ? 'nom' : 'noms'}</Text>
+        </View>
+        <Pressable
+          style={({ pressed }) => [styles.awardsToggle, pressed && styles.pressed]}
+          onPress={() => setExpanded(v => !v)}
+        >
+          <Text style={styles.awardsToggleText}>
+            {expanded ? 'Hide categories' : `See all categories (${deduped.length})`}
+          </Text>
+          <IconSymbol
+            name={expanded ? 'chevron.up' : 'chevron.down'}
+            size={14}
+            color={Colors.text.muted}
+          />
+        </Pressable>
+        {expanded && ordered.map((a, i) => (
+          <View key={i} style={styles.tonyRow}>
+            <View style={styles.tonyIconSlot}>
+              {a.won ? (
                 <IconSymbol name="trophy.fill" size={16} color="#FFD700" />
-              </View>
-              <View style={styles.tonyInfo}>
-                <Text style={styles.tonyCategory}>{a.category}</Text>
-                {a.name && <Text style={styles.tonyName}>{a.name} · {ceremonyToYear(a.year)}</Text>}
-                {!a.name && <Text style={styles.tonyName}>{ceremonyToYear(a.year)}</Text>}
-              </View>
-            </View>
-          ))}
-        </>
-      )}
-      {noms.length > 0 && (
-        <>
-          <Text style={[styles.tonyGroupLabel, { marginTop: wins.length > 0 ? Spacing.md : 0 }]}>NOMINATIONS</Text>
-          {noms.map((a, i) => (
-            <View key={i} style={styles.tonyRow}>
-              <View style={styles.tonyIconSlot}>
+              ) : (
                 <IconSymbol name="star" size={16} color={Colors.text.muted} />
-              </View>
-              <View style={styles.tonyInfo}>
-                <Text style={styles.tonyCategory}>{a.category}</Text>
-                {a.name && <Text style={styles.tonyName}>{a.name} · {ceremonyToYear(a.year)}</Text>}
-                {!a.name && <Text style={styles.tonyName}>{ceremonyToYear(a.year)}</Text>}
-              </View>
+              )}
             </View>
-          ))}
-        </>
-      )}
-    </View>
+            <View style={styles.tonyInfo}>
+              <Text style={styles.tonyCategory}>{a.category}</Text>
+              {a.name ? <Text style={styles.tonyName}>{a.name}</Text> : null}
+            </View>
+            {a.won && (
+              <View style={styles.awardsWonTag}>
+                <Text style={styles.awardsWonTagText}>Won</Text>
+              </View>
+            )}
+          </View>
+        ))}
+      </View>
+    </SectionCard>
   );
 }
 
@@ -1396,8 +1417,7 @@ function SocialScorecardSection({ sp }: { sp: SocialPulsePayload }) {
     .slice(0, 2);
 
   return (
-    <View style={styles.section}>
-      <Text style={styles.sectionTitle}>Socials Scorecard</Text>
+    <SectionCard title="Socials Scorecard" meta={`${totalMentions.toLocaleString()} mentions`}>
       {/* Tier badge row */}
       <View style={[styles.socialTierRow, { borderColor: config.color + '40', backgroundColor: config.color + '14' }]}>
         <View style={[styles.socialTierBadge, { backgroundColor: config.color }]}>
@@ -1427,7 +1447,7 @@ function SocialScorecardSection({ sp }: { sp: SocialPulsePayload }) {
           {q.a && <Text style={styles.socialQuoteAuthor}>— {q.a} on {q.p}</Text>}
         </View>
       ))}
-    </View>
+    </SectionCard>
   );
 }
 
@@ -1441,8 +1461,7 @@ const VERDICT_CONFIG: Record<string, { label: string; color: string }> = {
 
 function SeatingGuidanceSection({ sections }: { sections: ShowDetail['seatingSections'] }) {
   return (
-    <View style={styles.section}>
-      <Text style={styles.sectionTitle}>Seating Scorecard</Text>
+    <SectionCard title="Seating Scorecard" meta={`${sections.length} sections`}>
       {sections.map((s, i) => {
         const cfg = VERDICT_CONFIG[s.verdict] ?? { label: s.verdictLabel, color: Colors.text.muted };
         return (
@@ -1459,45 +1478,60 @@ function SeatingGuidanceSection({ sections }: { sections: ShowDetail['seatingSec
           </View>
         );
       })}
-    </View>
+    </SectionCard>
   );
 }
 
 // ---------- Theater Scorecard ----------
 
+// Labels match the web's Theater Scorecard rows (facilities → "Restrooms").
 const VENUE_DIMENSIONS = [
   { key: 'sightlines' as const, label: 'Sightlines' },
   { key: 'sound' as const, label: 'Sound' },
   { key: 'comfort' as const, label: 'Comfort' },
   { key: 'ambiance' as const, label: 'Ambiance' },
-  { key: 'facilities' as const, label: 'Facilities' },
+  { key: 'facilities' as const, label: 'Restrooms' },
 ];
+
+/** Five filled/unfilled squares, the web's ScoreDots pattern. */
+function ScoreSquares({ score, color }: { score: number; color: string }) {
+  return (
+    <View style={styles.venueSquares}>
+      {[1, 2, 3, 4, 5].map(i => (
+        <View
+          key={i}
+          style={[
+            styles.venueSquare,
+            { backgroundColor: i <= score ? color : Colors.surface.overlay },
+          ]}
+        />
+      ))}
+    </View>
+  );
+}
 
 function TheaterScorecardSection({ scores, venueName }: { scores: ShowDetail['venueScores']; venueName: string }) {
   if (!scores) return null;
   const dims = VENUE_DIMENSIONS.filter(d => scores[d.key] != null);
   if (dims.length === 0) return null;
+  const avg = dims.reduce((sum, d) => sum + (scores[d.key] as number), 0) / dims.length;
 
   return (
-    <View style={styles.section}>
-      <Text style={styles.sectionTitle}>Theater Scorecard</Text>
+    <SectionCard title="Theater Scorecard" meta={`${avg.toFixed(1)}/5 overall`}>
       <Text style={styles.venueScorecardName}>{venueName}</Text>
       {dims.map(d => {
         const score = scores[d.key] as number;
         // Venue dimensions are on a 1-5 scale
-        const pct = Math.max(0, Math.min(100, (score / 5) * 100));
         const color = score >= 4 ? '#10b981' : score >= 3 ? '#f59e0b' : '#ef4444';
         return (
           <View key={d.key} style={styles.venueDimRow}>
             <Text style={styles.venueDimLabel}>{d.label}</Text>
-            <View style={styles.venueDimBarBg}>
-              <View style={[styles.venueDimBarFill, { width: `${pct}%` as any, backgroundColor: color }]} />
-            </View>
-            <Text style={[styles.venueDimScore, { color }]}>{score} / 5</Text>
+            <ScoreSquares score={score} color={color} />
+            <Text style={[styles.venueDimScore, { color }]}>{score}/5</Text>
           </View>
         );
       })}
-    </View>
+    </SectionCard>
   );
 }
 
@@ -1505,8 +1539,7 @@ function TheaterScorecardSection({ scores, venueName }: { scores: ShowDetail['ve
 
 function VideoReviewsSection({ reviews }: { reviews: ShowDetail['videoReviews'] }) {
   return (
-    <View style={styles.section}>
-      <Text style={styles.sectionTitle}>Video Reviews ({reviews.length})</Text>
+    <SectionCard title="Video Reviews" meta={`${reviews.length} creators`}>
       {reviews.map((v, i) => {
         const bucketColor = v.bucket === 'Rave' || v.bucket === 'Positive' ? '#10b981'
           : v.bucket === 'Mixed' ? '#f59e0b' : '#ef4444';
@@ -1538,7 +1571,7 @@ function VideoReviewsSection({ reviews }: { reviews: ShowDetail['videoReviews'] 
           </Pressable>
         );
       })}
-    </View>
+    </SectionCard>
   );
 }
 
@@ -1810,9 +1843,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   qfCard: {
-    backgroundColor: Colors.surface.raised,
-    borderRadius: BorderRadius.md,
-    paddingHorizontal: Spacing.md,
+    // Rows sit directly inside the SectionCard shell; no nested surface.
   },
   qfRow: {
     flexDirection: 'row',
@@ -1860,7 +1891,7 @@ const styles = StyleSheet.create({
   audienceHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.surface.raised,
+    backgroundColor: Colors.surface.overlay,
     borderRadius: BorderRadius.md,
     padding: Spacing.lg,
     borderWidth: 1,
@@ -1895,7 +1926,9 @@ const styles = StyleSheet.create({
   },
   audienceSourceCard: {
     width: 110,
-    backgroundColor: Colors.surface.raised,
+    backgroundColor: Colors.surface.overlay,
+    borderWidth: 1,
+    borderColor: Colors.border.subtle,
     borderRadius: BorderRadius.md,
     padding: Spacing.md,
     alignItems: 'center',
@@ -1924,43 +1957,6 @@ const styles = StyleSheet.create({
   },
 
   // Info section
-  infoSection: {
-    marginHorizontal: Spacing.lg,
-    marginTop: Spacing.xl,
-    backgroundColor: Colors.surface.raised,
-    borderRadius: BorderRadius.md,
-    overflow: 'hidden',
-  },
-  infoRow: {
-    flexDirection: 'row',
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border.subtle,
-    gap: Spacing.md,
-  },
-  infoLabel: {
-    color: Colors.text.muted,
-    fontSize: FontSize.md,
-    flexShrink: 0,
-  },
-  infoValue: {
-    color: Colors.text.primary,
-    fontSize: FontSize.md,
-    fontWeight: '500',
-    flex: 1,
-    textAlign: 'right',
-  },
-  section: {
-    paddingHorizontal: Spacing.lg,
-    marginTop: Spacing.xl,
-  },
-  sectionTitle: {
-    color: Colors.text.primary,
-    fontSize: FontSize.lg,
-    fontWeight: '700',
-    marginBottom: Spacing.md,
-  },
   synopsis: {
     color: Colors.text.secondary,
     fontSize: FontSize.md,
@@ -2115,13 +2111,10 @@ const styles = StyleSheet.create({
   },
 
   // Showtimes
-  showtimesRange: {
-    color: Colors.text.muted,
-    fontSize: FontSize.xs,
-    marginBottom: Spacing.sm,
-  },
   showtimesGrid: {
-    backgroundColor: Colors.surface.raised,
+    backgroundColor: Colors.surface.overlay,
+    borderWidth: 1,
+    borderColor: Colors.border.subtle,
     borderRadius: BorderRadius.md,
     padding: Spacing.md,
   },
@@ -2175,7 +2168,9 @@ const styles = StyleSheet.create({
   },
   boCell: {
     flex: 1,
-    backgroundColor: Colors.surface.raised,
+    backgroundColor: Colors.surface.overlay,
+    borderWidth: 1,
+    borderColor: Colors.border.subtle,
     borderRadius: BorderRadius.sm,
     padding: Spacing.md,
   },
@@ -2199,57 +2194,109 @@ const styles = StyleSheet.create({
   lrCard: {
     borderWidth: 1,
     borderRadius: BorderRadius.md,
-    padding: Spacing.md,
-    marginBottom: Spacing.sm,
+    padding: Spacing.lg,
+    marginBottom: Spacing.lg,
     backgroundColor: Colors.surface.raised,
   },
   lrHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: Spacing.sm,
+    gap: Spacing.md,
   },
   lrLabel: {
-    fontSize: FontSize.sm,
+    fontSize: FontSize.md,
     fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    flexShrink: 1,
   },
   lrPrice: {
     color: Colors.text.primary,
-    fontSize: FontSize.lg,
+    fontSize: FontSize.xl,
     fontWeight: '700',
   },
   lrMeta: {
     color: Colors.text.secondary,
     fontSize: FontSize.sm,
     marginTop: 2,
+    lineHeight: 20,
   },
   lrInst: {
     color: Colors.text.muted,
-    fontSize: FontSize.xs,
-    marginTop: 4,
-    lineHeight: 16,
+    fontSize: FontSize.sm,
+    marginTop: Spacing.sm,
+    lineHeight: 19,
   },
   lrPlatform: {
     color: Colors.brand,
-    fontSize: FontSize.xs,
-    marginTop: 6,
+    fontSize: FontSize.sm,
+    marginTop: Spacing.md,
     fontWeight: '600',
   },
   lrDisclosure: {
     color: Colors.text.muted,
     fontSize: 12,
-    marginTop: Spacing.xs,
   },
 
-  // Tony Awards
-  tonyGroupLabel: {
+  // Awards Scorecard
+  awardsPanel: {
+    backgroundColor: Colors.surface.overlay,
+    borderWidth: 1,
+    borderColor: Colors.border.subtle,
+    borderRadius: BorderRadius.md,
+    padding: Spacing.lg,
+  },
+  awardsPanelLabel: {
     color: Colors.text.muted,
     fontSize: FontSize.xs,
     fontWeight: '700',
-    letterSpacing: 0.5,
-    marginBottom: Spacing.sm,
+    letterSpacing: 0.8,
+    marginBottom: Spacing.md,
+  },
+  awardsSummaryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: Spacing.md,
+  },
+  awardsSummaryNumber: {
+    color: Colors.text.primary,
+    fontSize: FontSize.xl,
+    fontWeight: '800',
+    fontVariant: ['tabular-nums'],
+  },
+  awardsSummaryUnit: {
+    color: Colors.text.secondary,
+    fontSize: FontSize.md,
+    marginRight: 2,
+  },
+  awardsSummaryOf: {
+    color: Colors.text.muted,
+    fontSize: FontSize.md,
+    marginHorizontal: 4,
+  },
+  awardsToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: Spacing.xs,
+  },
+  awardsToggleText: {
+    color: Colors.text.secondary,
+    fontSize: FontSize.sm,
+    fontWeight: '600',
+  },
+  awardsWonTag: {
+    backgroundColor: '#FFD70022',
+    borderRadius: 5,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 2,
+    alignSelf: 'center',
+  },
+  awardsWonTagText: {
+    color: '#FFD700',
+    fontSize: FontSize.xs,
+    fontWeight: '700',
   },
   tonyRow: {
     flexDirection: 'row',
@@ -2324,7 +2371,7 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.sm,
   },
   socialPlatformChip: {
-    backgroundColor: Colors.surface.raised,
+    backgroundColor: Colors.surface.overlay,
     borderRadius: 6,
     paddingHorizontal: Spacing.sm,
     paddingVertical: 4,
@@ -2342,7 +2389,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   socialQuote: {
-    backgroundColor: Colors.surface.raised,
+    backgroundColor: Colors.surface.overlay,
     borderRadius: BorderRadius.sm,
     padding: Spacing.md,
     marginBottom: Spacing.sm,
@@ -2369,7 +2416,7 @@ const styles = StyleSheet.create({
     gap: Spacing.md,
   },
   seatRowValuePick: {
-    backgroundColor: Colors.surface.raised,
+    backgroundColor: Colors.surface.overlay,
     borderRadius: BorderRadius.sm,
     paddingHorizontal: Spacing.sm,
     borderBottomWidth: 0,
@@ -2413,37 +2460,38 @@ const styles = StyleSheet.create({
 
   // Theater Scorecard
   venueScorecardName: {
-    color: Colors.text.secondary,
-    fontSize: FontSize.sm,
-    marginBottom: Spacing.md,
+    color: Colors.text.primary,
+    fontSize: FontSize.xl,
+    fontWeight: '800',
+    marginBottom: Spacing.lg,
   },
   venueDimRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: Spacing.sm,
+    marginBottom: Spacing.md,
     gap: Spacing.md,
   },
   venueDimLabel: {
     color: Colors.text.secondary,
     fontSize: FontSize.sm,
-    width: 80,
+    width: 96,
   },
-  venueDimBarBg: {
+  venueSquares: {
     flex: 1,
-    height: 6,
-    backgroundColor: Colors.surface.raised,
-    borderRadius: 3,
-    overflow: 'hidden',
+    flexDirection: 'row',
+    gap: 5,
   },
-  venueDimBarFill: {
-    height: '100%',
-    borderRadius: 3,
+  venueSquare: {
+    width: 18,
+    height: 18,
+    borderRadius: 5,
   },
   venueDimScore: {
     fontSize: FontSize.sm,
     fontWeight: '700',
-    width: 28,
+    minWidth: 32,
     textAlign: 'right',
+    flexShrink: 0,
   },
 
   // Video Reviews

@@ -22,6 +22,8 @@ const MAPPING = {
   'gearshape.fill': 'settings',
   'trophy.fill': 'emoji-events',
   'star': 'star-border',
+  'chevron.down': 'keyboard-arrow-down',
+  'chevron.up': 'keyboard-arrow-up',
   'star.fill': 'star',
   'bookmark.fill': 'bookmark',
   'list.bullet': 'format-list-bulleted',
