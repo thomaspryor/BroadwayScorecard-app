@@ -88,6 +88,29 @@ export function filterByMarket(category: string, market: Market): boolean {
   return category === 'west-end';
 }
 
+/**
+ * Which market a show's category belongs to. Same mapping filterByMarket uses,
+ * stated positively so callers can ask "where is this show?" rather than
+ * "does it pass my filter?". Off-West-End counts as London (owner directive
+ * 2026-08-02) — note filterByMarket itself still omits it, tracked separately.
+ */
+export function marketForCategory(category?: string): Market | null {
+  if (category === 'broadway' || category === 'off-broadway') return 'nyc';
+  if (category === 'west-end' || category === 'off-west-end') return 'london';
+  return null;
+}
+
+/**
+ * City label to show when a show sits OUTSIDE the user's current market.
+ * Returns null for in-market shows (no chip) and for categories with no home
+ * market (regional) — labeling those "NYC"/"London" would be wrong.
+ */
+export function outOfMarketCity(category: string | undefined, market: Market): string | null {
+  const home = marketForCategory(category);
+  if (!home || home === market) return null;
+  return home === 'london' ? 'London' : 'NYC';
+}
+
 /** Filter by market with off-broadway control.
  * includeOB=false → Broadway only. includeOB=true → Off-Broadway only. */
 export function filterByMarketCategory(category: string, market: Market, includeOB: boolean): boolean {
