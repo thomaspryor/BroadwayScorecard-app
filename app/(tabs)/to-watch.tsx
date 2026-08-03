@@ -30,7 +30,8 @@ import { getImageUrl } from '@/lib/images';
 import { daysUntilDate, isClosingSoonDate, toLocalYMD } from '@/lib/date-utils';
 import { humanizeShowId } from '@/lib/show-format';
 import { useToastSafe } from '@/lib/toast-context';
-import { getStatusInfo } from '@/lib/score-utils';
+import { PosterStatusPill, statusOverlay } from '@/components/show-cards/PosterStatusPill';
+import { OutOfMarketChip } from '@/components/show-cards/OutOfMarketChip';
 import { featureFlags } from '@/lib/feature-flags';
 import type { WatchlistEntry } from '@/lib/user-types';
 import type { Show } from '@/lib/types';
@@ -42,40 +43,9 @@ import * as haptics from '@/lib/haptics';
 
 type WatchlistSort = 'added-desc' | 'alphabetical' | 'closing-soon';
 
-/**
- * Poster-corner status label (web parity: WatchlistCard bookabilityLabel).
- * Closing Soon wins over the raw status; upcoming shows say when they open,
- * or "Tix on sale" once tickets are bookable.
- */
-function statusOverlay(show?: Show): { label: string; color: string } | null {
-  if (!show) return null;
-  if (show.status === 'closed') return getStatusInfo('closed');
-  if (show.closingDate && isClosingSoonDate(show.closingDate)) {
-    return { label: 'CLOSING SOON', color: '#f59e0b' };
-  }
-  if (show.status === 'open' || show.status === 'previews') return getStatusInfo(show.status);
-  if (show.status === 'upcoming' || show.status === 'announced') {
-    if (show.ticketsOnSale) {
-      return { label: 'TIX ON SALE', color: Colors.status.open };
-    }
-    if (show.openingDate) {
-      const opens = new Date(show.openingDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-      return { label: `OPENS ${opens.toUpperCase()}`, color: getStatusInfo('upcoming').color };
-    }
-    return getStatusInfo('upcoming');
-  }
-  return null;
-}
-
-function StatusOverlayPill({ show }: { show?: Show }) {
-  const info = statusOverlay(show);
-  if (!info) return null;
-  return (
-    <View style={[styles.statusPill, { backgroundColor: 'rgba(0,0,0,0.72)' }]}>
-      <Text style={[styles.statusPillText, { color: info.color }]}>{info.label}</Text>
-    </View>
-  );
-}
+// Poster status pill + out-of-market chip live in components/show-cards so the
+// fixture screen (app/test/watchlist-tag-fixture.tsx) exercises the same code
+// this tab ships, not a copy of it.
 
 function EmptyState({ emoji, title, subtitle, actionLabel, onAction }: {
   emoji: string; title: string; subtitle: string; actionLabel?: string; onAction?: () => void;
@@ -311,6 +281,10 @@ export default function ToWatchScreen() {
         {/* No status pill here — these are booked (beta feedback 2026-07-25:
             "TIX ON SALE on the Upcoming shelf" is noise once you have tickets). */}
         <Text style={styles.gridTitle} numberOfLines={2}>{title}</Text>
+        {/* Date now rides as an overlay on the poster (beta feedback
+            2026-08-02), so no posterDate text line here — just the
+            out-of-market city chip. */}
+        <OutOfMarketChip show={show} />
       </Pressable>
     );
   };
@@ -335,11 +309,12 @@ export default function ToWatchScreen() {
                 <Text style={styles.placeholderText}>{title.charAt(0)}</Text>
               </View>
             )}
-            <StatusOverlayPill show={show} />
+            <PosterStatusPill show={show} />
             {/* No persistent empty-star strip (beta feedback 2026-07-25) —
                 rating lives on the show page / long-press action sheet. */}
           </View>
           <Text style={styles.gridTitle} numberOfLines={2}>{title}</Text>
+          <OutOfMarketChip show={show} />
         </Pressable>
       </View>
     );
@@ -371,6 +346,7 @@ export default function ToWatchScreen() {
             const info = statusOverlay(show);
             return info ? <Text style={[styles.listStatus, { color: info.color }]}>{info.label}</Text> : null;
           })()}
+          <OutOfMarketChip show={show} />
         </View>
       </Pressable>
     );
@@ -660,14 +636,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.45)',
   },
   upcomingDateOverlayText: { color: '#fff', fontSize: 12, fontWeight: '700' },
-  // Small overlay label (beta feedback 2026-07-26: the 12pt bordered pills
-  // still read "ugly and too large" — shrink to a plain dark scrim tag).
-  statusPill: {
-    position: 'absolute', top: 4, left: 4, zIndex: 10,
-    paddingHorizontal: 5, paddingVertical: 2,
-    borderRadius: 4,
-  },
-  statusPillText: { fontSize: 12, fontWeight: '700', letterSpacing: 0.3 },
+  // Poster status chip styling now lives in components/show-cards/PosterStatusPill.
   listStatus: { fontSize: 12, fontWeight: '600', marginTop: 2, letterSpacing: 0.3 },
   gridTitle: {
     color: Colors.text.secondary, fontSize: 12, fontWeight: '500',
