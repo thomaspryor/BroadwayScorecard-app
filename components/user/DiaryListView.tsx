@@ -59,9 +59,12 @@ interface RowProps {
   monthInBox?: boolean;
   onPress: () => void;
   onLongPress: () => void;
+  /** VoiceOver parity with the grid cards — swipe/long-press aren't discoverable. */
+  onEditRating: () => void;
+  onDelete: () => void;
 }
 
-export function DiaryLedgerRow({ review, show, fallbackTitle, posterUrl, monthInBox, onPress, onLongPress }: RowProps) {
+export function DiaryLedgerRow({ review, show, fallbackTitle, posterUrl, monthInBox, onPress, onLongPress, onEditRating, onDelete }: RowProps) {
   const title = show?.title || fallbackTitle;
   const d = review.date_seen ? new Date(review.date_seen + 'T00:00:00') : null;
   const hasDate = d && !Number.isNaN(d.getTime());
@@ -81,6 +84,14 @@ export function DiaryLedgerRow({ review, show, fallbackTitle, posterUrl, monthIn
       accessibilityRole="button"
       accessibilityLabel={a11yLabel}
       accessibilityHint="Long press for more actions"
+      accessibilityActions={[
+        { name: 'edit', label: 'Edit rating' },
+        { name: 'delete', label: 'Delete rating' },
+      ]}
+      onAccessibilityAction={e => {
+        if (e.nativeEvent.actionName === 'edit') onEditRating();
+        if (e.nativeEvent.actionName === 'delete') onDelete();
+      }}
     >
       <View style={styles.dayBox}>
         {monthInBox && month && <Text style={styles.dayBoxMonth}>{month}</Text>}

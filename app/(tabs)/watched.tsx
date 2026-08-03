@@ -477,6 +477,11 @@ export default function WatchedScreen() {
           monthInBox={!showYearGroups}
           onPress={() => guardedPush(item.id, () => goToShow(show, item.show_id))}
           onLongPress={() => { haptics.action(); setGridMenu({ kind: 'review', review: item }); }}
+          onEditRating={() => router.push({
+            pathname: '/rate/[showId]' as any,
+            params: { showId: item.show_id, showTitle: show?.title || showTitleFallback(item.show_id), reviewId: item.id },
+          })}
+          onDelete={() => handleDeleteDiaryItem(item)}
         />
       </ReanimatedSwipeable>
     );
@@ -800,6 +805,9 @@ export default function WatchedScreen() {
               key={mode}
               testID={SEGMENT_TEST_IDS[mode]}
               style={[styles.segment, viewMode === mode && styles.segmentActive]}
+              // 38pt visual (header-density pass) + 4pt slop keeps the
+              // effective target at 46pt, above the 44pt HIG floor.
+              hitSlop={{ top: 4, bottom: 4 }}
               onPress={() => { haptics.tap(); setViewMode(mode); }}
               accessibilityRole="button"
               accessibilityState={{ selected: viewMode === mode }}
@@ -821,7 +829,7 @@ export default function WatchedScreen() {
         <View style={styles.controlsRow}>
           <Text style={styles.showsSeenLabel}>{showsSeen} {showsSeen === 1 ? 'show' : 'shows'} seen</Text>
           <View style={styles.controlsRight}>
-            <Pressable style={styles.sortButton} onPress={cycleDiarySort}>
+            <Pressable style={styles.sortButton} hitSlop={{ top: 6, bottom: 6 }} onPress={cycleDiarySort}>
               <Text style={styles.sortText}>{sortLabel}</Text>
               <Svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke={Colors.text.muted} strokeWidth={2}>
                 <Path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
@@ -838,7 +846,8 @@ export default function WatchedScreen() {
                 accessibilityRole="button"
                 accessibilityState={{ selected: gridSubView === 'poster' }}
                 accessibilityLabel="Poster grid view"
-                hitSlop={4}
+                testID="diary-poster-layout-toggle"
+                hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
               >
                 <Svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={gridSubView === 'poster' ? Colors.text.primary : Colors.text.muted} strokeWidth={2}>
                   <Path strokeLinecap="round" strokeLinejoin="round" d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z" />
@@ -851,7 +860,7 @@ export default function WatchedScreen() {
                 accessibilityState={{ selected: gridSubView === 'list' }}
                 accessibilityLabel="List view"
                 testID="diary-list-layout-toggle"
-                hitSlop={4}
+                hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
               >
                 <Svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={gridSubView === 'list' ? Colors.text.primary : Colors.text.muted} strokeWidth={2}>
                   <Path strokeLinecap="round" strokeLinejoin="round" d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />
@@ -863,7 +872,8 @@ export default function WatchedScreen() {
                 accessibilityRole="button"
                 accessibilityState={{ selected: gridSubView === 'calendar' }}
                 accessibilityLabel="Calendar view"
-                hitSlop={4}
+                testID="diary-calendar-layout-toggle"
+                hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
               >
                 <Svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={gridSubView === 'calendar' ? Colors.text.primary : Colors.text.muted} strokeWidth={2}>
                   <Path strokeLinecap="round" strokeLinejoin="round" d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V6a2 2 0 012-2z" />
