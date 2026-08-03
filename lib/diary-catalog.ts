@@ -103,18 +103,34 @@ export function mergeDiaryCandidates(
 let cached: DiarySearchEntry[] | null = null;
 let inFlight: Promise<DiarySearchEntry[]> | null = null;
 
+/** Give up rather than leave the import spinner going forever on a stalled
+ *  connection — NSURLSession's own default is 60s of nothing. */
+export const DIARY_FETCH_TIMEOUT_MS = 30_000;
+
 /** Fetch (and memoise for the session) the diary catalog. Throws on failure —
  *  callers decide whether to degrade. */
 export async function fetchDiaryCatalog(signal?: AbortSignal): Promise<DiarySearchEntry[]> {
   if (cached) return cached;
   if (inFlight) return inFlight;
   inFlight = (async () => {
-    const res = await fetch(DIARY_SEARCH_URL, { signal });
-    if (!res.ok) throw new Error(`diary-search.json returned ${res.status}`);
-    const data = await res.json();
-    if (!Array.isArray(data)) throw new Error('diary-search.json is not an array');
-    cached = data as DiarySearchEntry[];
-    return cached;
+    const timeout = new AbortController();
+    const timer = setTimeout(() => timeout.abort(), DIARY_FETCH_TIMEOUT_MS);
+    const onOuterAbort = () => timeout.abort();
+    signal?.addEventListener('abort', onOuterAbort);
+    try {
+      const res = await fetch(DIARY_SEARCH_URL, { signal: timeout.signal });
+      if (!res.ok) throw new Error(`diary-search.json returned ${res.status}`);
+      const data = await res.json();
+      if (!Array.isArray(data)) throw new Error('diary-search.json is not an array');
+      // Never memoise an empty catalog — that would silently disable the merge
+      // for the rest of the session.
+      if (data.length === 0) throw new Error('diary-search.json is empty');
+      cached = data as DiarySearchEntry[];
+      return cached;
+    } finally {
+      clearTimeout(timer);
+      signal?.removeEventListener('abort', onOuterAbort);
+    }
   })();
   try {
     return await inFlight;

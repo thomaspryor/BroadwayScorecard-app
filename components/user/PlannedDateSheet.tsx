@@ -51,7 +51,14 @@ export function PlannedDateSheet({
   }
 
   const handleChange = useCallback(
-    (_event: DateTimePickerEvent, selected?: Date) => {
+    (event: DateTimePickerEvent, selected?: Date) => {
+      // Android sends a Date even on dismiss/neutral (eventCreators.js
+      // createDismissEvtParams), so cancelling used to SAVE the date. Only
+      // type === 'set' is a confirmation.
+      if (event.type !== 'set') {
+        if (Platform.OS !== 'ios') onCancel();
+        return;
+      }
       if (!selected) return;
       if (Platform.OS === 'ios') {
         // iOS inline picker stays open; commit on Done.
@@ -61,7 +68,7 @@ export function PlannedDateSheet({
         onConfirm(selected);
       }
     },
-    [onConfirm],
+    [onConfirm, onCancel],
   );
 
   return (

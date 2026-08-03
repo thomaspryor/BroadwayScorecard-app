@@ -8,7 +8,7 @@
  * ("the iOS imports don't work as well as, and are inconsistent with, the web
  * imports", 2026-08-02).
  */
-import Fuse from 'fuse.js';
+import Fuse, { type IFuseOptions } from 'fuse.js';
 
 /** The subset of a show the matcher needs. Both the scored catalog (lib/types
  *  Show) and diary-search.json entries adapt to this. */
@@ -96,31 +96,94 @@ function scoredFirst(a: MatchCandidate, b: MatchCandidate): number {
   return Number(!!a.diaryOnly) - Number(!!b.diaryOnly);
 }
 
+const FUSE_OPTIONS: IFuseOptions<MatchCandidate> = {
+  keys: [{ name: 'title', weight: 0.8 }, { name: 'venue', weight: 0.2 }],
+  threshold: 0.4,
+  ignoreLocation: true,
+  minMatchCharLength: 2,
+};
+
+/** Token key length for the fuzzy shortlist index. Four characters tolerates
+ *  the typos Fuse exists to absorb ("hamiltonn" → "hami") while still cutting
+ *  the candidate set by ~99%. */
+const TOKEN_KEY_LEN = 4;
+/** Buckets bigger than this are stop-word-ish ("the", "of") — only consulted
+ *  when nothing rarer matched. */
+const BIG_BUCKET = 4000;
+/** Enough candidates for Fuse to rank well; small enough to score instantly. */
+const SHORTLIST_TARGET = 600;
+
+function tokenKeys(norm: string): string[] {
+  const seen = new Set<string>();
+  for (const token of norm.split(' ')) {
+    if (!token) continue;
+    seen.add(token.length > TOKEN_KEY_LEN ? token.slice(0, TOKEN_KEY_LEN) : token);
+  }
+  return [...seen];
+}
+
 export class ShowMatcher {
   private readonly pool: MatchCandidate[];
+  /** normTitle(pool[i].title), precomputed — the prefix tier used to recompute
+   *  all ~34k of them on every call. */
+  private readonly norms: string[];
   private readonly byNormTitle: Map<string, MatchCandidate[]>;
-  private readonly fuse: Fuse<MatchCandidate>;
+  private readonly tokenIndex: Map<string, number[]>;
 
   constructor(pool: MatchCandidate[]) {
     this.pool = pool;
+    this.norms = new Array(pool.length);
     this.byNormTitle = new Map();
-    for (const s of pool) {
-      const key = normTitle(s.title);
-      const bucket = this.byNormTitle.get(key);
-      if (bucket) bucket.push(s);
-      else this.byNormTitle.set(key, [s]);
+    this.tokenIndex = new Map();
+
+    for (let i = 0; i < pool.length; i++) {
+      const norm = normTitle(pool[i].title);
+      this.norms[i] = norm;
+
+      const bucket = this.byNormTitle.get(norm);
+      if (bucket) bucket.push(pool[i]);
+      else this.byNormTitle.set(norm, [pool[i]]);
+
+      for (const key of tokenKeys(norm)) {
+        const list = this.tokenIndex.get(key);
+        if (list) list.push(i);
+        else this.tokenIndex.set(key, [i]);
+      }
     }
     for (const bucket of this.byNormTitle.values()) bucket.sort(scoredFirst);
-    this.fuse = new Fuse(pool, {
-      keys: [{ name: 'title', weight: 0.8 }, { name: 'venue', weight: 0.2 }],
-      threshold: 0.4,
-      ignoreLocation: true,
-      minMatchCharLength: 2,
-    });
   }
 
   get size(): number {
     return this.pool.length;
+  }
+
+  /**
+   * Candidates worth fuzzy-scoring for a query. Running Fuse over the whole
+   * merged pool costs ~530ms PER unmatched row on desktop V8 and far more
+   * under Hermes — an import with 45 unmatched rows froze the app behind a
+   * still-spinning indicator (found in review, 2026-08-03). Fuse cannot
+   * short-circuit on `limit`: it scores every record. Shortlisting first keeps
+   * the same ranking over a set 50-100x smaller.
+   */
+  private shortlist(nameNorm: string): MatchCandidate[] {
+    const keys = tokenKeys(nameNorm)
+      .map(k => ({ k, list: this.tokenIndex.get(k) }))
+      .filter((e): e is { k: string; list: number[] } => !!e.list)
+      .sort((a, b) => a.list.length - b.list.length);
+
+    const picked = new Set<number>();
+    for (const { list } of keys) {
+      // Skip stop-word buckets unless they are all we have.
+      if (list.length > BIG_BUCKET && picked.size > 0) continue;
+      for (const idx of list) {
+        picked.add(idx);
+        if (picked.size >= SHORTLIST_TARGET) break;
+      }
+      if (picked.size >= SHORTLIST_TARGET) break;
+    }
+    const out: MatchCandidate[] = [];
+    for (const idx of picked) out.push(this.pool[idx]);
+    return out;
   }
 
   match(title: string, venue: string | null, dateSeen: string | null): MatchResult {
@@ -134,13 +197,13 @@ export class ShowMatcher {
     let tierScore = 1;
     if (exactAll.length === 0 && nameNorm.length >= 8) {
       // Prefix tier: "Cabaret at the Kit Kat Club" ↔ "Cabaret".
-      exactAll = this.pool
-        .filter(s => {
-          const c = normTitle(s.title);
-          if (c.length < 8) return false;
-          return c.startsWith(nameNorm + ' ') || nameNorm.startsWith(c + ' ');
-        })
-        .sort(scoredFirst);
+      const hits: MatchCandidate[] = [];
+      for (let i = 0; i < this.pool.length; i++) {
+        const c = this.norms[i];
+        if (c.length < 8) continue;
+        if (c.startsWith(nameNorm + ' ') || nameNorm.startsWith(c + ' ')) hits.push(this.pool[i]);
+      }
+      exactAll = hits.sort(scoredFirst);
       tierScore = 0.85;
     }
 
@@ -158,7 +221,9 @@ export class ShowMatcher {
       return withSanity(closestRun(exactAll, dateSeen), tierScore);
     }
 
-    const results = this.fuse.search(title, { limit: 5 });
+    const candidates = this.shortlist(nameNorm);
+    if (candidates.length === 0) return { match: null, score: 0, dateSuspect: false };
+    const results = new Fuse(candidates, FUSE_OPTIONS).search(title, { limit: 5 });
     if (results.length === 0) return { match: null, score: 0, dateSuspect: false };
 
     if (venue) {

@@ -23,7 +23,11 @@
  *
  * Text stays at the app's 12pt floor rather than the web's 9px — on a phone
  * 9pt is unreadable at arm's length — with adjustsFontSizeToFit absorbing the
- * difference on narrow devices instead of ellipsising the label.
+ * difference on narrow devices instead of ellipsising the label. NOTE for the
+ * font-floor ledger: minimumFontScale 0.8 means the longest label ("Closing
+ * Soon") can render at ~9.6pt on a 375pt-wide device. That is deliberate and
+ * still no smaller than the web's fixed 9px; scripts/check-font-floor.js only
+ * inspects literal fontSize values and cannot see it.
  */
 
 import React from 'react';

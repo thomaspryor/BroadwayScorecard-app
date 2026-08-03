@@ -5,8 +5,8 @@
  * convention), built from existing design-system tokens only.
  */
 
-import React from 'react';
-import { Modal, View, Text, Pressable, StyleSheet } from 'react-native';
+import React, { useCallback, useRef } from 'react';
+import { Modal, View, Text, Pressable, StyleSheet, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
 import * as haptics from '@/lib/haptics';
@@ -27,9 +27,37 @@ interface ContextMenuProps {
 
 export function ContextMenu({ visible, title, actions, onClose }: ContextMenuProps) {
   const insets = useSafeAreaInsets();
+  // An action is run only AFTER this menu's own modal has finished dismissing.
+  // Running it inline (onClose(); action.onPress()) put both state changes in
+  // one commit, so an action that opens another Modal — "Set reminder date"
+  // opening the date sheet — asked UIKit to present over a view controller
+  // that was still presenting. UIKit refuses, but RN has already flipped its
+  // internal isPresented flag, so that sheet never opens again for the rest of
+  // the session. Found in review, 2026-08-03.
+  const pendingAction = useRef<(() => void) | null>(null);
+
+  const runPending = useCallback(() => {
+    const fn = pendingAction.current;
+    pendingAction.current = null;
+    fn?.();
+  }, []);
+
+  const handleAction = useCallback((action: ContextMenuAction) => {
+    haptics.tap();
+    pendingAction.current = action.onPress;
+    onClose();
+    // Modal.onDismiss is iOS-only; elsewhere there is nothing to wait for.
+    if (Platform.OS !== 'ios') runPending();
+  }, [onClose, runPending]);
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+      onDismiss={runPending}
+    >
       <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Dismiss menu">
         <Pressable style={[styles.sheet, { paddingBottom: insets.bottom + Spacing.sm }]} onPress={() => {}}>
           <View style={styles.group}>
@@ -48,7 +76,7 @@ export function ContextMenu({ visible, title, actions, onClose }: ContextMenuPro
                   action.disabled && styles.rowDisabled,
                 ]}
                 disabled={action.disabled}
-                onPress={() => { haptics.tap(); onClose(); action.onPress(); }}
+                onPress={() => handleAction(action)}
                 accessibilityRole="button"
                 accessibilityLabel={action.label}
               >

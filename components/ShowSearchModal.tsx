@@ -47,6 +47,11 @@ interface ShowSearchModalProps {
   excludeIds?: Set<string>;
   /** Caption + toast wording for an already-listed row. */
   excludedLabel?: string;
+  /** Fires once this modal has finished dismissing (iOS). Callers that open
+   *  ANOTHER modal after a selection must wait for this — presenting over a
+   *  view controller that is still dismissing is refused by UIKit and leaves
+   *  the incoming modal permanently unable to present. */
+  onDismiss?: () => void;
 }
 
 export function ShowSearchModal({
@@ -56,6 +61,7 @@ export function ShowSearchModal({
   onClose,
   excludeIds,
   excludedLabel = 'Already on your list',
+  onDismiss,
 }: ShowSearchModalProps) {
   const { shows } = useShows();
   const [query, setQuery] = useState('');
@@ -101,6 +107,7 @@ export function ShowSearchModal({
       animationType="slide"
       presentationStyle="pageSheet"
       onRequestClose={onClose}
+      onDismiss={onDismiss}
     >
       <KeyboardAvoidingView
         style={styles.container}

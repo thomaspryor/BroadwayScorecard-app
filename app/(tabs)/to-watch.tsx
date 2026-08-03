@@ -5,7 +5,7 @@
  * Grid/list view toggle, sort options: added-desc, alphabetical, closing-soon.
  */
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -97,6 +97,12 @@ export default function ToWatchScreen() {
   const [pendingDate, setPendingDate] = useState<Date>(new Date());
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [menuEntry, setMenuEntry] = useState<{ item: WatchlistEntry; title: string } | null>(null);
+  // Adding a show closes the search modal and then opens the date sheet. Both
+  // are native modals, so the sheet must not be presented until the search
+  // modal has actually finished dismissing (see ShowSearchModal.onDismiss) AND
+  // the add has resolved — whichever happens last opens it.
+  const pendingDateShowId = useRef<string | null>(null);
+  const searchModalDismissed = useRef(true);
 
   const showMap = useMemo(() => {
     const map: Record<string, Show> = {};
@@ -173,6 +179,14 @@ export default function ToWatchScreen() {
       // Hook sets error state
     }
   }, [removeFromWatchlist]);
+
+  const openPendingDatePrompt = useCallback(() => {
+    const showId = pendingDateShowId.current;
+    if (!showId || !searchModalDismissed.current) return;
+    pendingDateShowId.current = null;
+    setPendingDate(new Date());
+    setDatePickingShowId(showId);
+  }, []);
 
   const showWatchlistActionSheet = useCallback((item: WatchlistEntry, title: string) => {
     haptics.action();
@@ -580,6 +594,7 @@ export default function ToWatchScreen() {
         title="Add to Watchlist"
         excludeIds={new Set(watchlist.map(w => w.show_id))}
         onSelect={async (show) => {
+          searchModalDismissed.current = false;
           setShowSearchModal(false);
           haptics.action();
           try {
@@ -587,11 +602,15 @@ export default function ToWatchScreen() {
             await getWatchlist();
             // Web parity: prompt "when are you going?" right after adding
             // instead of hiding the planned date behind a long-press.
-            setPendingDate(new Date());
-            setDatePickingShowId(show.id);
+            pendingDateShowId.current = show.id;
+            openPendingDatePrompt();
           } catch {
             // Hook sets error state
           }
+        }}
+        onDismiss={() => {
+          searchModalDismissed.current = true;
+          openPendingDatePrompt();
         }}
         onClose={() => setShowSearchModal(false)}
       />
