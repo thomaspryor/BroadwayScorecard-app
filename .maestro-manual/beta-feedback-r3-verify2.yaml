@@ -1,0 +1,88 @@
+# Round-3 verification, part 2: the interaction-heavy items.
+# LOCAL-ONLY TOOL. Run: maestro test .maestro-manual/beta-feedback-r3-verify2.yaml
+
+appId: com.broadwayscorecard.app
+---
+- launchApp:
+    clearState: false
+- extendedWaitUntil:
+    visible:
+      text: "Broadway Scorecard"
+    timeout: 30000
+
+# ── Home shelves 1-5 in order (ADnQ3mUB)
+- openLink: broadwayscorecard:///
+- waitForAnimationToEnd
+- swipe:
+    direction: UP
+- waitForAnimationToEnd
+- takeScreenshot: /tmp/bwsc-r3b/01-home-shelf-2-3
+- swipe:
+    direction: UP
+- waitForAnimationToEnd
+- takeScreenshot: /tmp/bwsc-r3b/02-home-shelf-4-5
+
+# ── Browse card: tier caption size + score column (AAUXcLw6)
+- openLink: broadwayscorecard:///browse
+- waitForAnimationToEnd:
+    timeout: 8000
+- takeScreenshot: /tmp/bwsc-r3b/03-browse-cards
+
+# ── To Watch in list view, scrolled to TOP: Upcoming must be rows (APcRePHu)
+- openLink: broadwayscorecard:///to-watch
+- waitForAnimationToEnd
+- tapOn:
+    id: "list-view-toggle"
+- waitForAnimationToEnd
+- takeScreenshot: /tmp/bwsc-r3b/04-to-watch-list-top
+
+# ── Add-show search: an already-listed show must appear, marked (ANI-fwc0)
+- tapOn:
+    id: "add-to-watchlist-button"
+- extendedWaitUntil:
+    visible: "Add to Watchlist"
+    timeout: 8000
+- inputText: "Oh, Mary"
+- waitForAnimationToEnd:
+    timeout: 4000
+- takeScreenshot: /tmp/bwsc-r3b/05-add-search-already-listed
+- tapOn: "Cancel"
+- waitForAnimationToEnd
+
+# ── THE P0: long-press a watchlist poster -> "Set reminder date" must open the
+#    date sheet (previously the second modal was refused and never recovered)
+- openLink: broadwayscorecard:///to-watch
+- waitForAnimationToEnd
+- tapOn:
+    id: "grid-view-toggle"
+- waitForAnimationToEnd
+- longPressOn:
+    text: "War Horse"
+- extendedWaitUntil:
+    visible: "Set reminder date"
+    timeout: 6000
+- takeScreenshot: /tmp/bwsc-r3b/06-context-menu
+- tapOn: "Set reminder date"
+- extendedWaitUntil:
+    visible: "When are you going?"
+    timeout: 8000
+- takeScreenshot: /tmp/bwsc-r3b/07-date-sheet-from-menu
+- tapOn: "Cancel"
+- waitForAnimationToEnd
+
+# ── Show page: the rating row must NOT collapse when the date sheet opens
+#    (ADu0gjsK / AODNE6S9)
+- openLink: broadwayscorecard:///show/oh-mary
+- extendedWaitUntil:
+    visible: "MY RATING & REVIEW"
+    timeout: 15000
+- takeScreenshot: /tmp/bwsc-r3b/08-show-page-rating-row
+- tapOn:
+    text: "Add date|^[A-Z][a-z]{2} [0-9]{1,2}$"
+- extendedWaitUntil:
+    visible: "When are you going?"
+    timeout: 8000
+- takeScreenshot: /tmp/bwsc-r3b/09-show-page-date-sheet
+- tapOn: "Cancel"
+- waitForAnimationToEnd
+- takeScreenshot: /tmp/bwsc-r3b/10-show-page-after-dismiss

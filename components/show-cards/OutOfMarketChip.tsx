@@ -19,14 +19,18 @@ interface OutOfMarketChipProps {
   show?: Show;
   /** Override the viewer's market. Fixture/preview screens only. */
   market?: Market;
+  /** Left-align instead of centring — list rows are left-aligned, grid cards
+   *  are centred. Centring it in a row left the chip floating mid-row under
+   *  the venue (sim check 2026-08-03). */
+  align?: 'center' | 'left';
 }
 
-export function OutOfMarketChip({ show, market }: OutOfMarketChipProps) {
+export function OutOfMarketChip({ show, market, align = 'center' }: OutOfMarketChipProps) {
   const ctx = useMarket();
   const city = outOfMarketCity(show?.category, market ?? ctx.market);
   if (!city) return null;
   return (
-    <View style={styles.chip}>
+    <View style={[styles.chip, align === 'left' && styles.chipLeft]}>
       <Text style={styles.label} numberOfLines={1}>{city}</Text>
     </View>
   );
@@ -40,6 +44,9 @@ const styles = StyleSheet.create({
     paddingVertical: 1,
     borderRadius: 4,
     backgroundColor: Colors.surface.overlay,
+  },
+  chipLeft: {
+    alignSelf: 'flex-start',
   },
   label: {
     fontSize: 12,

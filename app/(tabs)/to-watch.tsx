@@ -354,7 +354,7 @@ export default function ToWatchScreen() {
         <View style={styles.listInfo}>
           <Text style={styles.listTitle} numberOfLines={1}>{title}</Text>
           {show?.venue && <Text style={styles.listVenue} numberOfLines={1}>{show.venue}</Text>}
-          <OutOfMarketChip show={show} />
+          <OutOfMarketChip show={show} align="left" />
         </View>
         {dateLabel && (
           <View style={styles.listDateCol}>
@@ -393,7 +393,7 @@ export default function ToWatchScreen() {
           <Text style={styles.listTitle} numberOfLines={1}>{title}</Text>
           {show?.venue && <Text style={styles.listVenue} numberOfLines={1}>{show.venue}</Text>}
           <PosterStatusPill show={show} inline />
-          <OutOfMarketChip show={show} />
+          <OutOfMarketChip show={show} align="left" />
         </View>
       </Pressable>
     );
@@ -409,6 +409,7 @@ export default function ToWatchScreen() {
           style={({ pressed }) => [styles.addButton, pressed && styles.pressed]}
           onPress={() => setShowSearchModal(true)}
           hitSlop={8}
+          testID="add-to-watchlist-button"
           accessibilityLabel="Add to watchlist"
         >
           <Svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={Colors.text.secondary} strokeWidth={2.5}>

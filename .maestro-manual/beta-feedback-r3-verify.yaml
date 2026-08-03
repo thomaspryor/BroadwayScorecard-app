@@ -1,0 +1,121 @@
+# Verification screenshots for the 2026-08-03 beta-feedback round-3 batch.
+# LOCAL-ONLY TOOL — outside .maestro/ so CI's glob never runs it.
+# Pre-req: Release sim build installed (scripts/build-sim.sh).
+# Run: maestro test .maestro-manual/beta-feedback-r3-verify.yaml
+
+appId: com.broadwayscorecard.app
+---
+- launchApp:
+    clearState: false
+
+- extendedWaitUntil:
+    visible:
+      text: "Broadway Scorecard"
+    timeout: 30000
+
+- runFlow:
+    when:
+      visible: "Skip"
+    commands:
+      - tapOn: "Skip"
+      - tapOn: "Skip"
+      - tapOn: "Skip"
+
+# Sign in if needed (dev-test account)
+- openLink: broadwayscorecard:///watched
+- tapOn:
+    text: "Open"
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 5000
+- runFlow:
+    when:
+      visible: "Sign In to Get Started"
+    commands:
+      - tapOn: "Sign In to Get Started"
+      - extendedWaitUntil:
+          visible: "Sign in with email"
+          timeout: 10000
+      - tapOn: "Sign in with email"
+      - extendedWaitUntil:
+          visible:
+            text: "Email"
+          timeout: 5000
+      - tapOn:
+          text: "Email"
+      - inputText: "dev-test@broadwayscorecard.com"
+      - tapOn:
+          text: "Password"
+      - inputText: "dev-test-local-only-2024"
+      - hideKeyboard
+      - tapOn:
+          text: "^Sign In$"
+      - extendedWaitUntil:
+          notVisible: "Sign In to Get Started"
+          timeout: 25000
+      - runFlow:
+          when:
+            visible: "Save Password"
+          commands:
+            - tapOn: "Not Now"
+
+# ── Home: shelf order + Closing Soon as the 5th shelf (ADnQ3mUB)
+- openLink: broadwayscorecard:///
+- tapOn:
+    text: "Open"
+    optional: true
+- waitForAnimationToEnd
+- takeScreenshot: /tmp/bwsc-r3/01-home-top
+- swipe:
+    direction: UP
+- swipe:
+    direction: UP
+- waitForAnimationToEnd
+- takeScreenshot: /tmp/bwsc-r3/02-home-shelves
+
+# ── Browse: tier caption size + score-column gap (AAUXcLw6, AKGsYTnH)
+- openLink: broadwayscorecard:///browse
+- tapOn:
+    text: "Open"
+    optional: true
+- waitForAnimationToEnd
+- takeScreenshot: /tmp/bwsc-r3/03-browse-cards
+
+# ── Watched: "Diary" segment, bigger stars, symmetric grid gaps (AIx0mAT5)
+- openLink: broadwayscorecard:///watched
+- tapOn:
+    text: "Open"
+    optional: true
+- waitForAnimationToEnd
+- takeScreenshot: /tmp/bwsc-r3/04-watched-diary-grid
+
+# ── To Watch: 3-up grid, web status chips, section spacing (APKyuqcH)
+- openLink: broadwayscorecard:///to-watch
+- tapOn:
+    text: "Open"
+    optional: true
+- waitForAnimationToEnd
+- takeScreenshot: /tmp/bwsc-r3/05-to-watch-grid
+- swipe:
+    direction: UP
+- waitForAnimationToEnd
+- takeScreenshot: /tmp/bwsc-r3/06-to-watch-not-yet-booked
+
+# ── To Watch list view: Upcoming must render as rows too (APcRePHu)
+- openLink: broadwayscorecard:///to-watch
+- tapOn:
+    text: "Open"
+    optional: true
+- waitForAnimationToEnd
+- tapOn:
+    id: "list-view-toggle"
+- waitForAnimationToEnd
+- takeScreenshot: /tmp/bwsc-r3/07-to-watch-list
+
+# ── Add-show search shows already-listed rows marked (ANI-fwc0)
+- tapOn:
+    text: "Search shows to add..."
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 4000
+- takeScreenshot: /tmp/bwsc-r3/08-add-search-empty
