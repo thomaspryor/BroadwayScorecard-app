@@ -1,0 +1,47 @@
+appId: com.broadwayscorecard.app
+---
+- launchApp
+- tapOn:
+    text: "Open"
+    optional: true
+- openLink: broadwayscorecard:///test/show-below-fold-variants
+- extendedWaitUntil:
+    visible:
+      id: "bf-cast-variant-current"
+    timeout: 25000
+- tapOn:
+    id: "bf-show-tab-deathOfASalesman"
+- waitForAnimationToEnd:
+    timeout: 3000
+- scrollUntilVisible:
+    element:
+      id: "bf-distribution-variant-current"
+    direction: DOWN
+    timeout: 15000
+- takeScreenshot: "32-dos-distribution-current"
+- tapOn:
+    id: "bf-distribution-variant-webParity"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: "33-dos-distribution-webparity"
+- scrollUntilVisible:
+    element:
+      id: "bf-scorecard-variant-current"
+    direction: DOWN
+    timeout: 15000
+- tapOn:
+    id: "bf-scorecard-variant-carded"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: "34-dos-scorecard-carded"
+- scrollUntilVisible:
+    element:
+      id: "bf-tickets-variant-current"
+    direction: DOWN
+    timeout: 15000
+- takeScreenshot: "35-dos-tickets-current"
+- tapOn:
+    id: "bf-tickets-variant-pillRow"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: "36-dos-tickets-pillrow"

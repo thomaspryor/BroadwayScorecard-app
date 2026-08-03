@@ -1,0 +1,132 @@
+# Screenshot capture for show-page below-the-fold design proposals, part 2 (#865).
+# Covers the 5 new sections added on top of the #595 fixture: score
+# distribution, Critics' Take, critic scorecard/review rows, synopsis, and
+# ticket CTAs. Each block re-opens the deep link fresh (resets scroll to
+# top) before tapping its target variant, avoiding a flaky
+# scroll-back-to-top-then-tap (same pattern as below-fold-capture.yaml).
+appId: com.broadwayscorecard.app
+---
+- launchApp
+- tapOn:
+    text: "Open"
+    optional: true
+
+# ── Hamilton: Score Distribution ──
+- openLink: broadwayscorecard:///test/show-below-fold-variants
+- extendedWaitUntil:
+    visible:
+      id: "bf-cast-variant-current"
+    timeout: 20000
+- scrollUntilVisible:
+    element:
+      id: "bf-distribution-variant-current"
+    direction: DOWN
+    timeout: 15000
+- takeScreenshot: "20-hamilton-distribution-current"
+- tapOn:
+    id: "bf-distribution-variant-webParity"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: "21-hamilton-distribution-webparity"
+
+# ── Hamilton: Critics' Take ──
+- scrollUntilVisible:
+    element:
+      id: "bf-criticstake-variant-current"
+    direction: DOWN
+    timeout: 15000
+- takeScreenshot: "22-hamilton-criticstake-current"
+- tapOn:
+    id: "bf-criticstake-variant-minimal"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: "23-hamilton-criticstake-minimal"
+
+# ── Hamilton: Critic Scorecard / Review Rows ──
+- scrollUntilVisible:
+    element:
+      id: "bf-scorecard-variant-current"
+    direction: DOWN
+    timeout: 15000
+- takeScreenshot: "24-hamilton-scorecard-current"
+- tapOn:
+    id: "bf-scorecard-variant-carded"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: "25-hamilton-scorecard-carded"
+- scroll
+- takeScreenshot: "26-hamilton-scorecard-carded-scroll1"
+
+# ── Hamilton: Synopsis ──
+- scrollUntilVisible:
+    element:
+      id: "bf-synopsis-variant-current"
+    direction: DOWN
+    timeout: 15000
+- takeScreenshot: "27-hamilton-synopsis-current"
+- tapOn:
+    id: "bf-synopsis-variant-contextual"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: "28-hamilton-synopsis-contextual"
+
+# ── Hamilton: Ticket CTAs ──
+- scrollUntilVisible:
+    element:
+      id: "bf-tickets-variant-current"
+    direction: DOWN
+    timeout: 15000
+- takeScreenshot: "29-hamilton-tickets-current"
+- tapOn:
+    id: "bf-tickets-variant-pillRow"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: "30-hamilton-tickets-pillrow"
+- tapOn:
+    id: "bf-tickets-variant-primarySecondary"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: "31-hamilton-tickets-primarysecondary"
+
+# ── Death of a Salesman: same 5 sections, current baseline only ──
+- openLink: broadwayscorecard:///test/show-below-fold-variants
+- extendedWaitUntil:
+    visible:
+      id: "bf-cast-variant-current"
+    timeout: 20000
+- tapOn:
+    id: "bf-show-tab-deathOfASalesman"
+- waitForAnimationToEnd:
+    timeout: 3000
+- scrollUntilVisible:
+    element:
+      id: "bf-distribution-variant-current"
+    direction: DOWN
+    timeout: 15000
+- takeScreenshot: "32-dos-distribution-current"
+- tapOn:
+    id: "bf-distribution-variant-webParity"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: "33-dos-distribution-webparity"
+- scrollUntilVisible:
+    element:
+      id: "bf-scorecard-variant-current"
+    direction: DOWN
+    timeout: 15000
+- tapOn:
+    id: "bf-scorecard-variant-carded"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: "34-dos-scorecard-carded"
+- scrollUntilVisible:
+    element:
+      id: "bf-tickets-variant-current"
+    direction: DOWN
+    timeout: 15000
+- takeScreenshot: "35-dos-tickets-current"
+- tapOn:
+    id: "bf-tickets-variant-pillRow"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: "36-dos-tickets-pillrow"
