@@ -12,11 +12,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
 
 const require = createRequire(import.meta.url);
+// Scratch dirs go under the repo, not os.tmpdir(): sandboxed runners deny
+// mkdtemp in /var/folders and the test would error rather than assert.
+const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const {
   parseEnvList,
   parseDotenv,
@@ -194,7 +197,7 @@ test('bracket and destructured reads are reported as defects, not required', () 
   // member expression. The other two spellings read an object that does not
   // exist on device — they are undefined however EAS is configured, so
   // requiring the variable would hide the real bug.
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ship-scan-'));
+  const dir = fs.mkdtempSync(path.join(REPO_ROOT, '.ship-scan-'));
   fs.mkdirSync(path.join(dir, 'lib'));
   fs.writeFileSync(
     path.join(dir, 'lib', 'a.ts'),
@@ -209,6 +212,32 @@ test('bracket and destructured reads are reported as defects, not required', () 
   assert.equal(scan.unsupported.length, 2);
   assert.match(scan.unsupported.join('\n'), /EXPO_PUBLIC_BRACKET/);
   assert.match(scan.unsupported.join('\n'), /EXPO_PUBLIC_DESTRUCTURED/);
+});
+
+test('an unsupported read mentioned in a COMMENT does not block shipping', () => {
+  // The throw halts every OTA until source is edited, so prose describing the
+  // rule — including this codebase's own docblocks — must not trip it.
+  const dir = fs.mkdtempSync(path.join(REPO_ROOT, '.ship-scan-'));
+  fs.mkdirSync(path.join(dir, 'lib'));
+  fs.writeFileSync(
+    path.join(dir, 'lib', 'b.ts'),
+    `// Never write process.env['EXPO_PUBLIC_X'] — Expo cannot inline it.\n` +
+    `/* nor const { EXPO_PUBLIC_Y } = process.env */\n` +
+    `const ok = process.env.EXPO_PUBLIC_REAL;\n`,
+  );
+  const scan = publicVarsUsedInSource(dir);
+  fs.rmSync(dir, { recursive: true, force: true });
+
+  assert.deepEqual(scan.unsupported, []);
+  assert.deepEqual(scan.required, ['EXPO_PUBLIC_REAL']);
+});
+
+test('a value that legitimately starts with # is not read as empty', () => {
+  // Over-eager comment stripping would block a ship on a perfectly good
+  // credential — a false alarm is not a safe default, it just stops delivery.
+  const values = parseDotenv('EXPO_PUBLIC_A=#abc123\nEXPO_PUBLIC_B= # unset\n');
+  assert.equal(values.get('EXPO_PUBLIC_A'), '#abc123');
+  assert.equal(values.get('EXPO_PUBLIC_B'), '');
 });
 
 test('auditUpdateCredentials refuses to run without the pulled values', () => {

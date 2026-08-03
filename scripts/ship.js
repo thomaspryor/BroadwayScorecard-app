@@ -158,6 +158,13 @@ function nativePathsChangedSince(sha) {
   return [...files].filter(f => f.startsWith('(') || NATIVE_PATHS.some(re => re.test(f)));
 }
 
+/** Blank out `//` and block comments so prose about code is not read as code. */
+function stripComments(src) {
+  return src
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/(^|[^:])\/\/[^\n]*/g, '$1'); // the [^:] keeps https:// intact
+}
+
 /**
  * Every EXPO_PUBLIC_* the shipped JavaScript actually reads, plus any read
  * written in a form Expo cannot inline.
@@ -185,7 +192,10 @@ function publicVarsUsedInSource(root = path.join(__dirname, '..')) {
       if (entry.isDirectory()) {
         if (entry.name !== 'node_modules' && !entry.name.startsWith('.')) walk(full);
       } else if (SOURCE_EXTS.has(path.extname(entry.name))) {
-        const src = fs.readFileSync(full, 'utf8');
+        // Comments are stripped first. An `unsupported` hit blocks every OTA
+        // until someone edits the source, so a sentence in a docblock
+        // explaining what not to write must not be able to wedge shipping.
+        const src = stripComments(fs.readFileSync(full, 'utf8'));
         const rel = path.relative(root, full);
         for (const m of src.matchAll(/process\.env\.(EXPO_PUBLIC_[A-Z0-9_]+)/g)) {
           found.add(m[1]);
@@ -341,9 +351,10 @@ function resolvedEnvValues(environment) {
 function parseDotenv(text) {
   const values = new Map();
   for (const line of text.split('\n')) {
-    const m = line.match(/^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/);
+    const m = line.match(/^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)=(.*)$/);
     if (!m || line.trim().startsWith('#')) continue;
-    let value = m[2].trim();
+    const raw = m[2];
+    let value = raw.trim();
 
     const quote = value[0] === '"' || value[0] === "'" ? value[0] : null;
     if (quote) {
@@ -351,11 +362,14 @@ function parseDotenv(text) {
       // trailing comment) is not part of the value.
       const end = value.indexOf(quote, 1);
       value = end === -1 ? value.slice(1) : value.slice(1, end);
+    } else if (/^\s/.test(raw) && value.startsWith('#')) {
+      // `KEY= # not set yet` — space after the `=` then a comment, so the
+      // variable is empty. `KEY=#abc` is a value that happens to start with
+      // '#' and must survive: blocking it would be a false alarm that stops
+      // shipping entirely.
+      value = '';
     } else {
-      // Unquoted: a # at the start, or after whitespace, begins a comment.
-      // `KEY= # not set yet` must read as empty, not as the comment text.
-      // A # with no space before it (a URL fragment) stays part of the value.
-      value = value.replace(/(^|\s+)#.*$/, '').trim();
+      value = value.replace(/\s+#.*$/, '').trim();
     }
     values.set(m[1], value);
   }
