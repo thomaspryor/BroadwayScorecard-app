@@ -15,9 +15,10 @@ appId: com.broadwayscorecard.app
     timeout: 3000
 - scrollUntilVisible:
     element:
-      id: "bf-distribution-variant-current"
+      id: "bf-distribution-content"
     direction: DOWN
     timeout: 15000
+    centerElement: true
 - takeScreenshot: "32-dos-distribution-current"
 - tapOn:
     id: "bf-distribution-variant-webParity"
@@ -26,9 +27,10 @@ appId: com.broadwayscorecard.app
 - takeScreenshot: "33-dos-distribution-webparity"
 - scrollUntilVisible:
     element:
-      id: "bf-scorecard-variant-current"
+      id: "bf-scorecard-content"
     direction: DOWN
     timeout: 15000
+    centerElement: true
 - tapOn:
     id: "bf-scorecard-variant-carded"
 - waitForAnimationToEnd:
@@ -36,9 +38,10 @@ appId: com.broadwayscorecard.app
 - takeScreenshot: "34-dos-scorecard-carded"
 - scrollUntilVisible:
     element:
-      id: "bf-tickets-variant-current"
+      id: "bf-tickets-content"
     direction: DOWN
     timeout: 15000
+    centerElement: true
 - takeScreenshot: "35-dos-tickets-current"
 - tapOn:
     id: "bf-tickets-variant-pillRow"

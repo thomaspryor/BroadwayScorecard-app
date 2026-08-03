@@ -4,6 +4,15 @@
 # ticket CTAs. Each block re-opens the deep link fresh (resets scroll to
 # top) before tapping its target variant, avoiding a flaky
 # scroll-back-to-top-then-tap (same pattern as below-fold-capture.yaml).
+#
+# GOTCHA (found 2026-08-02, same bug class as the #595 Audience defect):
+# scrollUntilVisible must target the *-content wrapper id (with
+# centerElement: true), NOT the *-variant-current segmented-control button.
+# Adjacent sections sit close enough together that the button is often
+# already on-screen without any scroll, so scrolling-to-the-button silently
+# no-ops and the next screenshot duplicates the previous one byte-for-byte
+# (verified via md5) while the caption still claims it shows the new
+# section's rendered content.
 appId: com.broadwayscorecard.app
 ---
 - launchApp
@@ -19,9 +28,10 @@ appId: com.broadwayscorecard.app
     timeout: 20000
 - scrollUntilVisible:
     element:
-      id: "bf-distribution-variant-current"
+      id: "bf-distribution-content"
     direction: DOWN
     timeout: 15000
+    centerElement: true
 - takeScreenshot: "20-hamilton-distribution-current"
 - tapOn:
     id: "bf-distribution-variant-webParity"
@@ -32,9 +42,10 @@ appId: com.broadwayscorecard.app
 # ── Hamilton: Critics' Take ──
 - scrollUntilVisible:
     element:
-      id: "bf-criticstake-variant-current"
+      id: "bf-criticstake-content"
     direction: DOWN
     timeout: 15000
+    centerElement: true
 - takeScreenshot: "22-hamilton-criticstake-current"
 - tapOn:
     id: "bf-criticstake-variant-minimal"
@@ -45,9 +56,10 @@ appId: com.broadwayscorecard.app
 # ── Hamilton: Critic Scorecard / Review Rows ──
 - scrollUntilVisible:
     element:
-      id: "bf-scorecard-variant-current"
+      id: "bf-scorecard-content"
     direction: DOWN
     timeout: 15000
+    centerElement: true
 - takeScreenshot: "24-hamilton-scorecard-current"
 - tapOn:
     id: "bf-scorecard-variant-carded"
@@ -60,9 +72,10 @@ appId: com.broadwayscorecard.app
 # ── Hamilton: Synopsis ──
 - scrollUntilVisible:
     element:
-      id: "bf-synopsis-variant-current"
+      id: "bf-synopsis-content"
     direction: DOWN
     timeout: 15000
+    centerElement: true
 - takeScreenshot: "27-hamilton-synopsis-current"
 - tapOn:
     id: "bf-synopsis-variant-contextual"
@@ -73,9 +86,10 @@ appId: com.broadwayscorecard.app
 # ── Hamilton: Ticket CTAs ──
 - scrollUntilVisible:
     element:
-      id: "bf-tickets-variant-current"
+      id: "bf-tickets-content"
     direction: DOWN
     timeout: 15000
+    centerElement: true
 - takeScreenshot: "29-hamilton-tickets-current"
 - tapOn:
     id: "bf-tickets-variant-pillRow"
@@ -100,9 +114,10 @@ appId: com.broadwayscorecard.app
     timeout: 3000
 - scrollUntilVisible:
     element:
-      id: "bf-distribution-variant-current"
+      id: "bf-distribution-content"
     direction: DOWN
     timeout: 15000
+    centerElement: true
 - takeScreenshot: "32-dos-distribution-current"
 - tapOn:
     id: "bf-distribution-variant-webParity"
@@ -111,9 +126,10 @@ appId: com.broadwayscorecard.app
 - takeScreenshot: "33-dos-distribution-webparity"
 - scrollUntilVisible:
     element:
-      id: "bf-scorecard-variant-current"
+      id: "bf-scorecard-content"
     direction: DOWN
     timeout: 15000
+    centerElement: true
 - tapOn:
     id: "bf-scorecard-variant-carded"
 - waitForAnimationToEnd:
@@ -121,9 +137,10 @@ appId: com.broadwayscorecard.app
 - takeScreenshot: "34-dos-scorecard-carded"
 - scrollUntilVisible:
     element:
-      id: "bf-tickets-variant-current"
+      id: "bf-tickets-content"
     direction: DOWN
     timeout: 15000
+    centerElement: true
 - takeScreenshot: "35-dos-tickets-current"
 - tapOn:
     id: "bf-tickets-variant-pillRow"
