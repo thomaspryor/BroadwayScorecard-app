@@ -15,16 +15,24 @@ import * as haptics from '@/lib/haptics';
 import { useReviewPhotos } from '@/hooks/useReviewPhotos';
 import { PhotoUploadBadge } from '@/components/user/PhotoUploadBadge';
 import { MAX_PHOTOS_PER_REVIEW } from '@/lib/photo-types';
-import { getLibraryAccess, requestLibraryAccess, processPhotoAsset } from '@/lib/photo-image-pipeline';
+import { getLibraryAccess, requestLibraryAccess, processPhotoAsset, pickAndProcessPhotos, type ProcessedPhoto } from '@/lib/photo-image-pipeline';
 import { findPhotosFromThatNight, requestMediaLibraryAccess } from '@/lib/photo-from-that-night';
 
 interface PhotoPickerRowProps {
   reviewId: string | null;
   userId: string | null;
   dateSeen: string | null;
+  /**
+   * Staging mode for a not-yet-saved entry (beta feedback 2026-08-02:
+   * "I shouldn't need to save the entry before being able to save a photo").
+   * Picked photos are held by the parent and uploaded after the first save.
+   */
+  stagedPhotos?: ProcessedPhoto[];
+  onStagePhotos?: (items: ProcessedPhoto[]) => void;
+  onRemoveStaged?: (index: number) => void;
 }
 
-export function PhotoPickerRow({ reviewId, userId, dateSeen }: PhotoPickerRowProps) {
+export function PhotoPickerRow({ reviewId, userId, dateSeen, stagedPhotos, onStagePhotos, onRemoveStaged }: PhotoPickerRowProps) {
   const {
     photos, pending, signedUrls, remainingSlots,
     addPhotos, addProcessedPhotos, retry, removePhoto,
@@ -84,11 +92,70 @@ export function PhotoPickerRow({ reviewId, userId, dateSeen }: PhotoPickerRowPro
     await addProcessedPhotos(processed);
   }, [dateSeen, remainingSlots, addProcessedPhotos]);
 
+  const handleStagePick = useCallback(async () => {
+    if (!onStagePhotos) return;
+    haptics.tap();
+    const access = await getLibraryAccess();
+    if (access === 'undetermined') {
+      const granted = await requestLibraryAccess();
+      if (granted === 'none') {
+        Alert.alert('Photo access needed', 'Allow photo library access in Settings to add photos to your diary.');
+        return;
+      }
+    } else if (access === 'none') {
+      Alert.alert('Photo access needed', 'Allow photo library access in Settings to add photos to your diary.');
+      return;
+    }
+    const remaining = MAX_PHOTOS_PER_REVIEW - (stagedPhotos?.length ?? 0);
+    if (remaining <= 0) return;
+    const processed = await pickAndProcessPhotos(remaining);
+    if (processed.length > 0) onStagePhotos(processed);
+  }, [onStagePhotos, stagedPhotos]);
+
   if (!reviewId) {
+    // No staging callbacks (older call sites): keep the save-first hint.
+    if (!onStagePhotos) {
+      return (
+        <View style={styles.field}>
+          <Text style={styles.fieldLabel}>Photos</Text>
+          <Text style={styles.saveFirstHint}>Save this entry to start adding photos.</Text>
+        </View>
+      );
+    }
+    const staged = stagedPhotos ?? [];
     return (
       <View style={styles.field}>
-        <Text style={styles.fieldLabel}>Photos</Text>
-        <Text style={styles.saveFirstHint}>Save this entry to start adding photos.</Text>
+        <Text style={styles.fieldLabel}>
+          Photos <Text style={styles.optional}>({staged.length}/{MAX_PHOTOS_PER_REVIEW})</Text>
+        </Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.row}>
+          {staged.map((photo, i) => (
+            <View key={`${photo.uri}-${i}`} style={styles.thumbWrap}>
+              <Image source={{ uri: photo.uri }} style={styles.thumb} contentFit="cover" />
+              <Pressable
+                style={styles.removeBtn}
+                onPress={() => { haptics.action(); onRemoveStaged?.(i); }}
+                accessibilityRole="button"
+                accessibilityLabel="Remove photo"
+              >
+                <Text style={styles.removeBtnText}>×</Text>
+              </Pressable>
+            </View>
+          ))}
+          {staged.length < MAX_PHOTOS_PER_REVIEW && (
+            <Pressable
+              style={styles.addTile}
+              onPress={handleStagePick}
+              accessibilityRole="button"
+              accessibilityLabel="Add photos"
+            >
+              <Text style={styles.addTileText}>+</Text>
+            </Pressable>
+          )}
+        </ScrollView>
+        {staged.length > 0 && (
+          <Text style={styles.saveFirstHint}>Photos upload when you save.</Text>
+        )}
       </View>
     );
   }

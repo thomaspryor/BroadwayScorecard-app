@@ -284,25 +284,33 @@ export default function ToWatchScreen() {
         onPress={() => show ? router.push(`/show/${show.slug}`) : handleMissingShow()}
         onLongPress={() => { setPendingDate(new Date()); setDatePickingShowId(item.show_id); }}
       >
-        {posterUrl ? (
-          <Image source={{ uri: posterUrl }} style={styles.gridPoster} contentFit="cover" transition={200} />
-        ) : (
-          <View style={[styles.gridPoster, styles.cardPosterPlaceholder]}>
-            <Text style={styles.placeholderText}>{title.charAt(0)}</Text>
-          </View>
-        )}
+        <View>
+          {posterUrl ? (
+            <Image source={{ uri: posterUrl }} style={styles.gridPoster} contentFit="cover" transition={200} />
+          ) : (
+            <View style={[styles.gridPoster, styles.cardPosterPlaceholder]}>
+              <Text style={styles.placeholderText}>{title.charAt(0)}</Text>
+            </View>
+          )}
+          {/* Date as an overlaid poster tag, matching the Watched tab's grid
+              (beta feedback 2026-08-02: bare text dates under Upcoming
+              posters "look really bad" — use the overlaid tag). */}
+          {item.planned_date && (
+            <View style={styles.upcomingDateOverlayWrap}>
+              <View style={styles.upcomingDateOverlay}>
+                <Text style={styles.upcomingDateOverlayText} numberOfLines={1}>
+                  {new Date(item.planned_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                  {daysUntil !== null && daysUntil >= 0 && daysUntil <= 7 && (
+                    daysUntil === 0 ? ' · Today!' : daysUntil === 1 ? ' · Tomorrow' : ` · ${daysUntil}d`
+                  )}
+                </Text>
+              </View>
+            </View>
+          )}
+        </View>
         {/* No status pill here — these are booked (beta feedback 2026-07-25:
-            "TIX ON SALE on the Upcoming shelf" is noise once you have tickets).
-            Name above date, matching web. */}
+            "TIX ON SALE on the Upcoming shelf" is noise once you have tickets). */}
         <Text style={styles.gridTitle} numberOfLines={2}>{title}</Text>
-        {item.planned_date && (
-          <Text style={styles.posterDate}>
-            {new Date(item.planned_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-            {daysUntil !== null && daysUntil >= 0 && daysUntil <= 7 && (
-              daysUntil === 0 ? ' · Today!' : daysUntil === 1 ? ' · Tomorrow' : ` · ${daysUntil}d`
-            )}
-          </Text>
-        )}
       </Pressable>
     );
   };
@@ -640,7 +648,17 @@ const styles = StyleSheet.create({
   },
   cardPosterPlaceholder: { alignItems: 'center', justifyContent: 'center' },
   placeholderText: { color: Colors.text.muted, fontSize: 18, fontWeight: '600' },
-  posterDate: { color: Colors.text.secondary, fontSize: 12, fontWeight: '500', textAlign: 'center', marginTop: 4 },
+  // Centered overlaid date tag for Upcoming posters — mirrors the Watched
+  // tab's grid date scrim (beta feedback 2026-08-02).
+  upcomingDateOverlayWrap: {
+    position: 'absolute', left: 0, right: 0, bottom: 6,
+    alignItems: 'center',
+  },
+  upcomingDateOverlay: {
+    paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+  },
+  upcomingDateOverlayText: { color: '#fff', fontSize: 12, fontWeight: '700' },
   // Small overlay label (beta feedback 2026-07-26: the 12pt bordered pills
   // still read "ugly and too large" — shrink to a plain dark scrim tag).
   statusPill: {

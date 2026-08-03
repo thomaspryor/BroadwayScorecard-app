@@ -122,8 +122,10 @@ function GridPoster({ posterUrl, title, dateLabel }: { posterUrl: string | null;
         </View>
       )}
       {!!dateLabel && (
-        <View style={styles.gridDateOverlay}>
-          <Text style={styles.gridDateOverlayText} numberOfLines={1}>{dateLabel}</Text>
+        <View style={styles.gridDateOverlayWrap}>
+          <View style={styles.gridDateOverlay}>
+            <Text style={styles.gridDateOverlayText} numberOfLines={1}>{dateLabel}</Text>
+          </View>
         </View>
       )}
     </View>
@@ -181,6 +183,7 @@ export default function WatchedScreen() {
   const [gridMenu, setGridMenu] = useState<
     | { kind: 'review'; review: UserReview }
     | { kind: 'upcoming'; entry: WatchlistEntry }
+    | { kind: 'toBeRated'; entry: WatchlistEntry }
     | null
   >(null);
 
@@ -590,6 +593,13 @@ export default function WatchedScreen() {
                     pathname: '/rate/[showId]' as any,
                     params: { showId: item.show_id, showTitle: title, suggestedDate: item.planned_date || '' },
                   })}
+                  // Escape hatch for shows you didn't end up seeing — without
+                  // this a past-dated entry is stuck in To Be Rated forever
+                  // (beta feedback 2026-08-02: The Potluck).
+                  onLongPress={() => { haptics.action(); setGridMenu({ kind: 'toBeRated', entry: item }); }}
+                  accessibilityHint="Long press for more actions"
+                  accessibilityActions={[{ name: 'delete', label: 'Remove — didn’t see it' }]}
+                  onAccessibilityAction={(e) => { if (e.nativeEvent.actionName === 'delete') handleRemoveUpcoming(item); }}
                 >
                   <GridPoster
                     posterUrl={posterUrl}
@@ -801,26 +811,35 @@ export default function WatchedScreen() {
                 <Path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
               </Svg>
             </Pressable>
-            {/* Calendar toggle — secondary view inside Grid (Round 2). */}
-            <Pressable
-              testID="diary-calendar-view-toggle"
-              style={styles.calendarToggle}
-              onPress={() => { haptics.tap(); setGridSubView(prev => prev === 'poster' ? 'calendar' : 'poster'); }}
-              accessibilityRole="button"
-              accessibilityState={{ selected: gridSubView === 'calendar' }}
-              accessibilityLabel={gridSubView === 'calendar' ? 'Switch to poster grid' : 'Switch to calendar view'}
-              hitSlop={4}
-            >
-              {gridSubView === 'calendar' ? (
-                <Svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={Colors.text.primary} strokeWidth={2}>
+            {/* Grid/calendar sub-view — segmented so BOTH options are visible
+                and the active one is highlighted (beta feedback 2026-08-02:
+                "not just a single icon that flips when you hit it"). */}
+            <View style={styles.subViewSegmented} testID="diary-calendar-view-toggle">
+              <Pressable
+                style={[styles.subViewSegment, gridSubView === 'poster' && styles.subViewSegmentActive]}
+                onPress={() => { haptics.tap(); setGridSubView('poster'); }}
+                accessibilityRole="button"
+                accessibilityState={{ selected: gridSubView === 'poster' }}
+                accessibilityLabel="Poster grid view"
+                hitSlop={4}
+              >
+                <Svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={gridSubView === 'poster' ? Colors.text.primary : Colors.text.muted} strokeWidth={2}>
                   <Path strokeLinecap="round" strokeLinejoin="round" d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z" />
                 </Svg>
-              ) : (
-                <Svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={Colors.text.primary} strokeWidth={2}>
+              </Pressable>
+              <Pressable
+                style={[styles.subViewSegment, gridSubView === 'calendar' && styles.subViewSegmentActive]}
+                onPress={() => { haptics.tap(); setGridSubView('calendar'); }}
+                accessibilityRole="button"
+                accessibilityState={{ selected: gridSubView === 'calendar' }}
+                accessibilityLabel="Calendar view"
+                hitSlop={4}
+              >
+                <Svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={gridSubView === 'calendar' ? Colors.text.primary : Colors.text.muted} strokeWidth={2}>
                   <Path strokeLinecap="round" strokeLinejoin="round" d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V6a2 2 0 012-2z" />
                 </Svg>
-              )}
-            </Pressable>
+              </Pressable>
+            </View>
           </View>
         </View>
       )}
@@ -935,6 +954,19 @@ export default function WatchedScreen() {
           }
           const { entry } = gridMenu;
           const show = showMap[entry.show_id];
+          if (gridMenu.kind === 'toBeRated') {
+            return [
+              {
+                label: 'Rate this show',
+                onPress: () => router.push({
+                  pathname: '/rate/[showId]' as any,
+                  params: { showId: entry.show_id, showTitle: show?.title || '', suggestedDate: entry.planned_date || '' },
+                }),
+              },
+              { label: 'View show', onPress: () => (show ? router.push(`/show/${show.slug}`) : handleMissingShow()) },
+              { label: 'Didn’t see it — remove', destructive: true, onPress: () => handleRemoveUpcoming(entry) },
+            ];
+          }
           return [
             { label: 'View show', onPress: () => (show ? router.push(`/show/${show.slug}`) : handleMissingShow()) },
             { label: 'Remove from Watchlist', destructive: true, onPress: () => handleRemoveUpcoming(entry) },
@@ -984,10 +1016,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.sm, paddingVertical: 6,
   },
   sortText: { color: Colors.text.secondary, fontSize: FontSize.xs, fontWeight: '500' },
-  calendarToggle: {
-    width: 44, height: 44, borderRadius: 8,
+  subViewSegmented: {
+    flexDirection: 'row',
     backgroundColor: Colors.surface.overlay,
+    borderRadius: 8,
+    padding: 3,
+    gap: 2,
+  },
+  subViewSegment: {
+    width: 38, height: 34, borderRadius: 6,
     alignItems: 'center', justifyContent: 'center',
+  },
+  subViewSegmentActive: {
+    backgroundColor: Colors.surface.raised,
   },
   // Grid · Feed · Stats segmented control.
   segmentedRow: { paddingHorizontal: Spacing.lg, paddingBottom: Spacing.sm },
@@ -1070,8 +1111,13 @@ const styles = StyleSheet.create({
   },
   // Date lives on the poster now, not the text block below (venue dropped
   // entirely) — small low-alpha corner scrim, unobtrusive by design.
+  // Horizontally centered so the tag lines up with the centered title/stars
+  // below the poster (beta feedback 2026-08-02).
+  gridDateOverlayWrap: {
+    position: 'absolute', left: 0, right: 0, bottom: 6,
+    alignItems: 'center',
+  },
   gridDateOverlay: {
-    position: 'absolute', left: 6, bottom: 6,
     paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4,
     backgroundColor: 'rgba(0,0,0,0.45)',
   },

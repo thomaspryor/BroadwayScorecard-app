@@ -42,6 +42,9 @@ import { savePendingAction, getPendingAction, clearPendingAction } from '@/lib/d
 import * as haptics from '@/lib/haptics';
 import StarRating from '@/components/user/StarRating';
 import { PhotoPickerRow } from '@/components/user/PhotoPickerRow';
+import * as Crypto from 'expo-crypto';
+import { enqueuePhotoUpload, flushPhotoQueue } from '@/lib/photo-upload-queue';
+import type { ProcessedPhoto } from '@/lib/photo-image-pipeline';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
 
 const MAX_CHARS = 2000;
@@ -105,6 +108,12 @@ export default function RateModal() {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  // Photos picked before the first save (new entries only) — uploaded right
+  // after the review row is created. Ref keeps performSave's dependency list
+  // stable while always seeing the latest picks.
+  const [stagedPhotos, setStagedPhotos] = useState<ProcessedPhoto[]>([]);
+  const stagedPhotosRef = useRef<ProcessedPhoto[]>([]);
+  useEffect(() => { stagedPhotosRef.current = stagedPhotos; }, [stagedPhotos]);
   const [loadingReview, setLoadingReview] = useState(!!reviewId);
   const isDirty = useRef(false);
   const populatingRef = useRef(!!reviewId); // true while loading edit data
@@ -215,7 +224,7 @@ export default function RateModal() {
       });
       if (error) throw new Error(error.message);
     } else {
-      const { error } = await supabaseRestInsert('reviews', {
+      const { data: inserted, error } = await supabaseRestInsert<{ id: string }>('reviews', {
         user_id: user.id,
         show_id: showId,
         rating: ratingVal,
@@ -223,6 +232,24 @@ export default function RateModal() {
         date_seen: dateVal || null,
       });
       if (error) throw new Error(error.message);
+      // Photos picked BEFORE the first save (beta feedback 2026-08-02) —
+      // now that the review row exists, queue them for upload. Best-effort:
+      // the upload queue retries on next foreground if this flush fails.
+      if (inserted?.id && stagedPhotosRef.current.length > 0) {
+        for (const photo of stagedPhotosRef.current) {
+          await enqueuePhotoUpload({
+            id: Crypto.randomUUID(),
+            reviewId: inserted.id,
+            userId: user.id,
+            localUri: photo.uri,
+            width: photo.width,
+            height: photo.height,
+            takenAt: null,
+          }).catch(() => {});
+        }
+        setStagedPhotos([]);
+        flushPhotoQueue().catch(() => {});
+      }
       // Watchlist = want to see; a first rating means you've seen it
       // (web parity, owner rule 2026-07-12). Best-effort — never block save.
       // A FUTURE-dated entry disappearing with no feedback reads as data loss
@@ -521,7 +548,14 @@ export default function RateModal() {
                   new (unsaved) entry shows a hint instead until reviewId
                   exists (Save always closes this sheet immediately, so
                   photos are added on a subsequent edit visit). */}
-              <PhotoPickerRow reviewId={reviewId ?? null} userId={user?.id ?? null} dateSeen={dateSeen || null} />
+              <PhotoPickerRow
+                reviewId={reviewId ?? null}
+                userId={user?.id ?? null}
+                dateSeen={dateSeen || null}
+                stagedPhotos={stagedPhotos}
+                onStagePhotos={(items) => { setStagedPhotos(prev => [...prev, ...items]); isDirty.current = true; }}
+                onRemoveStaged={(index) => setStagedPhotos(prev => prev.filter((_, i) => i !== index))}
+              />
 
               {/* Privacy note */}
               <View style={styles.privacyRow}>
