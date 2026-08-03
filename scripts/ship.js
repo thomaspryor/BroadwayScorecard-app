@@ -33,9 +33,22 @@
  * is not in the binary — an instant crash on the owner's phone. NATIVE_PATHS
  * below is a second, git-based gate: if any of those files moved since the last
  * build's commit, this builds regardless of what the fingerprint says.
+ *
+ * SAFETY 2 — credentials (2026-08-03 incident, the very first OTA this script
+ * shipped): a native build runs ON an EAS worker, where EVERY environment
+ * variable is injected, including ones stored with visibility "Secret". An
+ * `eas update` bundles wherever it runs — a GitHub runner — and EAS refuses to
+ * hand Secret values to anything off-worker. `process.env.EXPO_PUBLIC_X || ''`
+ * then compiles to an empty string, the Supabase client is never constructed,
+ * and the update installs an app that launches fine and cannot sign in. The
+ * publish itself succeeds and the CI job goes green, so nothing catches it
+ * except the owner. assertUpdateCanCarryCredentials() below blocks that before
+ * publishing, and verifyPublishedCredentials() rolls back if it happens anyway.
  */
 
 const { execFileSync } = require('child_process');
+const fs = require('fs');
+const path = require('path');
 
 // Files that can change the native binary. Mirrors the reasoning in
 // scripts/check-testflight-drift.js RELEVANT_PATHS, narrowed to native-only.
@@ -49,6 +62,22 @@ const NATIVE_PATHS = [
   /^patches\//,
   /^assets\/(icon|splash|adaptive)/i,
 ];
+
+// Directories whose JavaScript is what an OTA update actually replaces. Any
+// EXPO_PUBLIC_* read from here has to survive the update path.
+const SOURCE_DIRS = ['app', 'components', 'lib', 'hooks'];
+const SOURCE_EXTS = new Set(['.ts', '.tsx', '.js', '.jsx']);
+
+// EXPO_PUBLIC_* whose absence degrades something the owner would notice but
+// does NOT break the app. Everything else discovered in the source is treated
+// as required — a new credential is required by default, which is the only
+// direction that stays safe when someone adds one and forgets this list.
+const OPTIONAL_PUBLIC_VARS = new Set([
+  'EXPO_PUBLIC_DEV_AUTO_SIGNIN', // simulator-only auth bypass
+  'EXPO_PUBLIC_STATS_LAYOUT',    // layout experiment flag
+  'EXPO_PUBLIC_SENTRY_DSN',      // crash reporting; app runs without it
+  'EXPO_PUBLIC_POSTHOG_API_KEY', // analytics; app runs without it
+]);
 
 const args = process.argv.slice(2);
 const DRY_RUN = args.includes('--dry-run');
@@ -127,6 +156,114 @@ function nativePathsChangedSince(sha) {
   return [...files].filter(f => f.startsWith('(') || NATIVE_PATHS.some(re => re.test(f)));
 }
 
+/** Every EXPO_PUBLIC_* the shipped JavaScript actually reads. */
+function publicVarsUsedInSource(root = path.join(__dirname, '..')) {
+  const found = new Set();
+  const walk = (dir) => {
+    let entries;
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return; // directory absent in this checkout — nothing to require from it
+    }
+    for (const entry of entries) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        if (entry.name !== 'node_modules' && !entry.name.startsWith('.')) walk(full);
+      } else if (SOURCE_EXTS.has(path.extname(entry.name))) {
+        const src = fs.readFileSync(full, 'utf8');
+        for (const m of src.matchAll(/process\.env\.(EXPO_PUBLIC_[A-Z0-9_]+)/g)) {
+          found.add(m[1]);
+        }
+      }
+    }
+  };
+  SOURCE_DIRS.forEach(d => walk(path.join(root, d)));
+  return [...found].sort();
+}
+
+/**
+ * Parse `eas env:list --environment X`. Visibility is only ever stated in the
+ * masked-value hint, so that hint IS the signal we need: "secret" means the
+ * value exists on EAS and `eas update` will still bundle an empty string.
+ */
+function parseEnvList(text) {
+  const vars = new Map();
+  for (const line of text.split('\n')) {
+    const m = line.match(/^([A-Z][A-Z0-9_]*)=(.*)$/);
+    if (!m) continue;
+    const [, name, rest] = m;
+    const visibility = /secret env variable/i.test(rest)
+      ? 'secret'
+      : /sensitive env variable/i.test(rest)
+        ? 'sensitive'
+        : 'plaintext';
+    const prev = vars.get(name);
+    // A name can legitimately appear twice on EAS (it happened to
+    // EXPO_PUBLIC_POSTHOG_API_KEY). Remember every visibility seen: if ANY
+    // copy is secret, which copy wins is not something we get to assume.
+    vars.set(name, {
+      visibilities: [...(prev ? prev.visibilities : []), visibility],
+      count: (prev ? prev.count : 0) + 1,
+    });
+  }
+  return vars;
+}
+
+/**
+ * Decide whether an `eas update` published from here would carry real
+ * credentials. Returns { errors, warnings } rather than throwing so the caller
+ * can print everything at once — a half-reported env problem sends you round
+ * the loop twice.
+ */
+function auditUpdateCredentials(required, envVars) {
+  const errors = [];
+  const warnings = [];
+
+  for (const name of required) {
+    const entry = envVars.get(name);
+    if (!entry) {
+      errors.push(`${name} is not set in the EAS environment — an update would bundle ''`);
+      continue;
+    }
+    if (entry.visibilities.includes('secret')) {
+      errors.push(
+        `${name} has visibility "Secret" — EAS only injects Secret values on a ` +
+        `build worker, so an update would bundle ''. Delete and re-create it ` +
+        `with --visibility sensitive.`,
+      );
+      continue;
+    }
+    if (entry.count > 1) {
+      errors.push(`${name} is defined ${entry.count}× in this environment — which value ships is undefined`);
+    }
+  }
+
+  for (const [name, entry] of envVars) {
+    if (required.includes(name)) continue;
+    if (entry.count > 1) {
+      warnings.push(`${name} is defined ${entry.count}× in this environment — the copies may disagree`);
+    } else if (name.startsWith('EXPO_PUBLIC_') && entry.visibilities.includes('secret')) {
+      warnings.push(`${name} is "Secret", so it ships as '' over the air (optional — not blocking)`);
+    }
+  }
+
+  return { errors, warnings };
+}
+
+/** The names `eas update` reports it actually loaded, from its own output. */
+function parseLoadedVars(updateOutput) {
+  const m = updateOutput.match(/loaded from the "[^"]+" environment on EAS:\s*([^.\n]+)/);
+  if (!m) return null; // no such line — CLI output changed; treat as unknown
+  return m[1].split(',').map(s => s.trim()).filter(Boolean);
+}
+
+/** The runtime version an update was published against — needed to roll it back. */
+function parseRuntimeVersion(updateOutput) {
+  const m = updateOutput.match(/^\s*Runtime version\s+(\S+)\s*$/m);
+  return m ? m[1] : null;
+}
+
 function commitSubject() {
   try {
     return run('git', ['log', '-1', '--pretty=%s']).trim();
@@ -169,7 +306,31 @@ function main() {
 
   console.log(`\nDECISION: ${mode.toUpperCase()} — ${reason}`);
   if (process.env.GITHUB_OUTPUT) {
-    require('fs').appendFileSync(process.env.GITHUB_OUTPUT, `mode=${mode}\n`);
+    fs.appendFileSync(process.env.GITHUB_OUTPUT, `mode=${mode}\n`);
+  }
+
+  // Only the update path can lose credentials — a build runs on an EAS worker,
+  // which gets Secret values too. Checked before --dry-run returns so the local
+  // dry run is a real pre-flight, not just a decision preview.
+  let required = [];
+  if (mode === 'update') {
+    required = publicVarsUsedInSource().filter(v => !OPTIONAL_PUBLIC_VARS.has(v));
+    const envVars = parseEnvList(
+      run('npx', ['eas-cli', 'env:list', '--environment', 'production']),
+    );
+    const { errors, warnings } = auditUpdateCredentials(required, envVars);
+
+    console.log(`\nrequired EXPO_PUBLIC_*: ${required.join(', ') || '(none)'}`);
+    warnings.forEach(w => console.log(`WARNING: ${w}`));
+    if (errors.length) {
+      throw new Error(
+        `refusing to publish an update that cannot carry credentials:\n  - ` +
+        errors.join('\n  - ') +
+        `\n\nAn update published in this state installs an app that launches and ` +
+        `cannot sign in (2026-08-03).`,
+      );
+    }
+    console.log('credentials pre-flight: OK — every required variable is readable off-worker');
   }
 
   if (DRY_RUN) {
@@ -189,7 +350,10 @@ function main() {
   } else {
     const message = commitSubject().slice(0, 100);
     console.log(`\n$ eas update --branch production --environment production --message "${message}"`);
-    run('npx', [
+    // Captured, not inherited: the CLI names the variables it loaded, and that
+    // line is the only proof available that the bundle it just uploaded has
+    // credentials in it. Echoed verbatim so the CI log is unchanged.
+    const out = run('npx', [
       'eas-cli', 'update',
       '--branch', 'production',
       // Required from SDK 55 on; the CLI hard-errors without it.
@@ -197,7 +361,39 @@ function main() {
       '--platform', 'ios',
       '--message', message,
       '--non-interactive',
-    ], { stdio: 'inherit' });
+    ]);
+    console.log(out);
+
+    const loaded = parseLoadedVars(out);
+    const missing = loaded === null ? [] : required.filter(v => !loaded.includes(v));
+    if (loaded === null) {
+      console.log(
+        'WARNING: eas update did not report which environment variables it loaded — ' +
+        'the pre-flight passed, but this publish is unverified.',
+      );
+    } else if (missing.length) {
+      // The bad update is already live. Undo it before failing: every launch
+      // between now and a human noticing installs the credential-less bundle.
+      const runtime = parseRuntimeVersion(out);
+      console.error(`\nPUBLISHED UPDATE IS MISSING: ${missing.join(', ')} — rolling back`);
+      if (runtime) {
+        run('npx', [
+          'eas-cli', 'update:roll-back-to-embedded',
+          '--branch', 'production',
+          '--platform', 'ios',
+          '--runtime-version', runtime,
+          '--message', `Automatic rollback: update lacked ${missing.join(', ')}`,
+          '--non-interactive',
+        ], { stdio: 'inherit' });
+      }
+      throw new Error(
+        `update published without ${missing.join(', ')}` +
+        (runtime ? ' — rolled back to the embedded bundle' : ' — ROLL BACK MANUALLY (no runtime version in the output)'),
+      );
+    } else {
+      console.log(`credentials verified in the published bundle: ${required.join(', ')}`);
+    }
+
     console.log(
       '\nNOTE: an OTA update does NOT produce a TestFlight push notification.\n' +
       'The app picks it up on next launch. Use --force-build when the owner\n' +
@@ -206,9 +402,13 @@ function main() {
   }
 }
 
-try {
-  main();
-} catch (err) {
-  console.error(`ship: ${err.message}`);
-  process.exit(1);
+if (require.main === module) {
+  try {
+    main();
+  } catch (err) {
+    console.error(`ship: ${err.message}`);
+    process.exit(1);
+  }
 }
+
+module.exports = { parseEnvList, auditUpdateCredentials, parseLoadedVars, parseRuntimeVersion, publicVarsUsedInSource };

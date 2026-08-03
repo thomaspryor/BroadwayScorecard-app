@@ -96,6 +96,12 @@ jobs:
       - name: Unit-test advanced filters
         run: node --experimental-strip-types --import ./tests/register-alias.mjs --test scripts/advanced-filters.test.mjs
 
+      # Guards the OTA path against republishing the 2026-08-03 outage: an
+      # update bundled with empty Supabase credentials installs an app that
+      # launches and cannot sign in, and nothing else in CI notices.
+      - name: Unit-test OTA credential guard
+        run: node --test scripts/ship-credentials.test.mjs
+
       - name: Design floor (12pt minimum text size)
         run: npm run lint:design
 
