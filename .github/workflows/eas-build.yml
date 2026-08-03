@@ -181,8 +181,4 @@ jobs:
           EXPO_ASC_API_KEY_PATH: /tmp/AuthKey.p8
           EXPO_ASC_API_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
           EXPO_ASC_API_KEY_ISSUER_ID: ${{ secrets.ASC_API_KEY_ISSUER_ID }}
-        # env:exec loads the EAS `production` environment, which is where the
-        # EXPO_PUBLIC_* app credentials and SENTRY_AUTH_TOKEN actually live
-        # (they are NOT GitHub secrets). Without it `expo export` would bundle
-        # empty Supabase credentials and publish a broken update.
-        run: npx eas-cli env:exec production --non-interactive "node scripts/ship.js ${{ (github.event_name == 'workflow_dispatch' && inputs.force_build) && '--force-build' || '' }}"
+        run: node scripts/ship.js ${{ (github.event_name == 'workflow_dispatch' && inputs.force_build) && '--force-build' || '' }}
