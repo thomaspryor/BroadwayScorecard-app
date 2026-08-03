@@ -9,10 +9,18 @@
  * black scrim, which wrapped "NOW PLAYING" onto two lines and spanned most of
  * the poster.
  *
- * Color mapping is the web's, not the app's: green for OPEN / IN PREVIEWS /
- * TIX ON SALE, amber for CLOSING SOON, gray for CLOSED. Label is "OPEN" (web's
- * word), not "NOW PLAYING" — two words cannot fit one line in a 23%-width grid
- * cell at the 12pt font floor.
+ * Color mapping is the web's, not the app's: green for open / previews / on
+ * sale, amber for closing soon, gray for closed.
+ *
+ * WORDING DIFFERS FROM WEB ON PURPOSE. A To Watch grid cell is 23% of a ~402pt
+ * screen (~88pt); at the 12pt font floor a two-word label needs ~100-110pt, so
+ * web's "NOW PLAYING" / "IN PREVIEWS" / "CLOSING SOON" / "TIX ON SALE" all
+ * truncate to "IN PREV…" style ellipses — verified in the sim 2026-08-02, and
+ * exactly the truncation flaw the design panel rejected artifact Option B for.
+ * Single-line + 12pt floor + this cell width admits only one word, so each
+ * label keeps its distinctive word: OPEN / PREVIEWS / CLOSING / ON SALE /
+ * CLOSED. Widening the cells (3-across instead of 4) would allow web's exact
+ * wording — that's an owner call, not assumed here.
  */
 
 import React from 'react';
@@ -36,18 +44,20 @@ export function statusOverlay(show?: Show): { label: string; color: string } | n
   if (!show) return null;
   if (show.status === 'closed') return { label: 'CLOSED', color: WEB_STATUS_COLORS.closed };
   if (show.closingDate && isClosingSoonDate(show.closingDate)) {
-    return { label: 'CLOSING SOON', color: WEB_STATUS_COLORS.closingSoon };
+    return { label: 'CLOSING', color: WEB_STATUS_COLORS.closingSoon };
   }
   if (show.status === 'open') return { label: 'OPEN', color: WEB_STATUS_COLORS.open };
-  if (show.status === 'previews') return { label: 'IN PREVIEWS', color: WEB_STATUS_COLORS.open };
+  if (show.status === 'previews') return { label: 'PREVIEW', color: WEB_STATUS_COLORS.open };
   if (show.status === 'upcoming' || show.status === 'announced') {
-    if (show.ticketsOnSale) return { label: 'TIX ON SALE', color: WEB_STATUS_COLORS.open };
+    if (show.ticketsOnSale) return { label: 'ON SALE', color: WEB_STATUS_COLORS.open };
     if (show.openingDate) {
+      // Bare date, no "OPENS " prefix — "OPENS OCT 30" is 12 chars and
+      // truncates; the date alone reads unambiguously in an upcoming slot.
       const opens = new Date(show.openingDate + 'T00:00:00').toLocaleDateString('en-US', {
         month: 'short',
         day: 'numeric',
       });
-      return { label: `OPENS ${opens.toUpperCase()}`, color: getStatusInfo('upcoming').color };
+      return { label: opens.toUpperCase(), color: getStatusInfo('upcoming').color };
     }
     return getStatusInfo('upcoming');
   }
