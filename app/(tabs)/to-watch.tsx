@@ -27,7 +27,7 @@ import { useUserReviews } from '@/hooks/useUserReviews';
 import { useWatchlist } from '@/hooks/useWatchlist';
 import { useShows } from '@/lib/data-context';
 import { getImageUrl } from '@/lib/images';
-import { daysUntilDate, isClosingSoonDate, toLocalYMD } from '@/lib/date-utils';
+import { daysUntilDate, toLocalYMD } from '@/lib/date-utils';
 import { humanizeShowId } from '@/lib/show-format';
 import { useToastSafe } from '@/lib/toast-context';
 import { PosterStatusPill, statusOverlay } from '@/components/show-cards/PosterStatusPill';
