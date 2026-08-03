@@ -19,7 +19,7 @@ import { FlatList, Modal, Pressable, StyleSheet, Text, View } from 'react-native
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { getImageUrl } from '@/lib/images';
-import { humanizeShowId } from '@/lib/show-format';
+import { showTitleFallback } from '@/lib/show-format';
 import { BorderRadius, Colors, FontSize, Spacing } from '@/constants/theme';
 import { ScoreBadge } from '@/components/show-cards';
 import MiniStars from '@/components/user/MiniStars';
@@ -117,7 +117,7 @@ export function StatsDrilldownSheet({
     const show = item.show;
     const showId = item.kind === 'review' ? item.review.show_id : item.show.id;
     const title =
-      show?.title ?? (item.kind === 'review' ? humanizeShowId(item.review.show_id) : 'Unknown show');
+      show?.title ?? (item.kind === 'review' ? showTitleFallback(item.review.show_id) : 'Unknown show');
     const posterUrl = show?.images
       ? getImageUrl(show.images.poster) || getImageUrl(show.images.thumbnail)
       : null;

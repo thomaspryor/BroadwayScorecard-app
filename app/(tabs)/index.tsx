@@ -99,6 +99,33 @@ export default function HomeScreen() {
       },
     });
 
+    // ─── Shelves 3-5 (owner ask 2026-08-03, ADnQ3mUB: "move these three
+    // shelves to be the 3rd, 4th and 5th") — Best Off-Broadway, Starting Soon,
+    // then Closing Soon, which is rendered by its own component right after
+    // this list's 4th entry (see CLOSING_SOON_INDEX in the render).
+
+    // Best Off-Broadway (NYC market only, separate from main Broadway filter)
+    if (market === 'nyc') {
+      const offBway = shows
+        .filter(s => s.category === 'off-broadway' && isOpen(s) && getQualifiedScore(s) != null)
+        .sort(byScore).slice(0, 10);
+      if (offBway.length >= 3) rows.push({ title: 'Best Off-Broadway', shows: offBway });
+    }
+
+    // Shows Starting Soon (upcoming, not yet in previews)
+    const startingSoon = marketShows
+      .filter(s => s.status === 'upcoming')
+      .sort((a, b) => (a.openingDate ?? '').localeCompare(b.openingDate ?? ''))
+      .slice(0, 10);
+    if (startingSoon.length >= 2) rows.push({
+      title: 'Starting Soon',
+      shows: startingSoon,
+      getSubtitle: (s) => {
+        const d = shortDate(s.openingDate ?? '');
+        return d ? `Opens ${d}` : undefined;
+      },
+    });
+
     // Top Recent Shows (opened in last 12 months)
     const twelveMonthsAgo = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
     const recent = marketShows.filter(s =>
@@ -143,33 +170,11 @@ export default function HomeScreen() {
     }).sort(byScore).slice(0, 10);
     if (kids.length >= 2) rows.push({ title: 'Great for Kids', shows: kids });
 
-    // Best Off-Broadway (NYC market only, separate from main Broadway filter)
-    if (market === 'nyc') {
-      const offBway = shows
-        .filter(s => s.category === 'off-broadway' && isOpen(s) && getQualifiedScore(s) != null)
-        .sort(byScore).slice(0, 10);
-      if (offBway.length >= 3) rows.push({ title: 'Best Off-Broadway', shows: offBway });
-    }
-
     // Upcoming / In Previews
     const previews = marketShows.filter(s => s.status === 'previews').sort((a, b) => (a.openingDate ?? '').localeCompare(b.openingDate ?? '')).slice(0, 10);
     if (previews.length >= 2) rows.push({
       title: 'Coming Up',
       shows: previews,
-      getSubtitle: (s) => {
-        const d = shortDate(s.openingDate ?? '');
-        return d ? `Opens ${d}` : undefined;
-      },
-    });
-
-    // Shows Starting Soon (upcoming, not yet in previews)
-    const startingSoon = marketShows
-      .filter(s => s.status === 'upcoming')
-      .sort((a, b) => (a.openingDate ?? '').localeCompare(b.openingDate ?? ''))
-      .slice(0, 10);
-    if (startingSoon.length >= 2) rows.push({
-      title: 'Starting Soon',
-      shows: startingSoon,
       getSubtitle: (s) => {
         const d = shortDate(s.openingDate ?? '');
         return d ? `Opens ${d}` : undefined;
@@ -195,6 +200,11 @@ export default function HomeScreen() {
       })
       .sort((a, b) => (a.closingDate ?? '').localeCompare(b.closingDate ?? ''));
   }, [marketShows]);
+
+  // Closing Soon renders as the 5th shelf — after featuredRows[3] (owner ask
+  // 2026-08-03, ADnQ3mUB). Clamped so a short row list still renders it once.
+  const showClosingSoon = closingSoon.length >= 2;
+  const closingSoonAfterIndex = Math.min(3, featuredRows.length - 1);
 
   const scoredCount = useMemo(() =>
     marketShows.filter(s => s.compositeScore != null).length,
@@ -280,16 +290,19 @@ export default function HomeScreen() {
               <StaleBanner />
             </View>
 
-            {/* Featured rows */}
+            {/* Featured rows. Closing Soon is its own component (countdown
+                badges) but the owner wants it as the 5th shelf, i.e. straight
+                after the 4th entry above (ADnQ3mUB) — so it's interleaved
+                here rather than appended. If fewer than 4 shelves survive
+                their thresholds it falls to the end, which is still last. */}
             {featuredRows.map((row, i) => (
               <View key={i}>
                 <Text style={styles.sectionTitle}>{row.title}</Text>
                 <FeaturedCarousel shows={row.shows} watchlistSet={watchlistSet} onToggleWatchlist={toggleWatchlist} getSubtitle={row.getSubtitle} ratingsMap={ratingsMap} />
+                {showClosingSoon && i === closingSoonAfterIndex && <ClosingSoon shows={closingSoon} />}
               </View>
             ))}
-
-            {/* Closing Soon — dedicated section with countdown badges */}
-            {closingSoon.length >= 2 && <ClosingSoon shows={closingSoon} />}
+            {showClosingSoon && featuredRows.length === 0 && <ClosingSoon shows={closingSoon} />}
 
             {/* Main list title */}
             <Text style={styles.sectionTitle}>Now Playing</Text>

@@ -31,7 +31,7 @@ import Fuse from 'fuse.js';
 import { useUserLists } from '@/hooks/useUserLists';
 import { useShows } from '@/lib/data-context';
 import { getImageUrl } from '@/lib/images';
-import { humanizeShowId } from '@/lib/show-format';
+import { showTitleFallback } from '@/lib/show-format';
 import { useToastSafe } from '@/lib/toast-context';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
 import { ContextMenu } from '@/components/user/ContextMenu';
@@ -399,7 +399,7 @@ export default function ListsTab({ userId, showMap, createTrigger }: ListsTabPro
                   {/* Title */}
                   <View style={styles.itemInfo}>
                     <Text style={styles.itemTitle} numberOfLines={1}>
-                      {show?.title || humanizeShowId(item.show_id)}
+                      {show?.title || showTitleFallback(item.show_id)}
                     </Text>
                     {show?.venue && (
                       <Text style={styles.itemVenue} numberOfLines={1}>{show.venue}</Text>
@@ -454,7 +454,7 @@ export default function ListsTab({ userId, showMap, createTrigger }: ListsTabPro
                 )}
                 <View style={styles.itemInfo}>
                   <Text style={styles.itemTitle} numberOfLines={1}>
-                    {show?.title || humanizeShowId(item.show_id)}
+                    {show?.title || showTitleFallback(item.show_id)}
                   </Text>
                   {show?.venue && (
                     <Text style={styles.itemVenue} numberOfLines={1}>{show.venue}</Text>

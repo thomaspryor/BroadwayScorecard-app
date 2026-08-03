@@ -5,11 +5,14 @@
  * the user's date-seen instead of grabbing the first same-title match — the
  * root cause of wrong-production imports (History Boys 2006 etc, 2026-07-14).
  *
- * Scope vs web: matches against useShows()'s scored catalog only (no
- * diary-only 32k-show catalog merge, no per-row live "Find it" lookup — v1
- * cut per the iOS parity card). Unmatched rows are still listed, never
- * silently dropped, so the self-heal loop (unmatched_imports) can grow the
- * catalog toward matching them later.
+ * Catalog: the scored catalog from useShows() MERGED with diary-search.json,
+ * exactly as the web does (lib/diary-catalog.ts). Matching the scored catalog
+ * alone made the app reject ~45 productions per import that the website
+ * matched fine — "the imports miss shows that ARE on the site" and "don't work
+ * as well as, and are inconsistent with, the web imports" (owner, 2026-08-02).
+ * Still no per-row live "Find it" lookup (web-only). Unmatched rows are listed,
+ * never silently dropped, so the self-heal loop (unmatched_imports) can grow
+ * the catalog toward matching them later.
  */
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import {
@@ -25,7 +28,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import Fuse from 'fuse.js';
 import { useAuth } from '@/lib/auth-context';
 import { useShows } from '@/lib/data-context';
 import { supabaseRestInsert } from '@/lib/supabase-rest';
@@ -35,7 +37,18 @@ import {
   type ImportAcquireResult,
   type RawImportEntry,
 } from '@/lib/show-import';
-import type { Show } from '@/lib/types';
+import {
+  ShowMatcher,
+  isWeakMatch,
+  MATCH_THRESHOLD,
+  type MatchCandidate,
+} from '@/lib/show-match';
+import {
+  fetchDiaryCatalog,
+  mergeDiaryCandidates,
+  showToCandidate,
+} from '@/lib/diary-catalog';
+import { recordDiaryTitles } from '@/lib/diary-titles';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
 import * as haptics from '@/lib/haptics';
 
@@ -48,7 +61,7 @@ interface MatchedEntry {
   sourceScore: number | null;
   sourceDate: string | null;
   sourceReview: string | null;
-  match: Show | null;
+  match: MatchCandidate | null;
   matchScore: number;
   selected: boolean;
   /** Real match demoted only by the date-sanity guard — the user's date-seen
@@ -82,52 +95,8 @@ interface ImportCheckpoint {
 
 const CHECKPOINT_KEY = (userId: string) => `@bsc:import-checkpoint:${userId}`;
 
-// ─── Title/date matching (ported from web's ImportShows.tsx matchShow) ────
-
-/** Normalize a title for comparison: fancy quotes/dashes → plain, & → and,
- *  accents folded, strip punctuation, collapse whitespace. */
-const COMBINING_MARKS_RE = new RegExp('[\\u0300-\\u036f]', 'g');
-const SMART_APOSTROPHE_RE = new RegExp('[\\u2018\\u2019\\u201a\\u2032\']', 'g');
-const SMART_QUOTE_RE = new RegExp('[\\u201c\\u201d\\u201e\\u2033"]', 'g');
-
-function normTitle(t: string): string {
-  return t
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(COMBINING_MARKS_RE, '')
-    .replace(SMART_APOSTROPHE_RE, '')
-    .replace(SMART_QUOTE_RE, '')
-    .replace(/&/g, ' and ')
-    .replace(/[^a-z0-9]+/g, ' ')
-    .trim();
-}
-
-/** Downgrade a match whose production can't have been running when the user
- *  saw it (90-day grace on both ends; no closing date = never demoted). */
-function dateSanity(candidate: Show, dateSeen?: string | null): number {
-  if (!dateSeen) return 1;
-  const seen = Date.parse(dateSeen);
-  if (Number.isNaN(seen)) return 1;
-  const GRACE = 90 * 24 * 3600 * 1000;
-  if (candidate.openingDate && seen < Date.parse(candidate.openingDate) - GRACE) return 0.4;
-  if (candidate.closingDate && seen > Date.parse(candidate.closingDate) + GRACE) return 0.4;
-  return 1;
-}
-
-/** Same title, multiple productions: pick the run the user's date falls
- *  inside, else the one that opened closest to it. */
-function closestRun(candidates: Show[], dateSeen?: string | null): Show {
-  if (!dateSeen || candidates.length < 2) return candidates[0];
-  const seen = Date.parse(dateSeen);
-  const distance = (s: Show) => {
-    if (!s.openingDate) return 10 * 365 * 24 * 3600 * 1000;
-    const od = Date.parse(s.openingDate);
-    const cd = s.closingDate ? Date.parse(s.closingDate) : Number.POSITIVE_INFINITY;
-    if (seen >= od && seen <= cd) return 0;
-    return Math.min(Math.abs(seen - od), Number.isFinite(cd) ? Math.abs(seen - cd) : Number.MAX_SAFE_INTEGER);
-  };
-  return [...candidates].sort((a, b) => distance(a) - distance(b))[0];
-}
+// Title/date matching lives in lib/show-match.ts (unit-tested against the
+// real catalogs in tests/unit/show-match.test.mjs).
 
 function marketLabel(category: string): string {
   if (category === 'west-end' || category === 'off-west-end') return 'London';
@@ -135,9 +104,12 @@ function marketLabel(category: string): string {
   return '';
 }
 
-function matchContext(s: Show): string {
+function matchContext(s: MatchCandidate): string {
   const year = s.openingDate?.slice(0, 4);
-  return [[marketLabel(s.category), year].filter(Boolean).join(' '), s.venue].filter(Boolean).join(' · ');
+  // Diary-catalog entries are regional/international far more often than not,
+  // so the city is the thing that identifies them (web parity).
+  const market = marketLabel(s.category) || (s.diaryOnly ? (s.city ?? '') : '');
+  return [[market, year].filter(Boolean).join(' '), s.venue].filter(Boolean).join(' · ');
 }
 
 function formatDateSeen(iso: string): string {
@@ -148,7 +120,7 @@ function formatDateSeen(iso: string): string {
 }
 
 function isUnmatched(e: MatchedEntry): boolean {
-  return !e.match || (e.matchScore <= 0.7 && !e.dateSuspect);
+  return isWeakMatch({ match: e.match, score: e.matchScore, dateSuspect: e.dateSuspect });
 }
 
 export default function ImportScreen() {
@@ -169,13 +141,6 @@ export default function ImportScreen() {
   const checkpointRef = useRef<ImportCheckpoint | null>(null);
   const cancelledRef = useRef(false);
 
-  const fuse = useMemo(() => new Fuse(shows, {
-    keys: [{ name: 'title', weight: 0.8 }, { name: 'venue', weight: 0.2 }],
-    threshold: 0.4,
-    ignoreLocation: true,
-    minMatchCharLength: 2,
-  }), [shows]);
-
   // Check for an unfinished import from a previous session (checkpointing —
   // a killed/backgrounded app mid-bulk-import shouldn't force a full redo).
   useEffect(() => {
@@ -192,56 +157,22 @@ export default function ImportScreen() {
     }).catch(() => {});
   }, [user]);
 
-  const matchShow = useCallback((title: string, venue: string | null, dateSeen: string | null): { match: Show | null; score: number; dateSuspect: boolean } => {
-    const nameNorm = normTitle(title);
-    const withSanity = (match: Show, raw: number) => {
-      const sane = dateSanity(match, dateSeen);
-      return { match, score: raw * sane, dateSuspect: sane < 1 && raw > 0.7 };
-    };
-
-    let exactAll = shows.filter(s => normTitle(s.title) === nameNorm);
-    let tierScore = 1;
-    if (exactAll.length === 0 && nameNorm.length >= 8) {
-      exactAll = shows.filter(s => {
-        const c = normTitle(s.title);
-        if (c.length < 8) return false;
-        return c.startsWith(nameNorm + ' ') || nameNorm.startsWith(c + ' ');
-      });
-      tierScore = 0.85;
+  /** Scored catalog + diary catalog, built once per import run. The diary
+   *  fetch is ~7.5MB, so it is deliberately NOT done at mount. */
+  const buildMatcher = useCallback(async (): Promise<{ matcher: ShowMatcher; notice: string | null }> => {
+    const base = shows.map(showToCandidate);
+    try {
+      const diary = await fetchDiaryCatalog();
+      return { matcher: new ShowMatcher(mergeDiaryCandidates(base, diary)), notice: null };
+    } catch {
+      // Degrade to the scored catalog rather than failing the whole import,
+      // but say so — silently matching fewer shows is the bug this fixes.
+      return {
+        matcher: new ShowMatcher(base),
+        notice: "Couldn't load the full show catalog, so some Off-Broadway, touring and regional productions may show as not found. Check your connection and re-run the import to match them.",
+      };
     }
-    if (exactAll.length > 0) {
-      if (venue) {
-        const vnorm = (v: string) => v.toLowerCase().replace(/theatre|theater/gi, '').replace(/^the\s+/, '').trim();
-        const venueNorm = vnorm(venue);
-        const venueMatch = exactAll.find(s => {
-          if (!s.venue) return false;
-          const cand = vnorm(s.venue);
-          return venueNorm.length < 5 || cand.length < 5 ? cand === venueNorm : cand.includes(venueNorm);
-        });
-        if (venueMatch) return withSanity(venueMatch, tierScore);
-        return withSanity(closestRun(exactAll, dateSeen), tierScore * 0.95);
-      }
-      return withSanity(closestRun(exactAll, dateSeen), tierScore);
-    }
-
-    const results = fuse.search(title, { limit: 5 });
-    if (results.length === 0) return { match: null, score: 0, dateSuspect: false };
-
-    if (venue) {
-      const venueNorm = venue.toLowerCase().replace(/theatre|theater/gi, '').trim();
-      const venueMatch = results.find(r =>
-        r.item.venue && r.item.venue.toLowerCase().replace(/theatre|theater/gi, '').trim().includes(venueNorm)
-      );
-      if (venueMatch) return withSanity(venueMatch.item, 1 - (venueMatch.score || 0));
-    }
-
-    const best = results[0];
-    const score = 1 - (best.score || 0);
-    const nameL = nameNorm;
-    const matchL = normTitle(best.item.title);
-    const contained = nameL.includes(matchL) || matchL.includes(nameL);
-    return withSanity(best.item, contained ? score : score * 0.6);
-  }, [shows, fuse]);
+  }, [shows]);
 
   const matchAndPreview = useCallback(async (acquired: ImportAcquireResult, sourceId: ImportSourceId) => {
     const existingReviewShowIds = new Set<string>(); // populated below from cache; import happens against live DB state
@@ -255,9 +186,18 @@ export default function ImportScreen() {
       if (watchlistCache) (JSON.parse(watchlistCache) as { show_id: string }[]).forEach(w => existingWatchlistShowIds.add(w.show_id));
     } catch { /* best-effort de-dupe hint only — unique constraints are the real guard */ }
 
+    const { matcher, notice: catalogNotice } = await buildMatcher();
+    const matchShow = (title: string, venue: string | null, dateSeen: string | null) =>
+      matcher.match(title, venue, dateSeen);
+
     const matched: MatchedEntry[] = [];
     const diaryShowIds = new Set<string>();
     const unmatchedForLog: RawImportEntry[] = [];
+    /** Titles for diary-only matches, so Watched/To Watch don't render the id. */
+    const diaryTitleUpdates: Record<string, string> = {};
+    const noteDiaryTitle = (m: MatchCandidate | null) => {
+      if (m?.diaryOnly) diaryTitleUpdates[m.id] = m.title;
+    };
 
     for (const raw of acquired.entries.filter(e => e.kind === 'diary')) {
       const { match, score, dateSuspect } = matchShow(raw.title, raw.venue, raw.date);
@@ -271,14 +211,15 @@ export default function ImportScreen() {
         sourceReview: raw.reviewText,
         match,
         matchScore: score,
-        selected: !!match && score > 0.7 && !alreadyReviewed,
+        selected: !!match && score > MATCH_THRESHOLD && !alreadyReviewed,
         alreadyOwned: alreadyReviewed,
         dateSuspect,
         kind: 'diary',
         mezzShowId: raw.mezzShowId,
       });
+      noteDiaryTitle(match);
       if (showId) diaryShowIds.add(showId);
-      if (!match || (score <= 0.7 && !dateSuspect)) unmatchedForLog.push(raw);
+      if (isWeakMatch({ match, score, dateSuspect })) unmatchedForLog.push(raw);
     }
 
     for (const raw of acquired.entries.filter(e => e.kind === 'watchlist')) {
@@ -298,18 +239,21 @@ export default function ImportScreen() {
         sourceReview: null,
         match,
         matchScore: score,
-        selected: !!match && score > 0.7 && autoSelect,
+        selected: !!match && score > MATCH_THRESHOLD && autoSelect,
         alreadyOwned: alreadyWatchlisted || (raw.fromDiary ? alreadyReviewed : alreadyInDiary),
         dateSuspect,
         kind: 'watchlist',
         listName: raw.listName,
         mezzShowId: raw.mezzShowId,
       });
-      if (!match || (score <= 0.7 && !dateSuspect)) unmatchedForLog.push(raw);
+      noteDiaryTitle(match);
+      if (isWeakMatch({ match, score, dateSuspect })) unmatchedForLog.push(raw);
     }
 
+    recordDiaryTitles(diaryTitleUpdates).catch(() => {});
+
     setEntries(matched);
-    setNotices(acquired.notices);
+    setNotices(catalogNotice ? [...acquired.notices, catalogNotice] : acquired.notices);
     setStep('preview');
 
     // Fire-and-forget self-heal logging (mirrors web's unmatched_imports insert,
@@ -324,7 +268,7 @@ export default function ImportScreen() {
         mezz_show_id: raw.mezzShowId || null,
       }).catch(() => {});
     }
-  }, [matchShow, user]);
+  }, [buildMatcher, user]);
 
   const handlePickFile = useCallback(async () => {
     const result = await DocumentPicker.getDocumentAsync({ type: 'application/json', copyToCacheDirectory: true });
@@ -363,7 +307,7 @@ export default function ImportScreen() {
   const watchlistRows = useMemo(() => indexedEntries.filter(({ entry }) => entry.kind === 'watchlist' && (!entry.dateSuspect || entry.alreadyOwned) && !isUnmatched(entry)), [indexedEntries]);
   const unmatchedRows = useMemo(() => indexedEntries.filter(({ entry }) => isUnmatched(entry)), [indexedEntries]);
   const selectedCount = useMemo(() => entries.filter(e => e.selected && e.match).length, [entries]);
-  const skippedOwnedCount = useMemo(() => entries.filter(e => e.alreadyOwned && !e.selected && e.match && (e.matchScore > 0.7 || e.dateSuspect)).length, [entries]);
+  const skippedOwnedCount = useMemo(() => entries.filter(e => e.alreadyOwned && !e.selected && e.match && (e.matchScore > MATCH_THRESHOLD || e.dateSuspect)).length, [entries]);
 
   /** Build the ordered insert plan: rated diary entries → reviews table;
    *  unrated diary entries + watchlist entries → watchlist table. */

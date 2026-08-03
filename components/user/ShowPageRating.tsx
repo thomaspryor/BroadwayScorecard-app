@@ -8,9 +8,8 @@
  */
 
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { View, Text, Pressable, StyleSheet, Platform } from 'react-native';
+import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { usePathname, useRouter, useFocusEffect, Link } from 'expo-router';
-import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import Svg, { Path } from 'react-native-svg';
 import { useAuth } from '@/lib/auth-context';
 import { toLocalYMD } from '@/lib/date-utils';
@@ -24,6 +23,7 @@ import * as haptics from '@/lib/haptics';
 import StarRating from './StarRating';
 import WatchlistButton from './WatchlistButton';
 import AddToListSheet from './AddToListSheet';
+import { PlannedDateSheet } from './PlannedDateSheet';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
 
 interface ShowPageRatingProps {
@@ -230,25 +230,6 @@ export default function ShowPageRating({
     setShowListSheet(true);
   }, [isAuthenticated, showId, pathname, showSignIn]);
 
-  const handleWatchlistDateChange = useCallback(
-    (_event: DateTimePickerEvent, selectedDate?: Date) => {
-      if (Platform.OS !== 'ios') {
-        // Android: picker dismisses on selection, save immediately
-        setShowWatchlistDatePicker(false);
-        if (selectedDate) {
-          const iso = toLocalYMD(selectedDate);
-          updatePlannedDate(showId, iso).catch(() => {
-            showToast('Failed to save date.', 'error');
-          });
-        }
-      } else if (selectedDate) {
-        // iOS inline: store selection, save on "Done" tap
-        setPendingWatchlistDate(selectedDate);
-      }
-    },
-    [showId, updatePlannedDate, showToast],
-  );
-
   // ─── Render ──────────────────────────────────────────────
 
   // Feature flag check — in render, after all hooks (React rules)
@@ -436,32 +417,26 @@ export default function ShowPageRating({
               Also on {listsWithShow.length === 1 ? firstListContainingShow.name : `${listsWithShow.length} of your lists`}
             </Link>
           )}
-          {showWatchlistDatePicker && (
-            <View style={styles.datePickerContainer}>
-              <View style={styles.datePickerHeader}>
-                <Text style={styles.datePickerTitle}>When are you going?</Text>
-                <Pressable onPress={() => {
-                  const iso = toLocalYMD(pendingWatchlistDate);
-                  updatePlannedDate(showId, iso).catch(() => {
-                    showToast('Failed to save date.', 'error');
-                  });
-                  setShowWatchlistDatePicker(false);
-                }} hitSlop={8}>
-                  <Text style={styles.datePickerDone}>Done</Text>
-                </Pressable>
-              </View>
-              <DateTimePicker
-                value={pendingWatchlistDate}
-                mode="date"
-                display={Platform.OS === 'ios' ? 'inline' : 'default'}
-                onChange={handleWatchlistDateChange}
-                  themeVariant="dark"
-                style={{ alignSelf: 'center' }}
-              />
-            </View>
-          )}
         </View>
       </View>
+      {/* Modal, NOT inline: an inline DateTimePicker inside rightCol forced
+          that column to the picker's ~320pt intrinsic width and crushed the
+          rating column to a few points (ADu0gjsK / AODNE6S9, 2026-08-03). */}
+      <PlannedDateSheet
+        visible={showWatchlistDatePicker}
+        initialDate={pendingWatchlistDate}
+        onCancel={() => setShowWatchlistDatePicker(false)}
+        onClear={watchlistEntry?.planned_date ? () => {
+          setShowWatchlistDatePicker(false);
+          updatePlannedDate(showId, null).catch(() => showToast('Failed to clear date.', 'error'));
+        } : undefined}
+        onConfirm={(date) => {
+          setShowWatchlistDatePicker(false);
+          updatePlannedDate(showId, toLocalYMD(date)).catch(() => {
+            showToast('Failed to save date.', 'error');
+          });
+        }}
+      />
       {isAuthenticated && user && (
         <AddToListSheet
           showId={showId}
@@ -637,27 +612,5 @@ const styles = StyleSheet.create({
     color: Colors.text.secondary,
     fontSize: FontSize.sm,
     fontStyle: 'italic',
-  },
-  datePickerContainer: {
-    marginTop: Spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: Colors.border.subtle,
-    paddingTop: Spacing.md,
-  },
-  datePickerHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: Spacing.sm,
-  },
-  datePickerTitle: {
-    color: Colors.text.secondary,
-    fontSize: FontSize.sm,
-    fontWeight: '500',
-  },
-  datePickerDone: {
-    color: Colors.brand,
-    fontSize: FontSize.sm,
-    fontWeight: '600',
   },
 });

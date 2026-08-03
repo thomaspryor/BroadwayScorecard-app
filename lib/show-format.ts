@@ -12,3 +12,31 @@ export function humanizeShowId(showId: string): string {
     .map(word => (word ? word.charAt(0).toUpperCase() + word.slice(1) : word))
     .join(' ');
 }
+
+/**
+ * Real titles for show_ids that exist only in the diary catalog
+ * (diary-search.json), recorded when an import matches one. Without it a
+ * diary-only import renders as "Sleep No More Off Broadway 2011" — the
+ * humanized id — on every screen. Hydrated once at app start from
+ * AsyncStorage (see lib/diary-titles.ts).
+ */
+let diaryTitles: Record<string, string> = {};
+
+export function setDiaryTitleCache(titles: Record<string, string>): void {
+  diaryTitles = titles;
+}
+
+export function mergeDiaryTitleCache(titles: Record<string, string>): Record<string, string> {
+  diaryTitles = { ...diaryTitles, ...titles };
+  return diaryTitles;
+}
+
+export function getDiaryTitleCache(): Record<string, string> {
+  return diaryTitles;
+}
+
+/** Best available title for a show_id the scored catalog doesn't know about:
+ *  the recorded diary title if we have it, otherwise the humanized id. */
+export function showTitleFallback(showId: string): string {
+  return diaryTitles[showId] || humanizeShowId(showId);
+}

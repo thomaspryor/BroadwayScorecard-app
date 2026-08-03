@@ -32,11 +32,12 @@ import { useWatchlist } from '@/hooks/useWatchlist';
 import { useShows } from '@/lib/data-context';
 import { getImageUrl } from '@/lib/images';
 import { toLocalYMD } from '@/lib/date-utils';
-import { humanizeShowId } from '@/lib/show-format';
+import { showTitleFallback } from '@/lib/show-format';
 import { useToastSafe } from '@/lib/toast-context';
 import { featureFlags } from '@/lib/feature-flags';
 import StarRating from '@/components/user/StarRating';
 import MiniStars from '@/components/user/MiniStars';
+import { usePosterGrid } from '@/hooks/usePosterGrid';
 import type { UserReview, WatchlistEntry } from '@/lib/user-types';
 import type { Show } from '@/lib/types';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
@@ -54,16 +55,22 @@ import * as haptics from '@/lib/haptics';
 type DiarySort = 'date-desc' | 'date-asc' | 'rating-desc';
 /**
  * Profile segments (spec §2 — the Mezzanine mental model users already have):
- *   grid  → the poster wall
- *   list  → "Feed", the diary timeline. Sprint 4 turns this into the photo
- *           scrapbook; until then the segment shows the existing timeline
- *           rather than an empty promise.
+ *   grid  → "Diary", the log of what you've seen. Its own grid/calendar
+ *           sub-toggle chooses the LAYOUT of that log.
+ *   list  → "Feed", the photo scrapbook.
  *   stats → the Scorecard.
+ *
+ * The top segment used to be called "Grid", which collided head-on with the
+ * grid/calendar sub-toggle sitting right beneath it — two controls, both
+ * saying "grid", meaning different things (owner, 2026-08-03). Naming the
+ * segment after its CONTENT and leaving the sub-toggle to name the LAYOUT
+ * removes the collision; the internal id stays 'grid' so persisted state and
+ * e2e test ids are untouched.
  */
 type ViewMode = 'list' | 'grid' | 'stats';
 
 const VIEW_MODES: ViewMode[] = ['grid', 'list', 'stats'];
-const SEGMENT_LABELS: Record<ViewMode, string> = { grid: 'Grid', list: 'Feed', stats: 'Stats' };
+const SEGMENT_LABELS: Record<ViewMode, string> = { grid: 'Diary', list: 'Feed', stats: 'Stats' };
 // Existing e2e/screenshot flows tap diary-grid-view-toggle / diary-list-view-toggle;
 // those ids stay put so the segmented control is a drop-in for the old pair.
 const SEGMENT_TEST_IDS: Record<ViewMode, string> = {
@@ -133,9 +140,16 @@ function GridPoster({ posterUrl, title, dateLabel }: { posterUrl: string | null;
 }
 
 // ─── Add show card (grid footer) ──────────────────────
-function AddShowCard({ label, onPress, fixedWidth }: { label: string; onPress: () => void; fixedWidth?: boolean }) {
+function AddShowCard({ label, onPress, cardWidth }: { label: string; onPress: () => void; cardWidth?: number }) {
   return (
-    <Pressable style={({ pressed }) => [styles.addShowCard, fixedWidth && styles.addShowCardFixed, pressed && styles.pressed]} onPress={onPress}>
+    <Pressable
+      style={({ pressed }) => [
+        styles.addShowCard,
+        cardWidth != null && [styles.addShowCardFixed, { width: cardWidth }],
+        pressed && styles.pressed,
+      ]}
+      onPress={onPress}
+    >
       <Svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke={Colors.text.muted} strokeWidth={2}>
         <Path strokeLinecap="round" d="M12 5v14M5 12h14" />
       </Svg>
@@ -171,6 +185,10 @@ export default function WatchedScreen() {
       setRefreshing(false);
     }
   }, [getAllReviews, getWatchlist]);
+
+  // 3-up poster grid; exact column width, no stranded right-hand gap.
+  const grid = usePosterGrid(3);
+  const gridCardStyle = useMemo(() => ({ width: grid.cardWidth }), [grid.cardWidth]);
 
   const [diarySort, setDiarySort] = useState<DiarySort>('date-desc');
   const [viewMode, setViewModeState] = useState<ViewMode>('grid');
@@ -332,7 +350,7 @@ export default function WatchedScreen() {
   const handleDeleteDiaryItem = useCallback((review: UserReview) => {
     haptics.action();
     const show = showMap[review.show_id];
-    const title = show?.title || humanizeShowId(review.show_id);
+    const title = show?.title || showTitleFallback(review.show_id);
     Alert.alert(
       'Delete Rating',
       `Delete your ${review.rating.toFixed(1)}★ rating for ${title}?`,
@@ -421,7 +439,7 @@ export default function WatchedScreen() {
   // ─── List row (shared by To Be Rated is separate; this is for rated diary entries) ────
   const renderDiaryListRow = (item: UserReview) => {
     const show = showMap[item.show_id];
-    const title = show?.title || humanizeShowId(item.show_id);
+    const title = show?.title || showTitleFallback(item.show_id);
     const posterUrl = show?.images ? (getImageUrl(show.images.poster) || getImageUrl(show.images.thumbnail)) : null;
 
     return (
@@ -481,13 +499,13 @@ export default function WatchedScreen() {
   // ─── Grid card (shared by To Be Rated is separate; this is for rated diary entries) ────
   const renderDiaryGridCard = (item: UserReview) => {
     const show = showMap[item.show_id];
-    const title = show?.title || humanizeShowId(item.show_id);
+    const title = show?.title || showTitleFallback(item.show_id);
     const posterUrl = show?.images ? (getImageUrl(show.images.poster) || getImageUrl(show.images.thumbnail)) : null;
 
     return (
       <Pressable
         key={item.id}
-        style={({ pressed }) => [styles.gridCardFixed, pressed && styles.pressed]}
+        style={({ pressed }) => [styles.gridCardFixed, gridCardStyle, pressed && styles.pressed]}
         onPress={() => show ? router.push(`/show/${show.slug}`) : handleMissingShow()}
         onLongPress={() => { haptics.action(); setGridMenu({ kind: 'review', review: item }); }}
         accessibilityHint="Long press for more actions"
@@ -526,7 +544,7 @@ export default function WatchedScreen() {
 
   const renderUpcomingRow = (entry: WatchlistEntry) => {
     const show = showMap[entry.show_id];
-    const title = show?.title || humanizeShowId(entry.show_id);
+    const title = show?.title || showTitleFallback(entry.show_id);
     const posterUrl = show?.images ? (getImageUrl(show.images.poster) || getImageUrl(show.images.thumbnail)) : null;
     const daysUntil = entry.planned_date
       ? Math.ceil((new Date(entry.planned_date + 'T00:00:00').getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
@@ -587,12 +605,12 @@ export default function WatchedScreen() {
           <View style={styles.toBeRatedGrid}>
             {toBeRated.map(item => {
               const show = showMap[item.show_id];
-              const title = show?.title || humanizeShowId(item.show_id);
+              const title = show?.title || showTitleFallback(item.show_id);
               const posterUrl = show?.images ? (getImageUrl(show.images.poster) || getImageUrl(show.images.thumbnail)) : null;
               return (
                 <Pressable
                   key={item.id}
-                  style={({ pressed }) => [styles.gridCardFixed, pressed && styles.pressed]}
+                  style={({ pressed }) => [styles.gridCardFixed, gridCardStyle, pressed && styles.pressed]}
                   onPress={() => router.push({
                     pathname: '/rate/[showId]' as any,
                     params: { showId: item.show_id, showTitle: title, suggestedDate: item.planned_date || '' },
@@ -637,7 +655,7 @@ export default function WatchedScreen() {
             <View style={styles.pastGrid}>
               {upcomingWatchlistEntries.map(entry => {
                 const show = showMap[entry.show_id];
-                const title = show?.title || humanizeShowId(entry.show_id);
+                const title = show?.title || showTitleFallback(entry.show_id);
                 const posterUrl = show?.images ? (getImageUrl(show.images.poster) || getImageUrl(show.images.thumbnail)) : null;
                 const formattedDate = entry.planned_date
                   ? new Date(entry.planned_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
@@ -645,7 +663,7 @@ export default function WatchedScreen() {
                 return (
                   <Pressable
                     key={entry.id}
-                    style={({ pressed }) => [styles.gridCardFixed, pressed && styles.pressed]}
+                    style={({ pressed }) => [styles.gridCardFixed, gridCardStyle, pressed && styles.pressed]}
                     onPress={() => show ? router.push(`/show/${show.slug}`) : handleMissingShow()}
                     onLongPress={() => { haptics.action(); setGridMenu({ kind: 'upcoming', entry }); }}
                     accessibilityHint="Long press for more actions"
@@ -688,7 +706,7 @@ export default function WatchedScreen() {
                   <View style={styles.pastGrid}>
                     {reviewsByYear[year].map(renderDiaryGridCard)}
                     {year === sortedYears[sortedYears.length - 1] && (
-                      <AddShowCard label="Rate a show" onPress={() => setShowSearchModal(true)} fixedWidth />
+                      <AddShowCard label="Rate a show" onPress={() => setShowSearchModal(true)} cardWidth={grid.cardWidth} />
                     )}
                   </View>
                 ) : (
@@ -710,7 +728,7 @@ export default function WatchedScreen() {
             {viewMode === 'grid' ? (
               <View style={styles.pastGrid}>
                 {pastReviews.map(renderDiaryGridCard)}
-                <AddShowCard label="Rate a show" onPress={() => setShowSearchModal(true)} fixedWidth />
+                <AddShowCard label="Rate a show" onPress={() => setShowSearchModal(true)} cardWidth={grid.cardWidth} />
               </View>
             ) : (
               <View style={{ gap: Spacing.xs }}>
@@ -725,7 +743,7 @@ export default function WatchedScreen() {
       {pastReviews.length === 0 && (
         viewMode === 'grid' ? (
           <View style={styles.pastGrid}>
-            <AddShowCard label="Rate a show" onPress={() => setShowSearchModal(true)} fixedWidth />
+            <AddShowCard label="Rate a show" onPress={() => setShowSearchModal(true)} cardWidth={grid.cardWidth} />
           </View>
         ) : (
           <Pressable
@@ -945,7 +963,7 @@ export default function WatchedScreen() {
         title={
           gridMenu
             ? (showMap[gridMenu.kind === 'review' ? gridMenu.review.show_id : gridMenu.entry.show_id]?.title
-              || humanizeShowId(gridMenu.kind === 'review' ? gridMenu.review.show_id : gridMenu.entry.show_id))
+              || showTitleFallback(gridMenu.kind === 'review' ? gridMenu.review.show_id : gridMenu.entry.show_id))
             : undefined
         }
         onClose={() => setGridMenu(null)}
@@ -1116,8 +1134,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm,
   },
   // 3-up enriched grid (Round 2, Grid Direction B modified) — was 4-up/23%;
-  // wider cards give the poster + overlay date room to breathe.
-  gridCardFixed: { width: '31%', alignItems: 'center' },
+  // wider cards give the poster + overlay date room to breathe. Width itself
+  // comes from usePosterGrid(3): at 31% the three columns plus two gaps left
+  // ~13pt stranded on the right of every row, which read as "the gap on the
+  // right is bigger than on the left" (beta feedback 2026-08-03, AKGsYTnH).
+  gridCardFixed: { alignItems: 'center' },
   gridPosterWrap: { width: '100%', position: 'relative', borderRadius: BorderRadius.md, overflow: 'hidden' },
   gridPoster: {
     width: '100%', aspectRatio: 2 / 3, borderRadius: BorderRadius.md,
@@ -1150,7 +1171,7 @@ const styles = StyleSheet.create({
     borderWidth: 2, borderStyle: 'dashed', borderColor: Colors.surface.overlay,
     alignItems: 'center', justifyContent: 'center', gap: 4,
   },
-  addShowCardFixed: { flex: undefined, width: '31%' },
+  addShowCardFixed: { flex: undefined },
   addShowLabel: { color: Colors.text.muted, fontSize: 12, fontWeight: '500' },
   // Swipe
   swipeDelete: {

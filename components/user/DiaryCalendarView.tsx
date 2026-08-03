@@ -18,7 +18,7 @@ import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { Colors, FontSize, BorderRadius, Spacing } from '@/constants/theme';
 import { getImageUrl } from '@/lib/images';
-import { humanizeShowId } from '@/lib/show-format';
+import { showTitleFallback } from '@/lib/show-format';
 import * as haptics from '@/lib/haptics';
 import type { UserReview } from '@/lib/user-types';
 import type { Show } from '@/lib/types';
@@ -110,7 +110,7 @@ export function DiaryCalendarMonth({ year, month, reviewsByDate, showMap, onMiss
                 else onMissingShow();
               }}
               accessibilityRole="button"
-              accessibilityLabel={`${show?.title || humanizeShowId(cell.review.show_id)}, ${cell.dateStr}`}
+              accessibilityLabel={`${show?.title || showTitleFallback(cell.review.show_id)}, ${cell.dateStr}`}
             >
               {posterUrl ? (
                 <Image source={{ uri: posterUrl }} style={styles.cellPoster} contentFit="cover" />

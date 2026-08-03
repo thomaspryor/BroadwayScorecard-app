@@ -27,10 +27,16 @@ interface ScoreBadgeProps {
   animated?: boolean;
 }
 
+// labelFont tracks the web's tier caption, which is 9px semibold uppercase
+// (ShowListCard). At the app's old 12pt the caption was two-thirds the width
+// of the whole card's score column and read louder than the venue line —
+// "CRITICAL GOLD text is way too big... overhangs the box" (beta feedback
+// 2026-08-02, AAUXcLw6). labelMaxWidth keeps it tied to the badge instead of
+// spanning the column.
 const SIZES = {
-  small: { box: 40, font: FontSize.sm, labelFont: 0, radius: BorderRadius.sm },
-  medium: { box: 56, font: FontSize.xl, labelFont: FontSize.xs, radius: BorderRadius.md },
-  large: { box: 64, font: FontSize.xxl, labelFont: FontSize.sm, radius: BorderRadius.md },
+  small: { box: 40, font: FontSize.sm, showsLabel: false, labelMaxWidth: 0, radius: BorderRadius.sm },
+  medium: { box: 56, font: FontSize.xl, showsLabel: true, labelMaxWidth: 72, radius: BorderRadius.md },
+  large: { box: 64, font: FontSize.xxl, showsLabel: true, labelMaxWidth: 84, radius: BorderRadius.md },
 } as const;
 
 const GOLD_GRADIENT: [string, string, string, string, string] = [
@@ -121,12 +127,16 @@ export function ScoreBadge({ score, category, size = 'medium', showLabel = false
   return (
     <View style={styles.wrapper} accessibilityLabel={accessLabel} accessibilityRole="text">
       {/* Tier label ABOVE badge */}
-      {showLabel && dim.labelFont > 0 && (
+      {showLabel && dim.showsLabel && (
         <Text
-          style={[styles.tierLabel, { color: tier.color, fontSize: dim.labelFont }]}
+          style={[
+            styles.tierLabel,
+            size === 'large' ? styles.tierLabelLarge : styles.tierLabelMedium,
+            { color: tier.color, maxWidth: dim.labelMaxWidth },
+          ]}
           numberOfLines={1}
           adjustsFontSizeToFit
-          minimumFontScale={0.75}
+          minimumFontScale={0.8}
         >
           {tier.label}
         </Text>
@@ -191,11 +201,16 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontVariant: ['tabular-nums'],
   },
+  // Sizes live here (not in SIZES) so scripts/check-font-floor.js can see them
+  // and account for them as documented exemptions rather than being blind to a
+  // font size funnelled through a token.
+  tierLabelMedium: { fontSize: 10 }, // font-floor-exempt: web ships this tier caption at 9px (ShowListCard); owner asked for smaller + web parity (AAUXcLw6)
+  tierLabelLarge: { fontSize: 11 }, // font-floor-exempt: same tier caption, one step up for the large badge
   tierLabel: {
-    fontWeight: '700',
+    fontWeight: '600',
     marginBottom: 3,
     textAlign: 'center',
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 0.3,
   },
 });

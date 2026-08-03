@@ -10,9 +10,12 @@ import {
   toggleSelection,
 } from '../lib/advanced-filters.ts';
 
-// Minimal real-shaped shows — predicates only read tags/isRevival/compositeScore.
-const show = (id, { tags = [], isRevival = false, compositeScore = null } = {}) =>
-  ({ id, tags, isRevival, compositeScore });
+// Minimal real-shaped shows — predicates read tags/isRevival/compositeScore and,
+// since the min-review gate landed (getQualifiedScore, 2026-08-01), criticScore
+// .reviewCount + category too: a show that doesn't clear its market's review
+// floor has NO qualified score and therefore matches no score tier.
+const show = (id, { tags = [], isRevival = false, compositeScore = null, reviewCount = 12, category = 'broadway' } = {}) =>
+  ({ id, tags, isRevival, compositeScore, category, criticScore: { reviewCount } });
 
 const hamilton = show('hamilton', { tags: ['tony-winner', 'rush', 'lottery'], compositeScore: 91 });
 const chicago = show('chicago', { tags: ['jukebox'], isRevival: true, compositeScore: 87 });

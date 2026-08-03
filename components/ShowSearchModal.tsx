@@ -40,11 +40,23 @@ interface ShowSearchModalProps {
   title: string;
   onSelect: (show: Show) => void;
   onClose: () => void;
-  /** Show IDs to exclude from results (already added) */
+  /** Show IDs already on the caller's list. These stay VISIBLE and are marked
+   *  rather than filtered out: silently dropping them made the search look
+   *  broken — typing a show you'd already added returned "No shows found"
+   *  (beta feedback 2026-08-03, ANI-fwc0). */
   excludeIds?: Set<string>;
+  /** Caption + toast wording for an already-listed row. */
+  excludedLabel?: string;
 }
 
-export function ShowSearchModal({ visible, title, onSelect, onClose, excludeIds }: ShowSearchModalProps) {
+export function ShowSearchModal({
+  visible,
+  title,
+  onSelect,
+  onClose,
+  excludeIds,
+  excludedLabel = 'Already on your list',
+}: ShowSearchModalProps) {
   const { shows } = useShows();
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
@@ -80,12 +92,8 @@ export function ShowSearchModal({ visible, title, onSelect, onClose, excludeIds 
   const results = useMemo(() => {
     const q = debouncedQuery.trim();
     if (q.length < 2) return [];
-    let items = fuse.search(q, { limit: 20 }).map(r => r.item);
-    if (excludeIds?.size) {
-      items = items.filter(s => !excludeIds.has(s.id));
-    }
-    return items;
-  }, [fuse, debouncedQuery, excludeIds]);
+    return fuse.search(q, { limit: 20 }).map(r => r.item);
+  }, [fuse, debouncedQuery]);
 
   return (
     <Modal
@@ -138,10 +146,18 @@ export function ShowSearchModal({ visible, title, onSelect, onClose, excludeIds 
             keyboardShouldPersistTaps="handled"
             renderItem={({ item }) => {
               const posterUrl = getImageUrl(item.images.poster) || getImageUrl(item.images.thumbnail);
+              const alreadyListed = !!excludeIds?.has(item.id);
               return (
                 <Pressable
-                  style={({ pressed }) => [styles.resultRow, pressed && styles.pressed]}
+                  style={({ pressed }) => [styles.resultRow, alreadyListed && styles.resultRowMuted, pressed && styles.pressed]}
+                  // Inert rather than toast-on-tap: this modal is a native
+                  // Modal, so a toast rendered by the app-level provider would
+                  // paint BEHIND it. The persistent caption is the explanation.
+                  disabled={alreadyListed}
                   onPress={() => onSelect(item)}
+                  accessibilityRole="button"
+                  accessibilityState={{ disabled: alreadyListed }}
+                  accessibilityLabel={alreadyListed ? `${item.title} — ${excludedLabel}` : item.title}
                 >
                   {posterUrl ? (
                     <Image source={{ uri: posterUrl }} style={styles.resultPoster} contentFit="cover" />
@@ -153,6 +169,9 @@ export function ShowSearchModal({ visible, title, onSelect, onClose, excludeIds 
                   <View style={styles.resultInfo}>
                     <Text style={styles.resultTitle} numberOfLines={1}>{item.title}</Text>
                     {item.venue && <Text style={styles.resultVenue} numberOfLines={1}>{item.venue}</Text>}
+                    {alreadyListed && (
+                      <Text style={styles.resultAlready} numberOfLines={1}>{excludedLabel}</Text>
+                    )}
                     <Text style={styles.resultMeta} numberOfLines={1}>
                       {item.status === 'open' ? 'Now Playing' : item.status === 'previews' ? 'In Previews' : item.status === 'closed' ? 'Closed' : item.status}
                       {item.openingDate ? ` · ${item.openingDate.slice(0, 4)}` : ''}
@@ -242,6 +261,15 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.7,
+  },
+  // Dimmed, not hidden — the row still proves the show exists in the catalog.
+  resultRowMuted: {
+    opacity: 0.55,
+  },
+  resultAlready: {
+    color: Colors.brand,
+    fontSize: 12,
+    fontWeight: '600',
   },
   resultPoster: {
     width: 44,

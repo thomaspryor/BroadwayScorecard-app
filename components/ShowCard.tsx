@@ -231,7 +231,10 @@ const styles = StyleSheet.create({
     // Fixed width so badges line up down the list — a wide tier label
     // ("CRITICAL MISS") must not widen the column and shift its badge
     // relative to neighboring cards (beta feedback 2026-08-02).
-    width: 84,
+    // 72 = the 56pt badge + 8pt breathing room each side. At 84 the column
+    // left ~14pt of dead space either side of the badge, which read as an
+    // uneven gap on the card's right edge (beta feedback 2026-08-03).
+    width: 72,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,

@@ -21,6 +21,7 @@ import { setPostHogInstance } from '@/lib/analytics';
 import { Colors } from '@/constants/theme';
 import { registerForPushNotifications, setupNotificationHandler, configureNotificationChannels } from '@/lib/notifications';
 import { initSentry, wrapWithSentry } from '@/lib/sentry';
+import { hydrateDiaryTitles } from '@/lib/diary-titles';
 import { startAutoFlush, flushQueue } from '@/lib/offline-queue';
 import { rescheduleAllReminders } from '@/lib/local-notifications';
 
@@ -74,6 +75,10 @@ function RootLayout() {
     // Start offline queue auto-flush + flush any pending operations
     startAutoFlush();
     flushQueue().catch(() => {});
+
+    // Titles for imported diary-only shows (ids the scored catalog can never
+    // resolve) — without this they render as their humanized slug everywhere.
+    hydrateDiaryTitles().catch(() => {});
 
     // Init PostHog just off the sync effect path — analytics can start a tick
     // late, and this keeps the effect body free of synchronous setState.
