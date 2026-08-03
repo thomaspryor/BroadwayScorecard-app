@@ -102,6 +102,11 @@ jobs:
       - name: Unit-test OTA credential guard
         run: node --test scripts/ship-credentials.test.mjs
 
+      # The two ship-gating path lists must agree, or a native-only commit
+      # decides should_build=false and nothing ships at all.
+      - name: Unit-test ship path lists agree
+        run: node --test scripts/ship-paths.test.mjs
+
       - name: Design floor (12pt minimum text size)
         run: npm run lint:design
 
@@ -187,4 +192,4 @@ jobs:
           EXPO_ASC_API_KEY_PATH: /tmp/AuthKey.p8
           EXPO_ASC_API_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
           EXPO_ASC_API_KEY_ISSUER_ID: ${{ secrets.ASC_API_KEY_ISSUER_ID }}
-        run: node scripts/ship.js ${{ (github.event_name == 'workflow_dispatch' && inputs.force_build) && '--force-build' || '' }}
+        run: node scripts/ship.js ${{ (github.event_name == 'workflow_dispatch' && (inputs.force_build == true || inputs.force_build == 'true')) && '--force-build' || '' }}

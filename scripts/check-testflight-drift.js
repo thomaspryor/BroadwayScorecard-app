@@ -37,6 +37,13 @@ const RELEVANT_PATHS = [
   /^babel\.config\.js$/,
   /^metro\.config\.js$/,
   /^eas\.json$/,
+  // Both change the native binary, so a commit touching only these IS drift.
+  // ship.js treats them as native; if this list disagreed, the schedule path
+  // would decide should_build=false and NOTHING would ship (second-opinion,
+  // 2026-08-03). patches/ rewrites dependency source; .gitignore decides which
+  // files Expo hashes into the fingerprint. Locked by scripts/ship-paths.test.mjs.
+  /^patches\//,
+  /^\.gitignore$/,
 ];
 
 // If the newest FINISHED production build is older than this AND any commit
@@ -137,5 +144,5 @@ function main() {
   }
 }
 
-module.exports = { decide, isUserVisible };
+module.exports = { decide, isUserVisible, RELEVANT_PATHS };
 if (require.main === module) main();

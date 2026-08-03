@@ -52,8 +52,16 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-// Files that can change the native binary. Mirrors the reasoning in
-// scripts/check-testflight-drift.js RELEVANT_PATHS, narrowed to native-only.
+// Files that can change the native binary. Must stay a SUBSET of
+// scripts/check-testflight-drift.js RELEVANT_PATHS — a file that is native
+// here but invisible there decides should_build=false and ships nothing.
+// Locked by scripts/ship-paths.test.mjs.
+//
+// COST WARNING, measured 2026-08-03: Expo hashes package.json WHOLESALE, so
+// editing the "scripts" block — pure tooling, zero effect on the binary —
+// moves the fingerprint and turns the next ship into a $1.85 build. Same trap
+// as .gitignore below. Batch package.json housekeeping with work that was
+// going to need a native build anyway.
 const NATIVE_PATHS = [
   /^package\.json$/,
   /^package-lock\.json$/,
@@ -112,19 +120,24 @@ function localFingerprint() {
 /** Fingerprint of the newest FINISHED production build — i.e. what is on
  *  TestFlight and therefore what an OTA update would land on top of. */
 function lastBuild() {
+  // --build-profile filters SERVER-side and the sort is explicit, matching
+  // check-testflight-drift.js:100. Without both, a burst of sim-prod/dev builds
+  // can push every production build out of the window, lastBuild() returns null
+  // and ship.js buys an unnecessary native build (second-opinion, 2026-08-03).
   const out = run('npx', [
     'eas-cli', 'build:list',
     '--platform', 'ios',
-    '--limit', '20',
+    '--build-profile', 'production',
+    '--limit', '25',
     '--non-interactive',
     '--json',
   ]);
   const start = out.indexOf('[');
   if (start === -1) throw new Error('build:list produced no JSON');
   const builds = JSON.parse(out.slice(start));
-  const newest = builds.find(
-    b => b.buildProfile === 'production' && b.status === 'FINISHED',
-  );
+  const newest = builds
+    .filter(b => b.buildProfile === 'production' && b.status === 'FINISHED')
+    .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')))[0];
   if (!newest) return null;
   return {
     version: newest.appBuildVersion,
@@ -153,9 +166,15 @@ function nativePathsChangedSince(sha) {
   // dependency bump sitting in the working tree would otherwise look JS-only
   // and ship an OTA update against a binary that lacks the module.
   try {
-    run('git', ['status', '--porcelain'])
-      .split('\n').filter(Boolean)
-      .map(line => line.slice(3).trim())
+    // -z is NOT optional. Plain --porcelain quotes paths containing spaces
+    // (`?? "my app.json"`) and renders renames as `R  old -> new`; both then
+    // fail every ^-anchored NATIVE_PATHS regex, so a `git mv` into app.json or
+    // any native asset with a space in its name silently shipped an OTA
+    // (second-opinion, 2026-08-03). With -z, records are NUL-separated, paths
+    // are never quoted, and a rename's destination is its own trailing record.
+    run('git', ['status', '--porcelain', '-z'])
+      .split('\0').filter(Boolean)
+      .map(rec => (rec.length > 3 && rec[2] === ' ' ? rec.slice(3) : rec))
       .forEach(f => files.add(f));
   } catch { /* not a git checkout — the commit diff above already decided */ }
 
@@ -573,6 +592,10 @@ if (require.main === module) {
 }
 
 module.exports = {
+  // Exported so scripts/ship-paths.test.mjs can assert this stays a subset of
+  // check-testflight-drift.js RELEVANT_PATHS — a file that is native here but
+  // invisible there means NOTHING ships.
+  NATIVE_PATHS,
   parseEnvList,
   parseDotenv,
   auditUpdateCredentials,
