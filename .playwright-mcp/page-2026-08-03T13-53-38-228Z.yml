@@ -1,0 +1,224 @@
+- generic [active] [ref=e1]:
+  - link "Skip to main content" [ref=e2] [cursor=pointer]:
+    - /url: "#main-content"
+  - banner [ref=e3]:
+    - navigation [ref=e4]:
+      - generic [ref=e5]:
+        - generic [ref=e6]:
+          - link "BroadwayScorecard" [ref=e7] [cursor=pointer]:
+            - /url: /
+          - button "Switch market" [ref=e9] [cursor=pointer]: Broadway
+        - button "Search shows" [ref=e12] [cursor=pointer]
+  - main [ref=e15]:
+    - generic [ref=e16]:
+      - heading "404" [level=1] [ref=e17]
+      - heading "Page Not Found" [level=2] [ref=e18]
+      - paragraph [ref=e19]: The show you're looking for might have closed, or the page may have moved.
+      - generic [ref=e20]:
+        - link "View All Shows" [ref=e21] [cursor=pointer]:
+          - /url: /
+        - link "How It Works" [ref=e22] [cursor=pointer]:
+          - /url: /methodology
+  - contentinfo [ref=e23]:
+    - generic [ref=e24]:
+      - generic [ref=e25]:
+        - heading "Explore More Theatre" [level=4] [ref=e26]
+        - generic [ref=e27]:
+          - link "🎪 Off-B’way NYC" [ref=e28] [cursor=pointer]:
+            - /url: /off-broadway
+            - generic [ref=e29]: 🎪
+            - generic [ref=e30]: Off-B’way
+            - generic [ref=e31]: NYC
+          - link "🇬🇧 West End London" [ref=e32] [cursor=pointer]:
+            - /url: /west-end
+            - generic [ref=e33]: 🇬🇧
+            - generic [ref=e34]: West End
+            - generic [ref=e35]: London
+          - link "🎭 Off-W.End London" [ref=e36] [cursor=pointer]:
+            - /url: /off-west-end
+            - generic [ref=e37]: 🎭
+            - generic [ref=e38]: Off-W.End
+            - generic [ref=e39]: London
+          - link "🎪 Opera Met Opera" [ref=e40] [cursor=pointer]:
+            - /url: /opera
+            - generic [ref=e41]: 🎪
+            - generic [ref=e42]: Opera
+            - generic [ref=e43]: Met Opera
+      - generic [ref=e44]:
+        - generic [ref=e45]:
+          - heading "By Category" [level=4] [ref=e46]
+          - list [ref=e47]:
+            - listitem [ref=e48]:
+              - link "Best Musicals" [ref=e49] [cursor=pointer]:
+                - /url: /browse/best-broadway-musicals
+            - listitem [ref=e50]:
+              - link "Best Dramas" [ref=e51] [cursor=pointer]:
+                - /url: /browse/best-broadway-dramas
+            - listitem [ref=e52]:
+              - link "Comedies" [ref=e53] [cursor=pointer]:
+                - /url: /browse/best-broadway-comedies
+            - listitem [ref=e54]:
+              - link "Revivals" [ref=e55] [cursor=pointer]:
+                - /url: /browse/best-broadway-revivals
+            - listitem [ref=e56]:
+              - link "Tony Winning Shows" [ref=e57] [cursor=pointer]:
+                - /url: /browse/tony-winners-on-broadway
+            - listitem [ref=e58]:
+              - link "Jukebox Musicals" [ref=e59] [cursor=pointer]:
+                - /url: /browse/jukebox-musicals-on-broadway
+            - listitem [ref=e60]:
+              - link "New Musicals" [ref=e61] [cursor=pointer]:
+                - /url: /browse/best-recent-musicals
+            - listitem [ref=e62]:
+              - link "Longest-Running" [ref=e63] [cursor=pointer]:
+                - /url: /browse/longest-running-broadway-shows
+        - generic [ref=e64]:
+          - heading "By Audience" [level=4] [ref=e65]
+          - list [ref=e66]:
+            - listitem [ref=e67]:
+              - link "Shows for Kids" [ref=e68] [cursor=pointer]:
+                - /url: /browse/broadway-shows-for-kids
+            - listitem [ref=e69]:
+              - link "Age Guide" [ref=e70] [cursor=pointer]:
+                - /url: /browse/broadway-age-guide
+            - listitem [ref=e71]:
+              - link "Date Night" [ref=e72] [cursor=pointer]:
+                - /url: /browse/broadway-shows-for-date-night
+            - listitem [ref=e73]:
+              - link "For Tourists" [ref=e74] [cursor=pointer]:
+                - /url: /browse/broadway-shows-for-tourists
+            - listitem [ref=e75]:
+              - link "First-Timers" [ref=e76] [cursor=pointer]:
+                - /url: /browse/first-time-broadway
+            - listitem [ref=e77]:
+              - link "Show Runtimes" [ref=e78] [cursor=pointer]:
+                - /url: /browse/broadway-show-runtimes
+        - generic [ref=e79]:
+          - heading "Deals & Tickets" [level=4] [ref=e80]
+          - list [ref=e81]:
+            - listitem [ref=e82]:
+              - link "All Discount Tickets" [ref=e83] [cursor=pointer]:
+                - /url: /discount-tickets
+            - listitem [ref=e84]:
+              - link "Best Value Tickets" [ref=e85] [cursor=pointer]:
+                - /url: /best-value
+            - listitem [ref=e86]:
+              - link "Lottery Tickets" [ref=e87] [cursor=pointer]:
+                - /url: /lotteries
+            - listitem [ref=e88]:
+              - link "Rush Tickets" [ref=e89] [cursor=pointer]:
+                - /url: /rush
+            - listitem [ref=e90]:
+              - link "Standing Room" [ref=e91] [cursor=pointer]:
+                - /url: /standing-room
+            - listitem [ref=e92]:
+              - link "Closing Soon" [ref=e93] [cursor=pointer]:
+                - /url: /browse/broadway-shows-closing-soon
+        - generic [ref=e94]:
+          - heading "More" [level=4] [ref=e95]
+          - list [ref=e96]:
+            - listitem [ref=e97]:
+              - link "Beat the Critics" [ref=e98] [cursor=pointer]:
+                - /url: /beat-the-critics
+            - listitem [ref=e99]:
+              - link "Tony Awards" [ref=e100] [cursor=pointer]:
+                - /url: /tony-awards
+            - listitem [ref=e101]:
+              - link "Box Office Scorecard" [ref=e102] [cursor=pointer]:
+                - /url: /box-office
+            - listitem [ref=e103]:
+              - link "Trending Shows" [ref=e104] [cursor=pointer]:
+                - /url: /trending
+            - listitem [ref=e105]:
+              - link "AudienceGrade" [ref=e106] [cursor=pointer]:
+                - /url: /audience-buzz
+            - listitem [ref=e107]:
+              - link "Theater Map" [ref=e108] [cursor=pointer]:
+                - /url: /broadway-theaters-map
+            - listitem [ref=e109]:
+              - link "Reviews" [ref=e110] [cursor=pointer]:
+                - /url: /reviews
+            - listitem [ref=e111]:
+              - link "Guides" [ref=e112] [cursor=pointer]:
+                - /url: /guides
+            - listitem [ref=e113]:
+              - link "Critics" [ref=e114] [cursor=pointer]:
+                - /url: /critics
+            - listitem [ref=e115]:
+              - link "Outlets" [ref=e116] [cursor=pointer]:
+                - /url: /critics/outlets
+            - listitem [ref=e117]:
+              - link "Directors" [ref=e118] [cursor=pointer]:
+                - /url: /directors
+            - listitem [ref=e119]:
+              - link "Playwrights" [ref=e120] [cursor=pointer]:
+                - /url: /playwrights
+            - listitem [ref=e121]:
+              - link "Composers" [ref=e122] [cursor=pointer]:
+                - /url: /composers
+            - listitem [ref=e123]:
+              - link "Lyricists" [ref=e124] [cursor=pointer]:
+                - /url: /lyricists
+            - listitem [ref=e125]:
+              - link "Cast" [ref=e126] [cursor=pointer]:
+                - /url: /cast
+            - listitem [ref=e127]:
+              - link "Cast Changes" [ref=e128] [cursor=pointer]:
+                - /url: /cast-changes
+            - listitem [ref=e129]:
+              - link "How It Works" [ref=e130] [cursor=pointer]:
+                - /url: /methodology
+      - generic [ref=e131]:
+        - paragraph [ref=e132]: Help improve Broadway Scorecard™
+        - generic [ref=e133]:
+          - link "Submit a Review" [ref=e134] [cursor=pointer]:
+            - /url: /submit-review
+          - link "Give Feedback" [ref=e135] [cursor=pointer]:
+            - /url: /feedback
+      - generic [ref=e137]:
+        - paragraph [ref=e138]: Never Miss a New Broadway Show
+        - paragraph [ref=e139]: No spam, no schedule — just opening night scores. Unsubscribe anytime.
+        - generic [ref=e140]:
+          - generic [ref=e141]: Email address
+          - textbox "Email address" [ref=e142]:
+            - /placeholder: email@example.com
+          - button "Subscribe" [ref=e143] [cursor=pointer]
+      - generic [ref=e144]:
+        - generic [ref=e145]:
+          - generic [ref=e146]: BroadwayScorecard
+          - generic [ref=e147]: ™
+        - generic [ref=e148]:
+          - generic [ref=e149]: Follow Us
+          - generic [ref=e150]:
+            - link "Broadway Scorecard on Instagram" [ref=e151] [cursor=pointer]:
+              - /url: https://instagram.com/bwayscorecard
+            - link "Broadway Scorecard on Threads" [ref=e154] [cursor=pointer]:
+              - /url: https://threads.net/@bwayscorecard
+            - link "Broadway Scorecard on Bluesky" [ref=e157] [cursor=pointer]:
+              - /url: https://bsky.app/profile/bwayscorecard.bsky.social
+            - link "Broadway Scorecard on X (formerly Twitter)" [ref=e160] [cursor=pointer]:
+              - /url: https://x.com/BwayScorecard
+            - link "Broadway Scorecard on Facebook" [ref=e163] [cursor=pointer]:
+              - /url: https://facebook.com/BroadwayScorecard
+        - generic [ref=e166]:
+          - link "About" [ref=e167] [cursor=pointer]:
+            - /url: /about
+          - link "Methodology" [ref=e168] [cursor=pointer]:
+            - /url: /methodology
+          - link "Buy Me a Coffee" [ref=e169] [cursor=pointer]:
+            - /url: https://buymeacoffee.com/broadwayscorecard
+          - button "Get the Scorecard" [ref=e170] [cursor=pointer]
+          - link "Terms" [ref=e171] [cursor=pointer]:
+            - /url: /terms
+          - generic [ref=e172]: Every show. Every review. One score.
+        - paragraph [ref=e173]: Aggregating 15,342 critic reviews and counting...
+      - generic [ref=e174]:
+        - paragraph [ref=e175]: All ratings and reviews belong to their respective sources.
+        - paragraph [ref=e176]: Some ticket links are affiliate links. We may earn a commission at no extra cost to you.
+        - paragraph [ref=e177]: © 2026 Broadway Scorecard™ LLC. All rights reserved.
+        - paragraph [ref=e178]:
+          - text: By using this site, you agree to our
+          - link "Terms of Service" [ref=e179] [cursor=pointer]:
+            - /url: /terms
+          - text: .
+  - alert [ref=e180]

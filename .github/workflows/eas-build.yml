@@ -79,6 +79,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Unit-test date math (closing-soon window, local-date persistence)
+        run: node --experimental-strip-types --import ./tests/register-alias.mjs --test tests/unit/date-utils.test.mjs
+
       - name: Unit-test poster grid column math
         run: node --experimental-strip-types --import ./tests/register-alias.mjs --test tests/unit/poster-grid.test.mjs
 
