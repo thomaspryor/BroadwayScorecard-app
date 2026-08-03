@@ -34,7 +34,6 @@ import { getImageUrl } from '@/lib/images';
 import { toLocalYMD } from '@/lib/date-utils';
 import { showTitleFallback } from '@/lib/show-format';
 import { featureFlags } from '@/lib/feature-flags';
-import StarRating from '@/components/user/StarRating';
 import MiniStars from '@/components/user/MiniStars';
 import { usePosterGrid } from '@/hooks/usePosterGrid';
 import type { UserReview, WatchlistEntry } from '@/lib/user-types';
@@ -48,6 +47,7 @@ import { FeedModeToggle, type FeedMode } from '@/components/user/FeedModeToggle'
 import { PhotoFeedTimeline } from '@/components/user/PhotoFeedTimeline';
 import { PhotoWallGrid } from '@/components/user/PhotoWallGrid';
 import { DiaryCalendarMonth, buildDiaryCalendarMonths, buildReviewsByDate } from '@/components/user/DiaryCalendarView';
+import { DiaryLedgerRow, MonthDivider, groupReviewsByMonth } from '@/components/user/DiaryListView';
 import { usePhotoFeed } from '@/hooks/usePhotoFeed';
 import * as haptics from '@/lib/haptics';
 
@@ -79,6 +79,13 @@ const SEGMENT_TEST_IDS: Record<ViewMode, string> = {
 };
 
 const VIEW_MODE_KEY = '@bsc:diary_view_mode';
+
+// Diary layout sub-toggle. 'list' is the Ledger direction the owner picked
+// (2026-08-03 mockup). Persisted — session-only state made the user re-pick
+// their layout every launch.
+type DiaryLayout = 'poster' | 'list' | 'calendar';
+const DIARY_LAYOUTS: DiaryLayout[] = ['poster', 'list', 'calendar'];
+const DIARY_LAYOUT_KEY = '@bsc:diary_layout';
 
 // ─── Swipe delete action ─────────────────────────────
 function SwipeDeleteAction({ onDelete, drag }: { onDelete: () => void; drag: SharedValue<number> }) {
@@ -195,9 +202,9 @@ export default function WatchedScreen() {
 
   const [diarySort, setDiarySort] = useState<DiarySort>('date-desc');
   const [viewMode, setViewModeState] = useState<ViewMode>('grid');
-  // Calendar toggle inside Grid (Round 2, Direction D as a secondary view,
-  // not the main driver — owner's pick). Session-only, not persisted.
-  const [gridSubView, setGridSubView] = useState<'poster' | 'calendar'>('poster');
+  // Layout toggle inside Diary (Round 2, Direction D calendar as a secondary
+  // view; Ledger list added 2026-08-03 — the owner's pick from task #300).
+  const [gridSubView, setGridSubViewState] = useState<DiaryLayout>('poster');
   const [showSearchModal, setShowSearchModal] = useState(false);
   // Long-press context menu for poster grids — replaces raw Alert.alert
   // confirms (Round 2, Option B pattern extended from To Watch).
@@ -226,11 +233,19 @@ export default function WatchedScreen() {
     AsyncStorage.getItem(VIEW_MODE_KEY).then(stored => {
       if (VIEW_MODES.includes(stored as ViewMode)) setViewModeState(stored as ViewMode);
     }).catch(() => {});
+    AsyncStorage.getItem(DIARY_LAYOUT_KEY).then(stored => {
+      if (DIARY_LAYOUTS.includes(stored as DiaryLayout)) setGridSubViewState(stored as DiaryLayout);
+    }).catch(() => {});
   }, []);
 
   const setViewMode = useCallback((mode: ViewMode) => {
     setViewModeState(mode);
     AsyncStorage.setItem(VIEW_MODE_KEY, mode).catch(() => {});
+  }, []);
+
+  const setGridSubView = useCallback((layout: DiaryLayout) => {
+    setGridSubViewState(layout);
+    AsyncStorage.setItem(DIARY_LAYOUT_KEY, layout).catch(() => {});
   }, []);
 
   const showMap = useMemo(() => {
@@ -439,10 +454,9 @@ export default function WatchedScreen() {
     );
   }
 
-  // ─── List row (shared by To Be Rated is separate; this is for rated diary entries) ────
-  const renderDiaryListRow = (item: UserReview) => {
+  // ─── Ledger list row (Diary list layout — owner's 2026-08-03 mockup pick) ────
+  const renderDiaryLedgerRow = (item: UserReview) => {
     const show = showMap[item.show_id];
-    const title = show?.title || showTitleFallback(item.show_id);
     const posterUrl = show?.images ? (getImageUrl(show.images.poster) || getImageUrl(show.images.thumbnail)) : null;
 
     return (
@@ -455,46 +469,20 @@ export default function WatchedScreen() {
         )}
         overshootRight={false}
       >
-        <Pressable
-          style={({ pressed }) => [styles.card, styles.cardSwipeable, pressed && styles.pressed]}
+        <DiaryLedgerRow
+          review={item}
+          show={show}
+          fallbackTitle={showTitleFallback(item.show_id)}
+          posterUrl={posterUrl}
+          monthInBox={!showYearGroups}
           onPress={() => guardedPush(item.id, () => goToShow(show, item.show_id))}
-          onLongPress={() => handleDeleteDiaryItem(item)}
-        >
-          {posterUrl ? (
-            <Image source={{ uri: posterUrl }} style={styles.cardPoster} contentFit="cover" transition={200} />
-          ) : (
-            <View style={[styles.cardPoster, styles.cardPosterPlaceholder]}>
-              <Text style={styles.placeholderText}>{title.charAt(0)}</Text>
-            </View>
-          )}
-          <View style={styles.cardInfo}>
-            <Text style={styles.cardTitle} numberOfLines={1}>{title}</Text>
-            {show?.venue && <Text style={styles.cardVenue} numberOfLines={1}>{show.venue}</Text>}
-            {item.review_text && <Text style={styles.cardNote} numberOfLines={1}>{item.review_text}</Text>}
-          </View>
-          {/* Stars only + date on the right (beta feedback 2026-07-26: "Move
-              the dates to the right. Remove 4.0 — the stars themselves are
-              clear."). */}
-          <Pressable
-            style={styles.cardRating}
-            onPress={() => guardedPush(item.id, () => router.push({
-              pathname: '/rate/[showId]' as any,
-              params: { showId: item.show_id, showTitle: title, reviewId: item.id },
-            }))}
-            hitSlop={{ top: 8, bottom: 8, right: 8, left: 2 }}
-            accessibilityRole="button"
-            accessibilityLabel={`Edit your ${item.rating.toFixed(1)} star rating`}
-          >
-            <StarRating rating={item.rating} onRatingChange={() => {}} size="sm" readOnly hideLabel />
-            {item.date_seen && (
-              <Text style={styles.cardDate}>
-                {new Date(item.date_seen + 'T00:00:00').toLocaleDateString('en-US', {
-                  month: 'short', day: 'numeric', ...(showYearGroups ? {} : { year: 'numeric' }),
-                })}
-              </Text>
-            )}
-          </Pressable>
-        </Pressable>
+          onLongPress={() => { haptics.action(); setGridMenu({ kind: 'review', review: item }); }}
+          onEditRating={() => router.push({
+            pathname: '/rate/[showId]' as any,
+            params: { showId: item.show_id, showTitle: show?.title || showTitleFallback(item.show_id), reviewId: item.id },
+          })}
+          onDelete={() => handleDeleteDiaryItem(item)}
+        />
       </ReanimatedSwipeable>
     );
   };
@@ -650,7 +638,7 @@ export default function WatchedScreen() {
               {upcomingWatchlistEntries.length + upcomingReviews.length} {(upcomingWatchlistEntries.length + upcomingReviews.length) === 1 ? 'entry' : 'entries'}
             </Text>
           </View>
-          {viewMode === 'grid' ? (
+          {gridSubView === 'poster' ? (
             // pastGrid, not toBeRatedGrid: this section sits inside the
             // already-padded list container, so the padded grid double-indented
             // it (beta feedback 2026-07-26: "upcoming list should be left
@@ -683,7 +671,7 @@ export default function WatchedScreen() {
           ) : (
             <View style={{ gap: Spacing.xs, paddingHorizontal: 0 }}>
               {upcomingWatchlistEntries.map(renderUpcomingRow)}
-              {upcomingReviews.map(renderDiaryListRow)}
+              {upcomingReviews.map(renderDiaryLedgerRow)}
             </View>
           )}
         </View>
@@ -705,7 +693,7 @@ export default function WatchedScreen() {
                     </Text>
                   </View>
                 )}
-                {viewMode === 'grid' ? (
+                {gridSubView === 'poster' ? (
                   <View style={styles.pastGrid}>
                     {reviewsByYear[year].map(renderDiaryGridCard)}
                     {year === sortedYears[sortedYears.length - 1] && (
@@ -713,8 +701,16 @@ export default function WatchedScreen() {
                     )}
                   </View>
                 ) : (
-                  <View style={{ gap: Spacing.xs, paddingHorizontal: 0 }}>
-                    {reviewsByYear[year].map(renderDiaryListRow)}
+                  <View>
+                    {/* Month dividers within the year band — mockup: "JULY 2026"
+                        over that month's rows. The "No date" bucket has no
+                        months, so its rows render bare (label null). */}
+                    {groupReviewsByMonth(reviewsByYear[year]).map(monthGroup => (
+                      <View key={monthGroup.key}>
+                        {monthGroup.label && <MonthDivider label={monthGroup.label} />}
+                        {monthGroup.items.map(renderDiaryLedgerRow)}
+                      </View>
+                    ))}
                   </View>
                 )}
               </View>
@@ -728,14 +724,14 @@ export default function WatchedScreen() {
                 <Text style={styles.sectionCount}>{pastReviews.length} {pastReviews.length === 1 ? 'entry' : 'entries'}</Text>
               </View>
             )}
-            {viewMode === 'grid' ? (
+            {gridSubView === 'poster' ? (
               <View style={styles.pastGrid}>
                 {pastReviews.map(renderDiaryGridCard)}
                 <AddShowCard label="Rate a show" onPress={() => setShowSearchModal(true)} cardWidth={grid.cardWidth} />
               </View>
             ) : (
-              <View style={{ gap: Spacing.xs }}>
-                {pastReviews.map(renderDiaryListRow)}
+              <View>
+                {pastReviews.map(renderDiaryLedgerRow)}
               </View>
             )}
           </View>
@@ -744,7 +740,7 @@ export default function WatchedScreen() {
 
       {/* Add-show footer when there's no past section to attach it to */}
       {pastReviews.length === 0 && (
-        viewMode === 'grid' ? (
+        gridSubView === 'poster' ? (
           <View style={styles.pastGrid}>
             <AddShowCard label="Rate a show" onPress={() => setShowSearchModal(true)} cardWidth={grid.cardWidth} />
           </View>
@@ -809,6 +805,9 @@ export default function WatchedScreen() {
               key={mode}
               testID={SEGMENT_TEST_IDS[mode]}
               style={[styles.segment, viewMode === mode && styles.segmentActive]}
+              // 38pt visual (header-density pass) + 4pt slop keeps the
+              // effective target at 46pt, above the 44pt HIG floor.
+              hitSlop={{ top: 4, bottom: 4 }}
               onPress={() => { haptics.tap(); setViewMode(mode); }}
               accessibilityRole="button"
               accessibilityState={{ selected: viewMode === mode }}
@@ -830,15 +829,16 @@ export default function WatchedScreen() {
         <View style={styles.controlsRow}>
           <Text style={styles.showsSeenLabel}>{showsSeen} {showsSeen === 1 ? 'show' : 'shows'} seen</Text>
           <View style={styles.controlsRight}>
-            <Pressable style={styles.sortButton} onPress={cycleDiarySort}>
+            <Pressable style={styles.sortButton} hitSlop={{ top: 6, bottom: 6 }} onPress={cycleDiarySort}>
               <Text style={styles.sortText}>{sortLabel}</Text>
               <Svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke={Colors.text.muted} strokeWidth={2}>
                 <Path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
               </Svg>
             </Pressable>
-            {/* Grid/calendar sub-view — segmented so BOTH options are visible
-                and the active one is highlighted (beta feedback 2026-08-02:
-                "not just a single icon that flips when you hit it"). */}
+            {/* Grid/list/calendar sub-view — segmented so ALL options are
+                visible and the active one is highlighted (beta feedback
+                2026-08-02: "not just a single icon that flips when you hit
+                it"). */}
             <View style={styles.subViewSegmented} testID="diary-calendar-view-toggle">
               <Pressable
                 style={[styles.subViewSegment, gridSubView === 'poster' && styles.subViewSegmentActive]}
@@ -846,10 +846,24 @@ export default function WatchedScreen() {
                 accessibilityRole="button"
                 accessibilityState={{ selected: gridSubView === 'poster' }}
                 accessibilityLabel="Poster grid view"
-                hitSlop={4}
+                testID="diary-poster-layout-toggle"
+                hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
               >
                 <Svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={gridSubView === 'poster' ? Colors.text.primary : Colors.text.muted} strokeWidth={2}>
                   <Path strokeLinecap="round" strokeLinejoin="round" d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z" />
+                </Svg>
+              </Pressable>
+              <Pressable
+                style={[styles.subViewSegment, gridSubView === 'list' && styles.subViewSegmentActive]}
+                onPress={() => { haptics.tap(); setGridSubView('list'); }}
+                accessibilityRole="button"
+                accessibilityState={{ selected: gridSubView === 'list' }}
+                accessibilityLabel="List view"
+                testID="diary-list-layout-toggle"
+                hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
+              >
+                <Svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={gridSubView === 'list' ? Colors.text.primary : Colors.text.muted} strokeWidth={2}>
+                  <Path strokeLinecap="round" strokeLinejoin="round" d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />
                 </Svg>
               </Pressable>
               <Pressable
@@ -858,7 +872,8 @@ export default function WatchedScreen() {
                 accessibilityRole="button"
                 accessibilityState={{ selected: gridSubView === 'calendar' }}
                 accessibilityLabel="Calendar view"
-                hitSlop={4}
+                testID="diary-calendar-layout-toggle"
+                hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
               >
                 <Svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={gridSubView === 'calendar' ? Colors.text.primary : Colors.text.muted} strokeWidth={2}>
                   <Path strokeLinecap="round" strokeLinejoin="round" d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V6a2 2 0 012-2z" />
@@ -1027,26 +1042,30 @@ export default function WatchedScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.surface.default },
+  // Compacted 2026-08-03 (owner: header chrome "too tall vertically, taking
+  // up too much room" — the bottom bar is the native SwiftUI tab bar whose
+  // height iOS owns, so the reclaimable space is all up here).
   headerRow: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: Spacing.lg, paddingTop: Spacing.xl, paddingBottom: Spacing.sm,
+    paddingHorizontal: Spacing.lg, paddingTop: Spacing.sm, paddingBottom: Spacing.xs,
   },
-  pageTitle: { fontSize: FontSize.xxl, fontWeight: '700', color: Colors.text.primary },
+  pageTitle: { fontSize: FontSize.xl, fontWeight: '700', color: Colors.text.primary },
   addButton: {
-    width: 44, height: 44, borderRadius: 22,
+    // 38pt visual + hitSlop 8 at both call sites keeps the effective target ≥44pt.
+    width: 38, height: 38, borderRadius: 19,
     backgroundColor: Colors.surface.overlay, alignItems: 'center', justifyContent: 'center',
   },
   pressed: { opacity: 0.7 },
   controlsRow: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: Spacing.lg, paddingBottom: Spacing.sm,
+    paddingHorizontal: Spacing.lg, paddingBottom: 6,
   },
   showsSeenLabel: { color: Colors.text.muted, fontSize: FontSize.xs },
   controlsRight: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
   sortButton: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     backgroundColor: Colors.surface.overlay, borderRadius: 8,
-    minHeight: 44,
+    minHeight: 36,
     paddingHorizontal: Spacing.sm, paddingVertical: 6,
   },
   sortText: { color: Colors.text.secondary, fontSize: FontSize.xs, fontWeight: '500' },
@@ -1064,14 +1083,16 @@ const styles = StyleSheet.create({
   subViewSegmentActive: {
     backgroundColor: Colors.surface.raised,
   },
-  // Grid · Feed · Stats segmented control.
-  segmentedRow: { paddingHorizontal: Spacing.lg, paddingBottom: Spacing.sm },
+  // Diary · Feed · Stats segmented control. 38pt segments, not 44: each
+  // segment is ~⅓ screen wide so the touch target stays generous, and the
+  // shorter control is part of the same header-density pass.
+  segmentedRow: { paddingHorizontal: Spacing.lg, paddingBottom: 6 },
   segmented: {
     flexDirection: 'row', backgroundColor: Colors.surface.overlay,
     borderRadius: BorderRadius.sm, overflow: 'hidden', padding: 2,
   },
   segment: {
-    flex: 1, minHeight: 44, alignItems: 'center', justifyContent: 'center',
+    flex: 1, minHeight: 38, alignItems: 'center', justifyContent: 'center',
     borderRadius: 6,
   },
   segmentActive: { backgroundColor: 'rgba(255,255,255,0.1)' },
@@ -1117,7 +1138,6 @@ const styles = StyleSheet.create({
     gap: Spacing.md,
     borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: Colors.border.subtle,
   },
-  cardSwipeable: { backgroundColor: Colors.surface.default },
   cardPoster: {
     width: 48, height: 64, borderRadius: BorderRadius.sm,
     backgroundColor: Colors.surface.overlay,
@@ -1127,9 +1147,6 @@ const styles = StyleSheet.create({
   cardInfo: { flex: 1, gap: 2 },
   cardTitle: { color: Colors.text.primary, fontSize: FontSize.md, fontWeight: '600' },
   cardVenue: { color: Colors.text.muted, fontSize: FontSize.xs },
-  cardNote: { color: Colors.text.secondary, fontSize: FontSize.xs, fontStyle: 'italic' },
-  cardDate: { color: Colors.text.muted, fontSize: FontSize.xs },
-  cardRating: { alignItems: 'flex-end', gap: 3 },
   // Grid view
   gridContainer: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.md },
   pastGrid: {
