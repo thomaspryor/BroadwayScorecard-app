@@ -14,7 +14,6 @@ Last audited: 2026-08-03 (beta-feedback round 3, builds 69/70 — diary-catalog 
 | Feature | Pri | Flagged | Notes |
 |---|---|---|---|
 | Edit rating from diary entry | P1 | 2026-07-24 | Web: grid edit pencil + `?edit=1` (`d2035b21daa`). App: tapping a diary entry goes to the show page; no direct edit affordance. Pass `reviewId` to `/rate/[showId]` from diary cells. |
-| Diary-only show pages | P1 | 2026-08-03 | Imports now match the ~33k diary catalog (build 69), so a diary-only show_id can land in Watched/To Watch/Lists. Web resolves these at `/diary-show/[id]`; the app has no route, so tapping the row only toasts "isn't in the current catalog yet". Titles are cached (`lib/diary-titles.ts`) but there is nowhere to go. |
 | Add-show search misses diary-only shows | P2 | 2026-08-03 | `ShowSearchModal` fuses `useShows()` only. The web's Add-show dropdown merges `diary-search.json` (`useShowSearch` `mergeDataUrl`). The loader already exists in the app (`lib/diary-catalog.ts`, used by import) — wire it in behind the same on-demand fetch so you can watchlist an Off-Broadway/regional show you can already import. |
 | Import Find-it live lookup | P2 | 2026-07-24 | Web `8933a80ea6b`: per-row "find it" live Mezzanine catalog search for rows that miss the local match, writes a `user_show_stubs` row. Largely superseded by the diary-catalog merge (2026-08-03) — re-scope before starting: measure how many rows still miss now. |
 | Fantasy Broadway | P2 | 2026-04-19 | Web: `/fantasy/`. Multiple leagues, share links, draft page. Probably web-only for now. |
@@ -25,6 +24,7 @@ Last audited: 2026-08-03 (beta-feedback round 3, builds 69/70 — diary-catalog 
 
 | Feature | App Files | Shipped |
 |---|---|---|
+| Diary-only show pages | `app/diary-show/[id].tsx` | 2026-08-03 |
 | Browse with filters (status, type, sort) | `app/(tabs)/browse.tsx` | 2026-03 |
 | Market picker (NYC, London) | `components/MarketPicker.tsx` | 2026-03 |
 | Score toggle (critics/audience) | `components/ScoreToggle.tsx` | 2026-03 |
