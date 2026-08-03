@@ -721,8 +721,9 @@ export default function ShowDetailScreen() {
         )}
 
 
-        {/* Tony Awards */}
-        {detail?.tonyAwards && detail.tonyAwards.length > 0 && (
+        {/* Awards Scorecard — Tony rows OR any award-score data (Pulitzer /
+           Lortel-only shows have aw but no tn) */}
+        {detail && (detail.tonyAwards.length > 0 || detail.awards) && (
           <AwardsScorecardSection awards={detail.tonyAwards} awardScore={detail.awards} />
         )}
 
@@ -1274,7 +1275,7 @@ function BoxOfficeSection({ data }: { data: NonNullable<ShowDetail['boxOffice']>
               <Text style={styles.boLabel}>Performances</Text>
             </View>
             <View style={styles.boCell}>
-              <Text style={styles.boValue}>{at.attendance != null ? (at.attendance >= 1000 ? `${(at.attendance / 1000).toFixed(1)}K` : at.attendance.toString()) : '—'}</Text>
+              <Text style={styles.boValue}>{at.attendance != null ? (at.attendance >= 1_000_000 ? `${(at.attendance / 1_000_000).toFixed(1)}M` : at.attendance >= 1000 ? `${(at.attendance / 1000).toFixed(1)}K` : at.attendance.toString()) : '—'}</Text>
               <Text style={styles.boLabel}>Attendance</Text>
             </View>
           </View>
@@ -1388,25 +1389,42 @@ function AwardsScorecardSection({ awards, awardScore }: {
 }) {
   // Capture rig: default the category list open so the expanded state can be
   // screenshotted without a tap driver. Collapsed remains the shipped default.
-  const [expanded, setExpanded] = useState(process.env.EXPO_PUBLIC_AUTOSCROLL === '1');
-  // Dedupe: the feed can repeat a category (e.g. Hamilton's Best Original
-  // Score appears twice, once with and once without a nominee name).
-  const seen = new Set<string>();
-  const deduped = awards.filter(a => {
+  const [expanded, setExpanded] = useState(process.env.EXPO_PUBLIC_EXPAND_AWARDS === '1');
+  // Group like the site's AwardScoreCard: one row per category+outcome with
+  // co-nominees joined (" · "), counted once. The raw feed lists one row per
+  // nominee (584 categories have co-nominees) and can repeat a category with
+  // and without a name — naive row counts inflate wins/noms.
+  const grouped = new Map<string, { category: string; won: boolean; names: string[]; year: number }>();
+  for (const a of awards) {
     const key = `${a.category}|${a.won}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-  const wins = deduped.filter(a => a.won);
-  const noms = deduped.filter(a => !a.won);
-  const latestYear = Math.max(...deduped.map(a => ceremonyToYear(a.year)));
-  const season = awardScore?.season ?? seasonLabel(latestYear);
+    let g = grouped.get(key);
+    if (!g) {
+      g = { category: a.category, won: a.won, names: [], year: a.year };
+      grouped.set(key, g);
+    }
+    if (a.name && !g.names.includes(a.name)) g.names.push(a.name);
+  }
+  const rows = [...grouped.values()].map(g => ({
+    category: g.category,
+    won: g.won,
+    name: g.names.length > 0 ? g.names.join(' · ') : null,
+    year: g.year,
+  }));
+  const wins = rows.filter(a => a.won);
+  const noms = rows.filter(a => !a.won);
+  // Prefer the site-computed counts from the feed so numbers match the web
+  // exactly ("11 wins of 13 noms"); fall back to grouped-row counts.
+  const winCount = awardScore?.tonyWins ?? wins.length;
+  const nomCount = awardScore?.tonyNoms ?? rows.length;
+  const seasonFromRows = rows.length > 0
+    ? seasonLabel(Math.max(...rows.map(a => ceremonyToYear(a.year))))
+    : null;
+  const season = awardScore?.season ?? seasonFromRows;
   const ordered = [...wins, ...noms];
   const badge = awardScore ? AWARD_BADGE_CONFIG[awardScore.badge] ?? AWARD_BADGE_CONFIG.eligible : null;
 
   return (
-    <SectionCard title="Awards Scorecard" meta={`${season} season`}>
+    <SectionCard title="Awards Scorecard" meta={season ? `${season} season` : undefined}>
       {/* Award-score hero row — site parity (AwardScoreBadge + tier + sublabel) */}
       {awardScore && badge && (
         <View style={styles.awardsHeroRow}>
@@ -1430,23 +1448,24 @@ function AwardsScorecardSection({ awards, awardScore }: {
           </Text>
         </View>
       )}
+      {rows.length > 0 && (
       <View style={styles.awardsPanel}>
-        <Text style={styles.awardsPanelLabel}>TONY AWARDS ({season})</Text>
+        <Text style={styles.awardsPanelLabel}>TONY AWARDS{season ? ` (${season})` : ''}</Text>
         <View style={styles.awardsSummaryRow}>
           <IconSymbol name="trophy.fill" size={18} color="#FFD700" />
-          <Text style={styles.awardsSummaryNumber}>{wins.length}</Text>
-          <Text style={styles.awardsSummaryUnit}>{wins.length === 1 ? 'win' : 'wins'}</Text>
+          <Text style={styles.awardsSummaryNumber}>{winCount}</Text>
+          <Text style={styles.awardsSummaryUnit}>{winCount === 1 ? 'win' : 'wins'}</Text>
           <Text style={styles.awardsSummaryOf}>of</Text>
           <IconSymbol name="star" size={18} color={Colors.text.muted} />
-          <Text style={styles.awardsSummaryNumber}>{deduped.length}</Text>
-          <Text style={styles.awardsSummaryUnit}>{deduped.length === 1 ? 'nom' : 'noms'}</Text>
+          <Text style={styles.awardsSummaryNumber}>{nomCount}</Text>
+          <Text style={styles.awardsSummaryUnit}>{nomCount === 1 ? 'nom' : 'noms'}</Text>
         </View>
         <Pressable
           style={({ pressed }) => [styles.awardsToggle, pressed && styles.pressed]}
           onPress={() => setExpanded(v => !v)}
         >
           <Text style={styles.awardsToggleText}>
-            {expanded ? 'Hide categories' : `See all categories (${deduped.length})`}
+            {expanded ? 'Hide categories' : `See all categories (${rows.length})`}
           </Text>
           <IconSymbol
             name={expanded ? 'chevron.up' : 'chevron.down'}
@@ -1475,6 +1494,7 @@ function AwardsScorecardSection({ awards, awardScore }: {
           </View>
         ))}
       </View>
+      )}
       {/* Other Major Awards — per-ceremony chips, site parity */}
       {awardScore && awardScore.other.length > 0 && (
         <>
@@ -1615,6 +1635,7 @@ const VENUE_DIMENSIONS = [
 
 /** Five filled/unfilled squares, the web's ScoreDots pattern. */
 function ScoreSquares({ score, color }: { score: number; color: string }) {
+  const filled = Math.max(0, Math.min(5, Math.round(score)));
   return (
     <View style={styles.venueSquares}>
       {[1, 2, 3, 4, 5].map(i => (
@@ -1622,7 +1643,7 @@ function ScoreSquares({ score, color }: { score: number; color: string }) {
           key={i}
           style={[
             styles.venueSquare,
-            { backgroundColor: i <= score ? color : Colors.surface.overlay },
+            { backgroundColor: i <= filled ? color : Colors.surface.overlay },
           ]}
         />
       ))}
@@ -2339,8 +2360,11 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   showtimesCta: {
+    // 44pt-min tap target (HIG) — this is the affiliate on-ramp
     alignSelf: 'flex-start',
-    marginTop: Spacing.md,
+    marginTop: Spacing.xs,
+    paddingVertical: Spacing.md,
+    paddingRight: Spacing.xl,
   },
   showtimesCtaText: {
     color: Colors.brand,
@@ -2547,7 +2571,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: Spacing.xs,
+    paddingVertical: Spacing.md,
   },
   awardsToggleText: {
     color: Colors.text.secondary,

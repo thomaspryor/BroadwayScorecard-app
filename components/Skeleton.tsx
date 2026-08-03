@@ -189,9 +189,16 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginTop: Spacing.md,
   },
+  // Mirrors SectionCard's shell so the skeleton doesn't pop when real
+  // cards replace it.
   section: {
-    paddingHorizontal: Spacing.lg,
-    marginTop: Spacing.xl,
+    backgroundColor: Colors.surface.raised,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+    borderColor: Colors.border.subtle,
+    padding: Spacing.lg,
+    marginHorizontal: Spacing.lg,
+    marginTop: Spacing.lg,
     gap: Spacing.md,
   },
   reviewRow: {

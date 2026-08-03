@@ -8,7 +8,9 @@
 
 // Expected schema versions
 export const EXPECTED_SCHEMA_VERSION = 1;
-export const EXPECTED_DETAIL_SCHEMA_VERSION = 1;
+// v3: aw (award score), vs.sum, acc, tlk (card-parity redesign). All new
+// fields are optional — v2 payloads (offline cache) still map cleanly.
+export const EXPECTED_DETAIL_SCHEMA_VERSION = 3;
 
 /** Raw abbreviated show data from mobile-shows.json */
 export interface MobileShow {
@@ -134,6 +136,8 @@ export interface MobileShowDetail {
     ip?: true;                     // season in progress
     sub: string | null;            // sublabel, e.g. "Won Best Musical + 10 more"
     sea: string | null;            // Tony season, e.g. "2015-16"
+    tw?: number;                   // site-computed Tony wins (category-level)
+    tn?: number;                   // site-computed Tony noms (category-level)
     pz: { r: string; y: number | null } | null;  // Pulitzer result
     oth?: { n: string; w: number; nm: number }[]; // other ceremonies
   };
@@ -227,6 +231,8 @@ export interface ShowDetail {
     inProgress: boolean;
     sublabel: string | null;
     season: string | null;
+    tonyWins: number | null;
+    tonyNoms: number | null;
     pulitzer: { result: string; year: number | null } | null;
     other: { name: string; wins: number; noms: number }[];
   } | null;
@@ -321,6 +327,8 @@ export function mapShowDetail(raw: MobileShowDetail): ShowDetail {
       inProgress: raw.aw.ip === true,
       sublabel: raw.aw.sub ?? null,
       season: raw.aw.sea ?? null,
+      tonyWins: raw.aw.tw ?? null,
+      tonyNoms: raw.aw.tn ?? null,
       pulitzer: raw.aw.pz ? { result: raw.aw.pz.r, year: raw.aw.pz.y ?? null } : null,
       other: (raw.aw.oth ?? []).map(o => ({ name: o.n, wins: o.w, noms: o.nm })),
     } : null,
