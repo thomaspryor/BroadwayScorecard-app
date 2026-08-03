@@ -208,6 +208,18 @@ function RootLayout() {
         }}
       />
       <Stack.Screen
+        name="diary-show/[id]"
+        options={{
+          headerShown: true,
+          headerBackTitle: 'Back',
+          headerStyle: { backgroundColor: Colors.surface.default },
+          headerTintColor: Colors.brand,
+          headerTitleStyle: { color: Colors.text.primary },
+          title: '',
+          animation: 'slide_from_right',
+        }}
+      />
+      <Stack.Screen
         name="settings"
         options={{
           headerShown: true,

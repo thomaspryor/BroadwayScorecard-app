@@ -62,10 +62,9 @@ interface DiaryCalendarMonthProps {
   month: number;
   reviewsByDate: Record<string, UserReview>;
   showMap: Record<string, Show>;
-  onMissingShow: () => void;
 }
 
-export function DiaryCalendarMonth({ year, month, reviewsByDate, showMap, onMissingShow }: DiaryCalendarMonthProps) {
+export function DiaryCalendarMonth({ year, month, reviewsByDate, showMap }: DiaryCalendarMonthProps) {
   const cells = useMemo(() => {
     const startWeekday = new Date(year, month, 1).getDay();
     const daysInMonth = new Date(year, month + 1, 0).getDate();
@@ -100,17 +99,17 @@ export function DiaryCalendarMonth({ year, month, reviewsByDate, showMap, onMiss
               </View>
             );
           }
+          const reviewShowId = cell.review.show_id;
           return (
             <Pressable
               key={i}
               style={styles.cell}
               onPress={() => {
                 haptics.tap();
-                if (show) router.push(`/show/${show.slug}`);
-                else onMissingShow();
+                router.push(show ? `/show/${show.slug}` : `/diary-show/${reviewShowId}` as any);
               }}
               accessibilityRole="button"
-              accessibilityLabel={`${show?.title || showTitleFallback(cell.review.show_id)}, ${cell.dateStr}`}
+              accessibilityLabel={`${show?.title || showTitleFallback(reviewShowId)}, ${cell.dateStr}`}
             >
               {posterUrl ? (
                 <Image source={{ uri: posterUrl }} style={styles.cellPoster} contentFit="cover" />

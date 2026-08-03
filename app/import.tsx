@@ -49,6 +49,7 @@ import {
   showToCandidate,
 } from '@/lib/diary-catalog';
 import { recordDiaryTitles } from '@/lib/diary-titles';
+import type { DiaryShowMeta } from '@/lib/show-format';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
 import * as haptics from '@/lib/haptics';
 
@@ -193,10 +194,19 @@ export default function ImportScreen() {
     const matched: MatchedEntry[] = [];
     const diaryShowIds = new Set<string>();
     const unmatchedForLog: RawImportEntry[] = [];
-    /** Titles for diary-only matches, so Watched/To Watch don't render the id. */
-    const diaryTitleUpdates: Record<string, string> = {};
+    /** Detail for diary-only matches, so Watched/To Watch/Lists/the diary-show
+     *  page don't render the raw id. */
+    const diaryTitleUpdates: Record<string, DiaryShowMeta> = {};
     const noteDiaryTitle = (m: MatchCandidate | null) => {
-      if (m?.diaryOnly) diaryTitleUpdates[m.id] = m.title;
+      if (m?.diaryOnly) {
+        diaryTitleUpdates[m.id] = {
+          title: m.title,
+          venue: m.venue,
+          city: m.city ?? null,
+          category: m.category,
+          openingDate: m.openingDate,
+        };
+      }
     };
 
     for (const raw of acquired.entries.filter(e => e.kind === 'diary')) {

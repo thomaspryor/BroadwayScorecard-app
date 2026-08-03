@@ -32,7 +32,6 @@ import { useUserLists } from '@/hooks/useUserLists';
 import { useShows } from '@/lib/data-context';
 import { getImageUrl } from '@/lib/images';
 import { showTitleFallback } from '@/lib/show-format';
-import { useToastSafe } from '@/lib/toast-context';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
 import { ContextMenu } from '@/components/user/ContextMenu';
 import * as haptics from '@/lib/haptics';
@@ -59,11 +58,13 @@ export default function ListsTab({ userId, showMap, createTrigger }: ListsTabPro
     addToList, removeFromList, reorderList,
   } = useUserLists(userId);
   const { shows } = useShows();
-  const { showToast } = useToastSafe();
 
-  const handleMissingShow = useCallback(() => {
-    showToast("This show isn't in the current catalog yet.", 'info');
-  }, [showToast]);
+  // A show absent from showMap is diary-only (matched at import from
+  // diary-search.json, see lib/diary-catalog.ts) — it always has a real
+  // destination now (app/diary-show/[id].tsx), never a dead-end toast.
+  const goToShow = useCallback((show: Show | undefined, showId: string) => {
+    router.push(show ? `/show/${show.slug}` : `/diary-show/${showId}` as any);
+  }, [router]);
 
   // Load lists on mount
   useEffect(() => {
@@ -374,7 +375,7 @@ export default function ListsTab({ userId, showMap, createTrigger }: ListsTabPro
                 <Pressable
                   style={[styles.itemRow, isActive && styles.itemRowDragging]}
                   onLongPress={drag}
-                  onPress={() => show ? router.push(`/show/${show.slug}`) : handleMissingShow()}
+                  onPress={() => goToShow(show, item.show_id)}
                 >
                   {/* Rank number */}
                   <Text style={styles.rankNumber}>{idx + 1}</Text>
@@ -439,7 +440,7 @@ export default function ListsTab({ userId, showMap, createTrigger }: ListsTabPro
             return (
               <Pressable
                 style={styles.itemRow}
-                onPress={() => show ? router.push(`/show/${show.slug}`) : handleMissingShow()}
+                onPress={() => goToShow(show, item.show_id)}
               >
                 {show ? (
                   <Image

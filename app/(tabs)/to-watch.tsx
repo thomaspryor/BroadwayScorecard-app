@@ -27,7 +27,6 @@ import { useShows } from '@/lib/data-context';
 import { getImageUrl } from '@/lib/images';
 import { daysUntilDate, toLocalYMD } from '@/lib/date-utils';
 import { showTitleFallback } from '@/lib/show-format';
-import { useToastSafe } from '@/lib/toast-context';
 import { PosterStatusPill } from '@/components/show-cards/PosterStatusPill';
 import { OutOfMarketChip } from '@/components/show-cards/OutOfMarketChip';
 import { featureFlags } from '@/lib/feature-flags';
@@ -71,15 +70,17 @@ export default function ToWatchScreen() {
   const { reviews, getAllReviews } = useUserReviews(user?.id || null);
   const { watchlist, getWatchlist, addToWatchlist, removeFromWatchlist, updatePlannedDate, loading: watchlistLoading } = useWatchlist(user?.id || null);
   const { shows } = useShows();
-  const { showToast } = useToastSafe();
   // 3-up, width derived from the screen so the row has no stranded right-hand
   // gap (beta feedback 2026-08-03) and the web-worded status chips fit.
   const grid = usePosterGrid(3);
   const gridCardStyle = useMemo(() => ({ width: grid.cardWidth }), [grid.cardWidth]);
 
-  const handleMissingShow = useCallback(() => {
-    showToast("This show isn't in the current catalog yet.", 'info');
-  }, [showToast]);
+  // A show absent from useShows() is diary-only (matched at import from
+  // diary-search.json, see lib/diary-catalog.ts) — it always has a real
+  // destination now (app/diary-show/[id].tsx), never a dead-end toast.
+  const goToShow = useCallback((show: Show | undefined, showId: string) => {
+    router.push(show ? `/show/${show.slug}` : `/diary-show/${showId}` as any);
+  }, [router]);
 
   const [refreshing, setRefreshing] = useState(false);
   const onRefresh = useCallback(async () => {
@@ -256,7 +257,7 @@ export default function ToWatchScreen() {
       <Pressable
         key={item.id}
         style={({ pressed }) => [styles.gridCard, gridCardStyle, pressed && styles.pressed]}
-        onPress={() => show ? router.push(`/show/${show.slug}`) : handleMissingShow()}
+        onPress={() => goToShow(show, item.show_id)}
         onLongPress={() => { setPendingDate(new Date()); setDatePickingShowId(item.show_id); }}
       >
         <View style={styles.upcomingPosterWrap}>
@@ -303,7 +304,7 @@ export default function ToWatchScreen() {
       <View key={item.id} style={[styles.gridCard, gridCardStyle]}>
         <Pressable
           style={({ pressed }) => pressed && styles.pressed}
-          onPress={() => show ? router.push(`/show/${show.slug}`) : handleMissingShow()}
+          onPress={() => goToShow(show, item.show_id)}
           onLongPress={() => showWatchlistActionSheet(item, title)}
         >
           <View>
@@ -341,7 +342,7 @@ export default function ToWatchScreen() {
       <Pressable
         key={item.id}
         style={({ pressed }) => [styles.listRow, pressed && styles.pressed]}
-        onPress={() => show ? router.push(`/show/${show.slug}`) : handleMissingShow()}
+        onPress={() => goToShow(show, item.show_id)}
         onLongPress={() => { setPendingDate(new Date()); setDatePickingShowId(item.show_id); }}
       >
         {posterUrl ? (
@@ -379,7 +380,7 @@ export default function ToWatchScreen() {
       <Pressable
         key={item.id}
         style={({ pressed }) => [styles.listRow, pressed && styles.pressed]}
-        onPress={() => show ? router.push(`/show/${show.slug}`) : handleMissingShow()}
+        onPress={() => goToShow(show, item.show_id)}
         onLongPress={() => showWatchlistActionSheet(item, title)}
       >
         {posterUrl ? (
@@ -571,11 +572,7 @@ export default function ToWatchScreen() {
         actions={menuEntry ? [
           {
             label: 'View show',
-            onPress: () => {
-              const show = showMap[menuEntry.item.show_id];
-              if (show) router.push(`/show/${show.slug}`);
-              else handleMissingShow();
-            },
+            onPress: () => goToShow(showMap[menuEntry.item.show_id], menuEntry.item.show_id),
           },
           {
             label: 'Set reminder date',

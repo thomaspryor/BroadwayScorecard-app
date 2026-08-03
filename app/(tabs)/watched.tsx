@@ -33,7 +33,6 @@ import { useShows } from '@/lib/data-context';
 import { getImageUrl } from '@/lib/images';
 import { toLocalYMD } from '@/lib/date-utils';
 import { showTitleFallback } from '@/lib/show-format';
-import { useToastSafe } from '@/lib/toast-context';
 import { featureFlags } from '@/lib/feature-flags';
 import StarRating from '@/components/user/StarRating';
 import MiniStars from '@/components/user/MiniStars';
@@ -165,11 +164,15 @@ export default function WatchedScreen() {
   const { reviews, getAllReviews, deleteReview, loading: reviewsLoading, error: reviewsError, invalidateCache } = useUserReviews(user?.id || null);
   const { watchlist, getWatchlist, removeFromWatchlist, loading: watchlistLoading } = useWatchlist(user?.id || null);
   const { shows, isLoading: showsLoading } = useShows();
-  const { showToast } = useToastSafe();
 
-  const handleMissingShow = useCallback(() => {
-    showToast("This show isn't in the current catalog yet.", 'info');
-  }, [showToast]);
+  // A show absent from useShows() is either diary-only (matched at import
+  // from diary-search.json, see lib/diary-catalog.ts) or a stale reference —
+  // either way it always has a real destination now (app/diary-show/[id].tsx
+  // renders from the title/venue cache recorded at import time), never a
+  // dead-end toast.
+  const goToShow = useCallback((show: Show | undefined, showId: string) => {
+    router.push(show ? `/show/${show.slug}` : `/diary-show/${showId}` as any);
+  }, [router]);
 
   // Feed segment (Sprint 4) — private photo scrapbook, own sub-toggle.
   const [feedMode, setFeedMode] = useState<FeedMode>('timeline');
@@ -454,7 +457,7 @@ export default function WatchedScreen() {
       >
         <Pressable
           style={({ pressed }) => [styles.card, styles.cardSwipeable, pressed && styles.pressed]}
-          onPress={() => show ? guardedPush(item.id, () => router.push(`/show/${show.slug}`)) : handleMissingShow()}
+          onPress={() => guardedPush(item.id, () => goToShow(show, item.show_id))}
           onLongPress={() => handleDeleteDiaryItem(item)}
         >
           {posterUrl ? (
@@ -506,7 +509,7 @@ export default function WatchedScreen() {
       <Pressable
         key={item.id}
         style={({ pressed }) => [styles.gridCardFixed, gridCardStyle, pressed && styles.pressed]}
-        onPress={() => show ? router.push(`/show/${show.slug}`) : handleMissingShow()}
+        onPress={() => goToShow(show, item.show_id)}
         onLongPress={() => { haptics.action(); setGridMenu({ kind: 'review', review: item }); }}
         accessibilityHint="Long press for more actions"
         accessibilityActions={[{ name: 'delete', label: 'Delete rating' }]}
@@ -559,7 +562,7 @@ export default function WatchedScreen() {
       <Pressable
         key={entry.id}
         style={({ pressed }) => [styles.card, pressed && styles.pressed]}
-        onPress={() => show ? router.push(`/show/${show.slug}`) : handleMissingShow()}
+        onPress={() => goToShow(show, entry.show_id)}
         onLongPress={() => handleRemoveUpcoming(entry)}
         accessibilityHint="Long press to remove from watchlist"
         accessibilityActions={[{ name: 'delete', label: 'Remove from watchlist' }]}
@@ -664,7 +667,7 @@ export default function WatchedScreen() {
                   <Pressable
                     key={entry.id}
                     style={({ pressed }) => [styles.gridCardFixed, gridCardStyle, pressed && styles.pressed]}
-                    onPress={() => show ? router.push(`/show/${show.slug}`) : handleMissingShow()}
+                    onPress={() => goToShow(show, entry.show_id)}
                     onLongPress={() => { haptics.action(); setGridMenu({ kind: 'upcoming', entry }); }}
                     accessibilityHint="Long press for more actions"
                     accessibilityActions={[{ name: 'delete', label: 'Remove from watchlist' }]}
@@ -929,7 +932,6 @@ export default function WatchedScreen() {
               month={item.month}
               reviewsByDate={calendarReviewsByDate}
               showMap={showMap}
-              onMissingShow={handleMissingShow}
             />
           )}
           windowSize={5}
@@ -973,7 +975,7 @@ export default function WatchedScreen() {
             const { review } = gridMenu;
             const show = showMap[review.show_id];
             return [
-              { label: 'View show', onPress: () => (show ? router.push(`/show/${show.slug}`) : handleMissingShow()) },
+              { label: 'View show', onPress: () => goToShow(show, review.show_id) },
               {
                 label: 'Edit rating',
                 onPress: () => router.push({
@@ -995,12 +997,12 @@ export default function WatchedScreen() {
                   params: { showId: entry.show_id, showTitle: show?.title || '', suggestedDate: entry.planned_date || '' },
                 }),
               },
-              { label: 'View show', onPress: () => (show ? router.push(`/show/${show.slug}`) : handleMissingShow()) },
+              { label: 'View show', onPress: () => goToShow(show, entry.show_id) },
               { label: 'Didn’t see it — remove', destructive: true, onPress: () => handleRemoveUpcoming(entry, 'Didn’t see it') },
             ];
           }
           return [
-            { label: 'View show', onPress: () => (show ? router.push(`/show/${show.slug}`) : handleMissingShow()) },
+            { label: 'View show', onPress: () => goToShow(show, entry.show_id) },
             { label: 'Remove from Watchlist', destructive: true, onPress: () => handleRemoveUpcoming(entry) },
           ];
         })()}
