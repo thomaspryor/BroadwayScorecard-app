@@ -42,8 +42,9 @@
  * then compiles to an empty string, the Supabase client is never constructed,
  * and the update installs an app that launches fine and cannot sign in. The
  * publish itself succeeds and the CI job goes green, so nothing catches it
- * except the owner. assertUpdateCanCarryCredentials() below blocks that before
- * publishing, and verifyPublishedCredentials() rolls back if it happens anyway.
+ * except the owner. auditUpdateCredentials() below blocks that before
+ * publishing; the check on parseLoadedVars() after publishing rolls the update
+ * back if it somehow happens anyway.
  */
 
 const { execFileSync } = require('child_process');
