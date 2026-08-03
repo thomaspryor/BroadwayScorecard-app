@@ -14,12 +14,24 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
+import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 
 const require = createRequire(import.meta.url);
-// Scratch dirs go under the repo, not os.tmpdir(): sandboxed runners deny
-// mkdtemp in /var/folders and the test would error rather than assert.
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+
+// os.tmpdir() first. Sandboxed runners (Codex read-only, some CI images) deny
+// mkdtemp under /var/folders, where the test would ERROR instead of asserting
+// — so fall back into the repo. The fallback is never the default: an
+// untracked file at the repo root changes the Expo native fingerprint, which
+// turns the next free OTA into a $1.85 build. Always removed in a finally.
+function scratchDir() {
+  try {
+    return fs.mkdtempSync(path.join(os.tmpdir(), 'ship-scan-'));
+  } catch {
+    return fs.mkdtempSync(path.join(REPO_ROOT, '.ship-scan-'));
+  }
+}
 const {
   parseEnvList,
   parseDotenv,
@@ -197,7 +209,7 @@ test('bracket and destructured reads are reported as defects, not required', () 
   // member expression. The other two spellings read an object that does not
   // exist on device — they are undefined however EAS is configured, so
   // requiring the variable would hide the real bug.
-  const dir = fs.mkdtempSync(path.join(REPO_ROOT, '.ship-scan-'));
+  const dir = scratchDir();
   fs.mkdirSync(path.join(dir, 'lib'));
   fs.writeFileSync(
     path.join(dir, 'lib', 'a.ts'),
@@ -217,7 +229,7 @@ test('bracket and destructured reads are reported as defects, not required', () 
 test('an unsupported read mentioned in a COMMENT does not block shipping', () => {
   // The throw halts every OTA until source is edited, so prose describing the
   // rule — including this codebase's own docblocks — must not trip it.
-  const dir = fs.mkdtempSync(path.join(REPO_ROOT, '.ship-scan-'));
+  const dir = scratchDir();
   fs.mkdirSync(path.join(dir, 'lib'));
   fs.writeFileSync(
     path.join(dir, 'lib', 'b.ts'),

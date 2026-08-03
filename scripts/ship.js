@@ -63,6 +63,10 @@ const NATIVE_PATHS = [
   /^plugins\//,
   /^patches\//,
   /^assets\/(icon|splash|adaptive)/i,
+  // Not obvious and it cost a build to learn: .gitignore decides which files
+  // Expo hashes, so editing it moves the fingerprint and forces a $1.85 build
+  // out of what looks like a cosmetic change (2026-08-03).
+  /^\.gitignore$/,
 ];
 
 // Directories whose JavaScript is what an OTA update actually replaces. Any

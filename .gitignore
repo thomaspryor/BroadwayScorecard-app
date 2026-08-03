@@ -54,6 +54,3 @@ app-example
 
 # also match a bare node_modules symlink (worktrees symlink it; "node_modules/" alone misses symlinks)
 node_modules
-
-# Scratch dirs from scripts/ship-credentials.test.mjs (removed on success)
-.ship-scan-*
