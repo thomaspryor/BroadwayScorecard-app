@@ -60,6 +60,20 @@ export default function ShowDetailScreen() {
   const [showAllCast, setShowAllCast] = useState(false);
   const [socialPulse, setSocialPulse] = useState<SocialPulsePayload | null>(null);
   const shareCardRef = useRef<ShareCardHandle>(null);
+  // Capture rig: EXPO_PUBLIC_AUTOSCROLL=1 slowly pages the screen so design
+  // captures can be taken with simctl alone (no UI-driver needed). Dev only.
+  const captureScrollRef = useRef<ScrollView>(null);
+  useEffect(() => {
+    if (process.env.EXPO_PUBLIC_AUTOSCROLL !== '1') return;
+    let y = 0;
+    const id = setInterval(() => {
+      y += 600;
+      // animated:false — discrete jumps so every captured frame is at rest
+      captureScrollRef.current?.scrollTo({ y, animated: false });
+      if (y > 40000) clearInterval(id);
+    }, 1400);
+    return () => clearInterval(id);
+  }, [detail]);
 
   const show = useMemo(() => shows.find(s => s.slug === slug), [shows, slug]);
   const { user, isAuthenticated, showSignIn } = useAuth();
@@ -282,7 +296,7 @@ export default function ShowDetailScreen() {
         }}
       />
       <View style={styles.container}>
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
+      <ScrollView ref={captureScrollRef} style={styles.scrollView} contentContainerStyle={styles.content}>
         {/* Header card — matches website: poster + info, score below */}
         <View style={styles.headerCard}>
           {/* Top row: Poster + Title/Meta */}
@@ -1372,7 +1386,9 @@ function AwardsScorecardSection({ awards, awardScore }: {
   awards: ShowDetail['tonyAwards'];
   awardScore: ShowDetail['awards'];
 }) {
-  const [expanded, setExpanded] = useState(false);
+  // Capture rig: default the category list open so the expanded state can be
+  // screenshotted without a tap driver. Collapsed remains the shipped default.
+  const [expanded, setExpanded] = useState(process.env.EXPO_PUBLIC_AUTOSCROLL === '1');
   // Dedupe: the feed can repeat a category (e.g. Hamilton's Best Original
   // Score appears twice, once with and once without a nominee name).
   const seen = new Set<string>();
