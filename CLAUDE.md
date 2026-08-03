@@ -5,11 +5,17 @@
 ### 1. NEVER Ask User to Run Local Commands
 User is **non-technical, often on phone**. Automate everything. Push to Git, use EAS Build / GitHub Actions.
 
-### 1b. TestFlight Ships Without Pre-Review (owner decision 2026-07-27)
-TestFlight builds auto-submit on merge — the owner LIKES this: the TestFlight
-push notification is their signal to go review the live build. Never block a
-TestFlight submit on owner approval or screenshot sign-off; design-review
+### 1b. Ships Without Pre-Review; OTA by default (owner decisions 2026-07-27, 2026-08-03)
+Never block a ship on owner approval or screenshot sign-off — design-review
 gates apply to feature direction and App Store releases, not beta builds.
+**JS-only changes ship over the air and produce NO TestFlight notification**
+(owner chose this 2026-08-03 over ~$1.85/change); the app applies them on the
+second launch. The push notification is still the owner's cue to go look, so
+it is now YOUR call when to buy one: dispatch with `-f force_build=true` for
+anything you actually want them to review — a visible redesign, a batch of
+beta-feedback fixes, anything you'd otherwise ask "can you check this?" about.
+Silent OTA is right for bug fixes, copy, and follow-ups to something they have
+already seen. See the Deployment section.
 
 ### 2. Git Workflow
 - **Main branch only** — no PRs, no feature branches (matches web project).
@@ -83,12 +89,8 @@ The source web project lives at: `~/Broadwayscore/` (repo: `thomaspryor/Broadway
   dependency added/removed/upgraded, `app.json`/`app.config.*` native config, an
   SDK bump, a config plugin, app icon/splash. Everything in `app/`,
   `components/`, `lib/`, `hooks/` is JavaScript and goes OTA.
-- **`--force-build` when the owner must be pinged.** An OTA update produces no
-  TestFlight push notification (the app picks it up on next launch), and that
-  notification is the owner's review signal (rule 1b). Dispatch with
-  `-f force_build=true` when you want them to go look.
-- **Still never end "merged + pushed"** without shipping — a session that did
-  left the owner on a stale build (2026-07-24, build 54).
+- **Never end "merged + pushed"** without shipping — a session that did left the
+  owner on a stale build (2026-07-24, build 54). See rule 1b for build-vs-OTA.
 - **App Store:** EAS Submit (future)
 
 ## File Hygiene
