@@ -15,14 +15,14 @@ import { useShows } from '@/lib/data-context';
 import { fetchShowDetail, fetchSocialPulse } from '@/lib/api';
 import { getImageUrl } from '@/lib/images';
 import { nowMs } from '@/lib/date-utils';
-import { getScoreColor, getScoreTier, getContrastTextColor, getMarketMinReviews, getQualifiedScore } from '@/lib/score-utils';
+import { getScoreColor, getContrastTextColor, getMarketMinReviews, getQualifiedScore } from '@/lib/score-utils';
 import { Show, ShowDetail, MobileShowDetail, mapShowDetail } from '@/lib/types';
 import { ScoreBadge, StatusBadge, FormatPill, ProductionPill, CategoryBadge } from '@/components/show-cards';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
 import { trackTicketTap, trackTicketLinksVisible, trackTicketBrowserOpened, trackTicketBrowserDismissed, trackShowDetailViewed, trackShowShared, trackFullReviewTapped } from '@/lib/analytics';
 import { buildTicketUrl, buildTicketEventProps, isAffiliatePlatform, chooseTicketOpenStrategy, type TicketSource } from '@/lib/ticket-utils';
 import { addSentryBreadcrumb, captureException } from '@/lib/sentry';
-import Svg, { Path } from 'react-native-svg';
+import Svg, { Path, Rect, Circle, Line, Defs, LinearGradient as SvgLinearGradient, Stop } from 'react-native-svg';
 import ShowPageRating from '@/components/user/ShowPageRating';
 import { BookmarkOverlay } from '@/components/BookmarkOverlay';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -727,7 +727,7 @@ export default function ShowDetailScreen() {
 
         {/* Video Reviews */}
         {detail?.videoReviews && detail.videoReviews.length > 0 && (
-          <VideoReviewsSection reviews={detail.videoReviews} />
+          <VideoReviewsSection reviews={detail.videoReviews} category={show.category} />
         )}
 
         {/* Other Productions of the same show */}
@@ -932,9 +932,6 @@ function BreakdownBar({ reviews }: { reviews: ShowDetail['reviews'] }) {
 }
 
 function ReviewRow({ review, showId, category }: { review: ShowDetail['reviews'][0]; showId: string; category?: string }) {
-  const scoreColor = getScoreColor(review.score, category);
-  const scoreTextColor = getScoreTier(review.score, category)?.textColor ?? '#ffffff';
-
   const formattedDate = review.publishDate ? (() => {
     try {
       return new Date(review.publishDate + 'T12:00:00').toLocaleDateString('en-US', {
@@ -964,9 +961,7 @@ function ReviewRow({ review, showId, category }: { review: ShowDetail['reviews']
       accessibilityRole={openFullReview ? 'link' : undefined}
       accessibilityLabel={`${review.score} from ${review.outlet}${review.criticName ? ` by ${review.criticName}` : ''}${openFullReview ? '. Opens full review' : ''}`}
     >
-      <View style={[styles.reviewScore, { backgroundColor: scoreColor }]}>
-        <Text style={[styles.reviewScoreText, { color: scoreTextColor }]}>{review.score}</Text>
-      </View>
+      <ScoreBadge score={review.score} category={category} size="small" />
       <View style={styles.reviewBody}>
         <View style={styles.reviewTopRow}>
           {logoUrl && (
@@ -1582,24 +1577,112 @@ function AwardsScorecardSection({ awards, awardScore }: {
 
 // ---------- Social Scorecard ----------
 
+// Brand-colored platform icons — ports of the web's SocialPulseCard.tsx icon
+// set (same paths/colors), sized down for the mobile chip row.
+function XIcon() {
+  return (
+    <Svg width={16} height={16} viewBox="0 0 24 24">
+      <Rect width={24} height={24} rx={4} fill="#000000" />
+      <Path
+        fill="#ffffff"
+        d="M17.95 5.5h2.213l-4.835 5.527 5.687 7.516h-4.453l-3.488-4.561-3.992 4.561H6.864l5.171-5.913L6.55 5.5h4.567l3.154 4.17zm-.776 11.731h1.226L9.875 6.708H8.559z"
+      />
+    </Svg>
+  );
+}
+
+function TikTokIcon() {
+  return (
+    <Svg width={16} height={16} viewBox="0 0 24 24">
+      <Rect width={24} height={24} rx={4} fill="#000000" />
+      <Path fill="#ff0050" d="M17.5 8.4c-1.13 0-2.13-.6-2.7-1.5v6.7c0 2.65-2.15 4.8-4.8 4.8a4.8 4.8 0 1 1 0-9.6c.18 0 .35.02.5.04v2.4a2.4 2.4 0 1 0 1.9 2.36V4h2.4a3.6 3.6 0 0 0 2.7 3.5z" />
+      <Path fill="#00f2ea" d="M18.1 7.8c-1.13 0-2.13-.6-2.7-1.5V13c0 2.65-2.15 4.8-4.8 4.8a4.8 4.8 0 1 1 0-9.6c.18 0 .35.02.5.04v2.4a2.4 2.4 0 1 0 1.9 2.36V3.4h2.4a3.6 3.6 0 0 0 2.7 3.5z" />
+      <Path fill="#ffffff" d="M17.8 8.1c-1.13 0-2.13-.6-2.7-1.5v6.7c0 2.65-2.15 4.8-4.8 4.8a4.8 4.8 0 1 1 0-9.6c.18 0 .35.02.5.04v2.4a2.4 2.4 0 1 0 1.9 2.36V3.7h2.4a3.6 3.6 0 0 0 2.7 3.5z" />
+    </Svg>
+  );
+}
+
+function InstagramIcon() {
+  return (
+    <Svg width={16} height={16} viewBox="0 0 24 24">
+      <Defs>
+        <SvgLinearGradient id="ig-grad-mobile" x1="0%" y1="100%" x2="100%" y2="0%">
+          <Stop offset="0%" stopColor="#feda75" />
+          <Stop offset="25%" stopColor="#fa7e1e" />
+          <Stop offset="50%" stopColor="#d62976" />
+          <Stop offset="75%" stopColor="#962fbf" />
+          <Stop offset="100%" stopColor="#4f5bd5" />
+        </SvgLinearGradient>
+      </Defs>
+      <Rect width={24} height={24} rx={6} fill="url(#ig-grad-mobile)" />
+      <Rect x={5} y={5} width={14} height={14} rx={4} fill="none" stroke="#ffffff" strokeWidth={1.6} />
+      <Circle cx={12} cy={12} r={3.4} fill="none" stroke="#ffffff" strokeWidth={1.6} />
+      <Circle cx={16.4} cy={7.6} r={0.9} fill="#ffffff" />
+    </Svg>
+  );
+}
+
+function RedditIcon() {
+  return (
+    <Svg width={16} height={16} viewBox="0 0 24 24">
+      <Rect width={24} height={24} rx={4} fill="#ff4500" />
+      <Circle cx={12} cy={13} r={6} fill="#ffffff" />
+      <Circle cx={16.2} cy={5.6} r={1.3} fill="#ffffff" />
+      <Line x1={12} y1={7} x2={15.3} y2={6.5} stroke="#ffffff" strokeWidth={1.2} strokeLinecap="round" />
+      <Circle cx={9.5} cy={12.2} r={1.1} fill="#ff4500" />
+      <Circle cx={14.5} cy={12.2} r={1.1} fill="#ff4500" />
+      <Path d="M9 15 Q12 17 15 15" stroke="#ff4500" strokeWidth={1.2} strokeLinecap="round" fill="none" />
+    </Svg>
+  );
+}
+
+// Colors + labels match the web's TIER_DISPLAY (SocialPulseCard.tsx) exactly.
 const SOCIAL_TIER_CONFIG = {
-  Buzzing: { label: 'BUZZING', color: '#f97316', subtitle: 'Trending hot right now' },
-  Rising: { label: 'RISING', color: '#10b981', subtitle: 'Picking up momentum' },
-  Steady: { label: 'STEADY', color: '#3b82f6', subtitle: 'Consistent buzz' },
-  Troubled: { label: 'TROUBLED', color: '#ef4444', subtitle: 'Negative chatter outweighs positive' },
-  BuildingBaseline: { label: 'BUILDING', color: '#8b5cf6', subtitle: 'Gathering early buzz' },
+  Buzzing: { label: 'BUZZING', emoji: '🔥', color: '#f97316', subtitle: 'Trending hot right now' },
+  Rising: { label: 'RISING', emoji: '📈', color: '#10b981', subtitle: 'Picking up momentum' },
+  Steady: { label: 'STEADY', emoji: '⚪', color: '#3b82f6', subtitle: 'Consistent buzz' },
+  Troubled: { label: 'TROUBLED', emoji: '💔', color: '#ef4444', subtitle: 'Negative chatter outweighs positive' },
+  // Legacy state — old data files may still tag a show BuildingBaseline. The
+  // web now treats it as an alias for Steady rather than a distinct tier
+  // (SocialPulseCard.tsx TIER_DISPLAY comment) — match that here instead of
+  // showing app-only purple "BUILDING" branding the web doesn't have.
+  BuildingBaseline: { label: 'STEADY', emoji: '⚪', color: '#3b82f6', subtitle: 'Consistent buzz' },
   Hidden: null,
 } as const;
+
+const PLATFORM_ICONS: Record<string, () => React.ReactElement> = {
+  x: XIcon,
+  tiktok: TikTokIcon,
+  instagram: InstagramIcon,
+  reddit: RedditIcon,
+};
+
+/** Splits a rank string like "3/42 Broadway" into its parts — port of the
+ * web's parseRank (SocialPulseCard.tsx). */
+function parseSocialRank(r: string | undefined): { position: string; total: string; market: string } | null {
+  if (!r) return null;
+  const m = /^(\d+)\/(\d+)\s+(.+)$/.exec(r);
+  if (!m) return null;
+  return { position: m[1], total: m[2], market: m[3] };
+}
+
+function formatSocialUpdatedDate(iso: string): string {
+  try {
+    return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  } catch {
+    return iso;
+  }
+}
 
 function SocialScorecardSection({ sp }: { sp: SocialPulsePayload }) {
   const config = SOCIAL_TIER_CONFIG[sp.t];
   if (!config) return null;
   const totalMentions = sp.v;
   const platforms = [
-    { label: 'X / Twitter', count: sp.xv ?? sp.pl.x },
-    { label: 'TikTok', count: sp.pl.tt },
-    { label: 'Instagram', count: sp.pl.ig },
-    ...(sp.pl.r != null ? [{ label: 'Reddit', count: sp.pl.r }] : []),
+    { key: 'x', label: 'X / Twitter', count: sp.xv ?? sp.pl.x },
+    { key: 'tiktok', label: 'TikTok', count: sp.pl.tt },
+    { key: 'instagram', label: 'Instagram', count: sp.pl.ig },
+    ...(sp.pl.r != null ? [{ key: 'reddit', label: 'Reddit', count: sp.pl.r }] : []),
   ].filter(p => p.count > 0);
   const quotes = (sp.q ?? [])
     .filter(q => {
@@ -1611,38 +1694,59 @@ function SocialScorecardSection({ sp }: { sp: SocialPulsePayload }) {
       return true;
     })
     .slice(0, 2);
+  const rank = parseSocialRank(sp.r);
 
   return (
     <SectionCard title="Socials Scorecard" meta={`${totalMentions.toLocaleString()} mentions`}>
       {/* Tier badge row */}
       <View style={[styles.socialTierRow, { borderColor: config.color + '40', backgroundColor: config.color + '14' }]}>
         <View style={[styles.socialTierBadge, { backgroundColor: config.color }]}>
-          <Text style={styles.socialTierLabel}>{config.label}</Text>
+          <Text style={styles.socialTierLabel}>{config.label} {config.emoji}</Text>
         </View>
         <View style={styles.socialTierInfo}>
           <Text style={[styles.socialTierSubtitle, { color: config.color }]}>{config.subtitle}</Text>
           <Text style={styles.socialMentions}>{totalMentions.toLocaleString()} mentions · {sp.p}% positive</Text>
-          {sp.r && <Text style={styles.socialRank}>{sp.r}</Text>}
+          {rank ? (
+            <Text style={styles.socialRank}>Ranked #{rank.position} of {rank.total} in {rank.market} social buzz</Text>
+          ) : sp.r ? (
+            <Text style={styles.socialRank}>{sp.r}</Text>
+          ) : null}
         </View>
       </View>
-      {/* Platform breakdown */}
+      {/* Platform breakdown — brand icon + count, matches the web's icon row
+         (no text label chip on web; SocialPulseCard.tsx). */}
       {platforms.length > 0 && (
         <View style={styles.socialPlatforms}>
-          {platforms.map((p, i) => (
-            <View key={i} style={styles.socialPlatformChip}>
-              <Text style={styles.socialPlatformLabel}>{p.label}</Text>
-              <Text style={styles.socialPlatformCount}>{p.count.toLocaleString()}</Text>
-            </View>
-          ))}
+          {platforms.map((p) => {
+            const Icon = PLATFORM_ICONS[p.key];
+            return (
+              <View
+                key={p.key}
+                style={styles.socialPlatformChip}
+                accessible
+                accessibilityLabel={`${p.label}: ${p.count.toLocaleString()}`}
+              >
+                {Icon && <Icon />}
+                <Text style={styles.socialPlatformCount}>{p.count.toLocaleString()}</Text>
+              </View>
+            );
+          })}
         </View>
       )}
-      {/* Sample quotes */}
+      {/* Sample quotes — plain text, no card-in-card box (matches the web's
+         quote treatment and the app's own ReviewRow quote style). */}
       {quotes.length > 0 && quotes.map((q, i) => (
         <View key={i} style={styles.socialQuote}>
           <Text style={styles.socialQuoteText} numberOfLines={2}>{'\u201C'}{q.t.trim()}{'\u201D'}</Text>
           {q.a && <Text style={styles.socialQuoteAuthor}>— {q.a} on {q.p}</Text>}
         </View>
       ))}
+      {/* Footer — refresh metadata (matches the web's footer meta line; the
+         web also links to a full /trending leaderboard, which the app has
+         no screen for yet, so that half of the footer is omitted). */}
+      {sp.u && (
+        <Text style={styles.socialFooter}>updated {formatSocialUpdatedDate(sp.u)} · refreshed weekly</Text>
+      )}
     </SectionCard>
   );
 }
@@ -1802,7 +1906,7 @@ function TheaterScorecardSection({ scores, venueName, accessibility, links }: {
 
 // ---------- Video Reviews ----------
 
-function VideoReviewsSection({ reviews }: { reviews: ShowDetail['videoReviews'] }) {
+function VideoReviewsSection({ reviews, category }: { reviews: ShowDetail['videoReviews']; category?: string }) {
   return (
     <SectionCard title="Video Reviews" meta={`${reviews.length} creators`}>
       {reviews.map((v, i) => {
@@ -1832,11 +1936,7 @@ function VideoReviewsSection({ reviews }: { reviews: ShowDetail['videoReviews'] 
             </View>
             {/* Same score chip as the written Critic Reviews rows — no
                sentiment pill (owner decision 2026-08-03). */}
-            {score != null && (
-              <View style={[styles.reviewScore, { backgroundColor: getScoreColor(score) }]}>
-                <Text style={[styles.reviewScoreText, { color: getContrastTextColor(getScoreColor(score)) }]}>{score}</Text>
-              </View>
-            )}
+            {score != null && <ScoreBadge score={score} category={category} size="small" />}
           </Pressable>
         );
       })}
@@ -2019,17 +2119,6 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border.subtle,
-  },
-  reviewScore: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  reviewScoreText: {
-    fontSize: FontSize.md,
-    fontWeight: '800',
   },
   reviewBody: {
     flex: 1,
@@ -2740,43 +2829,37 @@ const styles = StyleSheet.create({
   socialPlatforms: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: Spacing.sm,
+    alignItems: 'center',
+    gap: Spacing.lg,
     marginBottom: Spacing.sm,
   },
   socialPlatformChip: {
-    backgroundColor: Colors.surface.overlay,
-    borderRadius: 6,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 4,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-  },
-  socialPlatformLabel: {
-    color: Colors.text.secondary,
-    fontSize: FontSize.xs,
+    gap: 6,
   },
   socialPlatformCount: {
     color: Colors.text.primary,
-    fontSize: FontSize.xs,
+    fontSize: FontSize.sm,
     fontWeight: '600',
   },
   socialQuote: {
-    backgroundColor: Colors.surface.overlay,
-    borderRadius: BorderRadius.sm,
-    padding: Spacing.md,
     marginBottom: Spacing.sm,
   },
   socialQuoteText: {
     color: Colors.text.secondary,
     fontSize: FontSize.sm,
-    fontStyle: 'italic',
-    lineHeight: 18,
+    lineHeight: 19,
   },
   socialQuoteAuthor: {
     color: Colors.text.muted,
     fontSize: FontSize.xs,
     marginTop: 4,
+  },
+  socialFooter: {
+    color: Colors.text.muted,
+    fontSize: FontSize.xs,
+    marginTop: Spacing.xs,
   },
 
   // Seating Guidance
