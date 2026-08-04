@@ -654,7 +654,10 @@ export default function WatchedScreen() {
               {upcomingReviews.map(renderDiaryGridCard)}
             </View>
           ) : (
-            <View style={{ gap: Spacing.sm, paddingHorizontal: 0 }}>
+            // No gap here: both row kinds carry their own marginBottom (the
+            // ledger rows on the swipeable wrapper, the upcoming rows on the
+            // card) — a parent gap would double the spacing between them.
+            <View>
               {upcomingWatchlistEntries.map(renderUpcomingRow)}
               {upcomingReviews.map(renderDiaryLedgerRow)}
             </View>

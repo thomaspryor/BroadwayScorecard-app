@@ -18,25 +18,42 @@ import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
 import type { Show } from '@/lib/types';
 import type { UserReview } from '@/lib/user-types';
 
-/** Consecutive-month groups, preserving the caller's sort order. */
+/**
+ * Month groups for the list layout, preserving the caller's sort order
+ * within each partition.
+ *
+ * Undated reviews are partitioned OUT before grouping and appended as one
+ * trailing NO DATE group: the caller's sort falls back to created_at, so an
+ * undated import can sit between two same-month dated rows — consecutive
+ * grouping alone would then emit the same month band twice with duplicate
+ * React keys (second-opinion blocker, 2026-08-03). The dated subsequence of
+ * a date-sorted list is strictly ordered, so its months can't split.
+ */
 export function groupReviewsByMonth(reviews: UserReview[]): { key: string; label: string; items: UserReview[] }[] {
-  const groups: { key: string; label: string; items: UserReview[] }[] = [];
+  const dated: { review: UserReview; d: Date }[] = [];
+  const undated: UserReview[] = [];
   for (const review of reviews) {
     const d = review.date_seen ? new Date(review.date_seen + 'T00:00:00') : null;
-    const valid = d && !Number.isNaN(d.getTime());
-    const key = valid ? `${d!.getFullYear()}-${d!.getMonth()}` : 'none';
+    if (d && !Number.isNaN(d.getTime())) dated.push({ review, d });
+    else undated.push(review);
+  }
+
+  const groups: { key: string; label: string; items: UserReview[] }[] = [];
+  for (const { review, d } of dated) {
+    const key = `${d.getFullYear()}-${d.getMonth()}`;
     const last = groups[groups.length - 1];
     if (last && last.key === key) {
       last.items.push(review);
     } else {
       groups.push({
         key,
-        label: valid
-          ? d!.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }).toUpperCase()
-          : 'NO DATE',
+        label: d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }).toUpperCase(),
         items: [review],
       });
     }
+  }
+  if (undated.length > 0) {
+    groups.push({ key: 'none', label: 'NO DATE', items: undated });
   }
   return groups;
 }
@@ -156,7 +173,9 @@ export function UpcomingLedgerRow({ plannedDate, show, fallbackTitle, posterUrl,
 
   return (
     <Pressable
-      style={({ pressed }) => [styles.card, pressed && styles.pressed]}
+      // cardSpacing here, on the wrapper for swipeable rated rows: both row
+      // kinds carry their own bottom margin so mixed sections space evenly.
+      style={({ pressed }) => [styles.card, styles.cardSpacing, pressed && styles.pressed]}
       onPress={onPress}
       onLongPress={onLongPress}
       accessibilityRole="button"
@@ -197,6 +216,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface.raised, borderRadius: BorderRadius.md,
     padding: Spacing.md,
   },
+  cardSpacing: { marginBottom: Spacing.sm },
   pressed: { opacity: 0.7 },
   row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
   dateCol: { width: 30, alignItems: 'center' },
