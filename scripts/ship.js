@@ -91,6 +91,14 @@ const OPTIONAL_PUBLIC_VARS = new Set([
   'EXPO_PUBLIC_STATS_LAYOUT',    // layout experiment flag
   'EXPO_PUBLIC_SENTRY_DSN',      // crash reporting; app runs without it
   'EXPO_PUBLIC_POSTHOG_API_KEY', // analytics; app runs without it
+  // Capture-rig / dev-only toggles (2026-08-04): each has an explicit `!== '1'`
+  // / `=== '1'` guard or a hardcoded fallback, so an unset value is the correct
+  // production behavior, not a degraded one. Discovered blocking a real ship —
+  // the source reads predate this allowlist entry.
+  'EXPO_PUBLIC_AUTOSCROLL',      // show/[slug].tsx, Onboarding.tsx — auto-paging for simctl captures
+  'EXPO_PUBLIC_DATA_BASE',       // lib/api.ts — falls back to the real production CDN URL when unset
+  'EXPO_PUBLIC_EXPAND_AWARDS',   // show/[slug].tsx — initial expand state for the awards card, defaults collapsed
+  'EXPO_PUBLIC_GRID_COLS',       // hooks/usePosterGrid.ts — column-count override, falls back to the caller's default
 ]);
 
 const args = process.argv.slice(2);
