@@ -13,13 +13,17 @@ import {
 
 export function usePosterGrid(columns: number): PosterGrid {
   const { width } = useWindowDimensions();
+  // Capture rig: EXPO_PUBLIC_GRID_COLS overrides every poster grid's column
+  // count so density variants can be screenshotted. Dev only; unset in prod.
+  const envCols = Number(process.env.EXPO_PUBLIC_GRID_COLS);
+  const cols = Number.isInteger(envCols) && envCols > 0 ? envCols : columns;
   return useMemo(
     () => ({
-      cardWidth: posterCardWidth(width, columns),
+      cardWidth: posterCardWidth(width, cols),
       gap: POSTER_GRID_GAP,
       horizontalPadding: POSTER_GRID_PADDING,
-      columns,
+      columns: cols,
     }),
-    [width, columns],
+    [width, cols],
   );
 }

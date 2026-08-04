@@ -30,6 +30,7 @@ import { ceremonyToYear } from '@/lib/tony-utils';
 import { recordShowView } from '@/lib/store-review';
 import { ShareCardWithRef, ShareCardHandle } from '@/components/ShareCard';
 import { SectionCard } from '@/components/show-page/SectionCard';
+import { LinearGradient } from 'expo-linear-gradient';
 import { ShowDetailSkeleton } from '@/components/Skeleton';
 import { useAuth } from '@/lib/auth-context';
 import { useWatchlist } from '@/hooks/useWatchlist';
@@ -467,13 +468,10 @@ export default function ShowDetailScreen() {
                 </Text>
               </View>
             </View>
-            {/* Horizontal source cards with logos (matching website) */}
+            {/* Source tile grid — wraps like the web's grid-cols-3; every
+               source visible, no horizontal scroll (owner 2026-08-03) */}
             {detail.audience.sources && (
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.audienceSourceCards}
-              >
+              <View style={styles.audienceSourceCards}>
                 {detail.audience.sources.showScore && (
                   <Pressable
                     style={styles.audienceSourceCard}
@@ -600,7 +598,7 @@ export default function ShowDetailScreen() {
                     </Text>
                   </View>
                 )}
-              </ScrollView>
+              </View>
             )}
           </SectionCard>
         )}
@@ -1363,13 +1361,48 @@ function seasonLabel(ceremonyYear: number): string {
   return `${ceremonyYear - 1}-${String(ceremonyYear).slice(-2)}`;
 }
 
-// Tier styling for the award-score badge, mirroring the site's AwardScoreBadge.
-const AWARD_BADGE_CONFIG: Record<string, { label: string; color: string }> = {
-  sweeper: { label: 'SWEEPER', color: '#FFD700' },
-  decorated: { label: 'DECORATED', color: '#f59e0b' },
-  honored: { label: 'HONORED', color: '#34d399' },
-  nominated: { label: 'NOMINATED', color: '#60a5fa' },
-  eligible: { label: 'ELIGIBLE', color: Colors.text.muted },
+// Tier styling for the award-score badge — same medal treatment as the
+// site's AwardScoreBadge (metallic gradient fill, rim, glow, dark digit).
+const AWARD_BADGE_CONFIG: Record<string, {
+  label: string;
+  gradient: [string, string, string, string, string] | null;
+  fill: string;          // used when gradient is null
+  rim: string;
+  digit: string;
+  labelColor: string;
+  glow: string | null;
+  dashed?: boolean;
+}> = {
+  sweeper: {
+    label: 'SWEEPER',
+    gradient: ['#C9A227', '#F7D560', '#FFF1B5', '#F7D560', '#C9A227'],
+    fill: '#F7D560', rim: 'rgba(255,232,117,0.85)', digit: '#451a03',
+    labelColor: '#fbbf24', glow: 'rgba(247,213,96,0.6)',
+  },
+  decorated: {
+    label: 'DECORATED',
+    gradient: ['#9a9a9a', '#D0D0D0', '#F0F0F0', '#D0D0D0', '#9a9a9a'],
+    fill: '#D0D0D0', rim: 'rgba(240,240,240,0.7)', digit: '#111827',
+    labelColor: '#d1d5db', glow: 'rgba(200,200,200,0.5)',
+  },
+  honored: {
+    label: 'HONORED',
+    gradient: ['#8a4a23', '#C2773A', '#D89668', '#C2773A', '#8a4a23'],
+    fill: '#C2773A', rim: 'rgba(216,150,104,0.75)', digit: '#451a03',
+    labelColor: '#fb923c', glow: 'rgba(194,119,58,0.55)',
+  },
+  nominated: {
+    label: 'NOMINATED',
+    gradient: null,
+    fill: 'rgba(255,255,255,0.03)', rim: 'rgba(255,255,255,0.22)', digit: 'rgba(255,255,255,0.55)',
+    labelColor: '#9ca3af', glow: null,
+  },
+  eligible: {
+    label: 'ELIGIBLE',
+    gradient: null,
+    fill: 'transparent', rim: 'rgba(255,255,255,0.18)', digit: 'rgba(255,255,255,0.4)',
+    labelColor: '#6b7280', glow: null, dashed: true,
+  },
 };
 
 // Per-ceremony chip tints, mirroring the site's OTHER_CEREMONY_CONFIGS.
@@ -1390,26 +1423,30 @@ function AwardsScorecardSection({ awards, awardScore }: {
   // Capture rig: default the category list open so the expanded state can be
   // screenshotted without a tap driver. Collapsed remains the shipped default.
   const [expanded, setExpanded] = useState(process.env.EXPO_PUBLIC_EXPAND_AWARDS === '1');
-  // Group like the site's AwardScoreCard: one row per category+outcome with
-  // co-nominees joined (" · "), counted once. The raw feed lists one row per
-  // nominee (584 categories have co-nominees) and can repeat a category with
-  // and without a name — naive row counts inflate wins/noms.
-  const grouped = new Map<string, { category: string; won: boolean; names: string[]; year: number }>();
+  // Group like the site's AwardScoreCard: one row per CATEGORY ("13" for
+  // Hamilton), co-nominees joined (" · "). Won categories show the winners'
+  // names; nominated-only categories show all nominees. The raw feed lists
+  // one row per nominee and can repeat a category with and without a name.
+  const grouped = new Map<string, { category: string; won: boolean; winners: string[]; nominees: string[]; year: number }>();
   for (const a of awards) {
-    const key = `${a.category}|${a.won}`;
-    let g = grouped.get(key);
+    let g = grouped.get(a.category);
     if (!g) {
-      g = { category: a.category, won: a.won, names: [], year: a.year };
-      grouped.set(key, g);
+      g = { category: a.category, won: false, winners: [], nominees: [], year: a.year };
+      grouped.set(a.category, g);
     }
-    if (a.name && !g.names.includes(a.name)) g.names.push(a.name);
+    if (a.won) g.won = true;
+    const bucket = a.won ? g.winners : g.nominees;
+    if (a.name && !bucket.includes(a.name)) bucket.push(a.name);
   }
-  const rows = [...grouped.values()].map(g => ({
-    category: g.category,
-    won: g.won,
-    name: g.names.length > 0 ? g.names.join(' · ') : null,
-    year: g.year,
-  }));
+  const rows = [...grouped.values()].map(g => {
+    const names = g.won ? g.winners : g.nominees;
+    return {
+      category: g.category,
+      won: g.won,
+      name: names.length > 0 ? names.join(' · ') : null,
+      year: g.year,
+    };
+  });
   const wins = rows.filter(a => a.won);
   const noms = rows.filter(a => !a.won);
   // Prefer the site-computed counts from the feed so numbers match the web
@@ -1425,14 +1462,33 @@ function AwardsScorecardSection({ awards, awardScore }: {
 
   return (
     <SectionCard title="Awards Scorecard" meta={season ? `${season} season` : undefined}>
-      {/* Award-score hero row — site parity (AwardScoreBadge + tier + sublabel) */}
+      {/* Award-score hero row — site parity (AwardScoreBadge medal + tier + sublabel) */}
       {awardScore && badge && (
         <View style={styles.awardsHeroRow}>
-          <View style={[styles.awardsScoreBadge, { borderColor: badge.color }]}>
-            <Text style={[styles.awardsScoreText, { color: badge.color }]}>{awardScore.score}</Text>
+          <View
+            style={[
+              styles.awardsScoreBadge,
+              {
+                borderColor: badge.rim,
+                borderStyle: badge.dashed ? 'dashed' : 'solid',
+                backgroundColor: badge.gradient ? 'transparent' : badge.fill,
+              },
+              badge.glow ? { shadowColor: badge.glow, shadowOpacity: 1, shadowRadius: 10, shadowOffset: { width: 0, height: 0 } } : null,
+            ]}
+          >
+            {badge.gradient && (
+              <LinearGradient
+                colors={badge.gradient}
+                locations={[0, 0.3, 0.5, 0.7, 1]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.awardsScoreBadgeFill}
+              />
+            )}
+            <Text style={[styles.awardsScoreText, { color: badge.digit }]}>{awardScore.score}</Text>
           </View>
           <View style={styles.awardsHeroInfo}>
-            <Text style={[styles.awardsTierLabel, { color: badge.color }]}>{badge.label}</Text>
+            <Text style={[styles.awardsTierLabel, { color: badge.labelColor }]}>{badge.label}</Text>
             {awardScore.sublabel && (
               <Text style={styles.awardsSublabel}>{awardScore.sublabel}</Text>
             )}
@@ -1651,6 +1707,16 @@ function ScoreSquares({ score, color }: { score: number; color: string }) {
   );
 }
 
+// Port of the site's getVenueDesignation (TheaterScorecardCard.tsx) —
+// same thresholds, labels, and tier colors.
+function venueDesignation(overall: number): { label: string; color: string } {
+  if (overall >= 4.5) return { label: 'Exceptional Venue', color: '#22c55e' };
+  if (overall >= 3.8) return { label: 'Great Venue', color: '#22c55e' };
+  if (overall >= 3.0) return { label: 'Typical Venue', color: '#d97706' };
+  if (overall >= 2.5) return { label: 'Below Average', color: '#ef4444' };
+  return { label: 'Rough Venue', color: '#ef4444' };
+}
+
 const ACCESSIBILITY_PILLS: { key: 'wheelchair' | 'elevator' | 'hearingLoop' | 'assistiveListening'; label: string }[] = [
   { key: 'wheelchair', label: 'Wheelchair' },
   { key: 'elevator', label: 'Elevator' },
@@ -1674,8 +1740,16 @@ function TheaterScorecardSection({ scores, venueName, accessibility, links }: {
     links?.aviewfrommyseat ? { label: 'A View From My Seat', url: links.aviewfrommyseat } : null,
   ].filter(Boolean) as { label: string; url: string }[];
 
+  const designation = venueDesignation(avg);
   return (
-    <SectionCard title="Theater Scorecard" meta={`${avg.toFixed(1)}/5 overall`}>
+    <SectionCard
+      title="Theater Scorecard"
+      metaContent={
+        <View style={[styles.venueTierPill, { borderColor: designation.color + '4D', backgroundColor: designation.color + '1A' }]}>
+          <Text style={[styles.venueTierPillText, { color: designation.color }]}>{designation.label.toUpperCase()}</Text>
+        </View>
+      }
+    >
       <Text style={styles.venueScorecardName}>{venueName}</Text>
       {scores.summary && <Text style={styles.venueSummary}>{scores.summary}</Text>}
       {dims.map(d => {
@@ -1732,8 +1806,6 @@ function VideoReviewsSection({ reviews }: { reviews: ShowDetail['videoReviews'] 
   return (
     <SectionCard title="Video Reviews" meta={`${reviews.length} creators`}>
       {reviews.map((v, i) => {
-        const bucketColor = v.bucket === 'Rave' || v.bucket === 'Positive' ? '#10b981'
-          : v.bucket === 'Mixed' ? '#f59e0b' : '#ef4444';
         // TikTok/Instagram stills are portrait (9:16); YouTube is landscape.
         const isPortrait = v.platform === 'tiktok' || v.platform === 'instagram';
         const thumbStyle = isPortrait ? styles.videoThumbPortrait : styles.videoThumb;
@@ -1758,18 +1830,13 @@ function VideoReviewsSection({ reviews }: { reviews: ShowDetail['videoReviews'] 
               {v.platform && <Text style={styles.videoPlatform}>{v.platform}</Text>}
               {v.keyQuote && <Text style={styles.videoQuote} numberOfLines={3}>{'\u201C'}{v.keyQuote}{'\u201D'}</Text>}
             </View>
-            <View style={styles.videoScoreCol}>
-              {score != null && (
-                <View style={[styles.videoScoreChip, { backgroundColor: getScoreColor(score) }]}>
-                  <Text style={[styles.videoScoreChipText, { color: getContrastTextColor(getScoreColor(score)) }]}>{score}</Text>
-                </View>
-              )}
-              {v.bucket && (
-                <View style={[styles.videoBucket, { backgroundColor: bucketColor + '20' }]}>
-                  <Text style={[styles.videoBucketText, { color: bucketColor }]}>{v.bucket}</Text>
-                </View>
-              )}
-            </View>
+            {/* Same score chip as the written Critic Reviews rows — no
+               sentiment pill (owner decision 2026-08-03). */}
+            {score != null && (
+              <View style={[styles.reviewScore, { backgroundColor: getScoreColor(score) }]}>
+                <Text style={[styles.reviewScoreText, { color: getContrastTextColor(getScoreColor(score)) }]}>{score}</Text>
+              </View>
+            )}
           </Pressable>
         );
       })}
@@ -2123,11 +2190,16 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   audienceSourceCards: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     paddingVertical: Spacing.sm,
     gap: Spacing.sm,
   },
   audienceSourceCard: {
-    width: 110,
+    // 3-per-row wrapped grid (web grid-cols-3); flexGrow keeps a short last
+    // row filled edge-to-edge.
+    flexBasis: '30%',
+    flexGrow: 1,
     backgroundColor: Colors.surface.overlay,
     borderWidth: 1,
     borderColor: Colors.border.subtle,
@@ -2465,13 +2537,22 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.lg,
   },
   awardsScoreBadge: {
+    // No overflow:hidden — it would clip the iOS shadow glow; the gradient
+    // fill is rounded itself instead.
     width: 64,
     height: 64,
     borderRadius: 32,
     borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.surface.overlay,
+  },
+  awardsScoreBadgeFill: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 30,
   },
   awardsScoreText: {
     fontSize: FontSize.xl,
@@ -2785,6 +2866,18 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     flexShrink: 0,
   },
+  venueTierPill: {
+    borderWidth: 1,
+    borderRadius: BorderRadius.pill,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 3,
+    flexShrink: 0,
+  },
+  venueTierPillText: {
+    fontSize: FontSize.xs,
+    fontWeight: '700',
+    letterSpacing: 0.8,
+  },
   venueSummary: {
     color: Colors.text.secondary,
     fontSize: FontSize.sm,
@@ -2869,22 +2962,6 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.sm,
     backgroundColor: Colors.surface.overlay,
   },
-  videoScoreCol: {
-    alignItems: 'flex-end',
-    gap: 6,
-  },
-  videoScoreChip: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  videoScoreChipText: {
-    fontSize: FontSize.md,
-    fontWeight: '800',
-    fontVariant: ['tabular-nums'],
-  },
   videoThumbPlaceholder: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -2913,15 +2990,5 @@ const styles = StyleSheet.create({
     marginTop: 4,
     fontStyle: 'italic',
     lineHeight: 16,
-  },
-  videoBucket: {
-    borderRadius: 6,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 4,
-    alignSelf: 'flex-start',
-  },
-  videoBucketText: {
-    fontSize: FontSize.xs,
-    fontWeight: '700',
   },
 });

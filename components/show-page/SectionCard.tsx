@@ -12,20 +12,22 @@ import { BorderRadius, Colors, Spacing } from '@/constants/theme';
 type Props = {
   title: string;
   meta?: string;
+  /** Custom right-side header content (e.g. a tier pill) — wins over meta. */
+  metaContent?: React.ReactNode;
   children: React.ReactNode;
   style?: StyleProp<ViewStyle>;
 };
 
-export function SectionCard({ title, meta, children, style }: Props) {
+export function SectionCard({ title, meta, metaContent, children, style }: Props) {
   return (
     <View style={[styles.card, style]}>
       <View style={styles.header}>
         <Text style={styles.eyebrow}>{title}</Text>
-        {meta ? (
+        {metaContent ?? (meta ? (
           <Text style={styles.meta} numberOfLines={1}>
             {meta}
           </Text>
-        ) : null}
+        ) : null)}
       </View>
       {children}
     </View>

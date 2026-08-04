@@ -79,7 +79,10 @@ export function FeaturedCarousel({ shows, watchlistSet, onToggleWatchlist, getSu
   if (shows.length === 0) return null;
 
   // Responsive: show more cards on wider screens (website uses ~112px on mobile)
-  const cardWidth = width >= 768 ? width * 0.2 : width * 0.3;
+  // Capture rig: EXPO_PUBLIC_GRID_COLS=4 previews the denser 4-per-row look
+  // (~0.225 width leaves the same partial-card peek that 0.3 gives 3-up).
+  const phoneFactor = process.env.EXPO_PUBLIC_GRID_COLS === '4' ? 0.225 : 0.3;
+  const cardWidth = width >= 768 ? width * 0.2 : width * phoneFactor;
 
   return (
     <View style={styles.container}>
