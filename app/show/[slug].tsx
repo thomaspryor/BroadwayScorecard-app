@@ -1636,17 +1636,21 @@ function RedditIcon() {
   );
 }
 
-// Colors + labels match the web's TIER_DISPLAY (SocialPulseCard.tsx) exactly.
+// Colors + labels match the web's TIER_DISPLAY (SocialPulseCard.tsx). The
+// web also shows a tier emoji next to the label — dropped here because real
+// Apple Color Emoji glyphs (🔥📈⚪💔) render as broken tofu boxes in this
+// Text component in on-device testing (simulator-verified 2026-08-04); the
+// tier color + text label already carry the same information without it.
 const SOCIAL_TIER_CONFIG = {
-  Buzzing: { label: 'BUZZING', emoji: '🔥', color: '#f97316', subtitle: 'Trending hot right now' },
-  Rising: { label: 'RISING', emoji: '📈', color: '#10b981', subtitle: 'Picking up momentum' },
-  Steady: { label: 'STEADY', emoji: '⚪', color: '#3b82f6', subtitle: 'Consistent buzz' },
-  Troubled: { label: 'TROUBLED', emoji: '💔', color: '#ef4444', subtitle: 'Negative chatter outweighs positive' },
+  Buzzing: { label: 'BUZZING', color: '#f97316', subtitle: 'Trending hot right now' },
+  Rising: { label: 'RISING', color: '#10b981', subtitle: 'Picking up momentum' },
+  Steady: { label: 'STEADY', color: '#3b82f6', subtitle: 'Consistent buzz' },
+  Troubled: { label: 'TROUBLED', color: '#ef4444', subtitle: 'Negative chatter outweighs positive' },
   // Legacy state — old data files may still tag a show BuildingBaseline. The
   // web now treats it as an alias for Steady rather than a distinct tier
   // (SocialPulseCard.tsx TIER_DISPLAY comment) — match that here instead of
   // showing app-only purple "BUILDING" branding the web doesn't have.
-  BuildingBaseline: { label: 'STEADY', emoji: '⚪', color: '#3b82f6', subtitle: 'Consistent buzz' },
+  BuildingBaseline: { label: 'STEADY', color: '#3b82f6', subtitle: 'Consistent buzz' },
   Hidden: null,
 } as const;
 
@@ -1701,7 +1705,7 @@ function SocialScorecardSection({ sp }: { sp: SocialPulsePayload }) {
       {/* Tier badge row */}
       <View style={[styles.socialTierRow, { borderColor: config.color + '40', backgroundColor: config.color + '14' }]}>
         <View style={[styles.socialTierBadge, { backgroundColor: config.color }]}>
-          <Text style={styles.socialTierLabel}>{config.label} {config.emoji}</Text>
+          <Text style={styles.socialTierLabel}>{config.label}</Text>
         </View>
         <View style={styles.socialTierInfo}>
           <Text style={[styles.socialTierSubtitle, { color: config.color }]}>{config.subtitle}</Text>
