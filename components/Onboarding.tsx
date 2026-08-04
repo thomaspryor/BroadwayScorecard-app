@@ -54,6 +54,9 @@ const SIGN_IN_PAGE: OnboardingPage = {
 };
 
 export async function hasSeenOnboarding(): Promise<boolean> {
+  // Capture rig: skip onboarding so design screenshots can be taken on a
+  // fresh install without a UI driver. Dev only; flag unset in production.
+  if (process.env.EXPO_PUBLIC_AUTOSCROLL === '1') return true;
   try {
     const value = await AsyncStorage.getItem(ONBOARDING_KEY);
     return value === 'true';

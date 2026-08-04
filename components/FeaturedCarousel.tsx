@@ -78,8 +78,10 @@ export function FeaturedCarousel({ shows, watchlistSet, onToggleWatchlist, getSu
   const { width } = useWindowDimensions();
   if (shows.length === 0) return null;
 
-  // Responsive: show more cards on wider screens (website uses ~112px on mobile)
-  const cardWidth = width >= 768 ? width * 0.2 : width * 0.3;
+  // Responsive: show more cards on wider screens (website uses ~112px on mobile).
+  // 4-up on phone (owner decision 2026-08-04) — ~0.225 width leaves a partial-card
+  // peek at the edge, same idiom the old 3-up (0.3) used.
+  const cardWidth = width >= 768 ? width * 0.2 : width * 0.225;
 
   return (
     <View style={styles.container}>
