@@ -61,6 +61,7 @@ export function diaryEntryToCandidate(entry: DiarySearchEntry): MatchCandidate {
     closingDate: null,
     city: entry.city ?? null,
     diaryOnly: true,
+    ratingsCount: entry.rc ?? 0,
   };
 }
 

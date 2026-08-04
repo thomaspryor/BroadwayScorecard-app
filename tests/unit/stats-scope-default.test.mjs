@@ -4,10 +4,11 @@
 // in the same fix pass.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-// tsx compiles the app's TS as CJS (no "type": "module"), so named exports
-// arrive on the default object.
-import scopeMod from '../../lib/stats-scope.ts';
-import critMod from '../../lib/stats-you-vs-critics.ts';
+// Namespace imports, not default: under `node --experimental-strip-types`
+// these modules are real ESM and have no default export, which made both
+// files fail to load at all. A namespace import works under tsx too.
+import * as scopeMod from '../../lib/stats-scope.ts';
+import * as critMod from '../../lib/stats-you-vs-critics.ts';
 
 const { ALL_TIME, buildScopes, defaultScope, inScope } = scopeMod;
 const { audienceVsYou } = critMod;

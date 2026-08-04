@@ -9,7 +9,7 @@
 // (ANLblfVA/ABdfRq1t = Mezzanine, AN2tu6Wo/AF2CHint = Show Score).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ShowMatcher, normTitle, isWeakMatch, MATCH_THRESHOLD } from '../../lib/show-match.ts';
+import { ShowMatcher, normTitle, isWeakMatch, MATCH_THRESHOLD, runContains, rankProductionChoices } from '../../lib/show-match.ts';
 import { mergeDiaryCandidates, diaryEntryToCandidate } from '../../lib/diary-catalog.ts';
 
 const scored = (id, title, extra = {}) => ({
@@ -175,4 +175,69 @@ test('a scored production still wins a date tie against a newer diary duplicate'
   ];
   const m = new ShowMatcher(pool).match('Chicago', null, '2023-05-01');
   assert.equal(m.match?.id, 'chicago-1996', `matched ${m.match?.id} instead`);
+});
+
+// ─── production picker ────────────────────────────────────────────────────
+//
+// The import screen flagged seven of the owner's Mezzanine rows as date
+// mismatches and then offered no way to act on any of them (2026-08-03). All
+// seven reproduce here in miniature: a Broadway run that closed well before
+// the logged date, plus the dateless touring productions the user almost
+// certainly saw instead.
+
+test('runContains respects the 90-day grace and ignores dateless candidates', () => {
+  const broadway = scored('humans-2016', 'The Humans', {
+    venue: 'Helen Hayes Theater', openingDate: '2016-02-18', closingDate: '2017-01-15',
+  });
+  assert.equal(runContains(broadway, '2016-06-01'), true);
+  assert.equal(runContains(broadway, '2017-03-01'), true, 'inside the closing grace');
+  assert.equal(runContains(broadway, '2018-06-08'), false, "the owner's logged date");
+  assert.equal(runContains(broadway, null), false);
+  // A production with no dates at all is unknown, not containing.
+  assert.equal(runContains(diaryEntryToCandidate({ id: 'tour', title: 'The Humans' }), '2018-06-08'), false);
+});
+
+test('rankProductionChoices puts a run containing the date first', () => {
+  const tour = diaryEntryToCandidate({ id: 'purple-tour', title: 'The Color Purple', venue: 'Fox Theatre', city: 'Atlanta', rc: 40 });
+  const broadway2015 = scored('purple-2015', 'The Color Purple', { openingDate: '2015-12-10', closingDate: '2017-01-08' });
+  const broadway2005 = scored('purple-2005', 'The Color Purple', { openingDate: '2005-12-01', closingDate: '2008-02-24' });
+  const ranked = rankProductionChoices([broadway2015, broadway2005, tour], '2006-06-01');
+  assert.equal(ranked[0].id, 'purple-2005', 'the run the date falls inside leads');
+});
+
+test('rankProductionChoices ranks scored above diary, then by ratings count', () => {
+  // The owner's date is inside nothing, which is the real tour case — the
+  // ordering has to be useful with no date signal at all.
+  const ranked = rankProductionChoices([
+    diaryEntryToCandidate({ id: 'rotten-quiet', title: 'Something Rotten!', venue: 'EJ Thomas Hall', city: 'Akron', rc: 3 }),
+    diaryEntryToCandidate({ id: 'rotten-busy', title: 'Something Rotten!', venue: 'Fox Theatre', city: 'Atlanta', rc: 120 }),
+    scored('rotten-2015', 'Something Rotten!', { openingDate: '2015-04-22', closingDate: '2017-01-01' }),
+  ], '2017-08-26');
+  assert.deepEqual(ranked.map(r => r.id), ['rotten-2015', 'rotten-busy', 'rotten-quiet']);
+});
+
+test('productionsFor offers the alternatives a flagged row needs', () => {
+  const pool = [
+    scored('boots-2013', 'Kinky Boots', { venue: 'Al Hirschfeld Theatre', openingDate: '2013-04-04', closingDate: '2019-04-07' }),
+    scored('boots-ob-2022', 'Kinky Boots', { venue: 'Stage 42', category: 'off-broadway', openingDate: '2022-08-25', closingDate: '2022-11-20' }),
+    diaryEntryToCandidate({ id: 'boots-tour', title: 'Kinky Boots', venue: 'Hollywood Pantages Theater', city: 'Los Angeles', rc: 55 }),
+  ];
+  const matcher = new ShowMatcher(pool);
+  // The row as the owner saw it: matched to Stage 42, logged six months after
+  // that run closed.
+  const m = matcher.match('Kinky Boots', 'Stage 42', '2023-05-22');
+  assert.equal(m.match?.id, 'boots-ob-2022');
+  assert.equal(m.dateSuspect, true);
+
+  const offered = matcher.productionsFor('Kinky Boots', '2023-05-22').filter(c => c.id !== m.match?.id);
+  assert.ok(offered.length >= 2, 'a flagged row must have somewhere to go');
+  assert.ok(offered.some(c => c.id === 'boots-tour'));
+  assert.ok(offered.some(c => c.id === 'boots-2013'));
+});
+
+test('productionsFor normalizes the title it was given', () => {
+  const pool = [diaryEntryToCandidate({ id: 'curious-tour', title: 'The Curious Incident of the Dog in the Night-Time', city: 'Boston' })];
+  const matcher = new ShowMatcher(pool);
+  assert.equal(matcher.productionsFor('The Curious Incident of the Dog in the Night Time').length, 1);
+  assert.equal(matcher.productionsFor('Nothing By That Name').length, 0);
 });

@@ -24,6 +24,9 @@ export interface MatchCandidate {
   city?: string | null;
   /** True for diary-only (unscored) catalog entries. */
   diaryOnly?: boolean;
+  /** Audience ratings count from the diary catalog — popularity, used only to
+   *  order the "which production did you see?" picker. */
+  ratingsCount?: number;
 }
 
 export interface MatchResult {
@@ -106,6 +109,41 @@ export function closestRun(candidates: MatchCandidate[], dateSeen?: string | nul
     .map(x => x.c)[0];
 }
 
+/** True when dateSeen falls inside this production's run (same 90-day grace as
+ *  dateSanity, so previews and a slipped closing notice still count). */
+export function runContains(candidate: MatchCandidate, dateSeen?: string | null): boolean {
+  if (!dateSeen) return false;
+  const seen = Date.parse(dateSeen);
+  if (Number.isNaN(seen)) return false;
+  if (!candidate.openingDate && !candidate.closingDate) return false;
+  return dateSanity(candidate, dateSeen) === 1;
+}
+
+/**
+ * Order the same-title productions offered by the import screen's "which
+ * production did you see?" picker.
+ *
+ * The rows this exists for are tours: the owner's Mezzanine import flagged
+ * seven date mismatches, and every one had dozens-to-hundreds of same-title
+ * productions to choose between (379 for "Rent"), of which only the one or two
+ * Broadway runs carry dates at all. So a run that actually contains the logged
+ * date leads, then productions with a real show page, then the most-rated —
+ * which is what puts a well-known tour stop above a community production.
+ */
+export function rankProductionChoices(
+  candidates: MatchCandidate[],
+  dateSeen?: string | null,
+): MatchCandidate[] {
+  return [...candidates]
+    .map((c, i) => ({ c, i, contains: runContains(c, dateSeen) ? 0 : 1 }))
+    .sort((a, b) =>
+      a.contains - b.contains
+      || scoredFirst(a.c, b.c)
+      || (b.c.ratingsCount ?? 0) - (a.c.ratingsCount ?? 0)
+      || a.i - b.i)
+    .map(x => x.c);
+}
+
 const normVenue = (v: string) =>
   v.toLowerCase().replace(/theatre|theater/gi, '').replace(/^the\s+/, '').trim();
 
@@ -179,6 +217,13 @@ export class ShowMatcher {
 
   get size(): number {
     return this.pool.length;
+  }
+
+  /** Every catalog production sharing this exact normalized title, ordered for
+   *  the import screen's production picker. Reuses the constructor's title
+   *  index, so offering alternatives for a flagged row costs nothing. */
+  productionsFor(title: string, dateSeen?: string | null): MatchCandidate[] {
+    return rankProductionChoices(this.byNormTitle.get(normTitle(title)) ?? [], dateSeen);
   }
 
   /**
