@@ -47,7 +47,7 @@ import { FeedModeToggle, type FeedMode } from '@/components/user/FeedModeToggle'
 import { PhotoFeedTimeline } from '@/components/user/PhotoFeedTimeline';
 import { PhotoWallGrid } from '@/components/user/PhotoWallGrid';
 import { DiaryCalendarMonth, buildDiaryCalendarMonths, buildReviewsByDate } from '@/components/user/DiaryCalendarView';
-import { DiaryLedgerRow, MonthDivider, groupReviewsByMonth } from '@/components/user/DiaryListView';
+import { DiaryLedgerRow, UpcomingLedgerRow, MonthBand, groupReviewsByMonth } from '@/components/user/DiaryListView';
 import { usePhotoFeed } from '@/hooks/usePhotoFeed';
 import * as haptics from '@/lib/haptics';
 
@@ -468,13 +468,15 @@ export default function WatchedScreen() {
           <SwipeDeleteAction onDelete={() => handleDeleteDiaryItem(item)} drag={drag} />
         )}
         overshootRight={false}
+        // Feed-card spacing lives on the wrapper, not the card — a margin on
+        // the card itself would let the red delete action peek through the gap.
+        containerStyle={{ marginBottom: Spacing.sm }}
       >
         <DiaryLedgerRow
           review={item}
           show={show}
           fallbackTitle={showTitleFallback(item.show_id)}
           posterUrl={posterUrl}
-          monthInBox={!showYearGroups}
           onPress={() => guardedPush(item.id, () => goToShow(show, item.show_id))}
           onLongPress={() => { haptics.action(); setGridMenu({ kind: 'review', review: item }); }}
           onEditRating={() => router.push({
@@ -533,49 +535,32 @@ export default function WatchedScreen() {
     );
   };
 
+  // Upcoming rows in the list layout share the Feed card anatomy — date on
+  // the LEFT like every other row on the page (owner feedback 2026-08-03:
+  // "Weird to have two different layouts on one page"); the countdown sits
+  // where rated rows put their stars.
   const renderUpcomingRow = (entry: WatchlistEntry) => {
     const show = showMap[entry.show_id];
-    const title = show?.title || showTitleFallback(entry.show_id);
     const posterUrl = show?.images ? (getImageUrl(show.images.poster) || getImageUrl(show.images.thumbnail)) : null;
     const daysUntil = entry.planned_date
       ? Math.ceil((new Date(entry.planned_date + 'T00:00:00').getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
       : null;
-    const formattedDate = entry.planned_date
-      ? new Date(entry.planned_date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+    const countdownLabel = daysUntil !== null && daysUntil > 0
+      ? (daysUntil === 1 ? 'Tomorrow' : `${daysUntil}d`)
       : null;
 
-    // Same row anatomy as the rated diary rows (beta feedback 2026-07-25:
-    // Upcoming rows had their own boxed format — inconsistent with the list).
     return (
-      <Pressable
+      <UpcomingLedgerRow
         key={entry.id}
-        style={({ pressed }) => [styles.card, pressed && styles.pressed]}
+        plannedDate={entry.planned_date}
+        show={show}
+        fallbackTitle={showTitleFallback(entry.show_id)}
+        posterUrl={posterUrl}
+        countdownLabel={countdownLabel}
         onPress={() => goToShow(show, entry.show_id)}
-        onLongPress={() => handleRemoveUpcoming(entry)}
-        accessibilityHint="Long press to remove from watchlist"
-        accessibilityActions={[{ name: 'delete', label: 'Remove from watchlist' }]}
-        onAccessibilityAction={(e) => { if (e.nativeEvent.actionName === 'delete') handleRemoveUpcoming(entry); }}
-      >
-        {posterUrl ? (
-          <Image source={{ uri: posterUrl }} style={styles.cardPoster} contentFit="cover" transition={200} />
-        ) : (
-          <View style={[styles.cardPoster, styles.cardPosterPlaceholder]}>
-            <Text style={styles.placeholderText}>{title.charAt(0)}</Text>
-          </View>
-        )}
-        <View style={styles.cardInfo}>
-          <Text style={styles.cardTitle} numberOfLines={1}>{title}</Text>
-          {show?.venue && <Text style={styles.cardVenue} numberOfLines={1}>{show.venue}</Text>}
-        </View>
-        {/* Date on the right, no X (beta feedback 2026-07-26: removing isn't
-            a common action — long-press handles it). */}
-        {formattedDate && (
-          <Text style={styles.upcomingDateText}>
-            {formattedDate}
-            {daysUntil !== null && daysUntil > 0 && (daysUntil === 1 ? ' · Tomorrow' : ` · ${daysUntil}d`)}
-          </Text>
-        )}
-      </Pressable>
+        onLongPress={() => { haptics.action(); setGridMenu({ kind: 'upcoming', entry }); }}
+        onRemove={() => handleRemoveUpcoming(entry)}
+      />
     );
   };
 
@@ -669,7 +654,7 @@ export default function WatchedScreen() {
               {upcomingReviews.map(renderDiaryGridCard)}
             </View>
           ) : (
-            <View style={{ gap: Spacing.xs, paddingHorizontal: 0 }}>
+            <View style={{ gap: Spacing.sm, paddingHorizontal: 0 }}>
               {upcomingWatchlistEntries.map(renderUpcomingRow)}
               {upcomingReviews.map(renderDiaryLedgerRow)}
             </View>
@@ -679,7 +664,20 @@ export default function WatchedScreen() {
 
       {/* Past shows — grouped by year, flat when sorting by rating */}
       {pastReviews.length > 0 && (
-        showYearGroups ? (
+        gridSubView === 'list' && showYearGroups ? (
+          // Feed parity (owner 2026-08-03): the Feed's month bands carry the
+          // year ("JULY 2026 · 4 entries"), so the list layout groups by month
+          // only — a separate year band on top would be a second layout on the
+          // same page, which is exactly what the owner objected to.
+          <View>
+            {groupReviewsByMonth(pastReviews).map(monthGroup => (
+              <View key={monthGroup.key}>
+                <MonthBand label={monthGroup.label} count={monthGroup.items.length} />
+                {monthGroup.items.map(renderDiaryLedgerRow)}
+              </View>
+            ))}
+          </View>
+        ) : showYearGroups ? (
           <View style={{ gap: Spacing.xl }}>
             {sortedYears.map(year => (
               <View key={year}>
@@ -693,26 +691,12 @@ export default function WatchedScreen() {
                     </Text>
                   </View>
                 )}
-                {gridSubView === 'poster' ? (
-                  <View style={styles.pastGrid}>
-                    {reviewsByYear[year].map(renderDiaryGridCard)}
-                    {year === sortedYears[sortedYears.length - 1] && (
-                      <AddShowCard label="Rate a show" onPress={() => setShowSearchModal(true)} cardWidth={grid.cardWidth} />
-                    )}
-                  </View>
-                ) : (
-                  <View>
-                    {/* Month dividers within the year band — mockup: "JULY 2026"
-                        over that month's rows. The "No date" bucket has no
-                        months, so its rows render bare (label null). */}
-                    {groupReviewsByMonth(reviewsByYear[year]).map(monthGroup => (
-                      <View key={monthGroup.key}>
-                        {monthGroup.label && <MonthDivider label={monthGroup.label} />}
-                        {monthGroup.items.map(renderDiaryLedgerRow)}
-                      </View>
-                    ))}
-                  </View>
-                )}
+                <View style={styles.pastGrid}>
+                  {reviewsByYear[year].map(renderDiaryGridCard)}
+                  {year === sortedYears[sortedYears.length - 1] && (
+                    <AddShowCard label="Rate a show" onPress={() => setShowSearchModal(true)} cardWidth={grid.cardWidth} />
+                  )}
+                </View>
               </View>
             ))}
           </View>
@@ -1111,7 +1095,6 @@ const styles = StyleSheet.create({
   sectionLabel: { color: Colors.text.primary, fontSize: 13, fontWeight: '700', letterSpacing: 0.6, textTransform: 'uppercase' },
   sectionCount: { color: Colors.text.muted, fontSize: 12 },
   upcomingSection: { marginBottom: Spacing.xl },
-  upcomingDateText: { color: '#fcd34d', fontSize: FontSize.xs, fontWeight: '600' },
   // To Be Rated
   toBeRatedSection: {
     backgroundColor: 'rgba(245, 158, 11, 0.06)',
@@ -1146,7 +1129,6 @@ const styles = StyleSheet.create({
   placeholderText: { color: Colors.text.muted, fontSize: 18, fontWeight: '600' },
   cardInfo: { flex: 1, gap: 2 },
   cardTitle: { color: Colors.text.primary, fontSize: FontSize.md, fontWeight: '600' },
-  cardVenue: { color: Colors.text.muted, fontSize: FontSize.xs },
   // Grid view
   gridContainer: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.md },
   pastGrid: {

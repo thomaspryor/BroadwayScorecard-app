@@ -1,27 +1,26 @@
 /**
- * Diary list layout — the "Ledger" direction the owner picked from the
- * 2026-07 diary design round (task #300, Direction F) and re-requested with
- * a mockup on 2026-08-03: a dense, scannable list with a date rail, micro
- * posters, star ratings and month dividers, grouped under the existing
- * year bands.
+ * Diary list layout — visually identical to the Feed timeline's entry cards
+ * (owner feedback 2026-08-03: "Weird to have two different layouts on one
+ * page … Match the feed layout, without the nudge to add a photo").
  *
- * The heart glyph from the mockup is intentionally absent: UserReview has
- * no favorite field, and we never render data we don't have. The comment
- * glyph appears only when the entry carries review text.
+ * Row anatomy, styles and month bands are copied from
+ * PhotoFeedTimeline.tsx (Round 2 Direction A) — date column (day over
+ * month) on the LEFT, 40x56 poster, title/venue/note, stars on the right.
+ * The Upcoming variant swaps stars for a countdown. No photo strip, no
+ * nudge — that stays the Feed's differentiator.
  */
 
 import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Image } from 'expo-image';
-import Svg, { Path } from 'react-native-svg';
 import MiniStars from '@/components/user/MiniStars';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
 import type { Show } from '@/lib/types';
 import type { UserReview } from '@/lib/user-types';
 
 /** Consecutive-month groups, preserving the caller's sort order. */
-export function groupReviewsByMonth(reviews: UserReview[]): { key: string; label: string | null; items: UserReview[] }[] {
-  const groups: { key: string; label: string | null; items: UserReview[] }[] = [];
+export function groupReviewsByMonth(reviews: UserReview[]): { key: string; label: string; items: UserReview[] }[] {
+  const groups: { key: string; label: string; items: UserReview[] }[] = [];
   for (const review of reviews) {
     const d = review.date_seen ? new Date(review.date_seen + 'T00:00:00') : null;
     const valid = d && !Number.isNaN(d.getTime());
@@ -34,7 +33,7 @@ export function groupReviewsByMonth(reviews: UserReview[]): { key: string; label
         key,
         label: valid
           ? d!.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }).toUpperCase()
-          : null,
+          : 'NO DATE',
         items: [review],
       });
     }
@@ -42,10 +41,37 @@ export function groupReviewsByMonth(reviews: UserReview[]): { key: string; label
   return groups;
 }
 
-export function MonthDivider({ label }: { label: string }) {
+/** Full-bleed band header — same convention as the Feed's month bands. */
+export function MonthBand({ label, count }: { label: string; count: number }) {
   return (
-    <View style={styles.monthDivider}>
-      <Text style={styles.monthDividerText}>{label}</Text>
+    <View style={styles.monthBand}>
+      <Text style={styles.monthLabel}>{label}</Text>
+      <Text style={styles.monthCount}>{count} {count === 1 ? 'entry' : 'entries'}</Text>
+    </View>
+  );
+}
+
+function DateCol({ date }: { date: string | null }) {
+  const d = date ? new Date(date + 'T00:00:00') : null;
+  const valid = d && !Number.isNaN(d.getTime());
+  return (
+    <View style={styles.dateCol}>
+      {valid ? (
+        <>
+          <Text style={styles.dateDay}>{d!.toLocaleDateString('en-US', { day: 'numeric' })}</Text>
+          <Text style={styles.dateMonth}>{d!.toLocaleDateString('en-US', { month: 'short' }).toUpperCase()}</Text>
+        </>
+      ) : null}
+    </View>
+  );
+}
+
+function PosterThumb({ posterUrl, title }: { posterUrl: string | null; title: string }) {
+  return posterUrl ? (
+    <Image source={{ uri: posterUrl }} style={styles.poster} contentFit="cover" transition={200} />
+  ) : (
+    <View style={[styles.poster, styles.posterPlaceholder]}>
+      <Text style={styles.posterPlaceholderText}>{title.charAt(0)}</Text>
     </View>
   );
 }
@@ -55,8 +81,6 @@ interface RowProps {
   show: Show | undefined;
   fallbackTitle: string;
   posterUrl: string | null;
-  /** Rating sort has no month dividers, so the date box carries the month. */
-  monthInBox?: boolean;
   onPress: () => void;
   onLongPress: () => void;
   /** VoiceOver parity with the grid cards — swipe/long-press aren't discoverable. */
@@ -64,13 +88,10 @@ interface RowProps {
   onDelete: () => void;
 }
 
-export function DiaryLedgerRow({ review, show, fallbackTitle, posterUrl, monthInBox, onPress, onLongPress, onEditRating, onDelete }: RowProps) {
+export function DiaryLedgerRow({ review, show, fallbackTitle, posterUrl, onPress, onLongPress, onEditRating, onDelete }: RowProps) {
   const title = show?.title || fallbackTitle;
   const d = review.date_seen ? new Date(review.date_seen + 'T00:00:00') : null;
   const hasDate = d && !Number.isNaN(d.getTime());
-  const day = hasDate ? String(d!.getDate()).padStart(2, '0') : '–';
-  const month = hasDate ? d!.toLocaleDateString('en-US', { month: 'short' }).toUpperCase() : null;
-  const year = show?.openingDate ? show.openingDate.slice(0, 4) : null;
 
   const a11yLabel = `${title}, rated ${review.rating.toFixed(1)} stars${
     hasDate ? `, seen ${d!.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}` : ''
@@ -78,7 +99,7 @@ export function DiaryLedgerRow({ review, show, fallbackTitle, posterUrl, monthIn
 
   return (
     <Pressable
-      style={({ pressed }) => [styles.row, pressed && styles.pressed]}
+      style={({ pressed }) => [styles.card, pressed && styles.pressed]}
       onPress={onPress}
       onLongPress={onLongPress}
       accessibilityRole="button"
@@ -93,92 +114,104 @@ export function DiaryLedgerRow({ review, show, fallbackTitle, posterUrl, monthIn
         if (e.nativeEvent.actionName === 'delete') onDelete();
       }}
     >
-      <View style={styles.dayBox}>
-        {monthInBox && month && <Text style={styles.dayBoxMonth}>{month}</Text>}
-        <Text style={styles.dayBoxNum}>{day}</Text>
-      </View>
-
-      {posterUrl ? (
-        <Image source={{ uri: posterUrl }} style={styles.thumb} contentFit="cover" transition={200} />
-      ) : (
-        <View style={[styles.thumb, styles.thumbPlaceholder]}>
-          <Text style={styles.thumbPlaceholderText}>{title.charAt(0)}</Text>
-        </View>
-      )}
-
-      <View style={styles.body}>
-        <Text numberOfLines={1} style={styles.title}>
-          {title}
-          {year ? <Text style={styles.year}>  {year}</Text> : null}
-        </Text>
-        <View style={styles.metaRow}>
-          <MiniStars rating={review.rating} />
+      <View style={styles.row}>
+        <DateCol date={review.date_seen} />
+        <PosterThumb posterUrl={posterUrl} title={title} />
+        <View style={styles.info}>
+          <Text style={styles.title} numberOfLines={1}>{title}</Text>
+          {!!show?.venue && <Text style={styles.venue} numberOfLines={1}>{show.venue}</Text>}
           {!!review.review_text && (
-            <Svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke={Colors.text.muted} strokeWidth={2}>
-              <Path strokeLinecap="round" strokeLinejoin="round" d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
-            </Svg>
+            <Text style={styles.note} numberOfLines={2}>{review.review_text}</Text>
           )}
         </View>
+        {review.rating > 0 && (
+          <View style={styles.starsCol}>
+            <MiniStars rating={review.rating} />
+          </View>
+        )}
       </View>
-
-      <Svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={Colors.text.muted} strokeWidth={2}>
-        <Path strokeLinecap="round" strokeLinejoin="round" d="M9 18l6-6-6-6" />
-      </Svg>
     </Pressable>
   );
 }
 
+interface UpcomingRowProps {
+  plannedDate: string | null;
+  show: Show | undefined;
+  fallbackTitle: string;
+  posterUrl: string | null;
+  /** e.g. "Tomorrow" or "23d" — replaces the stars column. */
+  countdownLabel: string | null;
+  onPress: () => void;
+  onLongPress: () => void;
+  onRemove: () => void;
+}
+
+export function UpcomingLedgerRow({ plannedDate, show, fallbackTitle, posterUrl, countdownLabel, onPress, onLongPress, onRemove }: UpcomingRowProps) {
+  const title = show?.title || fallbackTitle;
+  const d = plannedDate ? new Date(plannedDate + 'T00:00:00') : null;
+  const hasDate = d && !Number.isNaN(d.getTime());
+  const a11yLabel = `${title}${
+    hasDate ? `, planned for ${d!.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}` : ''
+  }`;
+
+  return (
+    <Pressable
+      style={({ pressed }) => [styles.card, pressed && styles.pressed]}
+      onPress={onPress}
+      onLongPress={onLongPress}
+      accessibilityRole="button"
+      accessibilityLabel={a11yLabel}
+      accessibilityHint="Long press for more actions"
+      accessibilityActions={[{ name: 'delete', label: 'Remove from watchlist' }]}
+      onAccessibilityAction={e => {
+        if (e.nativeEvent.actionName === 'delete') onRemove();
+      }}
+    >
+      <View style={styles.row}>
+        <DateCol date={plannedDate} />
+        <PosterThumb posterUrl={posterUrl} title={title} />
+        <View style={styles.info}>
+          <Text style={styles.title} numberOfLines={1}>{title}</Text>
+          {!!show?.venue && <Text style={styles.venue} numberOfLines={1}>{show.venue}</Text>}
+        </View>
+        {!!countdownLabel && <Text style={styles.countdown}>{countdownLabel}</Text>}
+      </View>
+    </Pressable>
+  );
+}
+
+// Styles below are copied from PhotoFeedTimeline.tsx so the two views stay
+// pixel-identical — if you restyle the Feed cards, restyle these with them.
 const styles = StyleSheet.create({
-  monthDivider: {
-    paddingTop: Spacing.md,
-    paddingBottom: Spacing.xs,
+  monthBand: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    marginHorizontal: -Spacing.lg,
+    paddingHorizontal: Spacing.lg, paddingVertical: 8,
+    marginTop: Spacing.lg, marginBottom: Spacing.sm,
+    backgroundColor: Colors.surface.raised,
+    borderTopWidth: 1, borderBottomWidth: 1, borderColor: Colors.border.subtle,
   },
-  monthDividerText: {
-    color: Colors.text.muted,
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 1,
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: Colors.border.subtle,
-    backgroundColor: Colors.surface.default,
+  monthLabel: { color: Colors.text.primary, fontSize: 13, fontWeight: '700', letterSpacing: 0.6 },
+  monthCount: { color: Colors.text.muted, fontSize: 12 },
+  card: {
+    backgroundColor: Colors.surface.raised, borderRadius: BorderRadius.md,
+    padding: Spacing.md,
   },
   pressed: { opacity: 0.7 },
-  dayBox: {
-    width: 40,
-    height: 44,
-    borderRadius: BorderRadius.sm,
-    backgroundColor: Colors.surface.overlay,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  dayBoxMonth: {
-    color: Colors.text.muted,
-    fontSize: 12,
-    fontWeight: '700',
-    lineHeight: 13,
-  },
-  dayBoxNum: {
-    color: Colors.text.primary,
-    fontSize: FontSize.md,
-    fontWeight: '700',
-    fontVariant: ['tabular-nums'],
-  },
-  thumb: {
-    width: 38,
-    height: 52,
-    borderRadius: BorderRadius.sm,
+  row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
+  dateCol: { width: 30, alignItems: 'center' },
+  dateDay: { color: Colors.text.primary, fontSize: 16, fontWeight: '700', lineHeight: 18 },
+  dateMonth: { color: Colors.text.muted, fontSize: 12, fontWeight: '700', letterSpacing: 0.4 },
+  poster: {
+    width: 40, height: 56, borderRadius: BorderRadius.sm,
     backgroundColor: Colors.surface.overlay,
   },
-  thumbPlaceholder: { alignItems: 'center', justifyContent: 'center' },
-  thumbPlaceholderText: { color: Colors.text.muted, fontSize: 16, fontWeight: '600' },
-  body: { flex: 1, gap: 3 },
-  title: { color: Colors.text.primary, fontSize: FontSize.md, fontWeight: '700' },
-  year: { color: Colors.text.muted, fontSize: FontSize.xs, fontWeight: '400' },
-  metaRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs },
+  posterPlaceholder: { alignItems: 'center', justifyContent: 'center' },
+  posterPlaceholderText: { color: Colors.text.muted, fontSize: 16, fontWeight: '600' },
+  info: { flex: 1, minWidth: 0, gap: 1 },
+  title: { fontSize: FontSize.md, fontWeight: '700', color: Colors.text.primary },
+  venue: { fontSize: FontSize.xs, color: Colors.text.muted },
+  note: { fontSize: FontSize.xs, color: Colors.text.secondary, marginTop: 2 },
+  starsCol: { alignItems: 'flex-end' },
+  countdown: { color: '#fcd34d', fontSize: FontSize.xs, fontWeight: '600' },
 });
