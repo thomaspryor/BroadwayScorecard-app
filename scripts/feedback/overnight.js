@@ -188,7 +188,17 @@ async function runAgent(items) {
 
   const code = await new Promise((resolve) => {
     const out = fs.openSync(agentLog, 'a');
-    const child = spawn('claude', ['--dangerously-skip-permissions', prompt], {
+    // -p is load-bearing. Without it the CLI starts its interactive TUI, and
+    // with stdio pointed at a file instead of a TTY it simply hangs: 0 bytes of
+    // output, no edits, alive until the timeout kills it (observed 2026-08-05).
+    // stream-json + --verbose is what makes a stalled overnight run diagnosable
+    // the next morning rather than a silent empty log.
+    const child = spawn('claude', [
+      '-p', prompt,
+      '--output-format', 'stream-json',
+      '--verbose',
+      '--dangerously-skip-permissions',
+    ], {
       cwd: wtPath,
       stdio: ['ignore', out, out],
       env: { ...process.env, FEEDBACK_AUTOPILOT_RUN: stamp },
