@@ -98,3 +98,30 @@ peek. Items from 03:45Z on 2026-08-04 onward were the first real queue.
 - Headless runs bill against the same account as everything else. As of
   2026-08-05 the 7-day limit was already exhausted and runs proceed on overage,
   so a nightly 6-item run is not free.
+- **`ship.js` can publish an OTA update and then throw.** Its post-publish
+  checks run after `eas update` has already gone out, so a nonzero exit does NOT
+  mean nothing shipped. Never requeue on that assumption — republishing a live
+  fix is as bad as losing one. The driver marks those items `deferred` with the
+  `eas-cli update:list` command to check.
+- **`assets/images/icon.png` was invisible to `ship.js`.** `NATIVE_PATHS` had
+  `assets/(icon|splash|adaptive)` but app.json points at `assets/images/`, one
+  directory deeper, so replacing the app icon read as JS-only, would have
+  shipped as a free OTA, and the icon would never have changed on the phone.
+  Fixed 2026-08-05; `scripts/feedback/overnight.test.mjs` now asserts both
+  spellings stay native.
+
+## Recovery
+
+- **Ledger looks empty or wrong:** `~/.claude/broadwayscore-feedback/ledger.json.bak`
+  is the previous write. `load()` refuses to parse a corrupt ledger rather than
+  falling back to empty, because an empty ledger re-implements every fix ever
+  shipped.
+- **An overnight fix looks wrong on the phone:**
+  `npx eas-cli update:rollback --branch production`. The morning report names the
+  update group the run published.
+- **The automation stopped running:** check `~/.claude/broadwayscore-feedback/launchd.log`
+  and `/tmp/feedback-overnight.err`. A leftover `run.lock` whose pid is gone is
+  cleared automatically; a `DISABLED` file is not.
+- **Everything is stuck on "local main has diverged":** shouldn't happen since
+  the driver resets main to origin/main after a failed push, but if it does, the
+  night's work is on its `worktree-feedback-overnight-*` branch.
