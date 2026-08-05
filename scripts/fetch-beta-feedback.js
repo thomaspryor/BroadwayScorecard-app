@@ -50,8 +50,23 @@ function mintToken() {
   });
 }
 
+/**
+ * Every caller (getAllPages' primary listing loop, downloadCrashLog) treats
+ * a returned __error object as "this page/request failed, move on" rather
+ * than throwing. A transport-level failure (DNS, timeout, connection reset)
+ * has to become the same __error shape here, at the one place all of them
+ * go through — not a per-caller try/catch — or an unhandled rejection from
+ * fetch() itself propagates out of the run's only top-level catch in main(),
+ * which writes nothing and silently loses every item already collected that
+ * run, not just the one request that failed (found in ship-check for #1055).
+ */
 async function getJSON(url, token) {
-  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+  let res;
+  try {
+    res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+  } catch (e) {
+    return { __error: 'network', __body: e.message, __url: url };
+  }
   const body = await res.text();
   if (!res.ok) return { __error: res.status, __body: body.slice(0, 2000), __url: url };
   try { return JSON.parse(body); } catch { return { __error: 'unparseable', __body: body.slice(0, 2000), __url: url }; }
