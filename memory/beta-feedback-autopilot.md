@@ -85,3 +85,16 @@ peek. Items from 03:45Z on 2026-08-04 onward were the first real queue.
   "this screen" without naming it.
 - Screenshot URLs are pre-signed and expire in about 7 days, so the bytes are
   pulled at fetch time, not lazily.
+- **The headless agent must be spawned with `claude -p`.** Without it the CLI
+  starts its interactive TUI; with stdio pointed at a log file instead of a TTY
+  it hangs — 0 bytes of output, zero edits, alive until the timeout kills it.
+  The first live run did exactly this. `--output-format stream-json --verbose`
+  is on for the same reason: an empty log is indistinguishable from "the agent
+  ran and decided to do nothing".
+- Crash submissions carry no crash log in their attributes. ASC keeps it behind
+  a separate `/crashLog` relationship that the fetcher does not pull yet, so a
+  crash item arrives as a bare comment. Worth adding the next time a live crash
+  shows up and the endpoint shape can actually be verified.
+- Headless runs bill against the same account as everything else. As of
+  2026-08-05 the 7-day limit was already exhausted and runs proceed on overage,
+  so a nightly 6-item run is not free.
