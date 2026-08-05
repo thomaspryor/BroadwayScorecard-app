@@ -176,6 +176,19 @@ test('computeThemeSummary clusters the real ledger without touching the network 
   assert.equal(clusters[0].count, 2);
 });
 
+// Regression: the "nothing to do tonight" call site once built its
+// reportBody() call without pullError, even though a failed pull is computed
+// and known before that branch is reached -- silently hiding "the pull failed
+// and new feedback may be unseen" behind a normal-looking empty report.
+test('reportBody renders the pull-failure warning when pullError is passed', () => {
+  const body = reportBody({
+    taken: [], result: null, gates: null, ship: null, pending: [], deferred: [], done: [],
+    pullError: 'run 123 did not succeed',
+  });
+  assert.match(body, /Could not fetch new feedback/);
+  assert.match(body, /run 123 did not succeed/);
+});
+
 test('computeThemeSummary returns [] rather than throwing on a corrupt ledger', () => {
   fs.mkdirSync(ledger.HOME, { recursive: true });
   fs.writeFileSync(ledger.LEDGER, 'not valid json');

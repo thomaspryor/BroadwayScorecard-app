@@ -784,7 +784,7 @@ async function main() {
   if (!taken.length) {
     log('nothing to do');
     writeReport(
-      reportBody({ taken: [], result: null, gates: null, ship: null, pending, deferred: [], done: [], themeClusters: computeThemeSummary() }),
+      reportBody({ taken: [], result: null, gates: null, ship: null, pending, deferred: [], done: [], pullError, themeClusters: computeThemeSummary() }),
       { didWork: false },
     );
     return;
