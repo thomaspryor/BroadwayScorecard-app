@@ -250,8 +250,11 @@ function formatReport(clusters) {
   if (!clusters.length) return 'No recurring themes matched.';
   const lines = [];
   for (const c of clusters) {
+    // null covers two cases indistinguishably on purpose: no build data was
+    // supplied, or it was but no item in this theme resolved to one -- both
+    // mean "we don't actually know the span," so neither should print as 0.
     const span = c.buildsSpanned === null
-      ? 'unknown (no build data)'
+      ? 'unknown # of builds'
       : `${c.buildsSpanned} build(s): ${c.builds.join(', ') || 'n/a'}`;
     lines.push(`## ${c.name}`);
     lines.push(`  filed ${c.count}x -- ${c.firstSeen.slice(0, 10)} to ${c.lastSeen.slice(0, 10)}, spans ${span}`);

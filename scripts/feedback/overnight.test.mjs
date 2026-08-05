@@ -16,7 +16,7 @@ import { createRequire } from 'node:module';
 process.env.BSC_FEEDBACK_HOME = fs.mkdtempSync(path.join(os.tmpdir(), 'overnight-test-home-'));
 
 const require = createRequire(import.meta.url);
-const { forbiddenIn, reportBody } = require('./overnight.js');
+const { forbiddenIn, reportBody, computeThemeSummary } = require('./overnight.js');
 const { NATIVE_PATHS } = require('../ship.js');
 const ledger = require('./ledger.js');
 
@@ -124,7 +124,39 @@ test('the automation cannot rewrite its own rules', () => {
 // This is the whole point of task #1054: the morning report must surface a
 // theme filed more than once, not just tonight's batch, so a complaint that
 // keeps recurring across builds doesn't stay invisible between overnight runs.
-test('reportBody surfaces a recurring theme even when nothing happened tonight', () => {
+// reportBody() takes themeClusters as a plain parameter (computed once by the
+// caller via computeThemeSummary(), never inside reportBody itself) so this
+// is a pure formatting test with no ledger/network dependency -- it must not
+// take longer than any other string-formatting test in this file.
+test('reportBody surfaces a recurring theme passed in via themeClusters', () => {
+  const themeClusters = [{
+    name: 'Labels / overlay text rendered too large',
+    count: 2,
+    firstSeen: '2026-07-25T00:00:00.000Z',
+    lastSeen: '2026-08-01T00:00:00.000Z',
+    buildsSpanned: 2,
+    builds: ['54', '61'],
+  }];
+  const body = reportBody({ taken: [], result: null, gates: null, ship: null, pending: [], deferred: [], done: [], themeClusters });
+  assert.match(body, /## Recurring themes/);
+  assert.match(body, /Labels \/ overlay text rendered too large/);
+  assert.match(body, /filed 2x/);
+});
+
+test('reportBody has no recurring-themes section when themeClusters is empty', () => {
+  const body = reportBody({ taken: [], result: null, gates: null, ship: null, pending: [], deferred: [], done: [], themeClusters: [] });
+  assert.doesNotMatch(body, /## Recurring themes/);
+});
+
+test('reportBody has no recurring-themes section when themeClusters is omitted (default)', () => {
+  const body = reportBody({ taken: [], result: null, gates: null, ship: null, pending: [], deferred: [], done: [] });
+  assert.doesNotMatch(body, /## Recurring themes/);
+});
+
+// computeThemeSummary() is the one place allowed to touch the ledger/network
+// -- tested separately, against a seeded fresh builds-cache so it never
+// depends on eas-cli reachability.
+test('computeThemeSummary clusters the real ledger without touching the network (fresh cache)', () => {
   const base = { id: 'x', role: 'owner', status: 'done', createdDate: '2026-07-25T00:00:00.000Z' };
   const raw = {
     version: 1,
@@ -136,15 +168,16 @@ test('reportBody surfaces a recurring theme even when nothing happened tonight',
   };
   fs.mkdirSync(ledger.HOME, { recursive: true });
   fs.writeFileSync(ledger.LEDGER, JSON.stringify(raw));
+  fs.writeFileSync(path.join(ledger.HOME, 'builds-cache.json'), JSON.stringify({ fetchedAt: new Date().toISOString(), builds: [] }));
 
-  const body = reportBody({ taken: [], result: null, gates: null, ship: null, pending: [], deferred: [], done: [] });
-  assert.match(body, /## Recurring themes/);
-  assert.match(body, /Labels \/ overlay text rendered too large/);
-  assert.match(body, /filed 2x/);
+  const clusters = computeThemeSummary();
+  assert.equal(clusters.length, 1);
+  assert.equal(clusters[0].name, 'Labels / overlay text rendered too large');
+  assert.equal(clusters[0].count, 2);
 });
 
-test('reportBody has no recurring-themes section when nothing repeats', () => {
-  fs.writeFileSync(ledger.LEDGER, JSON.stringify({ version: 1, items: {} }));
-  const body = reportBody({ taken: [], result: null, gates: null, ship: null, pending: [], deferred: [], done: [] });
-  assert.doesNotMatch(body, /## Recurring themes/);
+test('computeThemeSummary returns [] rather than throwing on a corrupt ledger', () => {
+  fs.mkdirSync(ledger.HOME, { recursive: true });
+  fs.writeFileSync(ledger.LEDGER, 'not valid json');
+  assert.deepEqual(computeThemeSummary(), []);
 });

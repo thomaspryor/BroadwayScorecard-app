@@ -607,7 +607,25 @@ function writeReport(sections, { didWork = true } = {}) {
   return file;
 }
 
-function reportBody({ taken, result, gates, ship, visual, screenshots = [], pending, deferred, done, unshipped = [], pullError = null }) {
+/**
+ * Computed once per run, not inside reportBody(): themes.loadBuilds() can hit
+ * a real network round trip (eas-cli, bounded to 30s but still I/O), and both
+ * report call sites -- including the common "nothing to do tonight" path --
+ * would otherwise each trigger it independently. Enrichment only: any failure
+ * here degrades to "no recurring-themes section" rather than blocking the
+ * report the owner actually reads every morning.
+ */
+function computeThemeSummary() {
+  try {
+    return themes.clusterThemes(Object.values(ledger.load().items), themes.loadBuilds())
+      .filter((c) => c.count >= 2);
+  } catch (e) {
+    log(`theme summary skipped: ${e.message}`);
+    return [];
+  }
+}
+
+function reportBody({ taken, result, gates, ship, visual, screenshots = [], pending, deferred, done, unshipped = [], pullError = null, themeClusters = [] }) {
   const L = [];
   L.push(`# Overnight beta feedback — ${stamp.slice(0, 10)}`);
   L.push('');
@@ -696,21 +714,16 @@ function reportBody({ taken, result, gates, ship, visual, screenshots = [], pend
   // Read the ledger as a set every morning, not just what tonight's run
   // touched -- the whole point of themes.js: a complaint filed 3x across
   // builds should read as "fix the class", not three unrelated one-offs.
-  // Enrichment only: a themes/ledger failure must not blank the report.
-  try {
-    const clusters = themes.clusterThemes(Object.values(ledger.load().items), themes.loadBuilds())
-      .filter((c) => c.count >= 2);
-    if (clusters.length) {
-      L.push('## Recurring themes (read the ledger as a set)');
-      L.push("These keep coming back on different screens -- worth fixing the class, not just tonight's item.");
-      clusters.forEach((c) => {
-        const span = c.buildsSpanned === null ? 'unknown # of builds' : `${c.buildsSpanned} build(s): ${c.builds.join(', ')}`;
-        L.push(`- **${c.name}** — filed ${c.count}x, spans ${span} (${c.firstSeen.slice(0, 10)} to ${c.lastSeen.slice(0, 10)})`);
-      });
-      L.push('');
-    }
-  } catch (e) {
-    log(`theme summary skipped: ${e.message}`);
+  // themeClusters is precomputed once by the caller (see computeThemeSummary)
+  // so this function stays a pure formatter with no I/O of its own.
+  if (themeClusters.length) {
+    L.push('## Recurring themes (read the ledger as a set)');
+    L.push("These keep coming back on different screens -- worth fixing the class, not just tonight's item.");
+    themeClusters.forEach((c) => {
+      const span = c.buildsSpanned === null ? 'unknown # of builds' : `${c.buildsSpanned} build(s): ${c.builds.join(', ')}`;
+      L.push(`- **${c.name}** — filed ${c.count}x, spans ${span} (${c.firstSeen.slice(0, 10)} to ${c.lastSeen.slice(0, 10)})`);
+    });
+    L.push('');
   }
 
   if (visual) {
@@ -771,7 +784,7 @@ async function main() {
   if (!taken.length) {
     log('nothing to do');
     writeReport(
-      reportBody({ taken: [], result: null, gates: null, ship: null, pending, deferred: [], done: [] }),
+      reportBody({ taken: [], result: null, gates: null, ship: null, pending, deferred: [], done: [], themeClusters: computeThemeSummary() }),
       { didWork: false },
     );
     return;
@@ -854,7 +867,10 @@ async function main() {
   }
 
   const screenshots = copyScreenshots(visual);
-  writeReport(reportBody({ taken, result, gates, ship, visual, screenshots, pending: ledger.pendingApproval(), deferred, done, unshipped, pullError }));
+  writeReport(reportBody({
+    taken, result, gates, ship, visual, screenshots, pending: ledger.pendingApproval(), deferred, done, unshipped, pullError,
+    themeClusters: computeThemeSummary(),
+  }));
   log('=== done ===');
 }
 
@@ -881,7 +897,7 @@ function copyScreenshots(visual) {
     .filter(Boolean);
 }
 
-module.exports = { FORBIDDEN_PATHS, forbiddenIn, crashLogExcerpt, reportBody };
+module.exports = { FORBIDDEN_PATHS, forbiddenIn, crashLogExcerpt, reportBody, computeThemeSummary };
 if (require.main === module) {
   main().catch((e) => { log('FAILED:', e.stack || e.message); process.exit(1); });
 }
