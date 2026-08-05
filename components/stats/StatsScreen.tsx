@@ -269,7 +269,11 @@ export function StatsScreen({
     setDrilldown({
       title: 'The audience & you',
       caption: `${bundle.audience.aligned} of ${bundle.audience.comparable} shows within a grade of the audience`,
-      reviews: reviewsFor(bundle.audience.alignedShowIds),
+      // Lifetime history, not scoped — same as gold and Aisle Mates. The card
+      // counts allRows and now says "All time" under a dated scope, so a
+      // drill-down reading reviewsInScope would open a shorter, season-filtered
+      // list than the number the owner just tapped.
+      reviews: reviewsFor(bundle.audience.alignedShowIds, reviews),
     });
   };
 
