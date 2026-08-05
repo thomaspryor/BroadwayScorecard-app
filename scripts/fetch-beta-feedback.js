@@ -86,6 +86,20 @@ async function downloadShots(item, token) {
   return files;
 }
 
+/** DIAGNOSTIC ONLY (task #1055): dump the raw crashLog relationship response
+ *  so the real shape can be inspected before the parser is written — the
+ *  endpoint shape was deliberately not guessed. Remove once normalise()
+ *  extracts a real field from it. */
+async function fetchCrashLogRaw(item, token) {
+  const related = item.relationships
+    && item.relationships.crashLog
+    && item.relationships.crashLog.links
+    && item.relationships.crashLog.links.related;
+  const url = related || `${API}/v1/betaFeedbackCrashSubmissions/${item.id}/crashLog`;
+  const body = await getJSON(url, token);
+  return { id: item.id, url, relationshipPresent: Boolean(related), body };
+}
+
 function normalise(item, kind, files) {
   const a = item.attributes || {};
   return {
@@ -124,6 +138,7 @@ async function main() {
 
   const raw = {};
   const items = [];
+  const crashLogDebug = [];
   for (const [name, { url, kind }] of Object.entries(targets)) {
     const pages = await getAllPages(url, token);
     raw[name] = pages;
@@ -136,6 +151,11 @@ async function main() {
     console.log(`${name}: ${data.length} items`);
     for (const it of data) {
       const files = await downloadShots(it, token);
+      if (kind === 'crash') {
+        const dbg = await fetchCrashLogRaw(it, token);
+        crashLogDebug.push(dbg);
+        console.log(`  crashLog ${it.id}: relationshipPresent=${dbg.relationshipPresent} url=${dbg.url}`);
+      }
       items.push(normalise(it, kind, files));
     }
   }
@@ -143,6 +163,9 @@ async function main() {
   items.sort((a, b) => new Date(a.createdDate || 0) - new Date(b.createdDate || 0));
   fs.writeFileSync(path.join(OUT, 'items.json'), JSON.stringify(items, null, 2));
   fs.writeFileSync(path.join(OUT, 'feedback-raw.json'), JSON.stringify(raw, null, 2));
+  if (crashLogDebug.length) {
+    fs.writeFileSync(path.join(OUT, 'crashlog-debug.json'), JSON.stringify(crashLogDebug, null, 2));
+  }
   const shotCount = items.reduce((n, i) => n + i.screenshots.length, 0);
   console.log(`done; ${items.length} items, ${shotCount} screenshots -> ${OUT}`);
 }
