@@ -484,9 +484,31 @@ function mergeAndShip(branch) {
 
 // ----------------------------------------------------------------- report
 
-function writeReport(sections) {
+/**
+ * The morning report is the owner's only record of what the automation did to
+ * their app, and the filename is per-day — so a second run on the same date
+ * used to overwrite the first. That is exactly what happened on 2026-08-05: a
+ * 02:15 run with an empty queue replaced the report listing eight shipped fixes
+ * with "Shipped: No", which reads as "the automation did nothing" while three
+ * OTAs were in fact live.
+ *
+ * A run that did no work therefore never replaces one that did; it appends a
+ * line instead.
+ */
+function writeReport(sections, { didWork = true } = {}) {
   fs.mkdirSync(OUTPUTS, { recursive: true });
   const file = path.join(OUTPUTS, `beta-feedback-overnight-${stamp.slice(0, 10)}.md`);
+
+  if (!didWork && fs.existsSync(file)) {
+    const existing = fs.readFileSync(file, 'utf8');
+    // Only defer to a report that actually recorded shipped work.
+    if (/^## Fixed$/m.test(existing)) {
+      fs.appendFileSync(file, `\n---\n\nA later run at ${new Date().toTimeString().slice(0, 5)} found nothing new to do. The report above still stands.\n`);
+      log(`report: ${file} (appended — kept the earlier run's report)`);
+      return file;
+    }
+  }
+
   fs.writeFileSync(file, sections);
   log(`report: ${file}`);
   return file;
@@ -625,7 +647,10 @@ async function main() {
   const taken = queue.slice(0, MAX_ITEMS);
   if (!taken.length) {
     log('nothing to do');
-    writeReport(reportBody({ taken: [], result: null, gates: null, ship: null, pending, deferred: [], done: [] }));
+    writeReport(
+      reportBody({ taken: [], result: null, gates: null, ship: null, pending, deferred: [], done: [] }),
+      { didWork: false },
+    );
     return;
   }
   log(`taking ${taken.length}: ${taken.map((i) => i.id).join(' ')}`);
