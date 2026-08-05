@@ -192,7 +192,10 @@ function clusterThemes(items, builds = []) {
       firstSeen: sorted[0].createdDate,
       lastSeen: sorted[sorted.length - 1].createdDate,
       builds: buildLabels,
-      buildsSpanned: builds.length ? buildLabels.length : null,
+      // null means "no build data to consult" (renders as "unknown"); 0 would
+      // read the same but for a different, misleading reason -- build data
+      // existed but no item in the theme resolved to a labeled build.
+      buildsSpanned: buildLabels.length ? buildLabels.length : null,
       siblingFiles: siblingFiles(theme),
     };
   }).filter(Boolean);
@@ -227,7 +230,10 @@ function loadBuilds({ force = false } = {}) {
     const raw = execFileSync(
       'npx',
       ['eas-cli', 'build:list', '--platform', 'ios', '--limit', '100', '--non-interactive', '--json'],
-      { cwd: REPO, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024, stdio: ['ignore', 'pipe', 'ignore'] },
+      // timeout matters: this runs inside seedPrompt(), synchronously, before
+      // the overnight run's own TIMEOUT_MIN timer even starts. A hung network
+      // call here would otherwise block the whole unattended run all night.
+      { cwd: REPO, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024, timeout: 30_000, stdio: ['ignore', 'pipe', 'ignore'] },
     );
     const builds = JSON.parse(raw.slice(raw.indexOf('[')));
     fs.mkdirSync(ledger.HOME, { recursive: true, mode: 0o700 });

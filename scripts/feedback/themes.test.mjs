@@ -7,6 +7,12 @@ import os from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 
+// Isolated from the real ~/.claude/broadwayscore-feedback/ -- loadBuilds()
+// writes a cache file there, and the tests below exercise that cache
+// directly. Must be set before themes.js (and the ledger.js it requires)
+// load, since ledger.HOME is computed once at require time.
+process.env.BSC_FEEDBACK_HOME = fs.mkdtempSync(path.join(os.tmpdir(), 'themes-test-home-'));
+
 const require = createRequire(import.meta.url);
 const themes = require('./themes.js');
 
@@ -62,6 +68,17 @@ test('clusterThemes reports buildsSpanned=null when no build data was supplied',
     assert.equal(c.buildsSpanned, null);
     assert.deepEqual(c.builds, []);
   }
+});
+
+test('clusterThemes reports buildsSpanned=null (not 0) when build data exists but no item resolves to one', () => {
+  // Builds present but missing appBuildVersion -- assignBuild() returns null
+  // for every item. 0 would misleadingly claim "the span is zero builds"
+  // when the truth is "we have no idea what build these were filed against".
+  const builds = [{ createdAt: '2026-07-01T00:00:00.000Z' }];
+  const clusters = themes.clusterThemes(FIXTURE, builds);
+  const labels = clusters.find((c) => c.key === 'labels-too-large');
+  assert.equal(labels.buildsSpanned, null);
+  assert.deepEqual(labels.builds, []);
 });
 
 test('assignBuild picks the newest build at or before the item date', () => {
@@ -160,4 +177,28 @@ test('siblingFiles codePattern does not substring-match inside unrelated words',
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }
+});
+
+test('loadBuilds returns the cached builds without touching the network when the cache is fresh', () => {
+  const BUILDS_CACHE = path.join(process.env.BSC_FEEDBACK_HOME, 'builds-cache.json');
+  fs.mkdirSync(process.env.BSC_FEEDBACK_HOME, { recursive: true });
+  const cached = [{ appBuildVersion: '99', createdAt: '2026-08-01T00:00:00.000Z' }];
+  fs.writeFileSync(BUILDS_CACHE, JSON.stringify({ fetchedAt: new Date().toISOString(), builds: cached }));
+  assert.deepEqual(themes.loadBuilds(), cached);
+});
+
+test('loadBuilds never throws once a stale cache forces a real eas-cli attempt', () => {
+  const BUILDS_CACHE = path.join(process.env.BSC_FEEDBACK_HOME, 'builds-cache.json');
+  fs.mkdirSync(process.env.BSC_FEEDBACK_HOME, { recursive: true });
+  const stale = [{ appBuildVersion: '1', createdAt: '2020-01-01T00:00:00.000Z' }];
+  // 7h old -- past the 6h TTL, so loadBuilds must attempt a real fetch here.
+  // Whether that fetch succeeds or fails on this machine, the call must
+  // return (an array), never throw -- the "enrichment, never blocks" contract.
+  fs.writeFileSync(BUILDS_CACHE, JSON.stringify({
+    fetchedAt: new Date(Date.now() - 7 * 60 * 60 * 1000).toISOString(),
+    builds: stale,
+  }));
+  let result;
+  assert.doesNotThrow(() => { result = themes.loadBuilds(); });
+  assert.ok(Array.isArray(result));
 });
