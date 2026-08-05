@@ -143,6 +143,12 @@ jobs:
       - name: Unit-test vendored stats engine drift
         run: node --test scripts/vendor-stats-lib.test.mjs
 
+      # The overnight feedback autopilot auto-implements the OWNER's TestFlight
+      # feedback but must never auto-implement anyone else's. That split is one
+      # email comparison — test it here so it cannot regress unnoticed.
+      - name: Unit-test beta-feedback approval gate
+        run: node --test scripts/feedback/ledger.test.mjs
+
       - name: Decide whether TestFlight drifted
         id: gate
         env:
