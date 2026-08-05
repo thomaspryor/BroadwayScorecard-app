@@ -102,8 +102,23 @@ async function downloadCrashLog(item, token) {
     && item.relationships.crashLog
     && item.relationships.crashLog.links
     && item.relationships.crashLog.links.related;
-  if (!related) return null;
-  const body = await getJSON(related, token);
+  if (!related) {
+    console.log(`  crashLog ${item.id}: no crashLog relationship on this item`);
+    return null;
+  }
+  // getJSON already turns a non-2xx or unparseable response into an __error
+  // object rather than throwing (see above) — this catch is for the transport
+  // failures that don't go through that path (DNS, timeout, connection reset).
+  // A crash item's log fetch failing must never take down the whole run and
+  // lose every already-collected screenshot item, same reasoning as
+  // downloadShots()'s try/catch just above.
+  let body;
+  try {
+    body = await getJSON(related, token);
+  } catch (e) {
+    console.log(`  crashLog ${item.id}: ${e.message}`);
+    return null;
+  }
   const text = extractLogText(body);
   if (!text) {
     console.log(`  crashLog ${item.id}: response did not contain logText`);

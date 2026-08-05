@@ -157,9 +157,16 @@ function crashLogExcerpt(i) {
   const file = path.join(ledger.LOGS, i.crashLogFile);
   let text;
   try { text = fs.readFileSync(file, 'utf8'); } catch { return null; }
-  return text.length > CRASH_LOG_MAX_CHARS
-    ? `${text.slice(0, CRASH_LOG_MAX_CHARS)}\n... (truncated, full log at ${file})`
-    : text;
+  // Most of a crash log is genuinely OS-generated, but sections like
+  // "Application Specific Information" can carry app- or tester-influenced
+  // strings (a custom exception reason, a malformed deep link). Neutralize
+  // any embedded ``` so that content can't close the fence early and have
+  // its remainder read as prompt text instead of quoted log data — the same
+  // untrusted-input posture the tester comment already gets via JSON.stringify.
+  const safe = text.replace(/```/g, "'''");
+  return safe.length > CRASH_LOG_MAX_CHARS
+    ? `${safe.slice(0, CRASH_LOG_MAX_CHARS)}\n... (truncated, full log at ${file})`
+    : safe;
 }
 
 function seedPrompt(items, worktree) {
@@ -777,7 +784,7 @@ async function main() {
   log('=== done ===');
 }
 
-module.exports = { FORBIDDEN_PATHS, forbiddenIn };
+module.exports = { FORBIDDEN_PATHS, forbiddenIn, crashLogExcerpt };
 if (require.main === module) {
   main().catch((e) => { log('FAILED:', e.stack || e.message); process.exit(1); });
 }
