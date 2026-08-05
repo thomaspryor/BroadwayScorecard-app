@@ -149,6 +149,11 @@ jobs:
       - name: Unit-test beta-feedback approval gate
         run: node --test scripts/feedback/ledger.test.mjs
 
+      # And the guard that stops an unattended run merging a native change,
+      # which ship.js would then price at $1.85.
+      - name: Unit-test beta-feedback native-path guard
+        run: node --test scripts/feedback/overnight.test.mjs
+
       - name: Decide whether TestFlight drifted
         id: gate
         env:

@@ -54,7 +54,9 @@ function isOwner(email) {
 }
 
 function ensureDirs() {
-  for (const d of [HOME, ITEMS, IMAGES]) fs.mkdirSync(d, { recursive: true });
+  // 0700 throughout: this holds tester email addresses and screenshots of their
+  // accounts, and the default umask would leave it readable by every process.
+  for (const d of [HOME, ITEMS, IMAGES]) fs.mkdirSync(d, { recursive: true, mode: 0o700 });
 }
 
 function load() {
@@ -62,17 +64,31 @@ function load() {
   if (!fs.existsSync(LEDGER)) {
     return { version: 1, ownerEmails: OWNER_EMAILS, updatedAt: null, items: {} };
   }
-  return JSON.parse(fs.readFileSync(LEDGER, 'utf8'));
+  const text = fs.readFileSync(LEDGER, 'utf8');
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    // Never fall back to an empty ledger — that reads as "nothing was ever
+    // actioned" and the next run would redo every fix already shipped.
+    throw new Error(
+      `${LEDGER} is not valid JSON (${e.message}). A backup of the last good `
+      + `write is at ${LEDGER}.bak — inspect it, restore it, and rerun. `
+      + `Refusing to continue, because an empty ledger would re-implement `
+      + `every piece of feedback ever shipped.`,
+    );
+  }
 }
 
 function save(ledger) {
   ensureDirs();
   ledger.updatedAt = new Date().toISOString();
-  // Write-then-rename: a crash mid-write must not leave a truncated ledger,
-  // because a truncated ledger reads as "nothing was ever actioned" and the
-  // next run would redo every fix.
-  const tmp = `${LEDGER}.tmp`;
-  fs.writeFileSync(tmp, JSON.stringify(ledger, null, 2));
+  // Write-then-rename so a crash mid-write cannot leave a truncated ledger.
+  // The temp name carries the pid: the agent runs `ledger.js --done` as its own
+  // process while the driver is also writing, and a shared temp name lets one
+  // writer rename the other's half-written file into place.
+  const tmp = `${LEDGER}.${process.pid}.tmp`;
+  if (fs.existsSync(LEDGER)) fs.copyFileSync(LEDGER, `${LEDGER}.bak`);
+  fs.writeFileSync(tmp, JSON.stringify(ledger, null, 2), { mode: 0o600 });
   fs.renameSync(tmp, LEDGER);
 }
 
