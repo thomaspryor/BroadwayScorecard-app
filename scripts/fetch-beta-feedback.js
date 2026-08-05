@@ -10,11 +10,12 @@
 // Output:
 //   feedback-out/items.json        normalised [{id, kind, createdDate, email,
 //                                   comment, deviceModel, osVersion,
-//                                   screenshots:[file,...]}]
+//                                   crashLogFile, screenshots:[file,...]}]
 //   feedback-out/feedback-raw.json raw API pages (kept for debugging)
 //   feedback-out/images/<id>-<n>.<ext>
+//   feedback-out/logs/<id>.crashlog.txt   crash items only
 //
-// Two things here are load-bearing and were both wrong before 2026-08-04:
+// Three things here are load-bearing and were all wrong before 2026-08-05:
 //
 // 1. Only the app-scoped collection paths work. The top-level
 //    /v1/betaFeedback*Submissions?filter[app]= endpoints answer 403
@@ -24,10 +25,16 @@
 //    as img-001.jpg in flat discovery order, which threw away the only link
 //    between an image and the comment describing it. Everything downstream
 //    (scripts/feedback/*) needs that link to show an agent the right screen.
+// 3. A crash submission's log is not an attribute on the submission itself —
+//    it lives behind a `crashLog` relationship
+//    (GET /v1/betaFeedbackCrashSubmissions/{id}/crashLog ->
+//    data.attributes.logText, see scripts/feedback/crashlog.js) and has to be
+//    fetched with a second request per crash item.
 
 const fs = require('fs');
 const path = require('path');
 const jwt = require('jsonwebtoken');
+const { extractLogText, crashLogFilename } = require('./feedback/crashlog');
 
 const OUT = path.resolve('feedback-out');
 const API = 'https://api.appstoreconnect.apple.com';
@@ -86,7 +93,28 @@ async function downloadShots(item, token) {
   return files;
 }
 
-function normalise(item, kind, files) {
+/** ASC keeps a crash submission's log behind a separate relationship rather
+ *  than inline in the item's attributes — see scripts/feedback/crashlog.js
+ *  for the verified response shape. Writes the raw text to
+ *  feedback-out/logs/<id>.crashlog.txt, same pattern as downloadShots(). */
+async function downloadCrashLog(item, token) {
+  const related = item.relationships
+    && item.relationships.crashLog
+    && item.relationships.crashLog.links
+    && item.relationships.crashLog.links.related;
+  if (!related) return null;
+  const body = await getJSON(related, token);
+  const text = extractLogText(body);
+  if (!text) {
+    console.log(`  crashLog ${item.id}: response did not contain logText`);
+    return null;
+  }
+  const name = crashLogFilename(item.id);
+  fs.writeFileSync(path.join(OUT, 'logs', name), text);
+  return name;
+}
+
+function normalise(item, kind, files, crashLogFile) {
   const a = item.attributes || {};
   return {
     id: item.id,
@@ -98,14 +126,16 @@ function normalise(item, kind, files) {
     osVersion: a.osVersion || null,
     bundleId: a.buildBundleId || null,
     locale: a.locale || null,
-    // Crash submissions carry a log instead of a comment.
-    crashLog: a.crashLog || null,
+    // Crash submissions carry a log behind a separate relationship, fetched
+    // by downloadCrashLog() and written to feedback-out/logs/.
+    crashLogFile: crashLogFile || null,
     screenshots: files,
   };
 }
 
 async function main() {
   fs.mkdirSync(path.join(OUT, 'images'), { recursive: true });
+  fs.mkdirSync(path.join(OUT, 'logs'), { recursive: true });
   const token = mintToken();
   const appId = process.env.ASC_APP_ID;
   if (!appId) throw new Error('ASC_APP_ID is required');
@@ -136,7 +166,8 @@ async function main() {
     console.log(`${name}: ${data.length} items`);
     for (const it of data) {
       const files = await downloadShots(it, token);
-      items.push(normalise(it, kind, files));
+      const crashLogFile = kind === 'crash' ? await downloadCrashLog(it, token) : null;
+      items.push(normalise(it, kind, files, crashLogFile));
     }
   }
 
@@ -144,7 +175,8 @@ async function main() {
   fs.writeFileSync(path.join(OUT, 'items.json'), JSON.stringify(items, null, 2));
   fs.writeFileSync(path.join(OUT, 'feedback-raw.json'), JSON.stringify(raw, null, 2));
   const shotCount = items.reduce((n, i) => n + i.screenshots.length, 0);
-  console.log(`done; ${items.length} items, ${shotCount} screenshots -> ${OUT}`);
+  const crashLogCount = items.filter((i) => i.crashLogFile).length;
+  console.log(`done; ${items.length} items, ${shotCount} screenshots, ${crashLogCount} crash logs -> ${OUT}`);
 }
 
 main().catch((e) => { console.error(e); process.exit(1); });

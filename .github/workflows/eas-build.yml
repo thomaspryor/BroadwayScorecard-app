@@ -154,6 +154,12 @@ jobs:
       - name: Unit-test beta-feedback native-path guard
         run: node --test scripts/feedback/overnight.test.mjs
 
+      # Crash submissions' log text lives behind a separate ASC relationship
+      # (task #1055) — locks the response-shape parsing and the ledger's
+      # attachment of the log file alongside screenshots.
+      - name: Unit-test beta-feedback crash log attachment
+        run: node --test scripts/feedback/crashlog.test.mjs
+
       - name: Decide whether TestFlight drifted
         id: gate
         env:

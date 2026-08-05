@@ -92,9 +92,16 @@ peek. Items from 03:45Z on 2026-08-04 onward were the first real queue.
   is on for the same reason: an empty log is indistinguishable from "the agent
   ran and decided to do nothing".
 - Crash submissions carry no crash log in their attributes. ASC keeps it behind
-  a separate `/crashLog` relationship that the fetcher does not pull yet, so a
-  crash item arrives as a bare comment. Worth adding the next time a live crash
-  shows up and the endpoint shape can actually be verified.
+  a separate `crashLog` relationship
+  (`GET /v1/betaFeedbackCrashSubmissions/{id}/crashLog` ->
+  `data.attributes.logText`, verified live against item
+  `AK1jBS_JWG4VL6RCQX2nyLw` 2026-08-05). `fetch-beta-feedback.js` fetches it
+  and writes `feedback-out/logs/<id>.crashlog.txt`; `ledger.js` copies it
+  alongside screenshots and `overnight.js` includes it (truncated to 4000
+  chars) in the seed prompt. The log is NOT symbolicated — app-code frames are
+  raw addresses; only a crash inside a named system library (the observed
+  sample: a missing framework at dyld load time) is legible without the dSYM
+  from the matching EAS build. Fixed task #1055.
 - Headless runs bill against the same account as everything else. As of
   2026-08-05 the 7-day limit was already exhausted and runs proceed on overage,
   so a nightly 6-item run is not free.
