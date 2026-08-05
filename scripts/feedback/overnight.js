@@ -199,6 +199,21 @@ ${list}
 If a gate fails, fix it. If you cannot, revert that item's change and mark the
 item deferred (below) rather than committing something broken.
 
+## Look at what you changed
+
+The four gates prove the code compiles. They prove nothing about how it looks,
+and every item here is a visual complaint. Before committing a change that moves
+layout, size, colour, or ordering, get it on screen: boot the iOS simulator, run
+the app with EXPO_PUBLIC_DEV_AUTO_SIGNIN=1, and look at the screen the feedback
+screenshot came from. memory/ios-worktree-design-render-recipe.md has the recipe
+for making a worktree's changes actually show up, and .maestro-manual/ has flows
+that navigate to specific screens.
+
+Compare against the feedback screenshot. If it does not match what was asked,
+fix it before committing. If you cannot get the simulator up, say so explicitly
+in your final report and defer any item whose change you could not see — a
+layout change nobody looked at goes straight to the owner's phone.
+
 ## Recording what you did — this is not optional
 
 The ledger is the only record that a piece of feedback was handled. After

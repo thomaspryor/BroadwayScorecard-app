@@ -110,6 +110,17 @@ peek. Items from 03:45Z on 2026-08-04 onward were the first real queue.
   Fixed 2026-08-05; `scripts/feedback/overnight.test.mjs` now asserts both
   spellings stay native.
 
+## Known weak point: visual QA
+
+The four gates prove the code compiles; they prove nothing about how it looks,
+and every feedback item is a visual complaint. The first live run (2026-08-05)
+shipped seven layout and colour changes on gates alone. The seed prompt now
+tells the agent to boot the simulator, compare against the feedback screenshot,
+and defer anything it could not see — but an unattended agent driving a
+simulator is the least reliable part of this system. If a morning report says
+the simulator could not be reached, treat that batch as unreviewed and look at
+the app yourself before trusting it.
+
 ## Recovery
 
 - **Ledger looks empty or wrong:** `~/.claude/broadwayscore-feedback/ledger.json.bak`
