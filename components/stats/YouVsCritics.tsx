@@ -133,7 +133,15 @@ export function YouVsCritics({ bundle, onOpenAligned, onOpenPick, onOpenGold }: 
 
   return (
     <StatsCard flush={marquee}>
-      <ModuleHeader title="You vs. the critics" caption={`Across ${critics.comparable} scored shows you've rated`} />
+      {/* Name the scope explicitly: with the pill pinned atop the page, cards
+          that didn't echo it read as unscoped-or-scoped-ambiguous (beta
+          feedback 2026-08-04, APoDDAi). This module IS scoped. */}
+      <ModuleHeader
+        title="You vs. the critics"
+        caption={`Across ${critics.comparable} scored shows you've rated${
+          bundle.scope.kind !== 'all' ? ` · ${bundle.scope.label}` : ''
+        }`}
+      />
 
       <Pressable
         testID="stats-alignment-gauge"

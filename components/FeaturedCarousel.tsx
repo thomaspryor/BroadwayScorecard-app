@@ -27,6 +27,11 @@ const FeaturedCard = memo(function FeaturedCard({ show, cardWidth, isWatchlisted
   const router = useRouter();
   const posterUrl = getImageUrl(show.images.poster) || getImageUrl(show.images.thumbnail);
   const cardHeight = cardWidth * 1.5;
+  const score = getQualifiedScore(show);
+  // Unopened shows have no score, so their badge slot was just an empty gray
+  // box — drop it entirely (beta feedback 2026-08-04, AELQBP2: "Remove the
+  // score boxes on unopened shows"). Open-but-unscored shows keep the "—".
+  const hideBadge = score == null && (show.status === 'upcoming' || show.status === 'previews');
 
   return (
     <Pressable
@@ -58,9 +63,11 @@ const FeaturedCard = memo(function FeaturedCard({ show, cardWidth, isWatchlisted
         )}
 
         {/* Score badge — bottom-right; min-review gated so a 1-review show shows "—" */}
-        <View style={styles.scoreOverlay}>
-          <ScoreBadge score={getQualifiedScore(show)} category={show.category} size="small" />
-        </View>
+        {!hideBadge && (
+          <View style={styles.scoreOverlay}>
+            <ScoreBadge score={score} category={show.category} size="poster" />
+          </View>
+        )}
       </View>
 
       {/* Title below image */}

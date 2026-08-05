@@ -190,7 +190,7 @@ export function StatsScreen({
     });
   };
 
-  const openRecord = (kind: 'busiest' | 'streak' | 'drought') => {
+  const openRecord = (kind: 'busiest' | 'streak') => {
     const { diary } = bundle;
     if (kind === 'busiest' && diary.busiestMonth) {
       openMonth(diary.busiestMonth.month);
@@ -207,17 +207,6 @@ export function StatsScreen({
         title: 'Current streak',
         caption: `${diary.currentStreak} consecutive months with a show`,
         reviews: rows,
-      });
-      return;
-    }
-    if (kind === 'drought' && diary.longestDrought) {
-      setDrilldown({
-        title: 'Longest drought',
-        caption: `${diary.longestDrought.months} months with nothing logged, ${formatMonth(
-          diary.longestDrought.from,
-        )} – ${formatMonth(diary.longestDrought.to)}`,
-        reviews: [],
-        emptyText: 'Nothing logged in that stretch — that is the point.',
       });
     }
   };
@@ -456,7 +445,11 @@ export function StatsScreen({
             threshold as the critics gauge. */}
         {bundle.audience.comparable >= 5 && (
           <StatsCard>
-            <ModuleHeader title="The audience & you" />
+            {/* Lifetime module — label it under a dated scope (APoDDAi). */}
+            <ModuleHeader
+              title="The audience & you"
+              caption={active.kind !== 'all' ? 'All time' : undefined}
+            />
             <Pressable
               testID="stats-audience-row"
               onPress={openAudience}
