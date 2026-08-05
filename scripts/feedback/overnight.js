@@ -99,6 +99,24 @@ function acquireLock(attempt = 0) {
   // create-then-write version allowed, letting one process delete another's
   // lock as "corrupt" while that process still believed it held it.
   const tmp = path.join(ledger.HOME, `.run.lock.${process.pid}`);
+  // Registered before the temp file exists so no path can leave it behind, and
+  // before the link succeeds so a crash between the two still releases.
+  const release = () => {
+    fs.rmSync(tmp, { force: true });
+    try {
+      // Only unlink a lock that is still ours — a stale-clear by another run
+      // could have replaced it, and removing theirs would let a third in.
+      const held = JSON.parse(fs.readFileSync(LOCK, 'utf8'));
+      if (held.pid === process.pid) fs.unlinkSync(LOCK);
+    } catch { /* gone, unreadable, or not ours */ }
+  };
+  if (!acquireLock.registered) {
+    acquireLock.registered = true;
+    process.once('exit', release);
+    process.once('SIGINT', () => { release(); process.exit(130); });
+    process.once('SIGTERM', () => { release(); process.exit(143); });
+  }
+
   fs.writeFileSync(tmp, mine, { mode: 0o600 });
   try {
     fs.linkSync(tmp, LOCK);
@@ -123,10 +141,6 @@ function acquireLock(attempt = 0) {
     return acquireLock(attempt + 1);
   }
   fs.rmSync(tmp, { force: true });
-  const release = () => { try { fs.unlinkSync(LOCK); } catch { /* already gone */ } };
-  process.on('exit', release);
-  process.on('SIGINT', () => { release(); process.exit(130); });
-  process.on('SIGTERM', () => { release(); process.exit(143); });
   return null;
 }
 
@@ -397,7 +411,17 @@ function mergeAndShip(branch) {
       // the tree is clean so preflight passes, but --ff-only to origin/main
       // then fails every night from here on. The work is safe on the branch, so
       // put main back where the remote is and let a human look at the branch.
-      tryShell('git', ['reset', '--hard', 'origin/main']);
+      const reset = tryShell('git', ['reset', '--hard', 'origin/main']);
+      if (!reset.ok) {
+        // Say so rather than claiming a rollback that did not happen: local
+        // main still holds the merge commit and every later run will refuse.
+        return {
+          merged: true, pushed: false, shipped: false,
+          reason: `push failed twice AND the rollback to origin/main failed. Local main still has the merge commit, `
+            + `so tomorrow's run will refuse with "main has diverged" until you reset it by hand:\n`
+            + `  git -C ${REPO} reset --hard origin/main\n${reset.out.slice(0, 400)}`,
+        };
+      }
       return {
         merged: false, pushed: false, shipped: false,
         reason: `push failed twice, so local main was reset back to origin/main to keep tomorrow's run unblocked. `
@@ -423,14 +447,19 @@ function mergeAndShip(branch) {
 
   const ship = tryShell('node', ['scripts/ship.js']);
   if (!ship.ok) {
-    // ship.js can publish the update and THEN throw on its post-publish
-    // checks, so a nonzero exit does not mean nothing shipped. Requeueing on
-    // that assumption would have the agent reimplement and republish a fix
-    // that is already live. Ambiguity goes to a human instead.
+    // ship.js can publish the update and THEN throw on its post-publish checks,
+    // so a nonzero exit does not by itself mean nothing shipped. But most
+    // failures (bad credentials, a failed pre-flight, node not starting) happen
+    // BEFORE publishing, and parking those instead of retrying them is its own
+    // way to lose work. ship.js echoes the eas command immediately before
+    // running it, so that line is the evidence of an attempted publish.
+    const attempted = /\$ eas update /.test(ship.out);
     return {
-      merged: true, pushed: true, shipped: false, shipAmbiguous: true,
-      reason: `ship.js exited non-zero. It can fail AFTER publishing, so it is not clear whether the update went out. `
-        + `Check with: npx eas-cli update:list --branch production --limit 3\n${ship.out.slice(-700)}`,
+      merged: true, pushed: true, shipped: false, shipAmbiguous: attempted,
+      reason: attempted
+        ? `ship.js started the update and then failed, so it is not clear whether it went out. `
+          + `Check with: npx eas-cli update:list --branch production --limit 3\n${ship.out.slice(-700)}`
+        : `ship.js failed before it got as far as publishing, so nothing went out:\n${ship.out.slice(-700)}`,
     };
   }
   log('OTA update published');
@@ -482,10 +511,33 @@ function reportBody({ taken, result, gates, ship, pending, deferred, done, unshi
   }
 
   if (unshipped.length) {
-    L.push('## Fixed but NOT shipped — back on the queue');
-    L.push('The agent committed these, but the change never reached your phone, so they have been requeued for tonight rather than marked done.');
-    unshipped.forEach((i) => L.push(`- ${(i.comment || '').replace(/\s+/g, ' ')}\n  (${i.id}, commit ${i.commit || '?'} on ${result ? result.branch : '?'})`));
-    L.push('');
+    // Say which of the two it actually is. Telling the owner something was
+    // requeued when it was parked makes them expect a retry that never comes.
+    const parked = unshipped.filter((i) => i.status === 'deferred');
+    const requeued = unshipped.filter((i) => i.status !== 'deferred');
+    if (requeued.length) {
+      L.push('## Fixed but not shipped — back on the queue');
+      L.push('The agent committed these and the change never reached your phone, so they are queued again for tonight rather than marked done. No action needed.');
+      requeued.forEach((i) => L.push(`- ${(i.comment || '').replace(/\s+/g, ' ')}\n  (${i.id}, commit ${i.commit || '?'} on ${result ? result.branch : '?'})`));
+      L.push('');
+    }
+    if (parked.length) {
+      L.push('## Fixed, but it is unclear whether it shipped — WAITING ON YOU');
+      L.push('The update was started and then failed, so these may or may not already be live. They will NOT retry on their own, because republishing something already on your phone is its own problem. Check which it is:');
+      L.push('```');
+      L.push('npx eas-cli update:list --branch production --limit 3');
+      L.push('```');
+      L.push('If it did NOT ship, put them back to work with:');
+      L.push('```');
+      L.push(`cd ${REPO} && node scripts/feedback/ledger.js --requeue ${parked.map((i) => i.id).join(' ')}`);
+      L.push('```');
+      L.push('If it DID ship, mark them done:');
+      L.push('```');
+      L.push(`cd ${REPO} && node scripts/feedback/ledger.js --done ${parked.map((i) => i.id).join(' ')} --commit ${parked[0].commit || '<sha>'} --note "confirmed live"`);
+      L.push('```');
+      parked.forEach((i) => L.push(`- ${(i.comment || '').replace(/\s+/g, ' ')}\n  (${i.id}, commit ${i.commit || '?'} on ${result ? result.branch : '?'})`));
+      L.push('');
+    }
   }
 
   if (deferred.length) {

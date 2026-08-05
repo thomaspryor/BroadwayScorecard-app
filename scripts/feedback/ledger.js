@@ -27,6 +27,7 @@
  *   node scripts/feedback/ledger.js --approve <id...>  allow a third-party item
  *   node scripts/feedback/ledger.js --reject <id...> [--note "..."]
  *   node scripts/feedback/ledger.js --defer <id...> --note "why"
+ *   node scripts/feedback/ledger.js --requeue <id...>  put a parked item back to work
  *   node scripts/feedback/ledger.js --done <id...> --commit <sha> [--note "..."]
  *   node scripts/feedback/ledger.js --ingest <dir>     merge a pull into the ledger
  *   node scripts/feedback/ledger.js --stats
@@ -231,7 +232,7 @@ function main() {
     return;
   }
 
-  for (const [name, status] of [['approve', 'approved'], ['reject', 'rejected'], ['defer', 'deferred'], ['done', 'done']]) {
+  for (const [name, status] of [['approve', 'approved'], ['reject', 'rejected'], ['defer', 'deferred'], ['done', 'done'], ['requeue', 'queued']]) {
     if (flag(name)) {
       const ids = idsAfter(name);
       if (!ids.length) { console.error(`--${name} needs at least one feedback id`); process.exit(1); }
