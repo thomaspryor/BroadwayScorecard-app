@@ -44,6 +44,7 @@ const HOME = process.env.BSC_FEEDBACK_HOME
 const LEDGER = path.join(HOME, 'ledger.json');
 const ITEMS = path.join(HOME, 'items');
 const IMAGES = path.join(HOME, 'images');
+const LOGS = path.join(HOME, 'logs');
 
 /** Terminal states — an item here is never offered to a run again. */
 const CLOSED = new Set(['done', 'rejected', 'wont-fix']);
@@ -59,7 +60,7 @@ function ensureDirs() {
   // accounts, and the default umask would leave it readable by every process.
   // chmod as well as mode-on-create, because mode is ignored for a directory
   // that already exists — which is every run after the first.
-  for (const d of [HOME, ITEMS, IMAGES]) {
+  for (const d of [HOME, ITEMS, IMAGES, LOGS]) {
     fs.mkdirSync(d, { recursive: true, mode: 0o700 });
     try { fs.chmodSync(d, 0o700); } catch { /* not ours to tighten */ }
   }
@@ -134,13 +135,19 @@ function ingest(dir, { defaultOwnerStatus = 'queued' } = {}) {
       const src = path.join(dir, 'images', f);
       if (fs.existsSync(src)) fs.copyFileSync(src, path.join(IMAGES, f));
     }
+    if (item.crashLogFile) {
+      const src = path.join(dir, 'logs', item.crashLogFile);
+      if (fs.existsSync(src)) fs.copyFileSync(src, path.join(LOGS, item.crashLogFile));
+    }
     if (ledger.items[item.id]) {
       // Refresh the descriptive fields (comment text never changes, but a
-      // re-pull can fill in screenshots that failed to download last time).
+      // re-pull can fill in screenshots or a crash log that failed to
+      // download last time).
       Object.assign(ledger.items[item.id], {
         createdDate: item.createdDate,
         comment: item.comment,
         screenshots: item.screenshots,
+        crashLogFile: item.crashLogFile || ledger.items[item.id].crashLogFile || null,
       });
       continue;
     }
@@ -153,6 +160,7 @@ function ingest(dir, { defaultOwnerStatus = 'queued' } = {}) {
       role: owner ? 'owner' : 'tester',
       comment: item.comment,
       screenshots: item.screenshots || [],
+      crashLogFile: item.crashLogFile || null,
       status: owner ? defaultOwnerStatus : 'needs-approval',
       commit: null,
       note: null,
@@ -203,7 +211,8 @@ function stats(ledger = load()) {
 
 function fmt(i, n) {
   const when = (i.createdDate || '').slice(0, 16).replace('T', ' ');
-  const text = (i.comment || i.crashLog || '(no comment)').replace(/\s+/g, ' ').slice(0, 88);
+  const fallback = i.crashLogFile ? '(crash log attached, no comment)' : '(no comment)';
+  const text = (i.comment || fallback).replace(/\s+/g, ' ').slice(0, 88);
   const idx = n === undefined ? '' : `${String(n + 1).padStart(2)} `;
   return `${idx}[${i.status}] ${when}Z ${i.role.padEnd(6)} ${i.id}\n     ${text}`;
 }
@@ -272,7 +281,7 @@ function main() {
 }
 
 module.exports = {
-  OWNER_EMAILS, HOME, LEDGER, ITEMS, IMAGES,
+  OWNER_EMAILS, HOME, LEDGER, ITEMS, IMAGES, LOGS,
   CLOSED, ACTIONABLE, isOwner, load, save, ingest, setStatus, queue, pendingApproval, stats,
 };
 if (require.main === module) main();
