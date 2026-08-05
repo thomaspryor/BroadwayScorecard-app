@@ -5,11 +5,20 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { createRequire } from 'node:module';
 
+// Isolated from the real ~/.claude/broadwayscore-feedback/ -- must be set
+// before overnight.js (and the ledger.js/themes.js it requires) load, since
+// ledger.HOME is computed once at require time.
+process.env.BSC_FEEDBACK_HOME = fs.mkdtempSync(path.join(os.tmpdir(), 'overnight-test-home-'));
+
 const require = createRequire(import.meta.url);
-const { forbiddenIn } = require('./overnight.js');
+const { forbiddenIn, reportBody } = require('./overnight.js');
 const { NATIVE_PATHS } = require('../ship.js');
+const ledger = require('./ledger.js');
 
 // Every path class that forces a paid native build. The seed prompt asks the
 // agent to avoid these; forbiddenIn is what actually enforces it.
@@ -110,4 +119,32 @@ test('the automation cannot rewrite its own rules', () => {
   for (const f of ['scripts/feedback/ledger.js', 'scripts/feedback/overnight.js', '.github/workflows/eas-build.yml']) {
     assert.deepEqual(forbiddenIn([f]), [f]);
   }
+});
+
+// This is the whole point of task #1054: the morning report must surface a
+// theme filed more than once, not just tonight's batch, so a complaint that
+// keeps recurring across builds doesn't stay invisible between overnight runs.
+test('reportBody surfaces a recurring theme even when nothing happened tonight', () => {
+  const base = { id: 'x', role: 'owner', status: 'done', createdDate: '2026-07-25T00:00:00.000Z' };
+  const raw = {
+    version: 1,
+    items: {
+      a: { ...base, id: 'a', comment: 'The labels here for MUSICAL, REVIVAL, etc are too large and visually prominent', createdDate: '2026-07-25T00:00:00.000Z' },
+      b: { ...base, id: 'b', comment: 'These closed and tix on sale labels are ugly and also too large', createdDate: '2026-08-01T00:00:00.000Z' },
+      c: { ...base, id: 'c', comment: 'Reviews are supposed to be in descending order of score', createdDate: '2026-08-02T00:00:00.000Z' },
+    },
+  };
+  fs.mkdirSync(ledger.HOME, { recursive: true });
+  fs.writeFileSync(ledger.LEDGER, JSON.stringify(raw));
+
+  const body = reportBody({ taken: [], result: null, gates: null, ship: null, pending: [], deferred: [], done: [] });
+  assert.match(body, /## Recurring themes/);
+  assert.match(body, /Labels \/ overlay text rendered too large/);
+  assert.match(body, /filed 2x/);
+});
+
+test('reportBody has no recurring-themes section when nothing repeats', () => {
+  fs.writeFileSync(ledger.LEDGER, JSON.stringify({ version: 1, items: {} }));
+  const body = reportBody({ taken: [], result: null, gates: null, ship: null, pending: [], deferred: [], done: [] });
+  assert.doesNotMatch(body, /## Recurring themes/);
 });

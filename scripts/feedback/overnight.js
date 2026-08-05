@@ -664,6 +664,26 @@ function reportBody({ taken, result, gates, ship, pending, deferred, done, unshi
     L.push('');
   }
 
+  // Read the ledger as a set every morning, not just what tonight's run
+  // touched -- the whole point of themes.js: a complaint filed 3x across
+  // builds should read as "fix the class", not three unrelated one-offs.
+  // Enrichment only: a themes/ledger failure must not blank the report.
+  try {
+    const clusters = themes.clusterThemes(Object.values(ledger.load().items), themes.loadBuilds())
+      .filter((c) => c.count >= 2);
+    if (clusters.length) {
+      L.push('## Recurring themes (read the ledger as a set)');
+      L.push("These keep coming back on different screens -- worth fixing the class, not just tonight's item.");
+      clusters.forEach((c) => {
+        const span = c.buildsSpanned === null ? 'unknown # of builds' : `${c.buildsSpanned} build(s): ${c.builds.join(', ')}`;
+        L.push(`- **${c.name}** — filed ${c.count}x, spans ${span} (${c.firstSeen.slice(0, 10)} to ${c.lastSeen.slice(0, 10)})`);
+      });
+      L.push('');
+    }
+  } catch (e) {
+    log(`theme summary skipped: ${e.message}`);
+  }
+
   L.push('## Run detail');
   L.push(`- items handed to the agent: ${taken.length}`);
   L.push(`- agent exit code: ${result ? result.agentExit : 'n/a'}`);
@@ -791,7 +811,7 @@ async function main() {
   log('=== done ===');
 }
 
-module.exports = { FORBIDDEN_PATHS, forbiddenIn, crashLogExcerpt };
+module.exports = { FORBIDDEN_PATHS, forbiddenIn, crashLogExcerpt, reportBody };
 if (require.main === module) {
   main().catch((e) => { log('FAILED:', e.stack || e.message); process.exit(1); });
 }
