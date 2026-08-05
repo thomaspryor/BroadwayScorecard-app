@@ -90,10 +90,21 @@ export function StatsScreen({
     [reviewsInScope],
   );
 
+  /**
+   * The whole diary, newest first. Theater Tracker, Canon, Gold, Aisle Mates
+   * and the audience gauge are all computed from allRows, and each says "all
+   * time" under a dated scope — so their drill-downs have to read from here,
+   * not from sortedInScope, or tapping "14 visits" opens a list of three.
+   */
+  const sortedAll = useMemo(
+    () => [...reviews].sort((a, b) => (b.date_seen ?? '').localeCompare(a.date_seen ?? '')),
+    [reviews],
+  );
+
   /** Diary rows logged at a specific Broadway house. */
   const reviewsAtHouse = useCallback(
-    (house: string) =>
-      sortedInScope.filter((r) => {
+    (house: string, from: UserReview[] = sortedInScope) =>
+      from.filter((r) => {
         const meta = bundle.showMeta[r.show_id];
         return matchVenueToHouse(meta?.venue, houseIndex, { category: meta?.category }) === house;
       }),
@@ -147,6 +158,9 @@ export function StatsScreen({
   }
 
   const suffix = scopeSuffix(active);
+  // For modules computed from the whole diary, saying "in the 2025-26 Tony
+  // season" would attach a scope their numbers do not honour.
+  const lifetimeSuffix = active.kind === 'all' ? '' : ' · all time';
 
   // ── Tap-through handlers ────────────────────────────────────────────
   const openHero = (which: 'shows' | 'hours' | 'theaters' | 'period') => {
@@ -212,11 +226,13 @@ export function StatsScreen({
   };
 
   const openHouse = (house: HouseVisit) => {
-    const rows = reviewsAtHouse(house.name);
+    // house.count comes from bundle.theaters, which is lifetime — so both the
+    // list and the caption have to be lifetime too.
+    const rows = reviewsAtHouse(house.name, sortedAll);
     setDrilldown({
       title: house.name,
       caption: house.visited
-        ? `${house.count} ${house.count === 1 ? 'visit' : 'visits'}${suffix}`
+        ? `${house.count} ${house.count === 1 ? 'visit' : 'visits'}${lifetimeSuffix}`
         : 'You have not been here yet',
       reviews: rows,
       shows: house.visited
@@ -233,7 +249,7 @@ export function StatsScreen({
         { label: 'Opened', value: house.yearBuilt ? String(house.yearBuilt) : '—' },
         { label: 'Your visits', value: String(house.count) },
       ],
-      emptyText: house.visited ? 'No shows in this scope.' : 'Nothing playing here right now.',
+      emptyText: house.visited ? 'No shows logged here yet.' : 'Nothing playing here right now.',
     });
   };
 
@@ -249,7 +265,8 @@ export function StatsScreen({
     setDrilldown({
       title: `${bundle.theaters.visited} of ${bundle.theaters.operating} Broadway houses`,
       caption: visited.map(houseShortName).join(' · '),
-      reviews: sortedInScope.filter((r) => {
+      // Lifetime: the "N of M houses" headline counts the whole diary.
+      reviews: sortedAll.filter((r) => {
         const meta = bundle.showMeta[r.show_id];
         return !!matchVenueToHouse(meta?.venue, houseIndex, { category: meta?.category });
       }),
@@ -260,8 +277,8 @@ export function StatsScreen({
     const venues = new Set(bundle.theaters.extraCredit.map((e) => e.venue));
     setDrilldown({
       title: 'Beyond Broadway',
-      caption: `${venues.size} off-Broadway, West End and regional venues${suffix}`,
-      reviews: sortedInScope.filter((r) => venues.has(bundle.showMeta[r.show_id]?.venue ?? '')),
+      caption: `${venues.size} off-Broadway, West End and regional venues${lifetimeSuffix}`,
+      reviews: sortedAll.filter((r) => venues.has(bundle.showMeta[r.show_id]?.venue ?? '')),
     });
   };
 
@@ -369,7 +386,8 @@ export function StatsScreen({
     setDrilldown({
       title: filter === 'before' ? `${label}: saw it before it won` : `${label} winners you've seen`,
       caption: `${entries.length} of ${list.total}`,
-      reviews: reviewsFor(entries.map((e) => e.id)),
+      // Canon progress is lifetime, so the list has to be too.
+      reviews: reviewsFor(entries.map((e) => e.id), reviews),
     });
   };
 
@@ -378,7 +396,9 @@ export function StatsScreen({
       setDrilldown({
         title: entry.t,
         caption: `${entry.season} winner${entry.sawBeforeItWon ? ' — you saw it before it won' : ''}`,
-        reviews: reviewsFor([entry.id]),
+        // A canon entry marked seen was seen at some point, not necessarily in
+        // the active scope — the default list would come back empty.
+        reviews: reviewsFor([entry.id], reviews),
       });
       return;
     }
