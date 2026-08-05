@@ -56,7 +56,12 @@ function isOwner(email) {
 function ensureDirs() {
   // 0700 throughout: this holds tester email addresses and screenshots of their
   // accounts, and the default umask would leave it readable by every process.
-  for (const d of [HOME, ITEMS, IMAGES]) fs.mkdirSync(d, { recursive: true, mode: 0o700 });
+  // chmod as well as mode-on-create, because mode is ignored for a directory
+  // that already exists — which is every run after the first.
+  for (const d of [HOME, ITEMS, IMAGES]) {
+    fs.mkdirSync(d, { recursive: true, mode: 0o700 });
+    try { fs.chmodSync(d, 0o700); } catch { /* not ours to tighten */ }
+  }
 }
 
 function load() {
@@ -90,6 +95,9 @@ function save(ledger) {
   if (fs.existsSync(LEDGER)) fs.copyFileSync(LEDGER, `${LEDGER}.bak`);
   fs.writeFileSync(tmp, JSON.stringify(ledger, null, 2), { mode: 0o600 });
   fs.renameSync(tmp, LEDGER);
+  for (const f of [LEDGER, `${LEDGER}.bak`]) {
+    try { fs.chmodSync(f, 0o600); } catch { /* may not exist yet */ }
+  }
 }
 
 /**
