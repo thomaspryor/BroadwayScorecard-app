@@ -113,9 +113,13 @@ export function AisleMates({ bundle, onOpenReviewer }: AisleMatesProps) {
 
   return (
     <StatsCard>
+      {/* Lifetime module — say "all time" under a dated scope so the pinned
+          scope pill can't be misread as filtering this card (APoDDAi). */}
       <ModuleHeader
         title="Aisle Mates"
-        caption={`Critics who see theater the way you do · across ${sharedShowCount} shared shows`}
+        caption={`Critics who see theater the way you do · across ${sharedShowCount} shared shows${
+          bundle.scope.kind !== 'all' ? ' · all time' : ''
+        }`}
       />
 
       {topMates.map((c) => (

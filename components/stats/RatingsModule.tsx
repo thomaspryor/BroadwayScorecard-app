@@ -48,9 +48,13 @@ export function RatingsModule({ bundle, onOpenBucket, onOpenUnrated }: RatingsMo
 
   return (
     <StatsCard flush={marquee}>
+      {/* Scoped module — echo the scope so it can't be misread as all-time
+          when a season/year filter is active (APoDDAi). */}
       <ModuleHeader
         title="Your ratings"
-        caption={`Average ${avg.toFixed(2)}★ · median ${histogram.median?.toFixed(1) ?? '—'}★`}
+        caption={`Average ${avg.toFixed(2)}★ · median ${histogram.median?.toFixed(1) ?? '—'}★${
+          bundle.scope.kind !== 'all' ? ` · ${bundle.scope.label}` : ''
+        }`}
       />
 
       <View style={styles.chartWrap}>

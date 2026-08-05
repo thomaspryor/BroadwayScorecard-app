@@ -141,13 +141,13 @@ export default function HomeScreen() {
     const tonyWinners = marketShows.filter(s => isOpen(s) && s.tags.includes('tony-winner')).sort(byScore).slice(0, 10);
     if (tonyWinners.length >= 2) rows.push({ title: 'Tony Award Winners', shows: tonyWinners });
 
+    // Best Plays — above Best Musicals (beta feedback 2026-08-04, AIYmmSht)
+    const plays = marketShows.filter(s => isOpen(s) && s.type === 'play' && getQualifiedScore(s) != null).sort(byScore).slice(0, 10);
+    if (plays.length >= 3) rows.push({ title: 'Best Plays', shows: plays });
+
     // Best Musicals
     const musicals = marketShows.filter(s => isOpen(s) && s.type === 'musical' && getQualifiedScore(s) != null).sort(byScore).slice(0, 10);
     if (musicals.length >= 3) rows.push({ title: 'Best Musicals', shows: musicals });
-
-    // Best Plays
-    const plays = marketShows.filter(s => isOpen(s) && s.type === 'play' && getQualifiedScore(s) != null).sort(byScore).slice(0, 10);
-    if (plays.length >= 3) rows.push({ title: 'Best Plays', shows: plays });
 
     // Jukebox Musicals
     const jukebox = marketShows.filter(s => isOpen(s) && s.tags.includes('jukebox')).sort(byScore).slice(0, 10);

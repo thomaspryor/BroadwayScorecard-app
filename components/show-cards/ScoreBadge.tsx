@@ -22,7 +22,7 @@ interface ScoreBadgeProps {
   score: number | null | undefined;
   /** Market category — WE/Off-WE have a higher Critical Gold threshold. */
   category?: string;
-  size?: 'small' | 'medium' | 'large';
+  size?: 'poster' | 'small' | 'medium' | 'large';
   showLabel?: boolean;
   animated?: boolean;
 }
@@ -34,6 +34,11 @@ interface ScoreBadgeProps {
 // 2026-08-02, AAUXcLw6). labelMaxWidth keeps it tied to the badge instead of
 // spanning the column.
 const SIZES = {
+  // poster tracks the web's MiniShowCard overlay badge exactly: w-9 (36px),
+  // text-sm (14px), rounded-lg — the app's 40pt box read "a bit big" next to
+  // mobile web (beta feedback 2026-08-04, AN27tpL). Poster gold also carries
+  // the web's 2px #C8960E ring and mini crown, which small never did.
+  poster: { box: 36, font: 14, showsLabel: false, labelMaxWidth: 0, radius: BorderRadius.sm },
   small: { box: 40, font: FontSize.sm, showsLabel: false, labelMaxWidth: 0, radius: BorderRadius.sm },
   medium: { box: 56, font: FontSize.xl, showsLabel: true, labelMaxWidth: 72, radius: BorderRadius.md },
   large: { box: 64, font: FontSize.xxl, showsLabel: true, labelMaxWidth: 84, radius: BorderRadius.md },
@@ -70,11 +75,12 @@ function GoldShimmer({ size }: { size: number }) {
   );
 }
 
-function Crown() {
-  // Thin 3-point crown matching the website — very subtle, sits just above the badge
+function Crown({ mini = false }: { mini?: boolean }) {
+  // Thin 3-point crown matching the website — very subtle, sits just above the
+  // badge. mini matches the web's MustSeeCrown size="mini" (poster tiles).
   return (
     <View style={{ alignItems: 'center', marginBottom: -1 }}>
-      <Svg width={14} height={6} viewBox="0 0 14 6">
+      <Svg width={mini ? 10 : 14} height={mini ? 5 : 6} viewBox="0 0 14 6">
         <Path
           d="M0,6 L1,2 L3.5,4 L7,0 L10.5,4 L13,2 L14,6 Z"
           fill="#C8960E"
@@ -111,6 +117,12 @@ export function ScoreBadge({ score, category, size = 'medium', showLabel = false
   const isGold = tier.glow;
   const rounded = Math.round(score);
   const showCrown = isGold && rounded >= 83 && size !== 'small';
+  // Web parity: .score-must-see carries a 2px #C8960E ring; the app's poster
+  // tiles were missing it (AN27tpL). Scoped to poster — the row/detail badges
+  // stay untouched (score badges are sacred).
+  const goldBorder = isGold && size === 'poster'
+    ? { borderWidth: 2, borderColor: '#C8960E' }
+    : null;
 
   // Per-tier shadow
   const shadowStyle = Platform.OS === 'ios' ? {
@@ -143,7 +155,7 @@ export function ScoreBadge({ score, category, size = 'medium', showLabel = false
       )}
 
       {/* Crown for gold 83+ */}
-      {showCrown && <Crown />}
+      {showCrown && <Crown mini={size === 'poster'} />}
 
       {/* Badge */}
       {isGold ? (
@@ -158,6 +170,7 @@ export function ScoreBadge({ score, category, size = 'medium', showLabel = false
               height: dim.box,
               borderRadius: dim.radius,
             },
+            goldBorder,
             shadowStyle,
           ]}
         >

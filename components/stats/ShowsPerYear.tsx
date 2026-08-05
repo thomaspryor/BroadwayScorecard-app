@@ -6,8 +6,9 @@
  * which is what makes the months breakdown appear, because a year-scoped diary
  * has one bar per month instead of per year.
  *
- * Records strip beneath: busiest month, current streak, longest drought. Each
- * pill taps to the shows behind it (spec §3.2, absorbing the cut Habits module).
+ * Records strip beneath: busiest month, current streak. Each pill taps to the
+ * shows behind it (spec §3.2, absorbing the cut Habits module). Longest drought
+ * was cut — "Not helpful" (beta feedback 2026-08-04, AEC0VX9).
  */
 
 import React, { useCallback, useMemo, useRef } from 'react';
@@ -40,7 +41,7 @@ export interface ShowsPerYearProps {
   /** Scope the screen to a calendar year (bar tap). */
   onSelectYear: (year: number) => void;
   onOpenMonth: (monthKey: string) => void;
-  onOpenRecord: (kind: 'busiest' | 'streak' | 'drought') => void;
+  onOpenRecord: (kind: 'busiest' | 'streak') => void;
 }
 
 export function ShowsPerYear({ bundle, scope, onSelectYear, onOpenMonth, onOpenRecord }: ShowsPerYearProps) {
@@ -197,14 +198,6 @@ export function ShowsPerYear({ bundle, scope, onSelectYear, onOpenMonth, onOpenR
             label="Current streak"
             value={`${diary.currentStreak} ${diary.currentStreak === 1 ? 'month' : 'months'}`}
             onPress={() => onOpenRecord('streak')}
-          />
-        )}
-        {diary.longestDrought && (
-          <RecordPill
-            testID="stats-record-drought"
-            label="Longest drought"
-            value={`${diary.longestDrought.months} ${diary.longestDrought.months === 1 ? 'month' : 'months'}`}
-            onPress={() => onOpenRecord('drought')}
           />
         )}
       </View>

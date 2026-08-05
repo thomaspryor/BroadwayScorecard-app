@@ -770,12 +770,15 @@ export default function WatchedScreen() {
             </Svg>
           </Pressable>
           <Pressable
-            style={({ pressed }) => [styles.addButton, pressed && styles.pressed]}
+            // Brand gold, not surface gray — the primary "log a show" action
+            // was invisible next to the import button (beta feedback
+            // 2026-08-05, ANCVRB3: "Make this a yellow action color").
+            style={({ pressed }) => [styles.addButton, styles.addButtonPrimary, pressed && styles.pressed]}
             onPress={() => setShowSearchModal(true)}
             hitSlop={8}
             accessibilityLabel="Rate a show"
           >
-            <Svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={Colors.text.secondary} strokeWidth={2.5}>
+            <Svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={Colors.text.inverse} strokeWidth={2.5}>
               <Path strokeLinecap="round" d="M12 5v14M5 12h14" />
             </Svg>
           </Pressable>
@@ -1042,6 +1045,7 @@ const styles = StyleSheet.create({
     width: 38, height: 38, borderRadius: 19,
     backgroundColor: Colors.surface.overlay, alignItems: 'center', justifyContent: 'center',
   },
+  addButtonPrimary: { backgroundColor: Colors.brand },
   pressed: { opacity: 0.7 },
   controlsRow: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
