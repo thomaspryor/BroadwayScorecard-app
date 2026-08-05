@@ -27,6 +27,7 @@ const path = require('path');
 
 const ledger = require('./ledger');
 const themes = require('./themes');
+const visualGate = require('./visual-gate');
 
 const REPO = path.resolve(__dirname, '..', '..');
 const OUTPUTS = path.join(os.homedir(), 'Documents', 'claude-outputs');
@@ -396,6 +397,34 @@ function runGates(cwd) {
   return results;
 }
 
+// ------------------------------------------------------------------ visual
+
+/**
+ * The four gates above prove the branch compiles. This is the mechanical
+ * check that someone actually looked at the screens it changed — the
+ * screenshots this produces are what land in the morning report next to the
+ * original feedback screenshot, so the owner is comparing "asked for" against
+ * "actually rendered" rather than trusting a compile-only pipeline or the
+ * agent's own unverified claim to have looked.
+ */
+function runVisualGate(branch, wtPath) {
+  const files = sh('git', ['diff', '--name-only', `main...${branch}`]).trim().split('\n').filter(Boolean);
+  const screens = visualGate.screensForFiles(files);
+  const unverifiable = visualGate.unverifiableFiles(files);
+  if (screens.length) log(`visual gate: capturing ${screens.map((s) => s.label).join(', ')}`);
+  const outDir = path.join(LOGS, `${stamp}.screens`);
+  let result;
+  try {
+    result = visualGate.captureScreens({ repoRoot: REPO, wtPath, screens, outDir });
+  } catch (e) {
+    result = { ok: false, captures: [], error: e.stack || e.message };
+  }
+  if (result.error) log(`visual gate capture error: ${result.error}`);
+  const decision = visualGate.decideVisualGate(screens, result.captures, unverifiable);
+  log(`visual gate: ${decision.ok ? 'PASS' : 'FAIL'} — ${decision.reason}`);
+  return { decision, captures: result.captures, error: result.error };
+}
+
 // ------------------------------------------------------------------- ship
 
 /**
@@ -578,7 +607,7 @@ function writeReport(sections, { didWork = true } = {}) {
   return file;
 }
 
-function reportBody({ taken, result, gates, ship, pending, deferred, done, unshipped = [], pullError = null }) {
+function reportBody({ taken, result, gates, ship, visual, screenshots = [], pending, deferred, done, unshipped = [], pullError = null }) {
   const L = [];
   L.push(`# Overnight beta feedback — ${stamp.slice(0, 10)}`);
   L.push('');
@@ -684,6 +713,16 @@ function reportBody({ taken, result, gates, ship, pending, deferred, done, unshi
     log(`theme summary skipped: ${e.message}`);
   }
 
+  if (visual) {
+    L.push('## Visual check');
+    L.push(visual.decision.ok ? `Passed: ${visual.decision.reason}` : `FAILED — this is why the branch above was not merged: ${visual.decision.reason}`);
+    if (visual.error) L.push(`\nCapture error:\n\`\`\`\n${visual.error.slice(-1500)}\n\`\`\``);
+    if (screenshots && screenshots.length) {
+      screenshots.forEach((s) => L.push(`\n### ${s.label}\n![${s.label}](${s.path})`));
+    }
+    L.push('');
+  }
+
   L.push('## Run detail');
   L.push(`- items handed to the agent: ${taken.length}`);
   L.push(`- agent exit code: ${result ? result.agentExit : 'n/a'}`);
@@ -763,6 +802,7 @@ async function main() {
 
   let gates = null;
   let ship = null;
+  let visual = null;
   const moved = mainMoved(mainBefore);
   if (moved) {
     log(`ABORT MERGE: main moved during the run (${moved.before.slice(0, 9)} -> ${moved.now.slice(0, 9)})`);
@@ -776,11 +816,17 @@ async function main() {
     log('agent produced no commits — nothing to merge');
   } else {
     gates = runGates(result.wtPath);
-    if (gates.every((g) => g.ok)) {
-      ship = mergeAndShip(result.branch);
-    } else {
+    if (!gates.every((g) => g.ok)) {
       log('gates failed — not merging');
       ship = { merged: false, pushed: false, shipped: false, reason: `gates failed: ${gates.filter((g) => !g.ok).map((g) => g.name).join(', ')}. Branch ${result.branch} left in place for you.` };
+    } else {
+      visual = runVisualGate(result.branch, result.wtPath);
+      if (!visual.decision.ok) {
+        log(`visual gate failed — not merging: ${visual.decision.reason}`);
+        ship = { merged: false, pushed: false, shipped: false, reason: `visual gate: ${visual.decision.reason}. Branch ${result.branch} left in place for you.` };
+      } else {
+        ship = mergeAndShip(result.branch);
+      }
     }
   }
 
@@ -807,8 +853,32 @@ async function main() {
     done = [];
   }
 
-  writeReport(reportBody({ taken, result, gates, ship, pending: ledger.pendingApproval(), deferred, done, unshipped, pullError }));
+  const screenshots = copyScreenshots(visual);
+  writeReport(reportBody({ taken, result, gates, ship, visual, screenshots, pending: ledger.pendingApproval(), deferred, done, unshipped, pullError }));
   log('=== done ===');
+}
+
+/**
+ * Screenshots live under LOGS (~/.claude/broadwayscore-feedback/runs/), not
+ * ~/Documents/claude-outputs/ where the report goes. Copy them alongside the
+ * report so a markdown image link in the report actually resolves. Keyed by
+ * the full run stamp, not just the date: the report itself is overwritten by
+ * same-day reruns, but a stale screens/ dir from an earlier run tonight must
+ * not be silently replaced — that would erase evidence of a bad capture a
+ * human might still need to see.
+ */
+function copyScreenshots(visual) {
+  if (!visual || !visual.captures || !visual.captures.length) return [];
+  const destDir = path.join(OUTPUTS, `beta-feedback-overnight-${stamp}-screens`);
+  fs.mkdirSync(destDir, { recursive: true });
+  return visual.captures
+    .filter((c) => c.ok && c.path)
+    .map((c) => {
+      const dest = path.join(destDir, path.basename(c.path));
+      try { fs.copyFileSync(c.path, dest); } catch { return null; }
+      return { label: c.label, path: dest };
+    })
+    .filter(Boolean);
 }
 
 module.exports = { FORBIDDEN_PATHS, forbiddenIn, crashLogExcerpt, reportBody };

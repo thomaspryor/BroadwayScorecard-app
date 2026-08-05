@@ -160,6 +160,13 @@ jobs:
       - name: Unit-test beta-feedback crash log attachment
         run: node --test scripts/feedback/crashlog.test.mjs
 
+      # The fail-closed decision that stops the overnight run merging a UI
+      # change nobody looked at: no captured screenshot for a touched screen
+      # means no merge, regardless of what the compile gates or the agent's
+      # own report say.
+      - name: Unit-test beta-feedback visual gate
+        run: node --test scripts/feedback/visual-gate.test.mjs
+
       - name: Decide whether TestFlight drifted
         id: gate
         env:
