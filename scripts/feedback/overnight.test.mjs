@@ -36,7 +36,20 @@ const MUST_ALLOW = [
   'lib/score-utils.ts',
   'hooks/useWatchlist.ts',
   'constants/Colors.ts',
+  'assets/images/show-placeholder.png',
+];
+
+// The app icon and splash are native even though they sit under assets/. Both
+// spellings must be blocked: ship.js's own assets/(icon|splash|adaptive)
+// pattern, and the assets/images/ paths app.json actually points at.
+const MUST_BLOCK_ASSETS = [
+  'assets/icon.png',
+  'assets/splash.png',
+  'assets/adaptive-icon.png',
   'assets/images/icon.png',
+  'assets/images/splash-icon.png',
+  'assets/images/favicon.png',
+  'assets/images/android-icon-foreground.png',
 ];
 
 test('every native path class is blocked before merge', () => {
@@ -47,6 +60,20 @@ test('every native path class is blocked before merge', () => {
 
 test('ordinary app JavaScript is allowed through', () => {
   assert.deepEqual(forbiddenIn(MUST_ALLOW), []);
+});
+
+test('app icon and splash assets are blocked', () => {
+  for (const f of MUST_BLOCK_ASSETS) {
+    assert.deepEqual(forbiddenIn([f]), [f], `${f} changes the binary — an OTA cannot deliver it`);
+  }
+});
+
+test('the icon paths this app actually uses are native to ship.js too', () => {
+  // Otherwise ship.js calls an icon change JS-only, ships a free OTA, and the
+  // icon silently never updates on the phone.
+  for (const f of ['assets/images/icon.png', 'assets/images/splash-icon.png']) {
+    assert.ok(NATIVE_PATHS.some((re) => re.test(f)), `ship.js must treat ${f} as native`);
+  }
 });
 
 test('a mixed branch is blocked, and names exactly what is wrong', () => {

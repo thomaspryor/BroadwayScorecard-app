@@ -71,6 +71,12 @@ const NATIVE_PATHS = [
   /^plugins\//,
   /^patches\//,
   /^assets\/(icon|splash|adaptive)/i,
+  // The icons this app actually ships live a directory deeper than the pattern
+  // above — app.json points icon at ./assets/images/icon.png and the splash
+  // plugin at ./assets/images/splash-icon.png. Without these, replacing the app
+  // icon looks JS-only, ships as a free OTA, and the icon never changes on the
+  // phone (found 2026-08-05 while writing the overnight autopilot's guard).
+  /^assets\/images\/(icon|splash|adaptive|favicon|android-icon)/i,
   // Not obvious and it cost a build to learn: .gitignore decides which files
   // Expo hashes, so editing it moves the fingerprint and forces a $1.85 build
   // out of what looks like a cosmetic change (2026-08-03).

@@ -87,31 +87,42 @@ const LOCK = path.join(ledger.HOME, 'run.lock');
  * tree the first had already moved. Easy to hit: a manual run that is still
  * going when launchd fires at 02:15.
  */
-function acquireLock() {
+function acquireLock(attempt = 0) {
+  // Bounded: each retry only happens after clearing a lock we judged dead, and
+  // an unbounded recursion here would spin instead of reporting.
+  if (attempt > 3) return 'could not take the run lock after 3 attempts — something is repeatedly recreating it';
   fs.mkdirSync(ledger.HOME, { recursive: true, mode: 0o700 });
   const mine = JSON.stringify({ pid: process.pid, stamp, startedAt: new Date().toISOString() });
+  // Write the content to a private temp file first, then link it into place.
+  // link() is atomic and fails if the target exists, so a reader can never
+  // observe the lock as an empty or half-written file — which the previous
+  // create-then-write version allowed, letting one process delete another's
+  // lock as "corrupt" while that process still believed it held it.
+  const tmp = path.join(ledger.HOME, `.run.lock.${process.pid}`);
+  fs.writeFileSync(tmp, mine, { mode: 0o600 });
   try {
-    // wx fails if the file exists, so the create is atomic — two processes
-    // racing here cannot both believe they took the lock.
-    fs.writeFileSync(LOCK, mine, { flag: 'wx' });
+    fs.linkSync(tmp, LOCK);
   } catch (e) {
-    if (e.code !== 'EEXIST') throw e;
+    if (e.code !== 'EEXIST') { fs.rmSync(tmp, { force: true }); throw e; }
     let held;
     try { held = JSON.parse(fs.readFileSync(LOCK, 'utf8')); } catch { held = null; }
     if (!held || typeof held.pid !== 'number') {
       log('lock file is unreadable — clearing it');
       fs.rmSync(LOCK, { force: true });
-      return acquireLock();
+      fs.rmSync(tmp, { force: true });
+      return acquireLock(attempt + 1);
     }
     let alive = false;
     // EPERM means the pid exists but belongs to someone else — that is still a
     // live process, and treating it as dead would clear a lock that is held.
     try { process.kill(held.pid, 0); alive = true; } catch (err) { alive = err.code === 'EPERM'; }
+    fs.rmSync(tmp, { force: true });
     if (alive) return `run ${held.stamp} is still going (pid ${held.pid}, started ${held.startedAt})`;
     log(`clearing stale lock from run ${held.stamp} (pid ${held.pid} is gone)`);
     fs.rmSync(LOCK, { force: true });
-    return acquireLock();
+    return acquireLock(attempt + 1);
   }
+  fs.rmSync(tmp, { force: true });
   const release = () => { try { fs.unlinkSync(LOCK); } catch { /* already gone */ } };
   process.on('exit', release);
   process.on('SIGINT', () => { release(); process.exit(130); });
@@ -262,6 +273,17 @@ async function runAgent(items) {
   return { branch, wtPath, commits: commits ? commits.split('\n') : [], agentExit: code };
 }
 
+/**
+ * The forbidden-path guard diffs main...branch, which only sees what the agent
+ * committed on its own branch. An agent that committed directly on main — it
+ * runs ledger.js from the main checkout, so it is standing there — would put
+ * those commits behind the merge base and out of that diff entirely.
+ */
+function mainMoved(before) {
+  const now = sh('git', ['rev-parse', 'main']).trim();
+  return now === before ? null : { before, now };
+}
+
 // ------------------------------------------------------------------ gates
 
 function runGates(cwd) {
@@ -291,7 +313,11 @@ function runGates(cwd) {
 const FORBIDDEN_PATHS = [
   /^ios\//, /^android\//, /^app\.json$/, /^app\.config\./, /^plugins\//,
   /^package\.json$/, /^package-lock\.json$/, /^patches\//, /^eas\.json$/,
-  /^\.github\//, /^scripts\/feedback\//, /^\.gitignore$/,
+  /^\.github\//, /^scripts\//, /^\.gitignore$/,
+  // App icon and splash. Both spellings: ship.js's own pattern, and the deeper
+  // assets/images/ paths this app actually uses.
+  /^assets\/(icon|splash|adaptive)/i,
+  /^assets\/images\/(icon|splash|adaptive|favicon|android-icon)/i,
 ];
 
 /** Pure half, so the path list can be tested without a git repo. */
@@ -311,15 +337,23 @@ function forbiddenTouches(branch) {
  * or missing line as "not a build" and then spend $1.85.
  */
 function shipDecision() {
-  const outFile = path.join(os.tmpdir(), `ship-decision-${process.pid}`);
-  fs.writeFileSync(outFile, '');
-  const r = tryShell('node', ['scripts/ship.js', '--dry-run'], {
-    env: { ...process.env, GITHUB_OUTPUT: outFile },
-  });
-  const kv = fs.readFileSync(outFile, 'utf8');
+  // Inside the 0700 state dir, not /tmp: a predictable world-writable path that
+  // another process can replace between write and read is a bad place to keep
+  // the one value standing between this run and a $1.85 charge.
+  const outFile = path.join(ledger.HOME, `.ship-decision-${process.pid}`);
   fs.rmSync(outFile, { force: true });
-  const mode = (kv.match(/^mode=(\w+)$/m) || [])[1] || null;
-  return { ok: r.ok, mode, out: r.out };
+  fs.writeFileSync(outFile, '', { flag: 'wx', mode: 0o600 });
+  try {
+    const r = tryShell('node', ['scripts/ship.js', '--dry-run'], {
+      env: { ...process.env, GITHUB_OUTPUT: outFile },
+    });
+    // Empty means ship.js threw before deciding — mode stays null, and the
+    // caller treats anything that is not exactly "update" as "do not ship".
+    const mode = (fs.readFileSync(outFile, 'utf8').match(/^mode=(\w+)$/m) || [])[1] || null;
+    return { ok: r.ok, mode, out: r.out };
+  } finally {
+    fs.rmSync(outFile, { force: true });
+  }
 }
 
 function mergeAndShip(branch) {
@@ -358,7 +392,18 @@ function mergeAndShip(branch) {
       return { merged: true, pushed: false, shipped: false, reason: `push rejected and the remote would not merge cleanly. The merge commit is sitting unpushed on local main.\n${remerge.out.slice(0, 600)}` };
     }
     push = tryShell('git', ['push', 'origin', 'main']);
-    if (!push.ok) return { merged: true, pushed: false, shipped: false, reason: `push failed twice; merge commit is unpushed on local main:\n${push.out.slice(0, 600)}` };
+    if (!push.ok) {
+      // Leaving the merge commit on local main wedges the automation forever:
+      // the tree is clean so preflight passes, but --ff-only to origin/main
+      // then fails every night from here on. The work is safe on the branch, so
+      // put main back where the remote is and let a human look at the branch.
+      tryShell('git', ['reset', '--hard', 'origin/main']);
+      return {
+        merged: false, pushed: false, shipped: false,
+        reason: `push failed twice, so local main was reset back to origin/main to keep tomorrow's run unblocked. `
+          + `The work is still on ${branch}.\n${push.out.slice(0, 500)}`,
+      };
+    }
   }
   log('pushed to origin/main');
 
@@ -377,7 +422,17 @@ function mergeAndShip(branch) {
   }
 
   const ship = tryShell('node', ['scripts/ship.js']);
-  if (!ship.ok) return { merged: true, pushed: true, shipped: false, reason: `ship failed:\n${ship.out.slice(-800)}` };
+  if (!ship.ok) {
+    // ship.js can publish the update and THEN throw on its post-publish
+    // checks, so a nonzero exit does not mean nothing shipped. Requeueing on
+    // that assumption would have the agent reimplement and republish a fix
+    // that is already live. Ambiguity goes to a human instead.
+    return {
+      merged: true, pushed: true, shipped: false, shipAmbiguous: true,
+      reason: `ship.js exited non-zero. It can fail AFTER publishing, so it is not clear whether the update went out. `
+        + `Check with: npx eas-cli update:list --branch production --limit 3\n${ship.out.slice(-700)}`,
+    };
+  }
   log('OTA update published');
   const updateId = (ship.out.match(/(?:Update group ID|ID)\s*[:=]?\s*([0-9a-f-]{36})/i) || [])[1] || null;
   return { merged: true, pushed: true, shipped: true, updateId, shipOut: ship.out.slice(-1200), reason: 'OTA update published' };
@@ -516,6 +571,7 @@ async function main() {
   }
 
   ledger.setStatus(taken.map((i) => i.id), 'in-progress');
+  const mainBefore = sh('git', ['rev-parse', 'main']).trim();
   const result = await runAgent(taken);
 
   const after = ledger.load();
@@ -531,7 +587,16 @@ async function main() {
 
   let gates = null;
   let ship = null;
-  if (!result.commits.length) {
+  const moved = mainMoved(mainBefore);
+  if (moved) {
+    log(`ABORT MERGE: main moved during the run (${moved.before.slice(0, 9)} -> ${moved.now.slice(0, 9)})`);
+    ship = {
+      merged: false, pushed: false, shipped: false,
+      reason: `main moved from ${moved.before.slice(0, 9)} to ${moved.now.slice(0, 9)} while the agent was running. `
+        + `Nothing was merged or shipped — the guard that checks what the agent changed only sees its branch, so a `
+        + `commit landing on main behind its back would go unchecked. Branch ${result.branch} is untouched.`,
+    };
+  } else if (!result.commits.length) {
     log('agent produced no commits — nothing to merge');
   } else {
     gates = runGates(result.wtPath);
@@ -550,9 +615,17 @@ async function main() {
   let unshipped = [];
   if (done.length && !(ship && ship.shipped)) {
     const why = ship ? ship.reason.split('\n')[0] : 'the agent committed nothing that could ship';
-    log(`${done.length} item(s) were marked done but nothing shipped — returning them to the queue`);
-    ledger.setStatus(done.map((i) => i.id), 'queued', {
-      note: `run ${stamp} committed a fix on ${result.branch} but it never shipped: ${why}`,
+    // Two different situations. If we know nothing shipped, requeue — tonight's
+    // run just retries. If ship.js failed in a way that may still have
+    // published, requeueing would republish a live fix, so it goes to the owner
+    // as deferred instead of being guessed at either way.
+    const ambiguous = !!(ship && ship.shipAmbiguous);
+    const status = ambiguous ? 'deferred' : 'queued';
+    log(`${done.length} item(s) marked done but not confirmed shipped — setting ${status}`);
+    ledger.setStatus(done.map((i) => i.id), status, {
+      note: ambiguous
+        ? `run ${stamp} committed on ${result.branch} and ship.js failed after possibly publishing — confirm with 'npx eas-cli update:list --branch production' before requeueing`
+        : `run ${stamp} committed a fix on ${result.branch} but it never shipped: ${why}`,
     });
     unshipped = done;
     done = [];

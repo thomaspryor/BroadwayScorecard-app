@@ -93,8 +93,22 @@ function save(ledger) {
   // writer rename the other's half-written file into place.
   const tmp = `${LEDGER}.${process.pid}.tmp`;
   if (fs.existsSync(LEDGER)) fs.copyFileSync(LEDGER, `${LEDGER}.bak`);
-  fs.writeFileSync(tmp, JSON.stringify(ledger, null, 2), { mode: 0o600 });
+  // fsync the replacement before it takes the real name, and fsync the
+  // directory after: without both, a crash can leave the rename visible while
+  // the file's contents are still in the page cache, i.e. an empty ledger —
+  // which reads as "nothing was ever actioned".
+  const fd = fs.openSync(tmp, 'w', 0o600);
+  try {
+    fs.writeFileSync(fd, JSON.stringify(ledger, null, 2));
+    fs.fsyncSync(fd);
+  } finally {
+    fs.closeSync(fd);
+  }
   fs.renameSync(tmp, LEDGER);
+  try {
+    const dir = fs.openSync(HOME, 'r');
+    try { fs.fsyncSync(dir); } finally { fs.closeSync(dir); }
+  } catch { /* directory fsync is unsupported on some filesystems */ }
   for (const f of [LEDGER, `${LEDGER}.bak`]) {
     try { fs.chmodSync(f, 0o600); } catch { /* may not exist yet */ }
   }
