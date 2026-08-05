@@ -79,6 +79,34 @@ function preflight() {
   return null;
 }
 
+const LOCK = path.join(ledger.HOME, 'run.lock');
+
+/**
+ * One run at a time. Two overlapping runs would each claim items, each build a
+ * branch from the same main, and each try to merge — the second landing on a
+ * tree the first had already moved. Easy to hit: a manual run that is still
+ * going when launchd fires at 02:15.
+ */
+function acquireLock() {
+  fs.mkdirSync(ledger.HOME, { recursive: true });
+  if (fs.existsSync(LOCK)) {
+    const held = JSON.parse(fs.readFileSync(LOCK, 'utf8'));
+    let alive = false;
+    // EPERM means the pid exists but belongs to someone else — that is still a
+    // live process, and treating it as dead would clear a lock that is held.
+    try { process.kill(held.pid, 0); alive = true; } catch (e) { alive = e.code === 'EPERM'; }
+    if (alive) return `run ${held.stamp} is still going (pid ${held.pid}, started ${held.startedAt})`;
+    log(`clearing stale lock from run ${held.stamp} (pid ${held.pid} is gone)`);
+    fs.unlinkSync(LOCK);
+  }
+  fs.writeFileSync(LOCK, JSON.stringify({ pid: process.pid, stamp, startedAt: new Date().toISOString() }));
+  const release = () => { try { fs.unlinkSync(LOCK); } catch { /* already gone */ } };
+  process.on('exit', release);
+  process.on('SIGINT', () => { release(); process.exit(130); });
+  process.on('SIGTERM', () => { release(); process.exit(143); });
+  return null;
+}
+
 // ------------------------------------------------------------------- seed
 
 function seedPrompt(items, worktree) {
@@ -350,6 +378,11 @@ async function main() {
     // in-flight work are worth reporting but not worth blocking on.
     if (!DRY_RUN) { log(`ABORT: ${blocked}`); process.exit(2); }
     log(`(would ABORT on a real run: ${blocked})`);
+  }
+
+  if (!DRY_RUN) {
+    const busy = acquireLock();
+    if (busy) { log(`ABORT: ${busy}`); process.exit(3); }
   }
 
   if (!SKIP_PULL) {
