@@ -139,11 +139,41 @@ function acquireLock(attempt = 0) {
     fs.rmSync(tmp, { force: true });
     if (alive) return `run ${held.stamp} is still going (pid ${held.pid}, started ${held.startedAt})`;
     log(`clearing stale lock from run ${held.stamp} (pid ${held.pid} is gone)`);
+    // Its agent may have outlived it — reap before the lock is released, so no
+    // other run can start reclaiming while that orphan is still writing.
+    reapOrphanAgent(held);
     fs.rmSync(LOCK, { force: true });
     return acquireLock(attempt + 1);
   }
   fs.rmSync(tmp, { force: true });
   return null;
+}
+
+/** Stamp the running agent's pid into our own lock so a later run can find it. */
+function recordAgentPid(pid) {
+  try {
+    const held = JSON.parse(fs.readFileSync(LOCK, 'utf8'));
+    if (held.pid !== process.pid) return; // not our lock any more
+    held.agentPid = pid;
+    fs.writeFileSync(LOCK, JSON.stringify(held), { mode: 0o600 });
+  } catch { /* no lock (dry run / --no-lock paths) */ }
+}
+
+/**
+ * A driver killed with SIGKILL runs no release handler, so its `claude` child
+ * outlives it. That orphan still holds the worktree, still edits the ledger via
+ * `ledger.js --done`, and still believes it owns its items — while the next run
+ * sees a dead driver pid, clears the lock, and reclaims those same items. Two
+ * agents then implement the same feedback and the ledger takes whichever write
+ * lands last. Stop the orphan before taking its work.
+ */
+function reapOrphanAgent(held) {
+  const pid = held && held.agentPid;
+  if (!pid) return null;
+  try { process.kill(pid, 0); } catch { return null; } // already gone
+  log(`run ${held.stamp} left a live agent (pid ${pid}) behind — stopping it before reclaiming its work`);
+  try { process.kill(pid, 'SIGKILL'); } catch (e) { log(`could not stop orphan agent ${pid}: ${e.message}`); }
+  return pid;
 }
 
 // ------------------------------------------------------------------- seed
@@ -354,6 +384,11 @@ async function runAgent(items) {
       stdio: ['ignore', out, out],
       env: { ...process.env, FEEDBACK_AUTOPILOT_RUN: stamp },
     });
+    // Record the agent's pid in the lock. If this driver is SIGKILLed, its
+    // release handlers never run and this child keeps going as an orphan — the
+    // next run must be able to find and stop it before reclaiming its items,
+    // or two agents work the same feedback and both try to ship.
+    recordAgentPid(child.pid);
     const timer = setTimeout(() => {
       log(`agent exceeded ${TIMEOUT_MIN}m — killing`);
       child.kill('SIGKILL');
@@ -780,9 +815,12 @@ async function main() {
   // requeue only fires if the run reaches its end — a killed or crashed run
   // leaves its items sitting in-progress forever, invisible to --queue, and the
   // feedback is silently lost. Found 2026-08-05: an item stranded exactly this
-  // way was only caught because a human happened to read the stats. Safe to do
-  // unconditionally here, because the run lock guarantees no other run holds a
-  // legitimate in-progress claim at this moment.
+  // way was only caught because a human happened to read the stats.
+  //
+  // What makes this safe is NOT the lock on its own — a SIGKILLed driver's
+  // agent outlives it, and reclaiming a live agent's items would have two
+  // agents on the same feedback. acquireLock reaps that orphan before releasing
+  // the stale lock, so by the time we get here nothing else is working these.
   const stale = Object.values(ledger.load().items).filter((i) => i.status === 'in-progress');
   if (stale.length) {
     log(`reclaiming ${stale.length} item(s) stranded in-progress by an earlier run: ${stale.map((i) => i.id).join(' ')}`);
