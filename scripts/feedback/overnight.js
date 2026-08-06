@@ -98,16 +98,28 @@ function preflight() {
  * One trivial prompt is far cheaper than a wasted run.
  */
 function checkAgentAuth() {
-  const probe = tryShell('claude', ['-p', 'OK', '--dangerously-skip-permissions'], {
+  // The probe must PROVE the agent works, not merely fail to recognise a known
+  // error string. Matching a list of auth phrases and treating everything else
+  // as success meant a timeout, a DNS failure, a missing binary, or a 429 all
+  // returned "fine" and the run proceeded to burn a session (adversarial
+  // review, 2026-08-06). Demand the sentinel back instead: anything that is not
+  // a confirmed success is a reason not to start.
+  const SENTINEL = 'AGENT_AUTH_OK';
+  const probe = tryShell('claude', ['-p', `Reply with exactly: ${SENTINEL}`, '--dangerously-skip-permissions'], {
     timeout: 90_000,
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   const out = probe.out || '';
-  if (/revoked|Not logged in|401|Failed to authenticate|Invalid API key/i.test(out)) {
-    return `the headless agent cannot authenticate, so this run would do nothing:\n  ${out.trim().split('\n').slice(0, 3).join('\n  ')}\n`
-      + `  Fix: run 'claude setup-token' and put the result in ${path.join(ledger.HOME, 'env')} as CLAUDE_CODE_OAUTH_TOKEN=...`;
-  }
-  return null;
+  if (probe.ok && out.includes(SENTINEL)) return null;
+
+  const authish = /revoked|Not logged in|401|Failed to authenticate|Invalid API key/i.test(out);
+  const detail = out.trim().split('\n').slice(0, 3).join('\n  ') || '(no output from the probe)';
+  return authish
+    ? `the headless agent cannot authenticate, so this run would do nothing:\n  ${detail}\n`
+      + `  Fix: run 'claude setup-token', then: bash scripts/feedback/set-agent-token.sh`
+    : `the headless agent did not answer the auth probe, so this run would likely do nothing:\n  ${detail}\n`
+      + `  Not obviously an auth failure — could be a timeout, a network problem, or a missing 'claude' binary.\n`
+      + `  Check by hand: claude -p "Reply with exactly: ${SENTINEL}" --dangerously-skip-permissions`;
 }
 
 const LOCK = path.join(ledger.HOME, 'run.lock');
