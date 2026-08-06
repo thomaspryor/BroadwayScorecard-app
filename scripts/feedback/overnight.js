@@ -776,6 +776,21 @@ async function main() {
     }
   }
 
+  // Reclaim anything a previous run claimed and never resolved. The end-of-run
+  // requeue only fires if the run reaches its end — a killed or crashed run
+  // leaves its items sitting in-progress forever, invisible to --queue, and the
+  // feedback is silently lost. Found 2026-08-05: an item stranded exactly this
+  // way was only caught because a human happened to read the stats. Safe to do
+  // unconditionally here, because the run lock guarantees no other run holds a
+  // legitimate in-progress claim at this moment.
+  const stale = Object.values(ledger.load().items).filter((i) => i.status === 'in-progress');
+  if (stale.length) {
+    log(`reclaiming ${stale.length} item(s) stranded in-progress by an earlier run: ${stale.map((i) => i.id).join(' ')}`);
+    ledger.setStatus(stale.map((i) => i.id), 'queued', {
+      note: `reclaimed by run ${stamp} — a previous run claimed this and died before recording an outcome`,
+    });
+  }
+
   const queue = ledger.queue();
   const pending = ledger.pendingApproval();
   log(`queue: ${queue.length} actionable, ${pending.length} awaiting approval`);
