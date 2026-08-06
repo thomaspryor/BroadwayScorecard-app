@@ -78,6 +78,35 @@ function preflight() {
   // overnight commit nobody reviewed.
   if (dirty) return `working tree is dirty:\n${dirty.split('\n').slice(0, 10).join('\n')}`;
 
+  const auth = checkAgentAuth();
+  if (auth) return auth;
+
+  return null;
+}
+
+/**
+ * The whole run is worthless if the headless agent cannot authenticate, and the
+ * failure is silent in the worst way: `claude -p` prints its 401 to the agent
+ * log, exits 0, writes no code, and the driver dutifully reports "agent
+ * produced no commits". The owner reads "Shipped: No" and has no idea their
+ * credential expired rather than the feedback being unfixable.
+ *
+ * Happened 2026-08-05: a `/login` rotated the OAuth token, revoking the one
+ * stored for launchd, and nothing would have said so until someone asked why
+ * the autopilot had quietly stopped doing anything.
+ *
+ * One trivial prompt is far cheaper than a wasted run.
+ */
+function checkAgentAuth() {
+  const probe = tryShell('claude', ['-p', 'OK', '--dangerously-skip-permissions'], {
+    timeout: 90_000,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  const out = probe.out || '';
+  if (/revoked|Not logged in|401|Failed to authenticate|Invalid API key/i.test(out)) {
+    return `the headless agent cannot authenticate, so this run would do nothing:\n  ${out.trim().split('\n').slice(0, 3).join('\n  ')}\n`
+      + `  Fix: run 'claude setup-token' and put the result in ${path.join(ledger.HOME, 'env')} as CLAUDE_CODE_OAUTH_TOKEN=...`;
+  }
   return null;
 }
 
