@@ -140,6 +140,14 @@ jobs:
       - name: Unit-test beta-feedback visual gate
         run: node --test scripts/feedback/visual-gate.test.mjs
 
+      # Route mapping, vision-response parsing, and report formatting for the
+      # web-parity diff (task #1077) — the check that compares an app capture
+      # against a same-route web screenshot instead of an open-ended "find
+      # problems" prompt. No network/simulator here; that half is verified
+      # separately against real screenshots.
+      - name: Unit-test beta-feedback web-parity diff
+        run: node --test scripts/feedback/web-parity.test.mjs
+
   gate:
     name: TestFlight drift gate
     if: github.event_name == 'schedule'

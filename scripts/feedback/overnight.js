@@ -28,6 +28,7 @@ const path = require('path');
 const ledger = require('./ledger');
 const themes = require('./themes');
 const visualGate = require('./visual-gate');
+const webParity = require('./web-parity');
 
 const REPO = path.resolve(__dirname, '..', '..');
 const OUTPUTS = path.join(os.homedir(), 'Documents', 'claude-outputs');
@@ -498,7 +499,35 @@ function runVisualGate(branch, wtPath) {
   if (result.error) log(`visual gate capture error: ${result.error}`);
   const decision = visualGate.decideVisualGate(screens, result.captures, unverifiable);
   log(`visual gate: ${decision.ok ? 'PASS' : 'FAIL'} — ${decision.reason}`);
-  return { decision, captures: result.captures, error: result.error };
+  return { decision, captures: result.captures, error: result.error, outDir };
+}
+
+/**
+ * Diffs the app captures runVisualGate already took against a same-route web
+ * screenshot (task #1077) — the check that actually found the owner's real
+ * badge-sizing/border complaint in evaluation, vs. the open-ended "list
+ * problems" prompt which found nothing and invented a false positive. Purely
+ * additive to the report: unlike the visual gate itself, a comparison
+ * failure here (no API key, no web route for this screen, playwright error)
+ * never blocks the merge — it just means one less thing got compared.
+ */
+async function runWebParityGate(visual) {
+  if (!visual || !visual.captures || !visual.captures.length) return null;
+  if (!webParity.comparableCaptures(visual.captures).length) return null;
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    log('web parity: skipped — OPENAI_API_KEY not set');
+    return [{ label: 'all', hasDivergence: false, departures: [], notes: '', error: 'OPENAI_API_KEY not set' }];
+  }
+  try {
+    const results = await webParity.runWebParityCheck({ captures: visual.captures, outDir: visual.outDir, apiKey });
+    const summary = webParity.summarizeParityResults(results);
+    if (summary) log(`web parity: ${summary.hasFindings ? 'FOUND DIVERGENCE' : 'clean'} — ${summary.summary.split('\n')[0]}`);
+    return results;
+  } catch (e) {
+    log(`web parity check error: ${e.stack || e.message}`);
+    return [{ label: 'all', hasDivergence: false, departures: [], notes: '', error: e.message }];
+  }
 }
 
 // ------------------------------------------------------------------- ship
@@ -701,7 +730,7 @@ function computeThemeSummary() {
   }
 }
 
-function reportBody({ taken, result, gates, ship, visual, screenshots = [], pending, deferred, done, unshipped = [], pullError = null, themeClusters = [] }) {
+function reportBody({ taken, result, gates, ship, visual, screenshots = [], webParityResults = null, pending, deferred, done, unshipped = [], pullError = null, themeClusters = [] }) {
   const L = [];
   L.push(`# Overnight beta feedback — ${stamp.slice(0, 10)}`);
   L.push('');
@@ -812,6 +841,16 @@ function reportBody({ taken, result, gates, ship, visual, screenshots = [], pend
     L.push('');
   }
 
+  // Reads next to the screenshots above so the owner is comparing "what the
+  // app rendered" against "what the web reference says it should look like"
+  // in one place, not hunting for it separately (task #1077).
+  const parity = webParity.summarizeParityResults(webParityResults);
+  if (parity) {
+    L.push('## Web parity check');
+    L.push(parity.hasFindings ? `Found departure(s) from the web reference:\n${parity.summary}` : parity.summary);
+    L.push('');
+  }
+
   L.push('## Run detail');
   L.push(`- items handed to the agent: ${taken.length}`);
   L.push(`- agent exit code: ${result ? result.agentExit : 'n/a'}`);
@@ -910,6 +949,7 @@ async function main() {
   let gates = null;
   let ship = null;
   let visual = null;
+  let webParityResults = null;
   const moved = mainMoved(mainBefore);
   if (moved) {
     log(`ABORT MERGE: main moved during the run (${moved.before.slice(0, 9)} -> ${moved.now.slice(0, 9)})`);
@@ -932,6 +972,7 @@ async function main() {
         log(`visual gate failed — not merging: ${visual.decision.reason}`);
         ship = { merged: false, pushed: false, shipped: false, reason: `visual gate: ${visual.decision.reason}. Branch ${result.branch} left in place for you.` };
       } else {
+        webParityResults = await runWebParityGate(visual);
         ship = mergeAndShip(result.branch);
       }
     }
@@ -962,7 +1003,7 @@ async function main() {
 
   const screenshots = copyScreenshots(visual);
   writeReport(reportBody({
-    taken, result, gates, ship, visual, screenshots, pending: ledger.pendingApproval(), deferred, done, unshipped, pullError,
+    taken, result, gates, ship, visual, screenshots, webParityResults, pending: ledger.pendingApproval(), deferred, done, unshipped, pullError,
     themeClusters: computeThemeSummary(),
   }));
   log('=== done ===');

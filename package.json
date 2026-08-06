@@ -82,6 +82,7 @@
     "eslint": "^9.25.0",
     "eslint-config-expo": "~57.0.0",
     "expo-dev-client": "~57.0.7",
+    "playwright": "1.61.1",
     "tsx": "^4.21.0",
     "typescript": "~6.0.3"
   },
