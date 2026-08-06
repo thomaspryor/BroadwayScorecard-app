@@ -41,9 +41,17 @@ if [ -f "$STATE/env" ]; then
   . "$STATE/env"
 fi
 
+# An EMPTY token is not the dangerous case — a STALE one is. A session OAuth
+# token copied into this file is a snapshot: the interactive CLI rotates its
+# token, the old value is revoked, and this file keeps exporting the dead one,
+# which then SHADOWS the perfectly good stored login (2026-08-06 — a manual run
+# succeeded on the stored login at the same moment the launchd path would have
+# failed on the exported token, which is precisely why "I verified auth" was
+# wrong). So: export nothing rather than something revoked, and let
+# overnight.js's auth preflight do the real check — it probes the API instead
+# of testing a string for non-emptiness.
 if [ -z "${CLAUDE_CODE_OAUTH_TOKEN:-}" ] && [ -z "${ANTHROPIC_API_KEY:-}" ]; then
-  log "ERROR: no CLAUDE_CODE_OAUTH_TOKEN or ANTHROPIC_API_KEY in $STATE/env — headless agent cannot start"
-  exit 1
+  log "no token in $STATE/env — falling back to the stored login; overnight.js will verify it"
 fi
 
 cd "$REPO" || { log "ERROR: $REPO missing"; exit 1; }
