@@ -32,10 +32,12 @@ import { useWatchlist } from '@/hooks/useWatchlist';
 import { useShows } from '@/lib/data-context';
 import { getImageUrl } from '@/lib/images';
 import { toLocalYMD } from '@/lib/date-utils';
+import { buildReviewIndex, classifyWatchlistEntry } from '@/lib/watchlist-slot';
 import { showTitleFallback } from '@/lib/show-format';
 import { featureFlags } from '@/lib/feature-flags';
 import MiniStars from '@/components/user/MiniStars';
 import { usePosterGrid } from '@/hooks/usePosterGrid';
+import { POSTER_GRID_GAP, POSTER_GRID_ROW_GAP } from '@/lib/poster-grid';
 import type { UserReview, WatchlistEntry } from '@/lib/user-types';
 import type { Show } from '@/lib/types';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
@@ -46,7 +48,7 @@ import { StatsScreen } from '@/components/stats/StatsScreen';
 import { FeedModeToggle, type FeedMode } from '@/components/user/FeedModeToggle';
 import { PhotoFeedTimeline } from '@/components/user/PhotoFeedTimeline';
 import { PhotoWallGrid } from '@/components/user/PhotoWallGrid';
-import { DiaryCalendarMonth, buildDiaryCalendarMonths, buildReviewsByDate } from '@/components/user/DiaryCalendarView';
+import { DiaryCalendarMonth, buildDiaryCalendarMonths, buildReviewsByDate, buildUpcomingByDate } from '@/components/user/DiaryCalendarView';
 import { DiaryLedgerRow, UpcomingLedgerRow, MonthBand, groupReviewsByMonth } from '@/components/user/DiaryListView';
 import { usePhotoFeed } from '@/hooks/usePhotoFeed';
 import * as haptics from '@/lib/haptics';
@@ -296,23 +298,25 @@ export default function WatchedScreen() {
   }, [reviews, diarySort]);
 
   const today = toLocalYMD(new Date());
-  const reviewedShowIds = useMemo(() => new Set(reviews.map(r => r.show_id)), [reviews]);
+  // Shelf assignment is shared with the To Watch tab (lib/watchlist-slot.ts) —
+  // this screen used to drop anything already rated from Upcoming, which hid a
+  // re-booked show that To Watch was still showing (beta feedback 2026-08-05
+  // AMRzGCE4 / 2026-08-07 AHJspB30).
+  const reviewIndex = useMemo(() => buildReviewIndex(reviews), [reviews]);
 
-  // To Be Rated — shows from watchlist where planned_date has passed but not yet rated
+  // To Be Rated — planned date has passed and that outing isn't logged yet
   const toBeRated = useMemo(() => {
     return watchlist
-      .filter(w => w.planned_date && w.planned_date < today && !reviewedShowIds.has(w.show_id))
+      .filter(w => classifyWatchlistEntry(w, reviewIndex, today) === 'to-be-rated')
       .sort((a, b) => (b.planned_date || '').localeCompare(a.planned_date || ''));
-  }, [watchlist, today, reviewedShowIds]);
+  }, [watchlist, today, reviewIndex]);
 
-  // Upcoming — watchlist entries with a future (or today) planned date, not yet rated.
-  // Mirrors the To Watch tab's own Upcoming split (>= today) so a today-dated
-  // show is never invisible to both tabs at once.
+  // Upcoming — watchlist entries with a future (or today) planned date.
   const upcomingWatchlistEntries = useMemo(() => {
     return watchlist
-      .filter(w => w.planned_date && w.planned_date >= today && !reviewedShowIds.has(w.show_id))
+      .filter(w => classifyWatchlistEntry(w, reviewIndex, today) === 'upcoming')
       .sort((a, b) => (a.planned_date || '').localeCompare(b.planned_date || ''));
-  }, [watchlist, today, reviewedShowIds]);
+  }, [watchlist, today, reviewIndex]);
 
   // Reviews with a future date_seen (diary imports / manual back-dating could
   // produce these even though the rate sheet itself caps at today).
@@ -351,7 +355,20 @@ export default function WatchedScreen() {
 
   // Calendar sub-view data — months as FlatList items (virtualized above)
   const calendarReviewsByDate = useMemo(() => buildReviewsByDate(pastReviews), [pastReviews]);
-  const calendarMonths = useMemo(() => buildDiaryCalendarMonths(calendarReviewsByDate), [calendarReviewsByDate]);
+  // Booked nights ride on the calendar too, so it runs forward to the last date
+  // the Upcoming shelf knows about instead of stopping at the newest rating
+  // (beta feedback 2026-08-09, ADd7L27s).
+  const calendarUpcomingByDate = useMemo(
+    () => buildUpcomingByDate([
+      ...upcomingWatchlistEntries.map(e => ({ show_id: e.show_id, date: e.planned_date })),
+      ...upcomingReviews.map(r => ({ show_id: r.show_id, date: r.date_seen })),
+    ]),
+    [upcomingWatchlistEntries, upcomingReviews],
+  );
+  const calendarMonths = useMemo(
+    () => buildDiaryCalendarMonths(calendarReviewsByDate, calendarUpcomingByDate),
+    [calendarReviewsByDate, calendarUpcomingByDate],
+  );
 
   // Sort cycling
   const cycleDiarySort = useCallback(() => {
@@ -936,6 +953,7 @@ export default function WatchedScreen() {
               year={item.year}
               month={item.month}
               reviewsByDate={calendarReviewsByDate}
+              upcomingByDate={calendarUpcomingByDate}
               showMap={showMap}
             />
           )}
@@ -1118,7 +1136,8 @@ const styles = StyleSheet.create({
   toBeRatedDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#f59e0b' },
   toBeRatedCount: { color: '#f59e0b', fontSize: 12, fontWeight: '600' },
   toBeRatedGrid: {
-    flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm,
+    flexDirection: 'row', flexWrap: 'wrap',
+    columnGap: POSTER_GRID_GAP, rowGap: POSTER_GRID_ROW_GAP,
     paddingHorizontal: Spacing.lg,
   },
   // Cards (list view)
@@ -1139,7 +1158,11 @@ const styles = StyleSheet.create({
   // Grid view
   gridContainer: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.md },
   pastGrid: {
-    flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm,
+    flexDirection: 'row', flexWrap: 'wrap',
+    // Gutters come from lib/poster-grid so they stay in lockstep with the card
+    // width the columns are cut to (beta feedback 2026-08-09, APv8Zqbv: tiles
+    // "too crowded").
+    columnGap: POSTER_GRID_GAP, rowGap: POSTER_GRID_ROW_GAP,
   },
   // 3-up enriched grid (Round 2, Grid Direction B modified) — was 4-up/23%;
   // wider cards give the poster + overlay date room to breathe. Width itself

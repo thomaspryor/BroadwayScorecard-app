@@ -15,7 +15,13 @@
  */
 import { Spacing } from '@/constants/theme';
 
-export const POSTER_GRID_GAP = Spacing.sm;
+// Gutter between poster columns. Widened from Spacing.sm 2026-08-09 (beta
+// feedback APv8Zqbv: the tiles on the diary grid and the To Watch grid "need
+// some more space in between them. They're too crowded"). Rows get more still,
+// because each poster carries a two-line title underneath that ran straight
+// into the next row's artwork.
+export const POSTER_GRID_GAP = Spacing.md;
+export const POSTER_GRID_ROW_GAP = Spacing.lg;
 export const POSTER_GRID_PADDING = Spacing.lg;
 
 export function posterCardWidth(
@@ -33,7 +39,10 @@ export function posterCardWidth(
 export interface PosterGrid {
   /** Exact per-card width in points. */
   cardWidth: number;
+  /** Column gutter — the one the card width is derived from. */
   gap: number;
+  /** Row gutter. Larger than the column gutter: titles sit under the posters. */
+  rowGap: number;
   horizontalPadding: number;
   columns: number;
 }
