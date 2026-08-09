@@ -7,9 +7,16 @@
  * month-granular pieces so the parent FlatList can virtualize months
  * instead of mounting the whole diary's grids at once.
  *
- * The month walk starts at the NEWEST dated review (not today) and stops at
+ * The month walk starts at the NEWEST dated entry (not today) and stops at
  * the oldest — starting at today would let the MAX_MONTHS cap swallow the
  * whole diary for a user whose last entry is years old.
+ *
+ * "Entry" means a rated night OR a booked future night: the calendar used to
+ * render only past reviews, so a diary whose Upcoming section ran to November
+ * still stopped at the current month (beta feedback 2026-08-09, ADd7L27sWf:
+ * "should also show future months up to whenever there are shows on the
+ * Upcoming section"). Future months are granted on top of the MAX_MONTHS
+ * budget rather than out of it, so adding a plan never truncates history.
  */
 
 import React, { useMemo } from 'react';
@@ -29,26 +36,45 @@ const MAX_MONTHS = 36;
 
 export interface CalendarMonth { year: number; month: number }
 
-/** Reviews keyed by exact date (YYYY-MM-DD) — same-day repeat viewings just
- *  show the first one; a rare edge case, not worth a stacked-poster cell. */
-export function buildReviewsByDate(reviews: UserReview[]): Record<string, UserReview> {
-  const map: Record<string, UserReview> = {};
+/** One night on the calendar: a show you rated, or one you have booked. */
+export interface CalendarEntry {
+  showId: string;
+  /** 'planned' cells are dimmed and ringed — nothing has been rated yet. */
+  kind: 'seen' | 'planned';
+}
+
+/** Nights keyed by exact date (YYYY-MM-DD) — same-day repeat viewings just
+ *  show the first one; a rare edge case, not worth a stacked-poster cell.
+ *  Reviews win a contested date: a rated night is a fact, a plan is not. */
+export function buildEntriesByDate(
+  reviews: UserReview[],
+  upcoming: { show_id: string; planned_date?: string | null }[] = [],
+): Record<string, CalendarEntry> {
+  const map: Record<string, CalendarEntry> = {};
   for (const r of reviews) {
-    if (r.date_seen && !map[r.date_seen]) map[r.date_seen] = r;
+    if (r.date_seen && !map[r.date_seen]) map[r.date_seen] = { showId: r.show_id, kind: 'seen' };
+  }
+  for (const w of upcoming) {
+    if (w.planned_date && !map[w.planned_date]) map[w.planned_date] = { showId: w.show_id, kind: 'planned' };
   }
   return map;
 }
 
-/** Newest→oldest month span of the dated diary, capped at MAX_MONTHS. */
-export function buildDiaryCalendarMonths(reviewsByDate: Record<string, UserReview>): CalendarMonth[] {
-  const dates = Object.keys(reviewsByDate).sort();
+const monthOrdinal = (d: Date) => d.getFullYear() * 12 + d.getMonth();
+
+/** Newest→oldest month span of the dated diary. Past months are capped at
+ *  MAX_MONTHS; months ahead of today are extra on top of that budget. */
+export function buildDiaryCalendarMonths(entriesByDate: Record<string, CalendarEntry>): CalendarMonth[] {
+  const dates = Object.keys(entriesByDate).sort();
   const today = new Date();
   const newest = dates.length > 0 ? new Date(`${dates[dates.length - 1]}T00:00:00`) : today;
   const oldest = dates.length > 0 ? new Date(`${dates[0]}T00:00:00`) : today;
+  const monthsAhead = Math.max(0, monthOrdinal(newest) - monthOrdinal(today));
+  const limit = MAX_MONTHS + monthsAhead;
   let y = newest.getFullYear();
   let m = newest.getMonth();
   const out: CalendarMonth[] = [];
-  while (out.length < MAX_MONTHS) {
+  while (out.length < limit) {
     out.push({ year: y, month: m });
     if (y === oldest.getFullYear() && m === oldest.getMonth()) break;
     m -= 1;
@@ -60,22 +86,22 @@ export function buildDiaryCalendarMonths(reviewsByDate: Record<string, UserRevie
 interface DiaryCalendarMonthProps {
   year: number;
   month: number;
-  reviewsByDate: Record<string, UserReview>;
+  entriesByDate: Record<string, CalendarEntry>;
   showMap: Record<string, Show>;
 }
 
-export function DiaryCalendarMonth({ year, month, reviewsByDate, showMap }: DiaryCalendarMonthProps) {
+export function DiaryCalendarMonth({ year, month, entriesByDate, showMap }: DiaryCalendarMonthProps) {
   const cells = useMemo(() => {
     const startWeekday = new Date(year, month, 1).getDay();
     const daysInMonth = new Date(year, month + 1, 0).getDate();
-    const out: ({ day: number; dateStr: string; review: UserReview | null } | null)[] = [];
+    const out: ({ day: number; dateStr: string; entry: CalendarEntry | null } | null)[] = [];
     for (let i = 0; i < startWeekday; i++) out.push(null);
     for (let day = 1; day <= daysInMonth; day++) {
       const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-      out.push({ day, dateStr, review: reviewsByDate[dateStr] || null });
+      out.push({ day, dateStr, entry: entriesByDate[dateStr] || null });
     }
     return out;
-  }, [year, month, reviewsByDate]);
+  }, [year, month, entriesByDate]);
 
   const monthLabel = new Date(year, month, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
@@ -90,32 +116,40 @@ export function DiaryCalendarMonth({ year, month, reviewsByDate, showMap }: Diar
       <View style={styles.grid}>
         {cells.map((cell, i) => {
           if (!cell) return <View key={i} style={styles.cell} />;
-          const show = cell.review ? showMap[cell.review.show_id] : null;
+          const show = cell.entry ? showMap[cell.entry.showId] : null;
           const posterUrl = show?.images ? (getImageUrl(show.images.poster) || getImageUrl(show.images.thumbnail)) : null;
-          if (!cell.review) {
+          if (!cell.entry) {
             return (
               <View key={i} style={styles.cell}>
                 <Text style={styles.dayNumber}>{cell.day}</Text>
               </View>
             );
           }
-          const reviewShowId = cell.review.show_id;
+          const { showId: cellShowId, kind } = cell.entry;
+          const planned = kind === 'planned';
+          const title = show?.title || showTitleFallback(cellShowId);
           return (
             <Pressable
               key={i}
               style={styles.cell}
               onPress={() => {
                 haptics.tap();
-                router.push(show ? `/show/${show.slug}` : `/diary-show/${reviewShowId}` as any);
+                router.push(show ? `/show/${show.slug}` : `/diary-show/${cellShowId}` as any);
               }}
               accessibilityRole="button"
-              accessibilityLabel={`${show?.title || showTitleFallback(reviewShowId)}, ${cell.dateStr}`}
+              accessibilityLabel={`${title}, ${cell.dateStr}${planned ? ', upcoming' : ''}`}
             >
+              {/* A booked night reads as a plan, not a memory: dimmed poster
+                  behind a brand-gold ring. */}
               {posterUrl ? (
-                <Image source={{ uri: posterUrl }} style={styles.cellPoster} contentFit="cover" />
+                <Image
+                  source={{ uri: posterUrl }}
+                  style={[styles.cellPoster, planned && styles.cellPosterPlanned]}
+                  contentFit="cover"
+                />
               ) : (
-                <View style={[styles.cellPoster, styles.cellPosterPlaceholder]}>
-                  <Text style={styles.cellPosterPlaceholderText}>{(show?.title || '?').charAt(0)}</Text>
+                <View style={[styles.cellPoster, styles.cellPosterPlaceholder, planned && styles.cellPosterPlanned]}>
+                  <Text style={styles.cellPosterPlaceholderText}>{title.charAt(0)}</Text>
                 </View>
               )}
               <Text style={styles.dayNumberOverlay}>{cell.day}</Text>
@@ -149,6 +183,10 @@ const styles = StyleSheet.create({
   cellPoster: {
     width: '100%', height: '100%', borderRadius: BorderRadius.sm,
     backgroundColor: Colors.surface.overlay,
+  },
+  cellPosterPlanned: {
+    opacity: 0.55,
+    borderWidth: 1.5, borderColor: Colors.brand,
   },
   cellPosterPlaceholder: { alignItems: 'center', justifyContent: 'center' },
   cellPosterPlaceholderText: { color: Colors.text.muted, fontSize: 12, fontWeight: '600' },

@@ -20,6 +20,7 @@ import { OutOfMarketChip } from '@/components/show-cards/OutOfMarketChip';
 import type { Market } from '@/components/MarketPicker';
 import type { Show } from '@/lib/types';
 import { usePosterGrid } from '@/hooks/usePosterGrid';
+import { POSTER_GRID_GAP } from '@/lib/poster-grid';
 import { Colors, Spacing, BorderRadius } from '@/constants/theme';
 
 function fixture(partial: Partial<Show> & { id: string; title: string }): Show {
@@ -89,7 +90,9 @@ const styles = StyleSheet.create({
   content: { padding: Spacing.lg, paddingTop: 60, gap: Spacing.xl },
   block: { gap: Spacing.md },
   heading: { color: Colors.text.primary, fontSize: 16, fontWeight: '700' },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm, rowGap: 12 },
+  // Same gap constant the real shelves use, so this fixture keeps matching the
+  // geometry it exists to preview (see lib/poster-grid).
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: POSTER_GRID_GAP },
   // Width comes from usePosterGrid(3) at render time — see lib/poster-grid.ts.
   gridCard: { alignItems: 'center' },
   gridPoster: {

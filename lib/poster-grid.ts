@@ -15,7 +15,15 @@
  */
 import { Spacing } from '@/constants/theme';
 
-export const POSTER_GRID_GAP = Spacing.sm;
+/**
+ * Both the row gap and the column gap of every poster shelf. Widened from
+ * Spacing.sm to Spacing.md (beta feedback 2026-08-09, APv8ZqbvfS: the posters
+ * on the Watched diary grid and the To Watch shelves "need some more space in
+ * between them. They're too crowded"). Every grid style reads this constant
+ * rather than hardcoding a spacing token — a gap that disagrees with the one
+ * the card width was computed from is what strands pixels at the end of a row.
+ */
+export const POSTER_GRID_GAP = Spacing.md;
 export const POSTER_GRID_PADDING = Spacing.lg;
 
 export function posterCardWidth(

@@ -38,6 +38,8 @@ import { ShowSearchModal } from '@/components/ShowSearchModal';
 import { ContextMenu } from '@/components/user/ContextMenu';
 import { PlannedDateSheet } from '@/components/user/PlannedDateSheet';
 import { usePosterGrid } from '@/hooks/usePosterGrid';
+import { POSTER_GRID_GAP, POSTER_GRID_PADDING } from '@/lib/poster-grid';
+import { splitWatchlist } from '@/lib/watchlist-sections';
 import * as haptics from '@/lib/haptics';
 
 type WatchlistSort = 'added-desc' | 'alphabetical' | 'closing-soon';
@@ -67,7 +69,10 @@ export default function ToWatchScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user, isAuthenticated, loading: authLoading, showSignIn } = useAuth();
-  const { reviews, getAllReviews } = useUserReviews(user?.id || null);
+  // Only the refetch — the section split no longer consults reviews at all
+  // (a past rating does not cancel a future plan, see lib/watchlist-sections);
+  // this keeps the shared review cache warm for the Watched tab.
+  const { getAllReviews } = useUserReviews(user?.id || null);
   const { watchlist, getWatchlist, addToWatchlist, removeFromWatchlist, updatePlannedDate, loading: watchlistLoading } = useWatchlist(user?.id || null);
   const { shows } = useShows();
   // 3-up, width derived from the screen so the row has no stranded right-hand
@@ -129,25 +134,16 @@ export default function ToWatchScreen() {
 
   const loading = authLoading || watchlistLoading;
   const today = toLocalYMD(new Date());
-  const reviewedShowIds = useMemo(() => new Set(reviews.map(r => r.show_id)), [reviews]);
 
-  // Split: upcoming (future planned dates), regular (no date or no planned date)
-  // Exclude "to be rated" items (past date, no review) — those go to Watched tab
-  const { upcomingWatchlist, regularWatchlist } = useMemo(() => {
-    const upcoming: WatchlistEntry[] = [];
-    const regular: WatchlistEntry[] = [];
-    for (const w of watchlist) {
-      if (w.planned_date && w.planned_date < today && !reviewedShowIds.has(w.show_id)) {
-        continue; // "to be rated" — handled by Watched tab
-      } else if (w.planned_date && w.planned_date >= today) {
-        upcoming.push(w);
-      } else {
-        regular.push(w);
-      }
-    }
-    upcoming.sort((a, b) => (a.planned_date || '').localeCompare(b.planned_date || ''));
-    return { upcomingWatchlist: upcoming, regularWatchlist: regular };
-  }, [watchlist, today, reviewedShowIds]);
+  // Split: upcoming (future planned dates), regular (no planned date). Entries
+  // whose planned date has passed are "to be rated" and belong to the Watched
+  // tab, so they are dropped here. Shared with that tab via
+  // lib/watchlist-sections — the two screens used to write this filter
+  // separately and drifted apart (beta feedback 2026-08-05 / 2026-08-07).
+  const { upcoming: upcomingWatchlist, undated: regularWatchlist } = useMemo(
+    () => splitWatchlist(watchlist, today),
+    [watchlist, today],
+  );
 
   const sortedWatchlist = useMemo(() => {
     const sorted = [...regularWatchlist];
@@ -413,7 +409,7 @@ export default function ToWatchScreen() {
           testID="add-to-watchlist-button"
           accessibilityLabel="Add to watchlist"
         >
-          <Svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={Colors.text.secondary} strokeWidth={2.5}>
+          <Svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={Colors.text.inverse} strokeWidth={2.5}>
             <Path strokeLinecap="round" d="M12 5v14M5 12h14" />
           </Svg>
         </Pressable>
@@ -623,9 +619,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg, paddingTop: Spacing.xl, paddingBottom: Spacing.sm,
   },
   pageTitle: { fontSize: FontSize.xxl, fontWeight: '700', color: Colors.text.primary },
+  // Same circle, same brand gold, same 38pt as the Watched tab's "log a show"
+  // button — it was a gray rounded square here (beta feedback 2026-08-09,
+  // AMHVzyzzrZ: "a different shape and color to the one on the Watched List").
+  // 38pt visual + hitSlop 8 at the call site keeps the target ≥44pt.
   addButton: {
-    width: 44, height: 44, borderRadius: 12,
-    backgroundColor: Colors.surface.overlay, alignItems: 'center', justifyContent: 'center',
+    width: 38, height: 38, borderRadius: 19,
+    backgroundColor: Colors.brand, alignItems: 'center', justifyContent: 'center',
   },
   pressed: { opacity: 0.7 },
   controlsRow: {
@@ -654,8 +654,10 @@ const styles = StyleSheet.create({
   sectionTitle: { color: Colors.text.primary, fontSize: 13, fontWeight: '700', letterSpacing: 0.6, textTransform: 'uppercase' },
   sectionCount: { color: Colors.text.muted, fontSize: 12 },
   posterGrid: {
-    flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm,
-    paddingHorizontal: Spacing.lg,
+    // Gap from lib/poster-grid, the same constant the card width is derived
+    // from — see POSTER_GRID_GAP for why it must not be hardcoded here.
+    flexDirection: 'row', flexWrap: 'wrap', gap: POSTER_GRID_GAP,
+    paddingHorizontal: POSTER_GRID_PADDING,
     // Breathing room before the next section band — without it the bottom row
     // of posters touched the "Not Yet Booked" header (beta feedback
     // 2026-08-03, APKyuqcH: "not enough space between the bottom row here and

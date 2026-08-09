@@ -1,0 +1,48 @@
+# Visual check for the 2026-08-09 overnight beta-feedback batch.
+#   To Watch      → items AMHVzyzz (+ button shape/colour) and APv8Zqbv (grid gap)
+#   Watched Diary → items AMRzGCE4 / AHJspB30 (Upcoming shows a re-booked show)
+#                   and APv8Zqbv (grid gap)
+#   Watched Diary → calendar layout → item ADd7L27s (future months)
+appId: com.broadwayscorecard.app
+---
+- launchApp:
+    clearState: false
+# A fresh install lands on onboarding, which occludes every tab.
+- tapOn:
+    text: "Skip"
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 5000
+- extendedWaitUntil:
+    visible:
+      text: "Broadway Scorecard"
+    timeout: 30000
+
+- openLink: broadwayscorecard:///to-watch
+- tapOn:
+    text: "Open"
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 8000
+- takeScreenshot: /tmp/bsc-shots/to-watch
+
+- openLink: broadwayscorecard:///watched
+- tapOn:
+    text: "Open"
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 8000
+- takeScreenshot: /tmp/bsc-shots/watched-diary
+
+- tapOn:
+    id: "diary-calendar-layout-toggle"
+- waitForAnimationToEnd:
+    timeout: 8000
+- takeScreenshot: /tmp/bsc-shots/watched-calendar
+
+# Leave the persisted layout back on posters so a re-run starts from the
+# same state this flow assumed.
+- tapOn:
+    id: "diary-poster-layout-toggle"
+- waitForAnimationToEnd:
+    timeout: 5000
