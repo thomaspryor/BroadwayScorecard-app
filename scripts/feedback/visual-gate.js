@@ -19,6 +19,7 @@
 
 const { execFileSync } = require('child_process');
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 
 // Core tab screens, deep-linked the same way .maestro-manual/beta-feedback-
@@ -225,15 +226,38 @@ function captureScreens({ repoRoot, wtPath, screens, outDir, buildTimeoutMs = 25
   const flowPath = path.join(outDir, 'capture.yaml');
   fs.writeFileSync(flowPath, buildFlow(appId, screens, outDir));
 
+  // maestro installs to ~/.maestro/bin, which is NOT on launchd's PATH — the
+  // autopilot therefore failed to exec it at all and the capture step produced
+  // nothing, indistinguishable in the report from "the screens looked wrong"
+  // (2026-08-09). Resolve it by absolute path rather than trusting PATH, and
+  // put both it and the JDK's bin on the child's PATH because the maestro
+  // launcher shells out to `java`.
+  const maestroBin = [
+    path.join(os.homedir(), '.maestro', 'bin', 'maestro'),
+    '/opt/homebrew/bin/maestro',
+    '/usr/local/bin/maestro',
+  ].find((p) => { try { fs.accessSync(p, fs.constants.X_OK); return true; } catch { return false; } });
+  if (!maestroBin) {
+    return { ok: false, captures: [], error: 'maestro is not installed (looked in ~/.maestro/bin, /opt/homebrew/bin, /usr/local/bin) — cannot capture screenshots' };
+  }
+  const javaHome = process.env.JAVA_HOME
+    || ['/opt/homebrew/opt/openjdk/libexec/openjdk.jdk/Contents/Home',
+        '/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home']
+        .find((p) => fs.existsSync(p));
+  if (!javaHome) {
+    return { ok: false, captures: [], error: 'no JDK found for maestro (needs JAVA_HOME or a brew openjdk) — cannot capture screenshots' };
+  }
+
   try {
-    execFileSync('maestro', ['test', '--udid', udid, flowPath], {
+    execFileSync(maestroBin, ['test', '--udid', udid, flowPath], {
       cwd: wtPath,
       stdio: ['ignore', 'pipe', 'pipe'],
       timeout: maestroTimeoutMs,
       maxBuffer: 64 * 1024 * 1024,
       env: {
         ...process.env,
-        JAVA_HOME: process.env.JAVA_HOME || '/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home',
+        JAVA_HOME: javaHome,
+        PATH: `${path.join(javaHome, 'bin')}:${path.dirname(maestroBin)}:${process.env.PATH || ''}`,
       },
     });
   } catch {
