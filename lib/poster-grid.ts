@@ -15,7 +15,11 @@
  */
 import { Spacing } from '@/constants/theme';
 
-export const POSTER_GRID_GAP = Spacing.sm;
+// Spacing.md, not sm — 8pt read as "too crowded" between posters on the
+// Watched diary and To Watch grids (beta feedback 2026-08-09, APv8Zqbv).
+// Grid styles must use this constant, never a raw Spacing value: the column
+// width below is derived from it, so a drifted gap wraps or strands cards.
+export const POSTER_GRID_GAP = Spacing.md;
 export const POSTER_GRID_PADDING = Spacing.lg;
 
 export function posterCardWidth(

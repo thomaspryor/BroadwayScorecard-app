@@ -38,6 +38,7 @@ import { ShowSearchModal } from '@/components/ShowSearchModal';
 import { ContextMenu } from '@/components/user/ContextMenu';
 import { PlannedDateSheet } from '@/components/user/PlannedDateSheet';
 import { usePosterGrid } from '@/hooks/usePosterGrid';
+import { POSTER_GRID_GAP } from '@/lib/poster-grid';
 import * as haptics from '@/lib/haptics';
 
 type WatchlistSort = 'added-desc' | 'alphabetical' | 'closing-soon';
@@ -413,7 +414,7 @@ export default function ToWatchScreen() {
           testID="add-to-watchlist-button"
           accessibilityLabel="Add to watchlist"
         >
-          <Svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={Colors.text.secondary} strokeWidth={2.5}>
+          <Svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={Colors.text.inverse} strokeWidth={2.5}>
             <Path strokeLinecap="round" d="M12 5v14M5 12h14" />
           </Svg>
         </Pressable>
@@ -624,8 +625,12 @@ const styles = StyleSheet.create({
   },
   pageTitle: { fontSize: FontSize.xxl, fontWeight: '700', color: Colors.text.primary },
   addButton: {
-    width: 44, height: 44, borderRadius: 12,
-    backgroundColor: Colors.surface.overlay, alignItems: 'center', justifyContent: 'center',
+    // Same anatomy as the Watched tab's primary add button — brand-gold
+    // circle, 38pt visual + hitSlop 8 keeps the target ≥44pt (beta feedback
+    // 2026-08-09, AMHVzyzz: "different shape and color to the one on the
+    // Watched List").
+    width: 38, height: 38, borderRadius: 19,
+    backgroundColor: Colors.brand, alignItems: 'center', justifyContent: 'center',
   },
   pressed: { opacity: 0.7 },
   controlsRow: {
@@ -654,7 +659,7 @@ const styles = StyleSheet.create({
   sectionTitle: { color: Colors.text.primary, fontSize: 13, fontWeight: '700', letterSpacing: 0.6, textTransform: 'uppercase' },
   sectionCount: { color: Colors.text.muted, fontSize: 12 },
   posterGrid: {
-    flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm,
+    flexDirection: 'row', flexWrap: 'wrap', gap: POSTER_GRID_GAP,
     paddingHorizontal: Spacing.lg,
     // Breathing room before the next section band — without it the bottom row
     // of posters touched the "Not Yet Booked" header (beta feedback

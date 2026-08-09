@@ -7,9 +7,13 @@
  * month-granular pieces so the parent FlatList can virtualize months
  * instead of mounting the whole diary's grids at once.
  *
- * The month walk starts at the NEWEST dated review (not today) and stops at
+ * The month walk starts at the NEWEST dated entry (not today) and stops at
  * the oldest — starting at today would let the MAX_MONTHS cap swallow the
- * whole diary for a user whose last entry is years old.
+ * whole diary for a user whose last entry is years old. Entries are any
+ * { show_id } keyed by date: rated reviews AND upcoming planned watchlist
+ * dates, so the walk runs forward to the last Upcoming show too (beta
+ * feedback 2026-08-09, ADd7L27s: "should also show future months up to
+ * whenever there are shows on the Upcoming section").
  */
 
 import React, { useMemo } from 'react';
@@ -29,10 +33,14 @@ const MAX_MONTHS = 36;
 
 export interface CalendarMonth { year: number; month: number }
 
+/** A dated calendar cell only needs a show to point at — rated reviews and
+ *  upcoming watchlist entries both qualify. */
+export interface CalendarEntry { show_id: string }
+
 /** Reviews keyed by exact date (YYYY-MM-DD) — same-day repeat viewings just
  *  show the first one; a rare edge case, not worth a stacked-poster cell. */
-export function buildReviewsByDate(reviews: UserReview[]): Record<string, UserReview> {
-  const map: Record<string, UserReview> = {};
+export function buildReviewsByDate(reviews: UserReview[]): Record<string, CalendarEntry> {
+  const map: Record<string, CalendarEntry> = {};
   for (const r of reviews) {
     if (r.date_seen && !map[r.date_seen]) map[r.date_seen] = r;
   }
@@ -40,7 +48,7 @@ export function buildReviewsByDate(reviews: UserReview[]): Record<string, UserRe
 }
 
 /** Newest→oldest month span of the dated diary, capped at MAX_MONTHS. */
-export function buildDiaryCalendarMonths(reviewsByDate: Record<string, UserReview>): CalendarMonth[] {
+export function buildDiaryCalendarMonths(reviewsByDate: Record<string, CalendarEntry>): CalendarMonth[] {
   const dates = Object.keys(reviewsByDate).sort();
   const today = new Date();
   const newest = dates.length > 0 ? new Date(`${dates[dates.length - 1]}T00:00:00`) : today;
@@ -60,7 +68,7 @@ export function buildDiaryCalendarMonths(reviewsByDate: Record<string, UserRevie
 interface DiaryCalendarMonthProps {
   year: number;
   month: number;
-  reviewsByDate: Record<string, UserReview>;
+  reviewsByDate: Record<string, CalendarEntry>;
   showMap: Record<string, Show>;
 }
 
@@ -68,7 +76,7 @@ export function DiaryCalendarMonth({ year, month, reviewsByDate, showMap }: Diar
   const cells = useMemo(() => {
     const startWeekday = new Date(year, month, 1).getDay();
     const daysInMonth = new Date(year, month + 1, 0).getDate();
-    const out: ({ day: number; dateStr: string; review: UserReview | null } | null)[] = [];
+    const out: ({ day: number; dateStr: string; review: CalendarEntry | null } | null)[] = [];
     for (let i = 0; i < startWeekday; i++) out.push(null);
     for (let day = 1; day <= daysInMonth; day++) {
       const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;

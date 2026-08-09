@@ -36,6 +36,7 @@ import { showTitleFallback } from '@/lib/show-format';
 import { featureFlags } from '@/lib/feature-flags';
 import MiniStars from '@/components/user/MiniStars';
 import { usePosterGrid } from '@/hooks/usePosterGrid';
+import { POSTER_GRID_GAP } from '@/lib/poster-grid';
 import type { UserReview, WatchlistEntry } from '@/lib/user-types';
 import type { Show } from '@/lib/types';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
@@ -305,14 +306,17 @@ export default function WatchedScreen() {
       .sort((a, b) => (b.planned_date || '').localeCompare(a.planned_date || ''));
   }, [watchlist, today, reviewedShowIds]);
 
-  // Upcoming — watchlist entries with a future (or today) planned date, not yet rated.
+  // Upcoming — watchlist entries with a future (or today) planned date.
   // Mirrors the To Watch tab's own Upcoming split (>= today) so a today-dated
-  // show is never invisible to both tabs at once.
+  // show is never invisible to both tabs at once. Deliberately NOT filtered by
+  // reviewedShowIds: rating a show in the past must not hide a planned repeat
+  // visit (beta feedback 2026-08-05/07, AMRzGCE4/AHJspB30 — Oh, Mary! showed
+  // on To Watch but vanished from this section because it had been rated).
   const upcomingWatchlistEntries = useMemo(() => {
     return watchlist
-      .filter(w => w.planned_date && w.planned_date >= today && !reviewedShowIds.has(w.show_id))
+      .filter(w => w.planned_date && w.planned_date >= today)
       .sort((a, b) => (a.planned_date || '').localeCompare(b.planned_date || ''));
-  }, [watchlist, today, reviewedShowIds]);
+  }, [watchlist, today]);
 
   // Reviews with a future date_seen (diary imports / manual back-dating could
   // produce these even though the rate sheet itself caps at today).
@@ -349,8 +353,17 @@ export default function WatchedScreen() {
 
   const showsSeen = new Set(reviews.map(r => r.show_id)).size;
 
-  // Calendar sub-view data — months as FlatList items (virtualized above)
-  const calendarReviewsByDate = useMemo(() => buildReviewsByDate(pastReviews), [pastReviews]);
+  // Calendar sub-view data — months as FlatList items (virtualized above).
+  // Upcoming planned dates are merged in so the month walk runs forward to
+  // the last Upcoming show, not just backward through the rated diary (beta
+  // feedback 2026-08-09, ADd7L27s).
+  const calendarReviewsByDate = useMemo(() => {
+    const map = buildReviewsByDate([...pastReviews, ...upcomingReviews]);
+    for (const w of upcomingWatchlistEntries) {
+      if (w.planned_date && !map[w.planned_date]) map[w.planned_date] = { show_id: w.show_id };
+    }
+    return map;
+  }, [pastReviews, upcomingReviews, upcomingWatchlistEntries]);
   const calendarMonths = useMemo(() => buildDiaryCalendarMonths(calendarReviewsByDate), [calendarReviewsByDate]);
 
   // Sort cycling
@@ -1118,7 +1131,7 @@ const styles = StyleSheet.create({
   toBeRatedDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#f59e0b' },
   toBeRatedCount: { color: '#f59e0b', fontSize: 12, fontWeight: '600' },
   toBeRatedGrid: {
-    flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm,
+    flexDirection: 'row', flexWrap: 'wrap', gap: POSTER_GRID_GAP,
     paddingHorizontal: Spacing.lg,
   },
   // Cards (list view)
@@ -1139,7 +1152,7 @@ const styles = StyleSheet.create({
   // Grid view
   gridContainer: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.md },
   pastGrid: {
-    flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm,
+    flexDirection: 'row', flexWrap: 'wrap', gap: POSTER_GRID_GAP,
   },
   // 3-up enriched grid (Round 2, Grid Direction B modified) — was 4-up/23%;
   // wider cards give the poster + overlay date room to breathe. Width itself
