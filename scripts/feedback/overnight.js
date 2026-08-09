@@ -834,6 +834,21 @@ function reportBody({ taken, result, gates, ship, visual, screenshots = [], webP
   if (visual) {
     L.push('## Visual check');
     L.push(visual.decision.ok ? `Passed: ${visual.decision.reason}` : `FAILED — this is why the branch above was not merged: ${visual.decision.reason}`);
+    // A gate that LOOKED and objected is a code problem: tomorrow's run may
+    // well pass. A gate that could not RUN is an infrastructure problem, and
+    // it will block every future night identically until a human fixes the
+    // tooling — fixes just pile up on branches while the report says the same
+    // "Shipped: No" each morning. That is exactly what happened 2026-08-07..09:
+    // three nights blocked by one broken simulator build, indistinguishable in
+    // the report from "your changes were rejected". Say which it is.
+    if (!visual.decision.ok && visual.error) {
+      L.push('');
+      L.push('**This is an infrastructure failure, not a problem with the fixes.** The screenshot step could not run at all, '
+        + 'so the gate had nothing to judge. It will block every night the same way until the capture tooling works again — '
+        + 'the fixes are safe on their branch meanwhile, but nothing will ship on its own.');
+      L.push('');
+      L.push('Check it by hand with: `bash scripts/build-sim.sh` (needs a booted simulator).');
+    }
     if (visual.error) L.push(`\nCapture error:\n\`\`\`\n${visual.error.slice(-1500)}\n\`\`\``);
     if (screenshots && screenshots.length) {
       screenshots.forEach((s) => L.push(`\n### ${s.label}\n![${s.label}](${s.path})`));
