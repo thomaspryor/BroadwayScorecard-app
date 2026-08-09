@@ -15,7 +15,13 @@
  */
 import { Spacing } from '@/constants/theme';
 
-export const POSTER_GRID_GAP = Spacing.sm;
+/**
+ * Gap between poster tiles, both directions. Every poster grid must lay out
+ * with THIS value — the card width is derived from it, so a screen that hard-
+ * codes a different gap wraps its last column. 8pt read as "too crowded"
+ * (beta feedback 2026-08-09, APv8Zqbv, on the Watched + To Watch grids).
+ */
+export const POSTER_GRID_GAP = Spacing.md;
 export const POSTER_GRID_PADDING = Spacing.lg;
 
 export function posterCardWidth(

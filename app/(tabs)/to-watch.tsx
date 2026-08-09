@@ -27,6 +27,7 @@ import { useShows } from '@/lib/data-context';
 import { getImageUrl } from '@/lib/images';
 import { daysUntilDate, toLocalYMD } from '@/lib/date-utils';
 import { showTitleFallback } from '@/lib/show-format';
+import { isUpcomingWatchlistEntry, loggedViewingKeys } from '@/lib/watchlist-sections';
 import { PosterStatusPill } from '@/components/show-cards/PosterStatusPill';
 import { OutOfMarketChip } from '@/components/show-cards/OutOfMarketChip';
 import { featureFlags } from '@/lib/feature-flags';
@@ -38,6 +39,7 @@ import { ShowSearchModal } from '@/components/ShowSearchModal';
 import { ContextMenu } from '@/components/user/ContextMenu';
 import { PlannedDateSheet } from '@/components/user/PlannedDateSheet';
 import { usePosterGrid } from '@/hooks/usePosterGrid';
+import { POSTER_GRID_GAP } from '@/lib/poster-grid';
 import * as haptics from '@/lib/haptics';
 
 type WatchlistSort = 'added-desc' | 'alphabetical' | 'closing-soon';
@@ -130,24 +132,28 @@ export default function ToWatchScreen() {
   const loading = authLoading || watchlistLoading;
   const today = toLocalYMD(new Date());
   const reviewedShowIds = useMemo(() => new Set(reviews.map(r => r.show_id)), [reviews]);
+  const loggedViewings = useMemo(() => loggedViewingKeys(reviews), [reviews]);
 
   // Split: upcoming (future planned dates), regular (no date or no planned date)
-  // Exclude "to be rated" items (past date, no review) — those go to Watched tab
+  // Exclude "to be rated" items (past date, no review) — those go to Watched tab.
+  // The upcoming test is the shared one so this shelf and the Watched tab's
+  // Upcoming shelf always hold the same shows (beta feedback 2026-08-05 /
+  // 2026-08-07 — they disagreed for shows the user had already rated once).
   const { upcomingWatchlist, regularWatchlist } = useMemo(() => {
     const upcoming: WatchlistEntry[] = [];
     const regular: WatchlistEntry[] = [];
     for (const w of watchlist) {
-      if (w.planned_date && w.planned_date < today && !reviewedShowIds.has(w.show_id)) {
-        continue; // "to be rated" — handled by Watched tab
-      } else if (w.planned_date && w.planned_date >= today) {
+      if (isUpcomingWatchlistEntry(w, today, loggedViewings)) {
         upcoming.push(w);
+      } else if (w.planned_date && w.planned_date < today && !reviewedShowIds.has(w.show_id)) {
+        continue; // "to be rated" — handled by Watched tab
       } else {
         regular.push(w);
       }
     }
     upcoming.sort((a, b) => (a.planned_date || '').localeCompare(b.planned_date || ''));
     return { upcomingWatchlist: upcoming, regularWatchlist: regular };
-  }, [watchlist, today, reviewedShowIds]);
+  }, [watchlist, today, reviewedShowIds, loggedViewings]);
 
   const sortedWatchlist = useMemo(() => {
     const sorted = [...regularWatchlist];
@@ -413,7 +419,7 @@ export default function ToWatchScreen() {
           testID="add-to-watchlist-button"
           accessibilityLabel="Add to watchlist"
         >
-          <Svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={Colors.text.secondary} strokeWidth={2.5}>
+          <Svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={Colors.text.inverse} strokeWidth={2.5}>
             <Path strokeLinecap="round" d="M12 5v14M5 12h14" />
           </Svg>
         </Pressable>
@@ -623,9 +629,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg, paddingTop: Spacing.xl, paddingBottom: Spacing.sm,
   },
   pageTitle: { fontSize: FontSize.xxl, fontWeight: '700', color: Colors.text.primary },
+  // Same gold circle as the Watched tab's "rate a show" button — this one was a
+  // gray rounded square, so the two primary add buttons looked like different
+  // controls (beta feedback 2026-08-09, AMHVzyzz). 38pt visual + hitSlop 8 keeps
+  // the effective target ≥44pt, matching Watched.
   addButton: {
-    width: 44, height: 44, borderRadius: 12,
-    backgroundColor: Colors.surface.overlay, alignItems: 'center', justifyContent: 'center',
+    width: 38, height: 38, borderRadius: 19,
+    backgroundColor: Colors.brand, alignItems: 'center', justifyContent: 'center',
   },
   pressed: { opacity: 0.7 },
   controlsRow: {
@@ -654,7 +664,9 @@ const styles = StyleSheet.create({
   sectionTitle: { color: Colors.text.primary, fontSize: 13, fontWeight: '700', letterSpacing: 0.6, textTransform: 'uppercase' },
   sectionCount: { color: Colors.text.muted, fontSize: 12 },
   posterGrid: {
-    flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm,
+    // POSTER_GRID_GAP, not a literal: usePosterGrid derives the card width from
+    // it, so the two must never disagree.
+    flexDirection: 'row', flexWrap: 'wrap', gap: POSTER_GRID_GAP,
     paddingHorizontal: Spacing.lg,
     // Breathing room before the next section band — without it the bottom row
     // of posters touched the "Not Yet Booked" header (beta feedback

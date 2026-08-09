@@ -33,9 +33,11 @@ import { useShows } from '@/lib/data-context';
 import { getImageUrl } from '@/lib/images';
 import { toLocalYMD } from '@/lib/date-utils';
 import { showTitleFallback } from '@/lib/show-format';
+import { isUpcomingWatchlistEntry, loggedViewingKeys } from '@/lib/watchlist-sections';
 import { featureFlags } from '@/lib/feature-flags';
 import MiniStars from '@/components/user/MiniStars';
 import { usePosterGrid } from '@/hooks/usePosterGrid';
+import { POSTER_GRID_GAP } from '@/lib/poster-grid';
 import type { UserReview, WatchlistEntry } from '@/lib/user-types';
 import type { Show } from '@/lib/types';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
@@ -46,7 +48,7 @@ import { StatsScreen } from '@/components/stats/StatsScreen';
 import { FeedModeToggle, type FeedMode } from '@/components/user/FeedModeToggle';
 import { PhotoFeedTimeline } from '@/components/user/PhotoFeedTimeline';
 import { PhotoWallGrid } from '@/components/user/PhotoWallGrid';
-import { DiaryCalendarMonth, buildDiaryCalendarMonths, buildReviewsByDate } from '@/components/user/DiaryCalendarView';
+import { DiaryCalendarMonth, buildDiaryCalendarMonths, buildCalendarEntriesByDate } from '@/components/user/DiaryCalendarView';
 import { DiaryLedgerRow, UpcomingLedgerRow, MonthBand, groupReviewsByMonth } from '@/components/user/DiaryListView';
 import { usePhotoFeed } from '@/hooks/usePhotoFeed';
 import * as haptics from '@/lib/haptics';
@@ -297,6 +299,7 @@ export default function WatchedScreen() {
 
   const today = toLocalYMD(new Date());
   const reviewedShowIds = useMemo(() => new Set(reviews.map(r => r.show_id)), [reviews]);
+  const loggedViewings = useMemo(() => loggedViewingKeys(reviews), [reviews]);
 
   // To Be Rated — shows from watchlist where planned_date has passed but not yet rated
   const toBeRated = useMemo(() => {
@@ -305,14 +308,16 @@ export default function WatchedScreen() {
       .sort((a, b) => (b.planned_date || '').localeCompare(a.planned_date || ''));
   }, [watchlist, today, reviewedShowIds]);
 
-  // Upcoming — watchlist entries with a future (or today) planned date, not yet rated.
-  // Mirrors the To Watch tab's own Upcoming split (>= today) so a today-dated
-  // show is never invisible to both tabs at once.
+  // Upcoming — watchlist entries with a future (or today) planned date. Shares
+  // isUpcomingWatchlistEntry with the To Watch tab so the two shelves hold the
+  // same shows: this one used to drop any show that had ever been rated, which
+  // hid a repeat booking of a show you'd already seen (beta feedback
+  // 2026-08-05 / 2026-08-07, "Oh, Mary!").
   const upcomingWatchlistEntries = useMemo(() => {
     return watchlist
-      .filter(w => w.planned_date && w.planned_date >= today && !reviewedShowIds.has(w.show_id))
+      .filter(w => isUpcomingWatchlistEntry(w, today, loggedViewings))
       .sort((a, b) => (a.planned_date || '').localeCompare(b.planned_date || ''));
-  }, [watchlist, today, reviewedShowIds]);
+  }, [watchlist, today, loggedViewings]);
 
   // Reviews with a future date_seen (diary imports / manual back-dating could
   // produce these even though the rate sheet itself caps at today).
@@ -349,9 +354,15 @@ export default function WatchedScreen() {
 
   const showsSeen = new Set(reviews.map(r => r.show_id)).size;
 
-  // Calendar sub-view data — months as FlatList items (virtualized above)
-  const calendarReviewsByDate = useMemo(() => buildReviewsByDate(pastReviews), [pastReviews]);
-  const calendarMonths = useMemo(() => buildDiaryCalendarMonths(calendarReviewsByDate), [calendarReviewsByDate]);
+  // Calendar sub-view data — months as FlatList items (virtualized above).
+  // Booked future dates go in alongside the diary so the calendar runs forward
+  // as far as the Upcoming shelf does, instead of stopping at the last show
+  // actually seen (beta feedback 2026-08-09, ADd7L27s).
+  const calendarEntriesByDate = useMemo(
+    () => buildCalendarEntriesByDate(sortedReviews, upcomingWatchlistEntries),
+    [sortedReviews, upcomingWatchlistEntries],
+  );
+  const calendarMonths = useMemo(() => buildDiaryCalendarMonths(calendarEntriesByDate), [calendarEntriesByDate]);
 
   // Sort cycling
   const cycleDiarySort = useCallback(() => {
@@ -935,7 +946,7 @@ export default function WatchedScreen() {
             <DiaryCalendarMonth
               year={item.year}
               month={item.month}
-              reviewsByDate={calendarReviewsByDate}
+              entriesByDate={calendarEntriesByDate}
               showMap={showMap}
             />
           )}
@@ -1118,7 +1129,7 @@ const styles = StyleSheet.create({
   toBeRatedDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#f59e0b' },
   toBeRatedCount: { color: '#f59e0b', fontSize: 12, fontWeight: '600' },
   toBeRatedGrid: {
-    flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm,
+    flexDirection: 'row', flexWrap: 'wrap', gap: POSTER_GRID_GAP,
     paddingHorizontal: Spacing.lg,
   },
   // Cards (list view)
@@ -1139,7 +1150,9 @@ const styles = StyleSheet.create({
   // Grid view
   gridContainer: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.md },
   pastGrid: {
-    flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm,
+    // POSTER_GRID_GAP, not a literal: usePosterGrid derives the card width from
+    // it, so the two must never disagree.
+    flexDirection: 'row', flexWrap: 'wrap', gap: POSTER_GRID_GAP,
   },
   // 3-up enriched grid (Round 2, Grid Direction B modified) — was 4-up/23%;
   // wider cards give the poster + overlay date room to breathe. Width itself
