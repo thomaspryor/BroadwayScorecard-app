@@ -37,6 +37,7 @@ import { useToastSafe } from '@/lib/toast-context';
 import { supabaseRestInsert, supabaseRestUpdate } from '@/lib/supabase-rest';
 import { recordRatingGiven } from '@/lib/store-review';
 import { getImageUrl } from '@/lib/images';
+import { getDiaryShowMeta } from '@/lib/show-format';
 import { toLocalYMD } from '@/lib/date-utils';
 import { savePendingAction, getPendingAction, clearPendingAction } from '@/lib/deferred-auth';
 import * as haptics from '@/lib/haptics';
@@ -78,20 +79,30 @@ export default function RateModal() {
   const initialRating = params.initialRating ? parseFloat(params.initialRating) : null;
   const suggestedDate = params.suggestedDate;
 
-  // Find show data for poster + production context
+  // Find show data for poster + production context. Diary-only ids (wide-
+  // catalog adds, imports) aren't in the scored catalog — fall back to the
+  // diary-title cache recorded when they were picked, so the header still
+  // says which production is being rated.
   const show = shows.find(s => s.id === showId);
+  const diaryMeta = !show ? getDiaryShowMeta(showId) : null;
   const posterUrl = show ? getImageUrl(show.images.poster) || getImageUrl(show.images.thumbnail) : null;
 
   // Production context — which run of this title is being rated
-  const marketLabel = show?.category ? MARKET_LABELS[show.category] || null : null;
-  const openingYear = show?.openingDate ? show.openingDate.slice(0, 4) : null;
+  const category = show?.category ?? diaryMeta?.category;
+  const marketLabel = category ? MARKET_LABELS[category] || null : null;
+  const openingDate = show?.openingDate ?? diaryMeta?.openingDate;
+  const openingYear = openingDate ? openingDate.slice(0, 4) : null;
   const closingYear = show?.closingDate ? show.closingDate.slice(0, 4) : null;
   const runLabel = openingYear
     ? closingYear
       ? (openingYear === closingYear ? openingYear : `${openingYear}–${closingYear}`)
-      : `${openingYear}–present`
+      : show
+        ? `${openingYear}–present`
+        : openingYear
     : null;
-  const contextLine = [show?.venue, marketLabel, runLabel].filter(Boolean).join(' · ');
+  const contextLine = [show?.venue ?? diaryMeta?.venue, diaryMeta?.city, marketLabel, runLabel]
+    .filter(Boolean)
+    .join(' · ');
 
   const todayYMD = toLocalYMD(new Date());
 

@@ -1035,11 +1035,11 @@ export default function WatchedScreen() {
       <ShowSearchModal
         visible={showSearchModal}
         title="Rate a Show"
-        onSelect={(show) => {
+        onSelect={(selection) => {
           setShowSearchModal(false);
           router.push({
             pathname: '/rate/[showId]' as any,
-            params: { showId: show.id, showTitle: show.title },
+            params: { showId: selection.id, showTitle: selection.title },
           });
         }}
         onClose={() => setShowSearchModal(false)}

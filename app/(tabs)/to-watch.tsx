@@ -592,16 +592,16 @@ export default function ToWatchScreen() {
         visible={showSearchModal}
         title="Add to Watchlist"
         excludeIds={new Set(watchlist.map(w => w.show_id))}
-        onSelect={async (show) => {
+        onSelect={async (selection) => {
           searchModalDismissed.current = false;
           setShowSearchModal(false);
           haptics.action();
           try {
-            await addToWatchlist(show.id);
+            await addToWatchlist(selection.id);
             await getWatchlist();
             // Web parity: prompt "when are you going?" right after adding
             // instead of hiding the planned date behind a long-press.
-            pendingDateShowId.current = show.id;
+            pendingDateShowId.current = selection.id;
             openPendingDatePrompt();
           } catch {
             // Hook sets error state
