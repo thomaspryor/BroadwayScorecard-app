@@ -164,6 +164,10 @@ export function ShowSearchModal({
   // has moved on — otherwise a slow response would clobber the reset and
   // show results for a query the user already edited away.
   const liveGeneration = useRef(0);
+  // Synchronous once-per-open selection latch. State-based guards can't stop
+  // two taps that land before the next render — this ref can. Cleared on
+  // reopen (in the visible effect; refs are unwritable during render).
+  const pickedRef = useRef(false);
 
   // Reset query when modal opens — render-phase reset (React-sanctioned pattern)
   // keeps setState out of the effect for the React Compiler.
@@ -185,6 +189,7 @@ export function ShowSearchModal({
       // writes are barred from render, so this lives here, not in the
       // render-phase reset above.)
       liveGeneration.current += 1;
+      pickedRef.current = false;
       const t = setTimeout(() => inputRef.current?.focus(), 50);
       return () => clearTimeout(t);
     }
@@ -247,6 +252,8 @@ export function ShowSearchModal({
 
   const selectDiary = useCallback(
     (candidate: MatchCandidate) => {
+      if (pickedRef.current) return;
+      pickedRef.current = true;
       // Without this the pick renders as a raw slug in Watched / To Watch /
       // Lists — it has no entry in the scored catalog.
       recordDiaryTitles({
@@ -281,6 +288,8 @@ export function ShowSearchModal({
 
   const selectLive = useCallback(
     (candidate: MezzanineCandidate) => {
+      if (pickedRef.current) return;
+      pickedRef.current = true;
       setAddingLiveId(candidate.id);
       // Give the production a row of its own so it stops being unmatchable
       // for everyone else too (self-heal loop, web parity). Best-effort —
@@ -396,7 +405,11 @@ export function ShowSearchModal({
                   // Modal, so a toast rendered by the app-level provider would
                   // paint BEHIND it. The persistent caption is the explanation.
                   disabled={alreadyListed}
-                  onPress={() => onSelect({ id: show.id, title: show.title, diaryOnly: false })}
+                  onPress={() => {
+                    if (pickedRef.current) return;
+                    pickedRef.current = true;
+                    onSelect({ id: show.id, title: show.title, diaryOnly: false });
+                  }}
                   accessibilityRole="button"
                   accessibilityState={{ disabled: alreadyListed }}
                   accessibilityLabel={alreadyListed ? `${show.title} — ${excludedLabel}` : show.title}

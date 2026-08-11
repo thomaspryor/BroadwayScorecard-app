@@ -35,6 +35,7 @@ import { daysUntilDate, isClosingSoonDate, toLocalYMD } from '@/lib/date-utils';
 import { featureFlags } from '@/lib/feature-flags';
 import StarRating from '@/components/user/StarRating';
 import MiniStars from '@/components/user/MiniStars';
+import { showTitleFallback } from '@/lib/show-format';
 import type { UserReview, WatchlistEntry } from '@/lib/user-types';
 import type { Show } from '@/lib/types';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
@@ -227,7 +228,7 @@ export default function MyShowsScreen() {
   const handleDeleteDiaryItem = useCallback((review: UserReview) => {
     haptics.action();
     const show = showMap[review.show_id];
-    const title = show?.title || review.show_id;
+    const title = show?.title || showTitleFallback(review.show_id);
     Alert.alert(
       'Delete Rating',
       `Delete your ${review.rating.toFixed(1)}★ rating for ${title}?`,
@@ -298,7 +299,7 @@ export default function MyShowsScreen() {
   // ─── Render diary item ─────────────────────────────────
   const renderDiaryItem = ({ item }: { item: UserReview }) => {
     const show = showMap[item.show_id];
-    const title = show?.title || item.show_id;
+    const title = show?.title || showTitleFallback(item.show_id);
     const posterUrl = show?.images ? (getImageUrl(show.images.poster) || getImageUrl(show.images.thumbnail)) : null;
 
     return (
@@ -347,7 +348,7 @@ export default function MyShowsScreen() {
   const renderDiaryGridItem = ({ item }: { item: GridItem }) => {
     if ('__spacer' in item) return <View style={styles.gridCardSpacer} />;
     const show = showMap[item.show_id];
-    const title = show?.title || item.show_id;
+    const title = show?.title || showTitleFallback(item.show_id);
     const posterUrl = show?.images ? (getImageUrl(show.images.poster) || getImageUrl(show.images.thumbnail)) : null;
 
     return (
@@ -385,7 +386,7 @@ export default function MyShowsScreen() {
   const renderWatchlistGridItem = ({ item }: { item: WatchlistGridItem }) => {
     if ('__spacer' in item) return <View style={styles.gridCardSpacer} />;
     const show = showMap[item.show_id];
-    const title = show?.title || item.show_id;
+    const title = show?.title || showTitleFallback(item.show_id);
     const posterUrl = show?.images ? (getImageUrl(show.images.poster) || getImageUrl(show.images.thumbnail)) : null;
 
     return (
@@ -414,7 +415,7 @@ export default function MyShowsScreen() {
   // ─── Render upcoming item ───────────────────────────────
   const renderUpcomingItem = ({ item }: { item: WatchlistEntry }) => {
     const show = showMap[item.show_id];
-    const title = show?.title || item.show_id;
+    const title = show?.title || showTitleFallback(item.show_id);
     const posterUrl = show?.images ? (getImageUrl(show.images.poster) || getImageUrl(show.images.thumbnail)) : null;
     const daysUntil = item.planned_date ? daysUntilDate(item.planned_date) : null;
     // Show "Rate" button if planned date is today or past
@@ -601,7 +602,7 @@ export default function MyShowsScreen() {
           <Text style={styles.toBeRatedHeader}>TO BE RATED</Text>
           {toBeRated.map(item => {
             const show = showMap[item.show_id];
-            const title = show?.title || item.show_id;
+            const title = show?.title || showTitleFallback(item.show_id);
             return (
               <Pressable
                 key={item.id}
@@ -794,7 +795,7 @@ function SwipeableWatchlistItem({
   router: ReturnType<typeof useRouter>;
 }) {
   const show = showMap[item.show_id];
-  const title = show?.title || item.show_id;
+  const title = show?.title || showTitleFallback(item.show_id);
   const posterUrl = show?.images ? (getImageUrl(show.images.poster) || getImageUrl(show.images.thumbnail)) : null;
   const isClosingSoon = show?.closingDate && (() => {
     return isClosingSoonDate(show.closingDate!);
