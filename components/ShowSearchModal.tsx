@@ -458,7 +458,7 @@ export function ShowSearchModal({
               No shows found for {'“'}{query.trim()}{'”'}
             </Text>
             {liveState === 'idle' && (
-              <Pressable onPress={runLiveSearch} hitSlop={8} accessibilityRole="button">
+              <Pressable onPress={runLiveSearch} hitSlop={12} accessibilityRole="button">
                 <Text style={styles.liveLink}>Can{'’'}t find it? Search the wider theater catalog</Text>
               </Pressable>
             )}
@@ -473,7 +473,7 @@ export function ShowSearchModal({
             {liveState === 'error' && (
               <>
                 <Text style={styles.liveErrorText}>{liveError}</Text>
-                <Pressable onPress={runLiveSearch} hitSlop={8} accessibilityRole="button">
+                <Pressable onPress={runLiveSearch} hitSlop={12} accessibilityRole="button">
                   <Text style={styles.liveLink}>Try again</Text>
                 </Pressable>
               </>
@@ -547,6 +547,8 @@ const styles = StyleSheet.create({
     color: Colors.brand,
     fontSize: FontSize.sm,
     textAlign: 'center',
+    // Text (~18pt) + padding (16) + hitSlop (12×2) clears the 44pt HIG floor.
+    paddingVertical: Spacing.sm,
   },
   liveStatus: {
     color: Colors.text.muted,
