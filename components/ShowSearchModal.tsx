@@ -159,6 +159,11 @@ export function ShowSearchModal({
   // A live pick writes a stub row + fires onSelect with no caller-side guard —
   // track it here so a rapid double-tap can't fire the add twice.
   const [addingLiveId, setAddingLiveId] = useState<string | null>(null);
+  // Bumped on every keystroke and modal reopen. An in-flight live search
+  // captures the generation at launch and discards its result if the world
+  // has moved on — otherwise a slow response would clobber the reset and
+  // show results for a query the user already edited away.
+  const liveGeneration = useRef(0);
 
   // Reset query when modal opens — render-phase reset (React-sanctioned pattern)
   // keeps setState out of the effect for the React Compiler.
@@ -175,6 +180,11 @@ export function ShowSearchModal({
 
   useEffect(() => {
     if (visible) {
+      // Invalidate any live search still in flight from a previous open —
+      // its resolution must not repopulate the freshly-reset modal. (Ref
+      // writes are barred from render, so this lives here, not in the
+      // render-phase reset above.)
+      liveGeneration.current += 1;
       const t = setTimeout(() => inputRef.current?.focus(), 50);
       return () => clearTimeout(t);
     }
@@ -198,6 +208,7 @@ export function ShowSearchModal({
     // A fresh keystroke invalidates live results shown for the previous query.
     setLiveState('idle');
     setAddingLiveId(null);
+    liveGeneration.current += 1;
     if (debounceTimer.current) clearTimeout(debounceTimer.current);
     debounceTimer.current = setTimeout(() => setDebouncedQuery(text), 150);
   }, []);
@@ -253,13 +264,16 @@ export function ShowSearchModal({
   );
 
   const runLiveSearch = useCallback(async () => {
+    const generation = liveGeneration.current;
     setLiveState('searching');
     setLiveError(null);
     try {
       const candidates = await searchMezzanineCatalog(debouncedQuery.trim());
+      if (liveGeneration.current !== generation) return;
       setLiveCandidates(candidates);
       setLiveState(candidates.length > 0 ? 'results' : 'empty');
     } catch (err) {
+      if (liveGeneration.current !== generation) return;
       setLiveError(err instanceof Error ? err.message : MEZZANINE_SEARCH_ERROR_COPY.internal);
       setLiveState('error');
     }
@@ -292,6 +306,12 @@ export function ShowSearchModal({
     const parts = [candidate.city, candidate.openingDate?.slice(0, 4)].filter(Boolean);
     return `${parts.join(' · ')}${parts.length > 0 ? ' · ' : ''}No critic score`;
   };
+
+  // "No shows found" (and its now-tappable wider-catalog CTA) must wait for
+  // the debounce to settle — mid-typing, `results` is still computed from the
+  // previous debouncedQuery, so gating on the immediate query would flash the
+  // empty state (and invite a live search) on every keystroke.
+  const querySettled = debouncedQuery.trim() === query.trim();
 
   return (
     <Modal
@@ -452,6 +472,10 @@ export function ShowSearchModal({
             contentContainerStyle={styles.list}
             showsVerticalScrollIndicator={false}
           />
+        ) : !querySettled ? (
+          // Debounce still settling — hold a blank frame instead of flashing
+          // "No shows found" + the live-search CTA against a stale result set.
+          <View style={styles.emptyState} />
         ) : (
           <View style={styles.emptyState}>
             <Text style={styles.emptyText}>
