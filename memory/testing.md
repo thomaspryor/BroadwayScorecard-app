@@ -172,23 +172,37 @@ anything.** The first migration was written on the assumption that the write
 was blocked and needed permitting. The write was never blocked — it was too
 permissive all along, in the opposite direction from the one assumed.
 
-## Awaiting verification
+## Resolved: the two 2026-08-12 flow fixes (checked 2026-08-12, dispatch 31646873154)
 
-**RECHECK-AFTER: 2026-08-13** — two Maestro flow fixes are pushed but NOT yet
-proven, because verifying them needs a simulator run this machine can't do
-quickly (prebuild + pod install + Release xcodebuild, ~45 min). The 05:40 UTC
-nightly is the check. If either still fails, the diagnosis below was wrong.
+**Both original diagnoses were correct — each fix closed the exact bug it
+named — but each flow still fails one step later, on a different, newly-
+exposed issue.** Measured by dispatching the `my-shows` suite on main, not
+inferred. The 2026-08-13 05:40 UTC nightly hadn't fired yet when this was
+checked, so this dispatch stood in for it.
 
-- `.maestro/my-shows/diary-photo-feed.yaml` opened the legacy `/my-shows` route
-  and tapped `diary-list-view-toggle`, which lives in `app/(tabs)/watched.tsx`
-  (`app/my-shows.tsx` has only the older `view-toggle` id). Repointed at
-  `/watched`.
-- `.maestro/my-shows/stats-capture.yaml` scrolled to the bottom taking
-  screenshots and then ran `scrollUntilVisible ... direction: DOWN` for
-  `stats-house-grid`, which cannot reveal an element already scrolled past.
-  Now returns to the top via `stats-scope-pill` first. `stats-tab.yaml` runs the
-  same DOWN search from the top and passes, which is what proves the element
-  renders.
+- `.maestro/my-shows/diary-photo-feed.yaml`: confirmed the `/watched` repoint
+  works — `openLink: broadwayscorecard:///watched` and
+  `tapOn: id: "diary-list-view-toggle"` both now complete (they used to fail
+  immediately). It then fails on `assertVisible: "Only you"`. That pill is
+  gated on `app/(tabs)/watched.tsx`'s `viewMode === 'list'` (line ~897), and
+  `diary-list-view-toggle`'s `onPress` does call `setViewMode('list')` — but
+  `viewMode` also loads a *persisted* preference from AsyncStorage in a
+  separate effect (line ~235), which can race the tap and land after it,
+  reverting the mode. Plausible trigger: an earlier flow in the same suite run
+  left a different mode (`grid`/`stats`) persisted. Not fixed — needs a
+  simulator to watch the actual timing, not a guess.
+- `.maestro/my-shows/stats-capture.yaml`: confirmed the "return to top before
+  searching down" fix works — `scrollUntilVisible` UP to `stats-scope-pill`
+  now completes (it used to never even attempt this). The subsequent DOWN
+  search for `stats-house-grid` still times out (30s), even from the same top
+  position that `stats-tab.yaml` searches DOWN from successfully. Difference:
+  this flow scrolls through the whole screen taking 12 screenshots first,
+  `stats-tab.yaml` doesn't. Possibly a virtualization/remount side effect of
+  that scroll sequence, possibly the UP scroll not actually reaching the same
+  position `stats-tab.yaml` starts from. Not fixed — same reasoning as
+  `mezzanine-import.yaml` below: a guess without a simulator in front of me is
+  a coin flip, and this is a screenshot-capture rig, not a screen a user
+  hits.
 
 Still failing, not attempted: `.maestro/import/mezzanine-import.yaml`
 (`"Downloads" is visible` assertion). It also failed on 2026-07-25, so it is
@@ -207,29 +221,28 @@ Which screens an E2E flow actually opens, from `grep -rh openLink .maestro`:
 | `(tabs)/browse` + inline search | 3 | reaches the results list only |
 | `(tabs)/index` (home) | 1 | smoke test |
 | `import` | 2 | one of them long-broken |
-| `show/[slug]` | **0** | the show page — scores, critic reviews, ticket links |
-| `rate/[showId]` | **0** | the 6 "show-rating" flows drive `test/show-rating-fixture`, not this |
-| `settings` | **0** | sign in/out, account deletion, notification prefs |
+| `show/[slug]` | 1 (added 2026-08-12) | `.maestro/show/show-detail.yaml` — search tap-through + render check |
+| `rate/[showId]` | 1 (added 2026-08-12) | `.maestro/rate/rate-lifecycle.yaml` — real create/edit/delete, not the fixture |
+| `settings` | 1 (added 2026-08-12) | `.maestro/settings/delete-account-guard.yaml` — confirmation copy + Cancel path only |
 | `diary-show/[id]` | **0** | |
 | `(tabs)/lists` | **0** | |
 | `(tabs)/to-watch` | **0** | |
 
-**The important one: `show/[slug]` has no end-to-end coverage at all.** It is the
-screen the app exists for — the scores, the critic reviews, the ticket links —
-and no flow ever opens it. Browse and search stop at the results list without
-tapping through. A change that broke the show page would pass every check in
-this repo.
+**Closed 2026-08-12** (pending green CI confirmation — see "Active work" below):
+`show/[slug]`, `settings`, and `rate/[showId]` each went from zero E2E coverage
+to one flow apiece. Full account: `memory/handoff-show-page-e2e.md`.
 
-Second: the show-rating suite tests a FIXTURE route, not the production rating
-screen. `test/show-rating-fixture.tsx` exercises the rating UI in isolation,
-which is useful, but `rate/[showId]` itself is never driven.
+Second: the 6 existing show-rating flows still test a FIXTURE route, not the
+production rating screen — `test/show-rating-fixture.tsx` exercises the rating
+UI in isolation with local state, no backend. `rate-lifecycle.yaml` (new,
+2026-08-12) is what actually drives `rate/[showId]` against real Supabase.
 
-Structural reason, and the reason this is not a quick fix: `show/[slug].tsx`,
-`rate/[showId].tsx` and `settings.tsx` contain **zero** `testID` attributes
-(verified by grep). They were never built to be driven by a test. Closing this
-means adding test hooks to product screens first, then writing flows, then a
-nightly cycle to verify each — well past a single session, and it touches
-screens the owner sees.
+Structural reason the gap existed, and why it wasn't a quick fix: `show/[slug].tsx`,
+`rate/[showId].tsx` and `settings.tsx` had **zero** `testID` attributes before
+2026-08-12 — they were never built to be driven by a test. One `testID` was
+added to `components/ShowCard.tsx` (E2E-only, no visual effect) to make the
+first search result tappable by a flow; `settings.tsx` needed none (its rows
+are plain, unambiguous text). Score badges were not touched.
 
 What IS well covered, so the gap is narrower than the table alone suggests:
 - every user-data table has adversarial two-account isolation coverage
@@ -238,10 +251,46 @@ What IS well covered, so the gap is narrower than the table alone suggests:
 - `expo export` proves the whole graph resolves on every push, so an import
   error on the show page is still caught, just not a rendering or data bug
 
-## Active handoff
+## Active work (2026-08-12): show/[slug], settings, rate/[showId]
 
 `memory/handoff-show-page-e2e.md` — the brief for closing the show-page
-coverage gap above. Dispatched to its own workspace on 2026-08-12.
+coverage gap above, now closed (see that file for the final status). Three
+new flows: `.maestro/show/show-detail.yaml`, `.maestro/settings/delete-account-guard.yaml`,
+`.maestro/rate/rate-lifecycle.yaml`.
+
+**RECHECK-AFTER: 2026-08-13** — the corrected flows (after the fail-proof
+exercise below) were dispatched for green confirmation and hadn't resolved
+before this session ended. Check `gh run list --workflow=maestro-e2e.yml` for
+runs on branch `worktree-show-page-e2e` around 2026-08-12 23:55 UTC, or the
+2026-08-13 nightly if the branch was already merged by then.
+
+**Every flow was proven able to fail before being trusted** (the repo's
+stated principle — a test that has only ever passed is untested): each
+flow's key selector was deliberately pointed at something nonexistent,
+dispatched, and confirmed it failed at exactly that step with every real
+prior step still passing. That surfaced one genuine bug the plant wasn't
+aimed at: `rate-lifecycle.yaml` failed a step *earlier* than intended — its
+`extendedWaitUntil` for `"MY RATING & REVIEW"` (15s) timed out on a loaded CI
+runner before ever reaching the deliberately-broken star tap. Widened to 20s
+in both `rate-lifecycle.yaml` and `show-detail.yaml` (which had the identical
+assertion with no explicit wait at all — worse, not better).
+
+An independent codex review (reading the actual component source, not just
+the diff) caught two more real bugs before any of this shipped: a
+copy-pasted "tap the field label" trick that doesn't actually focus the real
+notes `TextInput` (its `accessibilityLabel` doesn't match the label text on
+this screen, only on the unrelated fixture screen it was copied from), and an
+assertion racing an async Supabase re-fetch on entering edit mode. Both fixed
+before the corrected-flow dispatch above.
+
+`rate-lifecycle.yaml` does real Supabase writes against the shared dev-test
+CI account (creates a Hamilton rating, then deletes it) — self-cleaning by
+design, with a CI-level backstop delete (`maestro-e2e.yml`, scoped to
+`review_text`, deliberately not `date_seen` — a UTC-vs-device-local-time
+mismatch would make a date filter miss the exact row it exists to catch).
+`delete-account-guard.yaml` never completes a real account deletion — it only
+confirms the warning dialog appears with the right copy and that Cancel
+leaves the account untouched.
 
 ## Known gaps
 

@@ -98,14 +98,27 @@ than reading:
   **measured**. That mistake was made on 2026-08-12 and cost a production
   database change that fixed nothing. See `measure-before-asking-approval.md`.
 
-## Useful state as of 2026-08-12
+## Closed 2026-08-12
+
+All three screens now have a flow: `.maestro/show/show-detail.yaml`,
+`.maestro/settings/delete-account-guard.yaml`, `.maestro/rate/rate-lifecycle.yaml`.
+Each was proven able to fail (deliberate broken selector, dispatched,
+confirmed red at the right step) before being trusted — see
+`memory/testing.md`'s "Active work" section for the full account, including
+one real bug the fail-proof exercise caught that wasn't the one planted, and
+two more caught by an independent codex review before any of it shipped. The
+corrected flows were dispatched for a green-confirmation run; check
+`memory/testing.md`'s RECHECK-AFTER note for whether that landed and merged.
+
+## Other state as of 2026-08-12
 
 - 198 tests pass, 0 fail. `npm test` runs everything.
-- CI green on `2dcf85c`.
-- Two Maestro flow fixes are unverified pending the nightly:
-  `diary-photo-feed.yaml` (was opening the legacy `/my-shows` route) and
-  `stats-capture.yaml` (was scrolling down past an element then searching down
-  for it). Check the 2026-08-13 nightly before assuming they hold.
+- The two Maestro flow fixes from earlier on 2026-08-12 (`diary-photo-feed.yaml`,
+  `stats-capture.yaml`) were checked against a live dispatch, not the nightly
+  (hadn't fired yet). Both original diagnoses were correct, but each flow
+  still fails one step later on a different, newly-exposed issue — not fixed,
+  see `memory/testing.md`'s "Resolved: the two 2026-08-12 flow fixes" section
+  for what's known.
 - `.maestro/import/mezzanine-import.yaml` has failed since 2026-07-25. It drives
   a real Safari download through the iOS document picker. Left alone
   deliberately — do not guess at it without a simulator in front of you.
