@@ -3,7 +3,9 @@
  *
  * Index view shows all lists with poster previews.
  * Detail view shows items with drag-to-reorder (ranked) or flat list (unranked).
- * Inline search to add shows. Create/Edit modal for list metadata.
+ * Adding shows uses the shared ShowSearchModal (scored catalog + diary catalog
+ * + live Mezzanine fallback — owner request 2026-08-11, same wide-catalog
+ * search as To Watch / Watched). Create/Edit modal for list metadata.
  */
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -27,13 +29,12 @@ import DraggableFlatList, { ScaleDecorator, type RenderItemParams } from 'react-
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import Svg, { Path } from 'react-native-svg';
-import Fuse from 'fuse.js';
 import { useUserLists } from '@/hooks/useUserLists';
-import { useShows } from '@/lib/data-context';
 import { getImageUrl } from '@/lib/images';
 import { showTitleFallback } from '@/lib/show-format';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
 import { ContextMenu } from '@/components/user/ContextMenu';
+import { ShowSearchModal } from '@/components/ShowSearchModal';
 import * as haptics from '@/lib/haptics';
 import { trackListCreated, trackListDeleted, trackShowAddedToList, trackShowRemovedFromList, trackListReordered } from '@/lib/analytics';
 import type { UserList, ListItem } from '@/lib/user-types';
@@ -57,7 +58,6 @@ export default function ListsTab({ userId, showMap, createTrigger }: ListsTabPro
     createList, updateList, deleteList,
     addToList, removeFromList, reorderList,
   } = useUserLists(userId);
-  const { shows } = useShows();
 
   // A show absent from showMap is diary-only (matched at import from
   // diary-search.json, see lib/diary-catalog.ts) — it always has a real
@@ -86,7 +86,6 @@ export default function ListsTab({ userId, showMap, createTrigger }: ListsTabPro
   const [listItemsLoading, setListItemsLoading] = useState(false);
   const [showModal, setShowModal] = useState<'create' | 'edit' | null>(null);
   const [editingList, setEditingList] = useState<UserList | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
   const [showListMenu, setShowListMenu] = useState(false);
 
@@ -107,7 +106,6 @@ export default function ListsTab({ userId, showMap, createTrigger }: ListsTabPro
     } else {
       setListItems([]);
       setShowSearch(false);
-      setSearchQuery('');
     }
   }, [activeListId, getListItems]);
 
@@ -116,25 +114,9 @@ export default function ListsTab({ userId, showMap, createTrigger }: ListsTabPro
     [lists, activeListId],
   );
 
-  // ─── Fuse.js search for adding shows ───────────────────
-  const fuse = useMemo(() => {
-    return new Fuse(shows, {
-      keys: [{ name: 'title', weight: 0.8 }, { name: 'venue', weight: 0.2 }],
-      threshold: 0.35,
-    });
-  }, [shows]);
-
   const alreadyInList = useMemo(() => {
     return new Set(listItems.map(i => i.show_id));
   }, [listItems]);
-
-  const searchResults = useMemo(() => {
-    if (!searchQuery.trim()) return [];
-    return fuse.search(searchQuery.trim())
-      .filter(r => !alreadyInList.has(r.item.id))
-      .slice(0, 6)
-      .map(r => r.item);
-  }, [fuse, searchQuery, alreadyInList]);
 
   // ─── Handlers ───────────────────────────────────────────
   const handleCreateList = async (name: string, description: string | null, isRanked: boolean) => {
@@ -184,7 +166,6 @@ export default function ListsTab({ userId, showMap, createTrigger }: ListsTabPro
     // Refresh items
     const items = await getListItems(activeListId);
     setListItems(items);
-    setSearchQuery('');
   };
 
   const handleRemoveShow = async (showId: string) => {
@@ -422,11 +403,9 @@ export default function ListsTab({ userId, showMap, createTrigger }: ListsTabPro
           }}
           ListFooterComponent={<AddShowSearch />}
           ListEmptyComponent={
-            !showSearch ? (
-              <View style={styles.emptyDetailContainer}>
-                <Text style={styles.emptyDetailText}>No shows in this list yet</Text>
-              </View>
-            ) : null
+            <View style={styles.emptyDetailContainer}>
+              <Text style={styles.emptyDetailText}>No shows in this list yet</Text>
+            </View>
           }
         />
       ) : (
@@ -475,14 +454,27 @@ export default function ListsTab({ userId, showMap, createTrigger }: ListsTabPro
           }}
           ListFooterComponent={<AddShowSearch />}
           ListEmptyComponent={
-            !showSearch ? (
-              <View style={styles.emptyDetailContainer}>
-                <Text style={styles.emptyDetailText}>No shows in this list yet</Text>
-              </View>
-            ) : null
+            <View style={styles.emptyDetailContainer}>
+              <Text style={styles.emptyDetailText}>No shows in this list yet</Text>
+            </View>
           }
         />
       )}
+
+      {/* Add-show search — shared wide-catalog modal (scored + diary + live
+          Mezzanine). It records diary-title cache entries and stub rows
+          itself; handleAddShow only needs the id. */}
+      <ShowSearchModal
+        visible={showSearch}
+        title="Add to List"
+        excludeIds={alreadyInList}
+        excludedLabel="Already in this list"
+        onSelect={(selection) => {
+          setShowSearch(false);
+          handleAddShow(selection.id);
+        }}
+        onClose={() => setShowSearch(false)}
+      />
 
       {/* Edit modal */}
       <ListModal
@@ -498,59 +490,16 @@ export default function ListsTab({ userId, showMap, createTrigger }: ListsTabPro
     </View>
   );
 
-  // ─── Inline add show search ─────────────────────────────
+  // ─── Add-show footer — opens the shared wide-catalog search modal ────────
   function AddShowSearch() {
     return (
       <View style={styles.addShowSection}>
-        {!showSearch ? (
-          <Pressable
-            style={styles.addShowButton}
-            onPress={() => { haptics.tap(); setShowSearch(true); }}
-          >
-            <Text style={styles.addShowButtonText}>+ Add a show</Text>
-          </Pressable>
-        ) : (
-          <View>
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Search shows..."
-              placeholderTextColor={Colors.text.muted}
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              autoFocus
-              returnKeyType="search"
-            />
-            {searchResults.map(show => {
-              const inList = alreadyInList.has(show.id);
-              return (
-                <Pressable
-                  key={show.id}
-                  style={[styles.searchResult, inList && styles.searchResultDisabled]}
-                  onPress={() => !inList && handleAddShow(show.id)}
-                  disabled={inList}
-                >
-                  <Image
-                    source={{ uri: getImageUrl(show.images?.poster) || getImageUrl(show.images?.thumbnail) || undefined }}
-                    style={styles.searchResultPoster}
-                    contentFit="cover"
-                  />
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.searchResultTitle, inList && styles.searchResultTitleDisabled]} numberOfLines={1}>
-                      {show.title}
-                    </Text>
-                    {show.venue && (
-                      <Text style={styles.searchResultVenue} numberOfLines={1}>{show.venue}</Text>
-                    )}
-                  </View>
-                  {inList && <Text style={styles.inListBadge}>Added</Text>}
-                </Pressable>
-              );
-            })}
-            {searchQuery.trim().length > 0 && searchResults.length === 0 && (
-              <Text style={styles.noResults}>No shows found</Text>
-            )}
-          </View>
-        )}
+        <Pressable
+          style={styles.addShowButton}
+          onPress={() => { haptics.tap(); setShowSearch(true); }}
+        >
+          <Text style={styles.addShowButtonText}>+ Add a show</Text>
+        </Pressable>
       </View>
     );
   }
@@ -952,55 +901,6 @@ const styles = StyleSheet.create({
     color: Colors.text.muted,
     fontSize: FontSize.sm,
     fontWeight: '600',
-  },
-  searchInput: {
-    borderWidth: 1,
-    borderColor: Colors.border.subtle,
-    borderRadius: BorderRadius.md,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    color: Colors.text.primary,
-    fontSize: FontSize.sm,
-    marginBottom: Spacing.sm,
-  },
-  searchResult: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-    paddingVertical: Spacing.sm,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: Colors.border.subtle,
-  },
-  searchResultDisabled: {
-    opacity: 0.4,
-  },
-  searchResultPoster: {
-    width: 32,
-    height: 43,
-    borderRadius: 3,
-  },
-  searchResultTitle: {
-    color: Colors.text.primary,
-    fontSize: FontSize.sm,
-    fontWeight: '500',
-  },
-  searchResultTitleDisabled: {
-    color: Colors.text.muted,
-  },
-  searchResultVenue: {
-    color: Colors.text.muted,
-    fontSize: FontSize.xs,
-  },
-  inListBadge: {
-    color: '#fcd34d',
-    fontSize: FontSize.xs,
-    fontWeight: '600',
-  },
-  noResults: {
-    color: Colors.text.muted,
-    fontSize: FontSize.sm,
-    textAlign: 'center',
-    paddingVertical: Spacing.md,
   },
   // ─── Modal ──────────────────────
   modalContainer: {
