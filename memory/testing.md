@@ -238,6 +238,11 @@ What IS well covered, so the gap is narrower than the table alone suggests:
 - `expo export` proves the whole graph resolves on every push, so an import
   error on the show page is still caught, just not a rendering or data bug
 
+## Active handoff
+
+`memory/handoff-show-page-e2e.md` — the brief for closing the show-page
+coverage gap above. Dispatched to its own workspace on 2026-08-12.
+
 ## Known gaps
 
 - No React component/render tests. Deliberate: Maestro covers the same ground
