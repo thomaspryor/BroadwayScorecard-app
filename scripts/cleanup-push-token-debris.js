@@ -116,12 +116,19 @@ function req(method, path) {
     console.log(`  ${prefix}* — ${rows.length} row(s)${DRY_RUN ? ' (dry run)' : ''}`);
     if (DRY_RUN) { removed += rows.length; continue; }
 
-    const del = await req('DELETE', `/rest/v1/push_tokens?token=like.${like}${guard}`);
+    // Delete exactly the rows just enumerated, by token, instead of re-running
+    // the LIKE pattern. The ceiling above only bounded the LOOKUP: a second
+    // broad DELETE could still sweep rows inserted between the two requests, so
+    // the "refuse above 500" guard did not actually bound what got deleted. An
+    // explicit in-list cannot exceed what was counted and approved.
+    const tokens = rows.map(r => r.token);
+    const inList = encodeURIComponent(`(${tokens.map(t => JSON.stringify(t)).join(',')})`);
+    const del = await req('DELETE', `/rest/v1/push_tokens?token=in.${inList}`);
     if (del.status !== 200 && del.status !== 204) {
       console.error(`Delete failed for ${prefix}: ${del.status} ${JSON.stringify(del.body).slice(0, 200)}`);
       process.exit(1);
     }
-    removed += rows.length;
+    removed += tokens.length;
   }
   console.log(`${DRY_RUN ? 'Would remove' : 'Removed'} ${removed} test row(s).`);
 

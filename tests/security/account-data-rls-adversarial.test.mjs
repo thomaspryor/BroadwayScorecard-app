@@ -88,6 +88,13 @@ test('two-account account-data RLS adversarial test', async (t) => {
   // tests below for why that distinction decides whether they prove anything.
   let profileANameAtSetup, reviewARatingAtSetup;
 
+  // Service-role client, assigned in setup. Used ONLY to observe state from
+  // outside the two accounts under test — never to make a security claim, since
+  // it bypasses RLS and any assertion through it would be vacuous. Declared out
+  // here because the later subtests need it to check whether a write that
+  // account B could not read back actually landed.
+  let sbService;
+
   // A push token owned by A, seeded with the service role by
   // scripts/seed-photo-test-accounts.js. "Account B sees zero rows" is only
   // evidence of RLS if there was a row there to miss — and this row cannot be
@@ -182,7 +189,7 @@ test('two-account account-data RLS adversarial test', async (t) => {
     // never used for an isolation assertion — the service role bypasses RLS, so
     // any security claim made through it would be vacuous.
     assert.ok(SERVICE_ROLE_KEY, 'SUPABASE_SERVICE_ROLE_KEY is required to verify fixture state');
-    const sbService = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, { auth: { persistSession: false } });
+    sbService = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, { auth: { persistSession: false } });
     const { data: seededTokens, error: seedReadErr } = await sbService
       .from('push_tokens').select('token, user_id').eq('token', FIXTURE_PUSH_TOKEN);
     assert.equal(seedReadErr, null, `service-role read of the fixture token should not error: ${seedReadErr?.message}`);
@@ -338,14 +345,36 @@ test('two-account account-data RLS adversarial test', async (t) => {
     const { data: seen } = await sbB.from('unmatched_imports').select('title').eq('user_id', userAId);
     assert.equal(seen?.length ?? 0, 0, 'account B must not read account A\'s unmatched imports');
 
-    assertWriteBlocked(
-      'account B logging an unmatched import under account A\'s user_id',
-      await sbB.from('unmatched_imports')
-        .insert({ user_id: userAId, source: 'forged-by-b', title: 'forged', venue: null, date_seen: null })
-        .select(),
+    // The forged write has to be checked from OUTSIDE account B, not by reading
+    // what B's own request returned. assertWriteBlocked treats "no error and no
+    // rows returned" as blocked — but this table denies B any SELECT, so an
+    // accidentally-open INSERT policy would land the row and still return
+    // nothing, and the assertion would pass while the forgery succeeded. That is
+    // the same shape as every other bug this session: a check that cannot
+    // observe the thing it claims to prove (review finding, 2026-08-12).
+    const forgedMarker = `${marker}-forged-by-b`;
+    await sbB.from('unmatched_imports')
+      .insert({ user_id: userAId, source: 'forged-by-b', title: forgedMarker, venue: null, date_seen: null });
+
+    const { data: forged } = await sbService
+      .from('unmatched_imports').select('title').eq('title', forgedMarker);
+    assert.equal(
+      forged?.length ?? 0, 0,
+      'account B managed to log an unmatched import under account A\'s user_id — the row is really ' +
+      'there, checked with the service role rather than trusting B\'s own empty response',
     );
 
-    await sbA.from('unmatched_imports').delete().eq('title', marker);
+    // Teardown through the service role too. The app never deletes from this
+    // table, so there is no reason for an owner DELETE policy to exist, and a
+    // client-side delete that silently matches nothing would leave one row of a
+    // real user's diary behind on every CI run.
+    const { error: cleanupErr } = await sbService
+      .from('unmatched_imports').delete().like('title', `${marker}%`);
+    assert.equal(cleanupErr, null, `service-role cleanup should succeed: ${cleanupErr?.message}`);
+
+    const { data: leftover } = await sbService
+      .from('unmatched_imports').select('title').like('title', `${marker}%`);
+    assert.equal(leftover?.length ?? 0, 0, 'this test must not leave rows behind in a live table');
   });
 
   // ---- push_tokens ---------------------------------------------------------
