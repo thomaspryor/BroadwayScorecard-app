@@ -25,6 +25,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
+import { assertOnlyOwnerCanSee, assertWriteBlocked } from './isolation-helpers.mjs';
 
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
@@ -57,21 +58,6 @@ async function signIn(client, account) {
   const { data, error } = await client.auth.signInWithPassword(account);
   if (error) throw error;
   return data.user.id;
-}
-
-// A write blocked by RLS surfaces one of two ways depending on the policy:
-// PostgREST returns an explicit error (WITH CHECK violation on INSERT), or it
-// returns success having matched zero rows (USING clause filtered the target
-// out of an UPDATE/DELETE before it ever ran). Both are "blocked"; a write
-// that errors is not more secure than one that silently matches nothing, and
-// asserting on only one of the two shapes makes the test policy-dependent
-// rather than behaviour-dependent.
-function assertWriteBlocked(label, { data, error }) {
-  const rowsAffected = Array.isArray(data) ? data.length : (data ? 1 : 0);
-  assert.ok(
-    error != null || rowsAffected === 0,
-    `${label} — RLS must reject this write or match zero rows, but it affected ${rowsAffected} row(s)`,
-  );
 }
 
 test('two-account account-data RLS adversarial test', async (t) => {
@@ -229,9 +215,11 @@ test('two-account account-data RLS adversarial test', async (t) => {
   // ---- watchlist -----------------------------------------------------------
 
   await t.test('BLOCKING: account B cannot read account A watchlist rows', async () => {
-    const { data, error } = await sbB.from('watchlist').select('*').eq('user_id', userAId);
-    assert.equal(error, null, 'RLS filters rows, it does not 403 — an error here means something else broke');
-    assert.equal(data?.length ?? 0, 0, 'account B must see zero rows of account A\'s watchlist');
+    await assertOnlyOwnerCanSee(
+      'watchlist',
+      () => sbA.from('watchlist').select('*').eq('user_id', userAId),
+      () => sbB.from('watchlist').select('*').eq('user_id', userAId),
+    );
   });
 
   await t.test('BLOCKING: account B cannot write a watchlist row owned by account A', async () => {
@@ -255,9 +243,11 @@ test('two-account account-data RLS adversarial test', async (t) => {
   // ---- reviews (the diary) -------------------------------------------------
 
   await t.test('BLOCKING: account B cannot read account A reviews', async () => {
-    const { data, error } = await sbB.from('reviews').select('*').eq('user_id', userAId);
-    assert.equal(error, null);
-    assert.equal(data?.length ?? 0, 0, 'account B must see zero of account A\'s diary entries');
+    await assertOnlyOwnerCanSee(
+      'reviews (the diary)',
+      () => sbA.from('reviews').select('*').eq('user_id', userAId),
+      () => sbB.from('reviews').select('*').eq('user_id', userAId),
+    );
   });
 
   await t.test('BLOCKING: account B cannot edit or delete account A reviews', async () => {
@@ -276,16 +266,20 @@ test('two-account account-data RLS adversarial test', async (t) => {
   // ---- lists + list_items --------------------------------------------------
 
   await t.test('BLOCKING: account B cannot read account A lists or their items', async () => {
-    const { data: lists, error: listErr } = await sbB.from('lists').select('*').eq('user_id', userAId);
-    assert.equal(listErr, null);
-    assert.equal(lists?.length ?? 0, 0, 'account B must see zero of account A\'s lists');
+    await assertOnlyOwnerCanSee(
+      'lists',
+      () => sbA.from('lists').select('*').eq('user_id', userAId),
+      () => sbB.from('lists').select('*').eq('user_id', userAId),
+    );
 
     // list_items has no user_id of its own — it inherits ownership through
     // lists.user_id, which is exactly the kind of indirect policy that gets
     // written as a permissive `true` and never noticed.
-    const { data: items, error: itemErr } = await sbB.from('list_items').select('*').eq('list_id', listAId);
-    assert.equal(itemErr, null);
-    assert.equal(items?.length ?? 0, 0, 'account B must see zero items belonging to account A\'s list');
+    await assertOnlyOwnerCanSee(
+      'list_items (ownership inherited via lists.user_id)',
+      () => sbA.from('list_items').select('*').eq('list_id', listAId),
+      () => sbB.from('list_items').select('*').eq('list_id', listAId),
+    );
   });
 
   await t.test('BLOCKING: account B cannot insert into account A\'s list', async () => {
@@ -353,13 +347,16 @@ test('two-account account-data RLS adversarial test', async (t) => {
     });
     assert.equal(insErr, null, `account A should be able to log its own unmatched import: ${insErr?.message}`);
 
+    // Positive control via the service role rather than account A: the app never
+    // reads this table, so there is no reason for an owner SELECT policy to
+    // exist, and requiring A to see its own row could fail for a correct policy.
+    const { data: ownRow, error: ownErr } = await sbService
+      .from('unmatched_imports').select('title').eq('title', marker);
+    assert.equal(ownErr, null, `service-role read should not error: ${ownErr?.message}`);
+    assert.equal(ownRow?.length, 1, 'the row account B is about to fail to see must actually exist');
+
     const { data: seen, error: seenErr } = await sbB
       .from('unmatched_imports').select('title').eq('user_id', userAId);
-    // The error check is what makes the zero meaningful. `?? 0` turns a FAILED
-    // query into a passing "B saw nothing" — RLS filters rows silently, so a
-    // legitimate empty result and a broken query look identical here. The
-    // assertions that check for a POSITIVE value elsewhere in this file are
-    // fail-closed for free; these zero-row ones are not.
     assert.equal(seenErr, null, `account B's read should not error: ${seenErr?.message}`);
     assert.equal(seen?.length ?? 0, 0, 'account B must not read account A\'s unmatched imports');
 
