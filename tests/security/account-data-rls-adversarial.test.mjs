@@ -23,6 +23,7 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
 
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL;
@@ -88,12 +89,17 @@ test('two-account account-data RLS adversarial test', async (t) => {
   // tests below for why that distinction decides whether they prove anything.
   let profileANameAtSetup, reviewARatingAtSetup;
 
-  // Service-role client, assigned in setup. Used ONLY to observe state from
-  // outside the two accounts under test — never to make a security claim, since
-  // it bypasses RLS and any assertion through it would be vacuous. Declared out
-  // here because the later subtests need it to check whether a write that
-  // account B could not read back actually landed.
-  let sbService;
+  // Service-role client. Used ONLY to observe state from outside the two
+  // accounts under test — never to make a security claim, since it bypasses RLS
+  // and any assertion through it would be vacuous.
+  //
+  // Built here rather than inside the setup subtest: `await t.test()` fulfils
+  // even when its subtest FAILS, so the later subtests run either way. Assigning
+  // it in setup meant a setup failure left this undefined and the real failure
+  // was then buried under a TypeError from an unrelated subtest (review finding,
+  // 2026-08-12).
+  assert.ok(SERVICE_ROLE_KEY, 'SUPABASE_SERVICE_ROLE_KEY is required to verify fixture state');
+  const sbService = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, { auth: { persistSession: false } });
 
   // A push token owned by A, seeded with the service role by
   // scripts/seed-photo-test-accounts.js. "Account B sees zero rows" is only
@@ -188,8 +194,6 @@ test('two-account account-data RLS adversarial test', async (t) => {
     // The service-role client below is used ONLY to verify fixture state. It is
     // never used for an isolation assertion — the service role bypasses RLS, so
     // any security claim made through it would be vacuous.
-    assert.ok(SERVICE_ROLE_KEY, 'SUPABASE_SERVICE_ROLE_KEY is required to verify fixture state');
-    sbService = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, { auth: { persistSession: false } });
     const { data: seededTokens, error: seedReadErr } = await sbService
       .from('push_tokens').select('token, user_id').eq('token', FIXTURE_PUSH_TOKEN);
     assert.equal(seedReadErr, null, `service-role read of the fixture token should not error: ${seedReadErr?.message}`);
@@ -331,7 +335,10 @@ test('two-account account-data RLS adversarial test', async (t) => {
   // until the table-coverage guard was taught about the supabaseRest* wrapper,
   // because it is never written through `.from(` (review finding, 2026-08-12).
   await t.test('BLOCKING: account B cannot read or forge account A unmatched imports', async () => {
-    const marker = `rls-adversarial-${Date.now()}`;
+    // randomUUID, not Date.now(): two concurrent runs can land on the same
+    // millisecond, and the prefix delete below would then remove the other
+    // run's row and fail it spuriously (review finding, 2026-08-12).
+    const marker = `rls-adversarial-${randomUUID()}`;
     const { error: insErr } = await sbA.from('unmatched_imports').insert({
       user_id: userAId,
       source: 'rls-adversarial-test',
@@ -356,8 +363,13 @@ test('two-account account-data RLS adversarial test', async (t) => {
     await sbB.from('unmatched_imports')
       .insert({ user_id: userAId, source: 'forged-by-b', title: forgedMarker, venue: null, date_seen: null });
 
-    const { data: forged } = await sbService
+    const { data: forged, error: forgedReadErr } = await sbService
       .from('unmatched_imports').select('title').eq('title', forgedMarker);
+    // Without this, a failed query returns data: null, the length check reads
+    // that as zero rows, and the assertion passes having verified nothing. That
+    // is the same ignored-error-return defect that hid the push-token bug for
+    // the life of the feature — here in the code written to catch it.
+    assert.equal(forgedReadErr, null, `service-role read should not error: ${forgedReadErr?.message}`);
     assert.equal(
       forged?.length ?? 0, 0,
       'account B managed to log an unmatched import under account A\'s user_id — the row is really ' +
@@ -368,12 +380,15 @@ test('two-account account-data RLS adversarial test', async (t) => {
     // table, so there is no reason for an owner DELETE policy to exist, and a
     // client-side delete that silently matches nothing would leave one row of a
     // real user's diary behind on every CI run.
+    // Delete the exact two titles this run created, not a prefix match — a
+    // prefix sweep can take a concurrent run's rows with it.
     const { error: cleanupErr } = await sbService
-      .from('unmatched_imports').delete().like('title', `${marker}%`);
+      .from('unmatched_imports').delete().in('title', [marker, forgedMarker]);
     assert.equal(cleanupErr, null, `service-role cleanup should succeed: ${cleanupErr?.message}`);
 
-    const { data: leftover } = await sbService
-      .from('unmatched_imports').select('title').like('title', `${marker}%`);
+    const { data: leftover, error: leftoverReadErr } = await sbService
+      .from('unmatched_imports').select('title').in('title', [marker, forgedMarker]);
+    assert.equal(leftoverReadErr, null, `service-role leftover check should not error: ${leftoverReadErr?.message}`);
     assert.equal(leftover?.length ?? 0, 0, 'this test must not leave rows behind in a live table');
   });
 
