@@ -54,3 +54,7 @@ app-example
 
 # also match a bare node_modules symlink (worktrees symlink it; "node_modules/" alone misses symlinks)
 node_modules
+
+# Playwright MCP scratch output — debug artifacts from browser automation runs,
+# repeatedly swept into commits by `git add -A` (ship-check, 2026-08-12).
+.playwright-mcp/

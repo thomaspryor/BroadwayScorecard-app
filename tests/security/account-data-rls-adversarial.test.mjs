@@ -77,6 +77,14 @@ test('two-account account-data RLS adversarial test', async (t) => {
   const sbB = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: false } });
 
   let userAId, userBId, reviewAId, listAId;
+  // Captured at setup so the attack assertions can compare against a REAL
+  // known value rather than against undefined — see the profile and review
+  // tests below for why that distinction decides whether they prove anything.
+  let profileANameAtSetup, reviewARatingAtSetup;
+
+  // A push token owned by A. Nothing else seeds one, and "account B sees zero
+  // rows" is only evidence of RLS if there was a row there to miss.
+  const FIXTURE_PUSH_TOKEN = `ExponentPushToken[rls-adversarial-fixture]`;
 
   // Deletes every fixture row this test could have created, by NAME rather
   // than by the id of the row we happen to be holding — so it also sweeps
@@ -92,11 +100,23 @@ test('two-account account-data RLS adversarial test', async (t) => {
       await sbA.from('lists').delete().eq('id', id);
     }
     await sbA.from('watchlist').delete().eq('user_id', userAId).eq('show_id', FIXTURE_SHOW_ID);
+    await sbA.from('push_tokens').delete().eq('token', FIXTURE_PUSH_TOKEN);
   }
 
   t.after(async () => {
     try {
       await purgeFixtureRows();
+      // If RLS is BROKEN, account B's writes below actually land, and account
+      // A is left holding B's edits. Restoring the captured values keeps a
+      // failing run from permanently corrupting the fixture account — the
+      // suite has to stay re-runnable precisely when it is reporting a
+      // failure, since that is when it will be run over and over.
+      if (reviewARatingAtSetup != null) {
+        await sbA.from('reviews').update({ rating: reviewARatingAtSetup }).eq('id', reviewAId);
+      }
+      if (profileANameAtSetup) {
+        await sbA.from('profiles').update({ display_name: profileANameAtSetup }).eq('id', userAId);
+      }
     } catch {
       // Best-effort — a teardown failure doesn't invalidate the assertions
       // above, and the next run's setup sweeps whatever is left behind.
@@ -114,10 +134,32 @@ test('two-account account-data RLS adversarial test', async (t) => {
     await purgeFixtureRows();
 
     const { data: reviews, error: reviewErr } = await sbA
-      .from('reviews').select('id').eq('user_id', userAId).limit(1);
+      .from('reviews').select('id, rating').eq('user_id', userAId).limit(1);
     assert.equal(reviewErr, null, 'fetching account A review should not error');
     assert.ok(reviews?.length, 'account A must have a seeded review — run scripts/seed-photo-test-accounts.js first');
     reviewAId = reviews[0].id;
+    reviewARatingAtSetup = reviews[0].rating;
+
+    // The profile assertion later compares against this value. Without it the
+    // check reads `assert.notEqual(undefined, 'owned by B')`, which passes for
+    // an account that simply has no profile row — green while proving nothing.
+    const { data: profileA, error: profileErr } = await sbA
+      .from('profiles').select('display_name').eq('id', userAId).maybeSingle();
+    assert.equal(profileErr, null, 'fetching account A profile should not error');
+    assert.ok(profileA, 'account A must have a profile row — run scripts/seed-photo-test-accounts.js first');
+    assert.ok(profileA.display_name, 'account A profile must have a non-empty display_name to compare against');
+    profileANameAtSetup = profileA.display_name;
+
+    // Same reasoning for push tokens: seed one so "B sees zero rows" is
+    // evidence of RLS rather than evidence of an empty table.
+    const { error: tokenErr } = await sbA.from('push_tokens').upsert(
+      { token: FIXTURE_PUSH_TOKEN, platform: 'ios', user_id: userAId, updated_at: new Date().toISOString() },
+      { onConflict: 'token' },
+    );
+    assert.equal(tokenErr, null, `account A push_token insert should succeed: ${tokenErr?.message}`);
+    const { data: ownTokens } = await sbA
+      .from('push_tokens').select('token').eq('user_id', userAId).eq('token', FIXTURE_PUSH_TOKEN);
+    assert.equal(ownTokens?.length, 1, 'account A must be able to see its own push token — otherwise the B check below is vacuous');
 
     const { error: watchErr } = await sbA
       .from('watchlist')
@@ -232,7 +274,13 @@ test('two-account account-data RLS adversarial test', async (t) => {
       await sbB.from('profiles').update({ display_name: 'owned by B' }).eq('id', userAId).select(),
     );
     const { data } = await sbA.from('profiles').select('display_name').eq('id', userAId).maybeSingle();
-    assert.notEqual(data?.display_name, 'owned by B', 'account A\'s display name must not be writable by account B');
+    // Positive comparison against the value captured at setup, not
+    // `notEqual(..., 'owned by B')` — the negative form also passes when the
+    // profile row is missing entirely, which proves nothing about RLS.
+    assert.equal(
+      data?.display_name, profileANameAtSetup,
+      'account A\'s display name must be exactly what it was before account B\'s write attempt',
+    );
   });
 
   // ---- push_tokens ---------------------------------------------------------
@@ -240,10 +288,18 @@ test('two-account account-data RLS adversarial test', async (t) => {
   // Tokens are device secrets: anyone holding one can push arbitrary
   // notifications to that device. Anonymous INSERT is allowed by design
   // (lib/notifications.ts registers a token before sign-in), so the boundary
-  // being tested is READ, not write.
+  // being tested is READ, not write. Setup seeded a token for A and confirmed
+  // A can see it, so a zero-row result here is RLS doing its job rather than
+  // an empty table.
   await t.test('BLOCKING: account B cannot read account A\'s push tokens', async () => {
     const { data, error } = await sbB.from('push_tokens').select('token').eq('user_id', userAId);
     assert.equal(error, null);
     assert.equal(data?.length ?? 0, 0, 'account B must not be able to read another account\'s push tokens');
+
+    // Also check the direct lookup: a policy keyed only on user_id would still
+    // leak a token to anyone who can guess or replay the token string itself.
+    const { data: byToken } = await sbB
+      .from('push_tokens').select('token').eq('token', FIXTURE_PUSH_TOKEN);
+    assert.equal(byToken?.length ?? 0, 0, 'account B must not be able to read account A\'s token by its value');
   });
 });

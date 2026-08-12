@@ -72,10 +72,23 @@ jobs:
     name: Supabase RLS gate (account data)
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    # Secrets are not exposed to pull_request runs from forks; this repo is
-    # push-to-main so the gate still covers every real change.
-    if: github.event_name != 'pull_request'
+    # Runs for pushes and for same-repo PRs. Only FORK pull requests are
+    # skipped, because GitHub withholds secrets from them and the job would
+    # fail on missing credentials rather than on a real RLS problem. Skipping
+    # every pull_request (the first version of this line) would have let a
+    # same-repo PR show an all-green CI with the RLS gate never having run.
+    if: >-
+      github.event_name != 'pull_request' ||
+      github.event.pull_request.head.repo.full_name == github.repository
+    # Serialised against eas-build.yml's account-data security gate: both sign
+    # in as the SAME two fixture accounts and mutate the same rows.
+    concurrency:
+      group: supabase-fixture-accounts
+      cancel-in-progress: false
     env:
+      # GitHub sets CI=true itself, but the security tests fail closed on
+      # `process.env.CI` and a blocking gate should not depend on an implicit.
+      CI: 'true'
       EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
       EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
@@ -90,6 +103,22 @@ jobs:
           cache: npm
 
       - run: npm ci
+
+      # A renamed or emptied secret must stop the gate loudly. Without this the
+      # seed step's own error is the only signal, and an empty-but-present
+      # secret can read as configured.
+      - name: Verify required secrets are present
+        run: |
+          missing=""
+          for v in EXPO_PUBLIC_SUPABASE_URL EXPO_PUBLIC_SUPABASE_ANON_KEY \
+                   SUPABASE_SERVICE_ROLE_KEY FIXTURE_PHOTO_A_PASSWORD FIXTURE_PHOTO_B_PASSWORD; do
+            [ -z "${!v}" ] && missing="$missing $v"
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::BLOCKING security gate is missing secret(s):$missing — refusing to report green."
+            exit 1
+          fi
+          echo "All required secrets present."
 
       - name: Seed two-account fixtures
         run: node scripts/seed-photo-test-accounts.js

@@ -24,8 +24,14 @@ jobs:
     # workflow_dispatch (the TestFlight drift `gate` job below is
     # schedule-only per the 2026-07-27 auto-ship decision, but a brand-new
     # private-photo feature's RLS proof must never be skippable that way).
-    name: Photo Feed security gate
+    name: Account data security gate
     runs-on: ubuntu-latest
+    # Serialised against ci.yml's security job: both sign in as the SAME two
+    # fixture accounts and write to the same rows. Two concurrent runs delete
+    # each other's fixture list mid-test and fail for reasons unrelated to RLS.
+    concurrency:
+      group: supabase-fixture-accounts
+      cancel-in-progress: false
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -49,14 +55,19 @@ jobs:
           FIXTURE_PHOTO_B_PASSWORD: ${{ secrets.FIXTURE_PHOTO_B_PASSWORD }}
         run: node scripts/seed-photo-test-accounts.js
 
-      - name: BLOCKING — two-account adversarial RLS test
+      # The whole tests/security/ glob, not just the photo file. Naming one
+      # file here is what left the account-data RLS test (watchlist, reviews,
+      # lists, list_items, profiles, push_tokens) gating ci.yml only — and
+      # nothing in this workflow depends on ci.yml, so a ship could proceed
+      # with that gate red or never run (ship-check, 2026-08-12).
+      - name: BLOCKING — two-account adversarial RLS tests
         env:
           CI: 'true'
           EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
           EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
           FIXTURE_PHOTO_A_PASSWORD: ${{ secrets.FIXTURE_PHOTO_A_PASSWORD }}
           FIXTURE_PHOTO_B_PASSWORD: ${{ secrets.FIXTURE_PHOTO_B_PASSWORD }}
-        run: node --test tests/security/photo-rls-adversarial.test.mjs
+        run: npm run test:security
 
       - name: BLOCKING — diary-photos bucket must be Private
         env:
