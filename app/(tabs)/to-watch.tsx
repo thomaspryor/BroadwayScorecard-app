@@ -680,10 +680,11 @@ const styles = StyleSheet.create({
   cardPosterPlaceholder: { alignItems: 'center', justifyContent: 'center' },
   placeholderText: { color: Colors.text.muted, fontSize: 18, fontWeight: '600' },
   // Centered overlaid date tag for Upcoming posters — mirrors the Watched
-  // tab's grid date scrim (beta feedback 2026-08-02).
+  // tab's grid date scrim (beta feedback 2026-08-02; top-anchored per beta
+  // feedback 2026-08-10, ANIDtf6U).
   upcomingPosterWrap: { width: '100%' },
   upcomingDateOverlayWrap: {
-    position: 'absolute', left: 0, right: 0, bottom: 6,
+    position: 'absolute', left: 0, right: 0, top: 6,
     alignItems: 'center',
   },
   upcomingDateOverlay: {
