@@ -84,6 +84,14 @@ object rather than throwing, so the surrounding `try/catch` never fired and the
 healthy, and the row simply never arrived. Push is the owner's channel for
 new-score alerts, so this was a live delivery gap.
 
+`push_tokens` also returns zero rows on SELECT even for the row's owner. That
+half is correct and deliberate — the app only writes this table, the server
+reads it, and a token is a device secret — so the migration below fixes only
+the INSERT/UPDATE half. Widening reads to make an owner-visibility check pass
+would have been fixing the test by loosening the thing under test. The suite
+verifies the fixture row through the service role instead, which is fixture
+setup rather than a security claim.
+
 Status: the silent-swallow is fixed (the error is now inspected and reported to
 Sentry). The policy fix is written but **NOT applied** —
 `supabase/migrations/20260812013000_push_tokens_owner_insert.sql`, awaiting a

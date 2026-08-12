@@ -28,9 +28,15 @@ import { createClient } from '@supabase/supabase-js';
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 
+// SUPABASE_SERVICE_ROLE_KEY is required for fixture VERIFICATION only (see the
+// push-token step in setup). Every isolation assertion runs through anon-key
+// clients signed in as real users.
+const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
 const REQUIRED_VARS = [
   'EXPO_PUBLIC_SUPABASE_URL', 'EXPO_PUBLIC_SUPABASE_ANON_KEY',
   'FIXTURE_PHOTO_A_PASSWORD', 'FIXTURE_PHOTO_B_PASSWORD',
+  'SUPABASE_SERVICE_ROLE_KEY',
 ];
 const missing = REQUIRED_VARS.filter(v => !process.env[v]);
 if (missing.length > 0 && process.env.CI) {
@@ -155,25 +161,37 @@ test('two-account account-data RLS adversarial test', async (t) => {
     assert.ok(profileA.display_name, 'account A profile must have a non-empty display_name to compare against');
     profileANameAtSetup = profileA.display_name;
 
-    // Same reasoning for push tokens, but the row is seeded with the service
-    // role rather than created here.
+    // Push tokens: confirm the fixture row EXISTS before asserting that account
+    // B cannot see it. Without this the B assertion is satisfied by an empty
+    // table and proves nothing.
     //
-    // The first version of this test tried to insert it as account A, the way
-    // lib/notifications.ts does, and Postgres rejected it: `42501 new row
-    // violates row-level security policy for table "push_tokens"`. That is a
-    // real finding about the app, not about the test — savePushTokenToServer()
-    // performs the identical authenticated upsert and never inspects the
-    // returned error, so a signed-in user's push token silently fails to reach
-    // the server. Recorded in memory/testing.md; fixing it needs a policy
-    // change on the production database.
-    const { data: ownTokens, error: tokenReadErr } = await sbA
-      .from('push_tokens').select('token').eq('user_id', userAId).eq('token', FIXTURE_PUSH_TOKEN);
-    assert.equal(tokenReadErr, null, 'account A reading its own push token should not error');
+    // The existence check has to go through the service role, because
+    // `push_tokens` is closed to clients in both directions:
+    //   - INSERT as an authenticated user is rejected (42501). That one is a
+    //     real app bug — lib/notifications.ts performs exactly that upsert and
+    //     ignored the returned error, so signed-in users' devices silently
+    //     never registered. Fixed in lib/notifications.ts; the policy half is
+    //     supabase/migrations/20260812013000_push_tokens_owner_insert.sql.
+    //   - SELECT returns zero rows even for the owner. That is CORRECT and
+    //     deliberate: the app only ever writes this table, the server reads it,
+    //     and a push token is a device secret. The migration does NOT open
+    //     reads — widening a table to fix a test would be the exact inversion
+    //     of the point.
+    //
+    // The service-role client below is used ONLY to verify fixture state. It is
+    // never used for an isolation assertion — the service role bypasses RLS, so
+    // any security claim made through it would be vacuous.
+    assert.ok(SERVICE_ROLE_KEY, 'SUPABASE_SERVICE_ROLE_KEY is required to verify fixture state');
+    const sbService = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, { auth: { persistSession: false } });
+    const { data: seededTokens, error: seedReadErr } = await sbService
+      .from('push_tokens').select('token, user_id').eq('token', FIXTURE_PUSH_TOKEN);
+    assert.equal(seedReadErr, null, `service-role read of the fixture token should not error: ${seedReadErr?.message}`);
     assert.equal(
-      ownTokens?.length, 1,
-      'account A must be able to see its own seeded push token — run scripts/seed-photo-test-accounts.js first; ' +
+      seededTokens?.length, 1,
+      'the fixture push token must exist — run scripts/seed-photo-test-accounts.js first; ' +
       'without this row the account-B checks below would pass against an empty table',
     );
+    assert.equal(seededTokens[0].user_id, userAId, 'the fixture push token must belong to account A');
 
     const { error: watchErr } = await sbA
       .from('watchlist')
@@ -309,6 +327,10 @@ test('two-account account-data RLS adversarial test', async (t) => {
     const { data, error } = await sbB.from('push_tokens').select('token').eq('user_id', userAId);
     assert.equal(error, null);
     assert.equal(data?.length ?? 0, 0, 'account B must not be able to read another account\'s push tokens');
+
+    // And the row really is there to be missed — proven with the service role
+    // in setup, so this zero is RLS and not an empty table.
+    assert.ok(FIXTURE_PUSH_TOKEN, 'fixture token constant must be set');
 
     // Also check the direct lookup: a policy keyed only on user_id would still
     // leak a token to anyone who can guess or replay the token string itself.

@@ -67,6 +67,10 @@ jobs:
           EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
           FIXTURE_PHOTO_A_PASSWORD: ${{ secrets.FIXTURE_PHOTO_A_PASSWORD }}
           FIXTURE_PHOTO_B_PASSWORD: ${{ secrets.FIXTURE_PHOTO_B_PASSWORD }}
+          # Fixture VERIFICATION only — the suite proves the push-token row
+          # exists before asserting account B cannot see it. Every isolation
+          # assertion still runs through anon-key clients.
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: npm run test:security
 
       - name: BLOCKING — diary-photos bucket must be Private

@@ -57,9 +57,9 @@ create policy "push_tokens_owner_update"
   using (user_id is null or user_id = (select auth.uid()))
   with check (user_id is null or user_id = (select auth.uid()));
 
-drop policy if exists "push_tokens_owner_select" on public.push_tokens;
-create policy "push_tokens_owner_select"
-  on public.push_tokens
-  for select
-  to authenticated
-  using (user_id = (select auth.uid()));
+-- NO select policy, deliberately. The table is currently unreadable by clients
+-- in both directions, and only the INSERT half is a bug: the app writes push
+-- tokens and the server reads them, so a client never needs SELECT. Opening
+-- reads to make an owner-visibility check pass would widen a table holding
+-- device secrets in order to satisfy a test — the inversion of the point. The
+-- adversarial test verifies the fixture row through the service role instead.
