@@ -37,6 +37,15 @@ function findTestFiles(dir, found = []) {
 // Only the two shapes actually used here are supported — deliberately literal
 // rather than pulling in a glob dependency for one assertion.
 function globToRegExp(glob) {
+  // The sentinels below are only collision-proof if the glob itself contains no
+  // NUL. A package.json string CAN encode one as a JSON escape, which
+  // JSON.parse turns into a real NUL — so assert rather than assume. Such a
+  // glob could never match a real path anyway; failing loudly beats silently
+  // mis-converting it. (Review finding, 2026-08-12.)
+  assert.ok(
+    !glob.includes('\u0000'),
+    `glob contains a NUL and would collide with this function's sentinels: ${JSON.stringify(glob)}`,
+  );
   // NUL-delimited sentinels: a glob can never contain one, so they cannot
   // collide with the pattern being converted. Written as \u0000 escapes rather
   // than literal NUL characters — a raw NUL makes git treat the whole file as
