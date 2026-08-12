@@ -33,6 +33,8 @@ const TOKENS = {
   upsert: 'ExponentPushToken[diag-upsert]',
   nullUser: 'ExponentPushToken[diag-nulluser]',
   minimal: 'ExponentPushToken[diag-minimal]',
+  crossaccount: 'ExponentPushToken[diag-crossaccount]',
+  updateThenInsert: 'ExponentPushToken[diag-update-then-insert]',
 };
 
 function report(label, { error }) {
@@ -76,10 +78,42 @@ function report(label, { error }) {
   report('plain INSERT, token+platform only',
     await sb.from('push_tokens').insert({ token: TOKENS.minimal, platform: 'ios' }));
 
-  report('UPSERT onConflict=token, own user_id (the app\'s exact call)',
+  report('UPSERT onConflict=token, own user_id (the OLD app call)',
     await sb.from('push_tokens').upsert(
       { token: TOKENS.upsert, platform: 'ios', user_id: uid, updated_at: now },
       { onConflict: 'token' }));
+
+  // The replacement path in lib/notifications.ts: UPDATE first, INSERT if it
+  // matched nothing. Run twice — the second pass exercises the update branch,
+  // which is what every launch after the first one hits.
+  for (const pass of [1, 2]) {
+    const { data: updated, error: updErr } = await sb.from('push_tokens')
+      .update({ token: TOKENS.updateThenInsert, platform: 'ios', user_id: uid, updated_at: now })
+      .eq('token', TOKENS.updateThenInsert).select('token');
+    if (updErr) { report(`update-then-insert pass ${pass} (UPDATE leg)`, { error: updErr }); continue; }
+    if ((updated?.length ?? 0) === 0) {
+      report(`update-then-insert pass ${pass} (INSERT leg, no row matched)`,
+        await sb.from('push_tokens').insert(
+          { token: TOKENS.updateThenInsert, platform: 'ios', user_id: uid, updated_at: now }));
+    } else {
+      report(`update-then-insert pass ${pass} (UPDATE leg matched ${updated.length} row)`, { error: null });
+    }
+  }
+
+  // The pre-existing `Anon can insert push tokens` policy checks only token
+  // length and platform — not user_id. Permissive policies OR together, so it
+  // may allow a signed-in user to attach a device to SOMEBODY ELSE'S account,
+  // which would mean receiving their notifications. Testing rather than
+  // reading the policy and assuming.
+  const OTHER_USER = process.env.FIXTURE_B_USER_ID;
+  if (OTHER_USER) {
+    console.log('\nCross-account attach (must be REJECTED):');
+    report('INSERT a token owned by account B while signed in as A',
+      await sb.from('push_tokens').insert(
+        { token: 'ExponentPushToken[diag-crossaccount]', platform: 'ios', user_id: OTHER_USER, updated_at: now }));
+  } else {
+    console.log('\nCross-account attach: SKIPPED (set FIXTURE_B_USER_ID)');
+  }
 
   console.log('\nCleanup (delete has no policy, so these are expected to be no-ops):');
   for (const t of Object.values(TOKENS)) {

@@ -168,24 +168,42 @@ async function savePushTokenToServer(token: string): Promise<void> {
     const { data: { session } } = await client.auth.getSession();
     const userId = session?.user?.id ?? null;
 
-    const { error } = await client.from('push_tokens').upsert(
-      {
-        token,
-        platform: Platform.OS,
-        user_id: userId,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: 'token' },
-    );
+    const row = {
+      token,
+      platform: Platform.OS,
+      user_id: userId,
+      updated_at: new Date().toISOString(),
+    };
+
+    // Update-then-insert rather than `.upsert(..., { onConflict: 'token' })`.
+    //
+    // The upsert form issues `INSERT ... ON CONFLICT (token) DO UPDATE`, and
+    // Postgres rejected that with 42501 for every signed-in user, so no device
+    // ever registered and nobody received a notification. Measured directly
+    // (scripts/diagnose-push-token-insert.js, run 31602536481): plain INSERT
+    // with the user's own id SUCCEEDS, plain INSERT with a null id SUCCEEDS,
+    // and only the ON CONFLICT form fails — the conflict path needs to read the
+    // row it would update, and `push_tokens` grants ordinary users no SELECT.
+    //
+    // Both halves below are permitted by policies that already existed, so this
+    // needs no further production database change.
+    const { data: updated, error: updateErr } = await client
+      .from('push_tokens')
+      .update(row)
+      .eq('token', token)
+      .select('token');
+
+    let error = updateErr;
+    // No rows matched means this device is new to the server, so insert it.
+    if (!updateErr && (updated?.length ?? 0) === 0) {
+      ({ error } = await client.from('push_tokens').insert(row));
+    }
 
     // supabase-js RESOLVES with an { error } object instead of throwing, so the
-    // catch below never sees a rejected write. Ignoring this return value hid a
-    // live failure for as long as the feature has existed: RLS rejects a
-    // signed-in user inserting their own token (42501), so their device never
-    // reached the server and they silently received no notifications. Found by
-    // tests/security/account-data-rls-adversarial.test.mjs, 2026-08-12.
+    // catch below never sees a rejected write. Ignoring this return value is
+    // what hid the failure above for the life of the feature.
     if (error) {
-      captureException(new Error(`push_tokens upsert failed: ${error.message}`), {
+      captureException(new Error(`push_tokens write failed: ${error.message}`), {
         code: String((error as { code?: string }).code ?? 'unknown'),
         signedIn: String(userId != null),
       });
