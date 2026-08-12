@@ -14,11 +14,16 @@ on:
 
 jobs:
   inspect:
-    name: Inspect ${{ inputs.table }}
+    name: Inspect RLS
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # Reviewed code only — this holds the management token. See
+    # apply-migration.yml.
+    if: github.ref == 'refs/heads/main'
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: main
 
       - uses: actions/setup-node@v4
         with:
@@ -27,4 +32,6 @@ jobs:
       - name: Dump RLS state
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-        run: node scripts/inspect-rls.js "${{ inputs.table }}"
+          # Environment, not interpolation — see apply-migration.yml for why.
+          TABLE: ${{ inputs.table }}
+        run: node scripts/inspect-rls.js "$TABLE"

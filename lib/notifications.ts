@@ -196,9 +196,36 @@ async function savePushTokenToServer(token: string): Promise<void> {
     let { error } = await client.from('push_tokens').insert(row);
 
     if (error && (error as { code?: string }).code === '23505') {
-      // Device already known to the server — this is the re-registration path,
-      // which every launch after the first one takes.
-      ({ error } = await client.from('push_tokens').update(row).eq('token', token));
+      // Device already known to the server — the re-registration path, which
+      // every launch after the first one takes.
+      //
+      // The row may belong to a DIFFERENT user: sign out, hand the phone to
+      // someone else, they sign in, and the token is unchanged while the owner
+      // is not. The UPDATE policy then filters this row out, zero rows change,
+      // and Postgres reports NO error — with no SELECT policy there is nothing
+      // to read back that would reveal it either. Left alone, that is the same
+      // silent failure this whole function was fixed for, one layer deeper.
+      //
+      // So: ask for the updated row back and treat an empty result as
+      // unconfirmed rather than as success. `.select()` returns nothing under
+      // the current policies whether it worked or not, which is precisely why
+      // the outcome cannot be assumed and has to be reported.
+      const { data: updated, error: updateErr } = await client
+        .from('push_tokens').update(row).eq('token', token).select('token');
+      error = updateErr;
+
+      if (!updateErr && (updated?.length ?? 0) === 0) {
+        captureException(
+          new Error('push_tokens re-registration could not be confirmed'),
+          {
+            reason: 'update matched no visible row — token may belong to another account, or SELECT is closed',
+            signedIn: String(userId != null),
+          },
+        );
+        if (__DEV__) {
+          console.warn('[Notifications] Re-registration unconfirmed for an existing token.');
+        }
+      }
     }
 
     // supabase-js RESOLVES with an { error } object instead of throwing, so the

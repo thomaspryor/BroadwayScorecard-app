@@ -27,11 +27,19 @@ concurrency:
 
 jobs:
   apply:
-    name: ${{ inputs.confirm && 'APPLY' || 'Dry run' }} ${{ inputs.migration }}
+    name: ${{ inputs.confirm && 'APPLY' || 'Dry run' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # Only ever runs the migration and script as they exist on main. A
+    # workflow_dispatch lets the dispatcher pick ANY ref, and checkout would
+    # then run that branch's version of apply-migration.js against production
+    # with the management token — the filename guard inside the script is
+    # worthless if the script itself is attacker-chosen. Reviewed code only.
+    if: github.ref == 'refs/heads/main'
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: main
 
       - uses: actions/setup-node@v4
         with:
@@ -40,6 +48,17 @@ jobs:
       - name: Apply migration
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          # Passed through the environment, NOT interpolated into the script.
+          # `${{ inputs.x }}` inside a run: block is substituted textually
+          # before the shell sees it, so a crafted input escapes the quotes and
+          # executes — the standard GitHub Actions script-injection hole, and
+          # here it would run with a production database token in scope. The
+          # Node-side basename guard cannot help: the injection fires first.
+          MIGRATION: ${{ inputs.migration }}
+          CONFIRM: ${{ inputs.confirm }}
         run: |
-          node scripts/apply-migration.js "${{ inputs.migration }}" \
-            ${{ inputs.confirm && '--confirm' || '' }}
+          if [ "$CONFIRM" = "true" ]; then
+            node scripts/apply-migration.js "$MIGRATION" --confirm
+          else
+            node scripts/apply-migration.js "$MIGRATION"
+          fi

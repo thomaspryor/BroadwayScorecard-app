@@ -12,6 +12,10 @@ jobs:
     name: Try push_tokens write shapes as a signed-in user
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # Reviewed code only — this job holds fixture account passwords, and a
+    # dispatcher-chosen ref could replace the script with one that encodes them
+    # past GitHub's log masking. Public repo, public logs.
+    if: github.ref == 'refs/heads/main'
     env:
       EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
       EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
@@ -21,6 +25,8 @@ jobs:
       FIXTURE_PHOTO_B_PASSWORD: ${{ secrets.FIXTURE_PHOTO_B_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: main
       - uses: actions/setup-node@v4
         with:
           node-version: 22
