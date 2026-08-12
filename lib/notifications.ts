@@ -11,6 +11,7 @@
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
+import { captureException } from './sentry';
 
 const PUSH_TOKEN_KEY = '@bsc:pushToken';
 const PERMISSION_ASKED_KEY = '@bsc:notificationPermissionAsked';
@@ -167,7 +168,7 @@ async function savePushTokenToServer(token: string): Promise<void> {
     const { data: { session } } = await client.auth.getSession();
     const userId = session?.user?.id ?? null;
 
-    await client.from('push_tokens').upsert(
+    const { error } = await client.from('push_tokens').upsert(
       {
         token,
         platform: Platform.OS,
@@ -176,8 +177,23 @@ async function savePushTokenToServer(token: string): Promise<void> {
       },
       { onConflict: 'token' },
     );
+
+    // supabase-js RESOLVES with an { error } object instead of throwing, so the
+    // catch below never sees a rejected write. Ignoring this return value hid a
+    // live failure for as long as the feature has existed: RLS rejects a
+    // signed-in user inserting their own token (42501), so their device never
+    // reached the server and they silently received no notifications. Found by
+    // tests/security/account-data-rls-adversarial.test.mjs, 2026-08-12.
+    if (error) {
+      captureException(new Error(`push_tokens upsert failed: ${error.message}`), {
+        code: String((error as { code?: string }).code ?? 'unknown'),
+        signedIn: String(userId != null),
+      });
+      if (__DEV__) console.warn('[Notifications] Failed to save token to server:', error);
+    }
   } catch (e) {
     // Non-critical — token is cached locally, will retry next launch
+    captureException(e instanceof Error ? e : new Error(String(e)), { stage: 'savePushTokenToServer' });
     if (__DEV__) console.warn('[Notifications] Failed to save token to server:', e);
   }
 }

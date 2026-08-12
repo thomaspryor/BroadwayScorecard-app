@@ -70,6 +70,32 @@ npx expo export --platform ios
   suite conditional evaluates false on the nightly run and it executes zero
   flows while reporting success.
 
+## What the RLS suite has already caught
+
+**Push tokens never reach the server for signed-in users** (2026-08-12, CI run
+31566167644). The adversarial test tried to insert a push token as an ordinary
+authenticated user — exactly what `lib/notifications.ts`
+`savePushTokenToServer()` does — and Postgres rejected it with `42501 new row
+violates row-level security policy for table "push_tokens"`.
+
+It had gone unnoticed because supabase-js **resolves** with an `{ error }`
+object rather than throwing, so the surrounding `try/catch` never fired and the
+`__DEV__` warning never printed. The token cached locally, the app looked
+healthy, and the row simply never arrived. Push is the owner's channel for
+new-score alerts, so this was a live delivery gap.
+
+Status: the silent-swallow is fixed (the error is now inspected and reported to
+Sentry). The policy fix is written but **NOT applied** —
+`supabase/migrations/20260812013000_push_tokens_owner_insert.sql`, awaiting a
+deliberate decision to change production RLS. Nothing in this repo applies
+migrations automatically. Until it is applied, the fixture token is seeded with
+the service role by `scripts/seed-photo-test-accounts.js` so the isolation
+assertions still have a real row to test against.
+
+The general lesson: **a Supabase write whose return value is ignored is not a
+write.** Grep for `.from(...).insert/update/upsert/delete` without an `error`
+check before assuming any table is receiving data.
+
 ## Known gaps
 
 - No React component/render tests. Deliberate: Maestro covers the same ground

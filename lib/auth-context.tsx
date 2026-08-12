@@ -13,7 +13,7 @@ import { getSupabaseClient } from './supabase';
 import type { UserProfile } from './user-types';
 import SignInSheet from '@/components/SignInSheet';
 import { trackSignInStarted, trackSignInCompleted, trackSignOut as trackSignOutEvent, identifyUser, resetAnalyticsUser } from '@/lib/analytics';
-import { setSentryUser, clearSentryUser } from '@/lib/sentry';
+import { setSentryUser, clearSentryUser, captureException } from '@/lib/sentry';
 import { clearPendingAction } from '@/lib/deferred-auth';
 
 // Lazy-load native auth modules — they crash at import time if native modules
@@ -164,7 +164,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         data: { user: authUser },
       } = await client.auth.getUser();
       const meta = authUser?.user_metadata || {};
-      const { data } = await client
+      // Destructuring only `data` here discards the error the same way
+      // savePushTokenToServer() did, and with the same consequence: a rejected
+      // upsert leaves `data` null, `if (data)` quietly skips, and the profile
+      // is never written. That is how an RLS rejection on push_tokens went
+      // unnoticed for the life of the feature (2026-08-12) — supabase-js
+      // resolves with { error } rather than throwing, so nothing surfaces.
+      const { data, error } = await client
         .from('profiles')
         .upsert(
           {
@@ -176,6 +182,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         )
         .select()
         .single();
+
+      if (error) {
+        captureException(new Error(`profiles upsert failed: ${error.message}`), {
+          code: String((error as { code?: string }).code ?? 'unknown'),
+        });
+      }
 
       if (data) {
         setProfile(data as UserProfile);

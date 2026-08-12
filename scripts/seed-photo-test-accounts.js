@@ -86,6 +86,32 @@ async function ensureProfile(userId, email) {
   }
 }
 
+// Seeded with the SERVICE ROLE on purpose. The adversarial test's push-token
+// assertions need a row belonging to account A to exist before they can prove
+// account B cannot read it — "B sees zero rows" is not evidence of RLS when the
+// table is empty. Creating that row is fixture setup, not the thing under test,
+// so it does not weaken the assertions (which all run through anon-key clients).
+//
+// It also cannot be created any other way: an ordinary authenticated user
+// inserting its own push token is currently REJECTED by RLS on this table
+// (42501), which is a real app bug — lib/notifications.ts does exactly that
+// insert and ignores the returned error. See memory/testing.md.
+const FIXTURE_PUSH_TOKEN_A = 'ExponentPushToken[rls-adversarial-fixture]';
+
+async function ensurePushToken(userId) {
+  const existing = await req('GET', `/rest/v1/push_tokens?token=eq.${encodeURIComponent(FIXTURE_PUSH_TOKEN_A)}&select=token,user_id`);
+  const row = Array.isArray(existing.body) ? existing.body[0] : null;
+  if (row && row.user_id === userId) return FIXTURE_PUSH_TOKEN_A;
+
+  const res = await req(row ? 'PATCH' : 'POST',
+    row ? `/rest/v1/push_tokens?token=eq.${encodeURIComponent(FIXTURE_PUSH_TOKEN_A)}` : '/rest/v1/push_tokens',
+    { ...(row ? {} : { token: FIXTURE_PUSH_TOKEN_A }), platform: 'ios', user_id: userId, updated_at: new Date().toISOString() });
+  if (res.status !== 200 && res.status !== 201 && res.status !== 204) {
+    throw new Error(`Push token seed failed: ${res.status} ${JSON.stringify(res.body).slice(0, 300)}`);
+  }
+  return FIXTURE_PUSH_TOKEN_A;
+}
+
 async function ensureReview(userId) {
   const existing = await req('GET', `/rest/v1/reviews?user_id=eq.${userId}&show_id=eq.${FIXTURE_SHOW_ID}&select=id`);
   if (Array.isArray(existing.body) && existing.body.length > 0) return existing.body[0].id;
@@ -109,6 +135,8 @@ async function ensureReview(userId) {
     const userId = await ensureUser(account.email, account.password);
     await ensureProfile(userId, account.email);
     const reviewId = await ensureReview(userId);
+    // Only account A needs a push token — it is the target of B's read attempt.
+    if (account.key === 'A') await ensurePushToken(userId);
     // Never include password — CI logs on a public repo are world-readable.
     out[account.key] = { userId, reviewId, email: account.email };
     console.log(`  ✓ user=${userId} review=${reviewId}`);

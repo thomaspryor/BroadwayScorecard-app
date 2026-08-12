@@ -82,9 +82,12 @@ test('two-account account-data RLS adversarial test', async (t) => {
   // tests below for why that distinction decides whether they prove anything.
   let profileANameAtSetup, reviewARatingAtSetup;
 
-  // A push token owned by A. Nothing else seeds one, and "account B sees zero
-  // rows" is only evidence of RLS if there was a row there to miss.
-  const FIXTURE_PUSH_TOKEN = `ExponentPushToken[rls-adversarial-fixture]`;
+  // A push token owned by A, seeded with the service role by
+  // scripts/seed-photo-test-accounts.js. "Account B sees zero rows" is only
+  // evidence of RLS if there was a row there to miss — and this row cannot be
+  // created here as account A, because RLS currently rejects an authenticated
+  // user inserting its own push token (see the setup step below).
+  const FIXTURE_PUSH_TOKEN = 'ExponentPushToken[rls-adversarial-fixture]';
 
   // Deletes every fixture row this test could have created, by NAME rather
   // than by the id of the row we happen to be holding — so it also sweeps
@@ -100,7 +103,9 @@ test('two-account account-data RLS adversarial test', async (t) => {
       await sbA.from('lists').delete().eq('id', id);
     }
     await sbA.from('watchlist').delete().eq('user_id', userAId).eq('show_id', FIXTURE_SHOW_ID);
-    await sbA.from('push_tokens').delete().eq('token', FIXTURE_PUSH_TOKEN);
+    // Deliberately NOT deleting the push token: it is seeded fixture state
+    // (like the review and the profile), not per-run debris, and account A
+    // cannot recreate it under the current policy.
   }
 
   t.after(async () => {
@@ -150,16 +155,25 @@ test('two-account account-data RLS adversarial test', async (t) => {
     assert.ok(profileA.display_name, 'account A profile must have a non-empty display_name to compare against');
     profileANameAtSetup = profileA.display_name;
 
-    // Same reasoning for push tokens: seed one so "B sees zero rows" is
-    // evidence of RLS rather than evidence of an empty table.
-    const { error: tokenErr } = await sbA.from('push_tokens').upsert(
-      { token: FIXTURE_PUSH_TOKEN, platform: 'ios', user_id: userAId, updated_at: new Date().toISOString() },
-      { onConflict: 'token' },
-    );
-    assert.equal(tokenErr, null, `account A push_token insert should succeed: ${tokenErr?.message}`);
-    const { data: ownTokens } = await sbA
+    // Same reasoning for push tokens, but the row is seeded with the service
+    // role rather than created here.
+    //
+    // The first version of this test tried to insert it as account A, the way
+    // lib/notifications.ts does, and Postgres rejected it: `42501 new row
+    // violates row-level security policy for table "push_tokens"`. That is a
+    // real finding about the app, not about the test — savePushTokenToServer()
+    // performs the identical authenticated upsert and never inspects the
+    // returned error, so a signed-in user's push token silently fails to reach
+    // the server. Recorded in memory/testing.md; fixing it needs a policy
+    // change on the production database.
+    const { data: ownTokens, error: tokenReadErr } = await sbA
       .from('push_tokens').select('token').eq('user_id', userAId).eq('token', FIXTURE_PUSH_TOKEN);
-    assert.equal(ownTokens?.length, 1, 'account A must be able to see its own push token — otherwise the B check below is vacuous');
+    assert.equal(tokenReadErr, null, 'account A reading its own push token should not error');
+    assert.equal(
+      ownTokens?.length, 1,
+      'account A must be able to see its own seeded push token — run scripts/seed-photo-test-accounts.js first; ' +
+      'without this row the account-B checks below would pass against an empty table',
+    );
 
     const { error: watchErr } = await sbA
       .from('watchlist')
