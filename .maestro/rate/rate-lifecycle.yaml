@@ -1,0 +1,131 @@
+# Rate Modal — Real Screen Create -> Edit -> Delete
+# Verifies: app/rate/[showId].tsx (the production rating screen) actually
+# writes to and deletes from Supabase, via its real entry points (show-page
+# star tap, then the Edit button). Self-cleaning: ends in the same state it
+# started in.
+#
+# Why this exists: the 6 existing "show-rating" flows only drive
+# app/test/show-rating-fixture.tsx, which uses local React state and touches
+# no backend. app/rate/[showId].tsx and components/user/ShowPageRating.tsx
+# had zero coverage (audited 2026-08-12, see memory/testing.md) despite doing
+# real Supabase writes for every rating a real user saves.
+#
+# Assumption: the dev-test CI account has no pre-existing rating for
+# Hamilton. True as of 2026-08-12 — this flow is the only one that rates it,
+# and it deletes what it creates. If a future run ever fails at the "tap a
+# star" step because "Edit rating" is showing instead of bare stars, that
+# assumption broke (a real rating exists) and needs a human look, not a
+# guessed fix — see the workflow's cleanup step for the backstop.
+#
+# Backend writes have no visible confirmation beyond a 3-5s toast — this flow
+# also re-opens the show page after each write and checks the persisted
+# state directly (assertVisible on "Edit rating"/stars), not just the toast,
+# because a toast proves the client fired the request, not that it landed.
+
+appId: com.broadwayscorecard.app
+---
+- launchApp
+
+- tapOn:
+    text: "Open"
+    optional: true
+
+- extendedWaitUntil:
+    visible: "Broadway Scorecard"
+    timeout: 30000
+
+# Force-resolve auth via a screen that visibly distinguishes signed-in from
+# signed-out (ShowPageRating renders its stars either way — see
+# components/user/ShowPageRating.tsx — so it can't be used for this check).
+- tapOn: "Profile and settings"
+
+- extendedWaitUntil:
+    visible: "ACCOUNT"
+    timeout: 15000
+
+- extendedWaitUntil:
+    visible: "Sign Out"
+    timeout: 20000
+
+# Relaunch: the session is now cached locally, so this restart resolves
+# auth from storage instead of the slower network sign-in path.
+- launchApp
+
+- tapOn:
+    text: "Open"
+    optional: true
+
+- extendedWaitUntil:
+    visible: "Broadway Scorecard"
+    timeout: 30000
+
+- tapOn:
+    text: "Browse"
+
+- extendedWaitUntil:
+    visible: "Now Playing"
+    timeout: 30000
+
+- tapOn: "Search shows..."
+- inputText: "Hamilton"
+
+- extendedWaitUntil:
+    visible: "\\d+ results? for .*"
+    timeout: 15000
+
+- tapOn:
+    id: "show-card-result"
+
+- extendedWaitUntil:
+    visible: "MY RATING & REVIEW"
+    timeout: 15000
+
+# ─── Create ─────────────────────────────────────────────
+- tapOn:
+    id: "star-4"
+
+- assertVisible: "Your rating for"
+
+# Matches the field-label tap the fixture's save-flow.yaml already proves
+# works to focus this exact field (same label, same layout — rate/[showId]
+# just never had its own testID/accessibilityLabel-based hook to prefer instead).
+- tapOn: "Private Notes (optional)"
+- inputText: "MAESTRO E2E — safe to delete"
+
+- tapOn: "Save"
+
+- extendedWaitUntil:
+    visible: "Rating saved"
+    timeout: 10000
+
+# Round-trip proof: the show page now reads the rating back from Supabase,
+# not just from the form we filled in.
+- extendedWaitUntil:
+    visible:
+      id: "edit-rating"
+    timeout: 15000
+
+# ─── Edit (confirms the saved data persisted correctly) ───
+- tapOn:
+    id: "edit-rating"
+
+- assertVisible: "Editing your rating for"
+- assertVisible: "MAESTRO E2E — safe to delete"
+
+# ─── Delete ─────────────────────────────────────────────
+- tapOn: "Delete rating"
+
+- assertVisible: "Delete this rating?"
+- tapOn: "Delete"
+
+- extendedWaitUntil:
+    visible: "Rating deleted."
+    timeout: 10000
+
+# Round-trip proof again: back to the pre-test empty state, read from
+# Supabase, not assumed from the UI transition alone.
+- extendedWaitUntil:
+    visible: "1 star"
+    timeout: 15000
+- assertNotVisible:
+    id: "edit-rating"

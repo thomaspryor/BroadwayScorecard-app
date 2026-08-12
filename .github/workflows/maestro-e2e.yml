@@ -13,6 +13,9 @@ on:
           - my-shows
           - tabs
           - import
+          - show
+          - rate
+          - settings
   # Nightly full run at 05:40 UTC (01:40 ET) - before the 09:20 UTC eas-build
   # drift check, so a regression is already visible when the auto-ship decides.
   # 27 Maestro flows existed for months as dispatch-only, which meant they ran
@@ -181,6 +184,9 @@ jobs:
             my-shows)     PATTERN=".maestro/my-shows/*.yaml" ;;
             tabs)         PATTERN=".maestro/tabs/*.yaml" ;;
             import)       PATTERN=".maestro/import/*.yaml" ;;
+            show)         PATTERN=".maestro/show/*.yaml" ;;
+            rate)         PATTERN=".maestro/rate/*.yaml" ;;
+            settings)     PATTERN=".maestro/settings/*.yaml" ;;
           esac
 
           FAILED=0
@@ -215,5 +221,23 @@ jobs:
         run: |
           curl -s -X DELETE \
             "${EXPO_PUBLIC_SUPABASE_URL}/rest/v1/reviews?show_id=eq.titanique-2026&date_seen=eq.2026-05-05" \
+            -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" \
+            -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" || true
+
+      - name: Clean up rate-lifecycle review row (backstop)
+        # .maestro/rate/rate-lifecycle.yaml deletes what it creates itself
+        # (that delete IS the assertion, not just cleanup), so under normal
+        # conditions this finds nothing. It only matters if the flow dies
+        # between Save and its own Delete step, which would otherwise leave a
+        # permanent extra Hamilton viewing on the shared dev-test account —
+        # and break the flow's "no prior rating" assumption on every run
+        # after. Same date_seen-scoped-delete pattern as the import cleanup
+        # above; new saves default date_seen to today, hence computing it here
+        # instead of hardcoding one.
+        if: always() && (env.SUITE == 'all' || env.SUITE == 'rate')
+        run: |
+          TODAY=$(date -u +%F)
+          curl -s -X DELETE \
+            "${EXPO_PUBLIC_SUPABASE_URL}/rest/v1/reviews?show_id=eq.hamilton-2015&date_seen=eq.${TODAY}&review_text=eq.MAESTRO%20E2E%20%E2%80%94%20safe%20to%20delete" \
             -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" \
             -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" || true

@@ -185,7 +185,7 @@ export default function BrowseScreen() {
 
   const renderItem = useCallback(({ item, index }: { item: Show; index: number }) => (
     <AnimatedListItem index={index}>
-      <ShowCard show={item} scoreMode={scoreMode} hideStatus={statusFilter === 'open'} isWatchlisted={watchlistSet.has(item.id)} onToggleWatchlist={() => toggleWatchlist(item.id)} myRating={ratingsMap.get(item.id) ?? null} />
+      <ShowCard show={item} scoreMode={scoreMode} hideStatus={statusFilter === 'open'} isWatchlisted={watchlistSet.has(item.id)} onToggleWatchlist={() => toggleWatchlist(item.id)} myRating={ratingsMap.get(item.id) ?? null} testID={index === 0 ? 'show-card-result' : undefined} />
     </AnimatedListItem>
   ), [scoreMode, statusFilter, watchlistSet, toggleWatchlist, ratingsMap]);
 

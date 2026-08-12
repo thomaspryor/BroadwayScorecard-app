@@ -29,6 +29,8 @@ interface ShowCardProps {
   onToggleWatchlist?: () => void;
   /** Signed-in user's own rating; shows a ★ chip instead of the bookmark */
   myRating?: number | null;
+  /** E2E hook only — no visual effect. Lets a flow tap a specific row (e.g. the first result) without matching on title text. */
+  testID?: string;
 }
 
 const MARKET_LABELS: Record<string, string> = {
@@ -74,7 +76,7 @@ function getClosingInfo(closingDate: string | null, status: string): string | nu
   return null;
 }
 
-export const ShowCard = memo(function ShowCard({ show, scoreMode = 'critics', hideStatus = false, isWatchlisted, onToggleWatchlist, myRating }: ShowCardProps) {
+export const ShowCard = memo(function ShowCard({ show, scoreMode = 'critics', hideStatus = false, isWatchlisted, onToggleWatchlist, myRating, testID }: ShowCardProps) {
   const router = useRouter();
   const imageUrl = getImageUrl(show.images.poster ?? show.images.thumbnail);
   const displayScore = getQualifiedScore(show);
@@ -91,6 +93,7 @@ export const ShowCard = memo(function ShowCard({ show, scoreMode = 'critics', hi
 
   return (
     <Pressable
+      testID={testID}
       style={({ pressed }) => [styles.container, pressed && styles.pressed]}
       onPress={() => router.push(`/show/${show.slug}`)}
       accessibilityLabel={accessLabel}

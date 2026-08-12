@@ -1,0 +1,47 @@
+# Settings — Delete Account Guard
+# Verifies: the confirmation dialog actually appears before anything is
+# deleted, and Cancel leaves the account intact. Never completes a real
+# deletion — this runs against the shared dev-test CI account, which every
+# other signed-in flow depends on staying alive.
+#
+# app/settings.tsx had zero E2E coverage before this flow (audited 2026-08-12,
+# see memory/testing.md) despite account deletion being the costliest failure
+# mode in the app: a regression that skipped the confirmation, or changed its
+# wording so it no longer describes what's about to happen, would ship silently.
+
+appId: com.broadwayscorecard.app
+---
+- launchApp
+
+- tapOn:
+    text: "Open"
+    optional: true
+
+- extendedWaitUntil:
+    visible: "Broadway Scorecard"
+    timeout: 30000
+
+# Settings has no tab of its own — reached via the profile icon on Home
+# (icon-only Pressable, accessibilityLabel not a visible Text child, same
+# pattern as the icon-only Browse tab trigger in tabs/browse.yaml).
+- tapOn: "Profile and settings"
+
+- extendedWaitUntil:
+    visible: "ACCOUNT"
+    timeout: 15000
+
+# Signed in via the dev-test account (EXPO_PUBLIC_DEV_AUTO_SIGNIN) — the row
+# that would be devastating to lose.
+- assertVisible: "Sign Out"
+
+- tapOn: "Delete Account"
+
+# The exact warning copy — if this ever stops matching, either the copy
+# changed (update this flow) or the dialog stopped describing what it does.
+- assertVisible: "This permanently deletes your account, ratings, watchlist, and lists. This cannot be undone."
+
+- tapOn: "Cancel"
+
+# Still signed in — nothing was deleted.
+- assertVisible: "Sign Out"
+- assertNotVisible: "Sign In"

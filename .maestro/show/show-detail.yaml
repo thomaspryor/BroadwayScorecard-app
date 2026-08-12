@@ -1,0 +1,55 @@
+# Show Detail Page — Tap-Through + Render Check
+# Verifies: Browse search actually opens a show (not just the results list),
+# and the show page renders its score, critic reviews and ticket CTA.
+#
+# app/show/[slug].tsx had zero E2E coverage before this flow — Browse and
+# search stopped at the results list (audited 2026-08-12, see memory/testing.md).
+# Uses Hamilton because .maestro/tabs/search.yaml already depends on it
+# staying in the catalog; same assumption, not a new one.
+
+appId: com.broadwayscorecard.app
+---
+- launchApp
+
+- tapOn:
+    text: "Open"
+    optional: true
+
+- extendedWaitUntil:
+    visible: "Broadway Scorecard"
+    timeout: 30000
+
+- tapOn:
+    text: "Browse"
+
+- extendedWaitUntil:
+    visible: "Now Playing"
+    timeout: 30000
+
+- tapOn: "Search shows..."
+- inputText: "Hamilton"
+
+- extendedWaitUntil:
+    visible: "\\d+ results? for .*"
+    timeout: 15000
+
+# Tap the first result — proves ShowCard -> router.push(/show/[slug]) actually
+# navigates, not just that the results list renders.
+- tapOn:
+    id: "show-card-result"
+
+# Base show data (title, score, ticket links) comes from the already-loaded
+# list, so it should be on screen immediately, no network wait needed.
+- assertVisible: "Hamilton"
+- assertVisible:
+    text: "Score \\d+.*"
+- assertVisible: "Get Tickets"
+
+# Rating widget renders unconditionally once the show resolves — proves the
+# show page, not some other screen, is what's on screen.
+- assertVisible: "MY RATING & REVIEW"
+
+# Critic reviews come from a separate per-show CDN fetch — give it its own wait.
+- extendedWaitUntil:
+    visible: "Critic Scorecard"
+    timeout: 20000
