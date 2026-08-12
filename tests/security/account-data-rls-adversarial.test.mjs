@@ -115,8 +115,12 @@ test('two-account account-data RLS adversarial test', async (t) => {
   // work: the teardown is itself a positive control.
   async function purgeFixtureRows() {
     if (!userAId) return;
-    const { data: staleLists } = await sbA
+    const { data: staleLists, error: staleErr } = await sbA
       .from('lists').select('id').eq('user_id', userAId).eq('name', FIXTURE_LIST_NAME);
+    // Not an assertion — this runs in teardown as well, where throwing would
+    // mask the real failure. But a silent null here means the purge quietly
+    // sweeps nothing and the debris it exists to remove survives, so say so.
+    if (staleErr) console.warn(`[purge] could not list stale fixture lists: ${staleErr.message}`);
     for (const { id } of staleLists ?? []) {
       await sbA.from('list_items').delete().eq('list_id', id);
       await sbA.from('lists').delete().eq('id', id);
@@ -336,8 +340,8 @@ test('two-account account-data RLS adversarial test', async (t) => {
   // because it is never written through `.from(` (review finding, 2026-08-12).
   await t.test('BLOCKING: account B cannot read or forge account A unmatched imports', async () => {
     // randomUUID, not Date.now(): two concurrent runs can land on the same
-    // millisecond, and the prefix delete below would then remove the other
-    // run's row and fail it spuriously (review finding, 2026-08-12).
+    // millisecond, and would then collide on these row titles (review
+    // finding, 2026-08-12). Teardown deletes the exact titles created here.
     const marker = `rls-adversarial-${randomUUID()}`;
     const { error: insErr } = await sbA.from('unmatched_imports').insert({
       user_id: userAId,
@@ -349,7 +353,14 @@ test('two-account account-data RLS adversarial test', async (t) => {
     });
     assert.equal(insErr, null, `account A should be able to log its own unmatched import: ${insErr?.message}`);
 
-    const { data: seen } = await sbB.from('unmatched_imports').select('title').eq('user_id', userAId);
+    const { data: seen, error: seenErr } = await sbB
+      .from('unmatched_imports').select('title').eq('user_id', userAId);
+    // The error check is what makes the zero meaningful. `?? 0` turns a FAILED
+    // query into a passing "B saw nothing" — RLS filters rows silently, so a
+    // legitimate empty result and a broken query look identical here. The
+    // assertions that check for a POSITIVE value elsewhere in this file are
+    // fail-closed for free; these zero-row ones are not.
+    assert.equal(seenErr, null, `account B's read should not error: ${seenErr?.message}`);
     assert.equal(seen?.length ?? 0, 0, 'account B must not read account A\'s unmatched imports');
 
     // The forged write has to be checked from OUTSIDE account B, not by reading
@@ -411,8 +422,9 @@ test('two-account account-data RLS adversarial test', async (t) => {
 
     // Also check the direct lookup: a policy keyed only on user_id would still
     // leak a token to anyone who can guess or replay the token string itself.
-    const { data: byToken } = await sbB
+    const { data: byToken, error: byTokenErr } = await sbB
       .from('push_tokens').select('token').eq('token', FIXTURE_PUSH_TOKEN);
+    assert.equal(byTokenErr, null, `account B's token lookup should not error: ${byTokenErr?.message}`);
     assert.equal(byToken?.length ?? 0, 0, 'account B must not be able to read account A\'s token by its value');
   });
 });
