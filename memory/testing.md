@@ -205,5 +205,11 @@ without a simulator in front of me would be a coin flip.
   not E2E-tested — they need real provider credentials on the simulator. The
   RLS suite covers what happens to the *data* once signed in, which is the part
   that can leak.
-- ESLint runs with 38 pre-existing warnings and no `--max-warnings` ceiling.
-  Adding one now would fail CI on day one; clean the warnings first, then cap.
+- ESLint sits at 5 warnings with `--max-warnings=5`, so the count can shrink but
+  never grow. All five are `react-hooks/exhaustive-deps`; editing a dependency
+  array changes runtime behaviour (render loops, stale closures), so they need
+  individual analysis rather than a sweep. Lower the cap as they are cleared.
+- `tests/unit/every-user-table-has-a-security-test.test.mjs` fails if the app
+  starts using a Supabase table that no adversarial test covers. It cannot check
+  that the coverage is GOOD — a weak test still satisfies it — only that the
+  omission is loud. That omission is what let the push-token hole exist.

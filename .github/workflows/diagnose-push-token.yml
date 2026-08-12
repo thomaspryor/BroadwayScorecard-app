@@ -33,3 +33,12 @@ jobs:
           cache: npm
       - run: npm ci
       - run: node scripts/diagnose-push-token-insert.js
+
+      # Always, even if the diagnostic failed — the rows it wrote exist either
+      # way, and push_tokens has no DELETE policy so nothing else can remove
+      # them. Without this every run leaves permanent litter in a live table.
+      - name: Remove the rows this run created
+        if: always()
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: node scripts/cleanup-push-token-debris.js
