@@ -16,6 +16,9 @@ jobs:
       EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
       EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
       FIXTURE_PHOTO_A_PASSWORD: ${{ secrets.FIXTURE_PHOTO_A_PASSWORD }}
+      # Account B, used only to learn its user id for the cross-account attach
+      # check — no new secret needed.
+      FIXTURE_PHOTO_B_PASSWORD: ${{ secrets.FIXTURE_PHOTO_B_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

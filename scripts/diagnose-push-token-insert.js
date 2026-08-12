@@ -22,6 +22,7 @@ const { createClient } = require('@supabase/supabase-js');
 const URL = process.env.EXPO_PUBLIC_SUPABASE_URL;
 const ANON = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 const PW = process.env.FIXTURE_PHOTO_A_PASSWORD;
+const PW_B = process.env.FIXTURE_PHOTO_B_PASSWORD;
 
 if (!URL || !ANON || !PW) {
   console.error('Missing EXPO_PUBLIC_SUPABASE_URL / EXPO_PUBLIC_SUPABASE_ANON_KEY / FIXTURE_PHOTO_A_PASSWORD.');
@@ -105,14 +106,24 @@ function report(label, { error }) {
   // may allow a signed-in user to attach a device to SOMEBODY ELSE'S account,
   // which would mean receiving their notifications. Testing rather than
   // reading the policy and assuming.
-  const OTHER_USER = process.env.FIXTURE_B_USER_ID;
+  // Account B's id, obtained by signing in as B rather than by adding a secret.
+  let OTHER_USER = null;
+  if (PW_B) {
+    const sbB = createClient(URL, ANON, { auth: { persistSession: false } });
+    const { data: bData, error: bErr } = await sbB.auth.signInWithPassword({
+      email: 'fixture-photo-b@broadwayscorecard.com',
+      password: PW_B,
+    });
+    if (bErr) console.log(`  (could not sign in as B: ${bErr.message})`);
+    else OTHER_USER = bData.user.id;
+  }
   if (OTHER_USER) {
     console.log('\nCross-account attach (must be REJECTED):');
     report('INSERT a token owned by account B while signed in as A',
       await sb.from('push_tokens').insert(
         { token: 'ExponentPushToken[diag-crossaccount]', platform: 'ios', user_id: OTHER_USER, updated_at: now }));
   } else {
-    console.log('\nCross-account attach: SKIPPED (set FIXTURE_B_USER_ID)');
+    console.log('\nCross-account attach: SKIPPED (needs FIXTURE_PHOTO_B_PASSWORD)');
   }
 
   console.log('\nCleanup (delete has no policy, so these are expected to be no-ops):');
