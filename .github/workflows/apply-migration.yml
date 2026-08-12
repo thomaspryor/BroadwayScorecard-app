@@ -1,0 +1,45 @@
+name: Apply Supabase migration
+
+# Manual only, one migration per press. There is no schedule and no push
+# trigger: this writes to the production database, and the whole point is that
+# a human decides when. SUPABASE_ACCESS_TOKEN lives only here as a repository
+# secret, which is why applying a migration cannot be done from a local session.
+#
+# The run log contains the full SQL that was executed (scripts/apply-migration.js
+# prints it before running), so this workflow's history IS the record of what
+# has been applied and when.
+on:
+  workflow_dispatch:
+    inputs:
+      migration:
+        description: 'Filename inside supabase/migrations/ (e.g. 20260812013000_push_tokens_owner_insert.sql)'
+        required: true
+        type: string
+      confirm:
+        description: 'Actually run it. Leave unchecked for a dry run that only prints the SQL.'
+        required: true
+        type: boolean
+        default: false
+
+concurrency:
+  group: supabase-migration
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    name: ${{ inputs.confirm && 'APPLY' || 'Dry run' }} ${{ inputs.migration }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Apply migration
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          node scripts/apply-migration.js "${{ inputs.migration }}" \
+            ${{ inputs.confirm && '--confirm' || '' }}
