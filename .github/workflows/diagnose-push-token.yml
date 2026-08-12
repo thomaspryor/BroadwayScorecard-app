@@ -1,0 +1,26 @@
+name: Diagnose push_tokens write
+
+# Diagnostic, manual only. Signs in as fixture account A with the anon key and
+# tries several shapes of push_tokens write, printing the exact error for each.
+# Needs the anon key and a fixture password, which exist only as repository
+# secrets — hence a workflow rather than a local script run.
+on:
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    name: Try push_tokens write shapes as a signed-in user
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+      EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
+      FIXTURE_PHOTO_A_PASSWORD: ${{ secrets.FIXTURE_PHOTO_A_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: node scripts/diagnose-push-token-insert.js

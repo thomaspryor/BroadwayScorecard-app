@@ -92,7 +92,41 @@ would have been fixing the test by loosening the thing under test. The suite
 verifies the fixture row through the service role instead, which is fixture
 setup rather than a security claim.
 
-Status: **fixed and verified.** The silent swallow is fixed (the error is now
+Status: **half fixed, and the second half is not yet understood.**
+
+The silent swallow is fixed. The policy is NOT: migration 20260812013000 was
+applied on 2026-08-12 (run 31601639316) and the write it was meant to unblock
+still returns 42501.
+
+What the RLS inspector (`scripts/inspect-rls.js`, run 31602235291) rules out:
+the new policy IS present, PERMISSIVE, scoped to `{anon, authenticated}`, with
+check `(user_id IS NULL) OR (user_id = auth.uid())`; there are no RESTRICTIVE
+policies; and `authenticated` holds the INSERT grant. A pre-existing permissive
+policy `Anon can insert push tokens` should also have allowed the row on its
+own, since permissive policies OR together — which means the original diagnosis
+("no policy permits this") was incomplete, not just the fix.
+
+Leading hypothesis, untested: supabase-js `.upsert(..., { onConflict })` issues
+`INSERT ... ON CONFLICT DO UPDATE`, which pulls the UPDATE policies and a read
+of the conflicting row into the check. `push_tokens` has no SELECT policy for
+ordinary users — only `service_role` — so the conflict path may be unable to
+see the row it would update. `scripts/diagnose-push-token-insert.js`
+(workflow `diagnose-push-token.yml`) tries plain INSERT vs UPSERT side by side
+to settle it.
+
+**RECHECK-AFTER: 2026-08-13.** `tests/security/push-token-owner-write.test.mjs`
+is written and correct but is NOT on main — it asserts a state that is not true
+yet, and leaving it there kept `npm run test:security` red, which blocks the
+eas-build ship gate for every other change. It lives on branch
+`worktree-verify-push-token-policy` and goes back the moment the write works.
+Restoring it is part of the fix, not optional.
+
+The applied migration is being left in place: it is purely additive, and the
+account-data suite's BLOCKING assertions all still pass, so it demonstrably
+widened nothing. Rolling it back would restore the same broken behaviour.
+
+Superseded status line (kept so the earlier claim is not silently rewritten):
+~~fixed and verified~~ The silent swallow is fixed (the error is now
 inspected and reported to Sentry), and the policy half was applied to production
 on 2026-08-12 with owner approval —
 `supabase/migrations/20260812013000_push_tokens_owner_insert.sql`, via
