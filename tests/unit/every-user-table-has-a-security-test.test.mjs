@@ -35,8 +35,13 @@ const CODE_EXTS = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs']);
 // Tables the app touches that carry no per-user data, so an isolation test
 // would have nothing to isolate. Each needs a reason, not just an entry.
 const NO_USER_DATA = new Map([
-  // (none today — every table the app writes is user-scoped. Add here with a
-  // one-line justification if a genuinely shared/public table appears.)
+  // A show-catalog stub written when someone picks a live search result that
+  // is not yet in the catalog (components/ShowSearchModal.tsx:298,
+  // app/import.tsx:460). The row IS the shared catalog entry; `created_by` is
+  // provenance, not ownership, and the app never reads the table back. There is
+  // no private data here to isolate — one user seeing another's stub is the
+  // feature. Revisit if the table ever gains a per-user column that is read.
+  ['user_show_stubs', 'shared catalog data; created_by is provenance, not ownership'],
 ]);
 
 function walk(dir, found = []) {
@@ -53,13 +58,25 @@ function walk(dir, found = []) {
   return found;
 }
 
+// Two ways the app names a table, and the second one is why the first version
+// of this test passed while lying: `lib/supabase-rest.ts` takes the table as a
+// plain first argument and builds `/rest/v1/${table}` itself, so
+// `supabaseRestInsert('user_show_stubs', ...)` never contains `.from(`.
+// `user_show_stubs` and `unmatched_imports` are written exclusively that way
+// and had no security coverage at all, which this test was supposed to notice
+// (review finding, 2026-08-12).
+const TABLE_PATTERNS = [
+  /\.from\(\s*['"]([a-z_][a-z0-9_]*)['"]\s*\)/g,
+  /supabaseRest(?:Insert|Upsert|Update|Delete)\(\s*['"]([a-z_][a-z0-9_]*)['"]/g,
+];
+
 function tablesReferencedIn(dirs) {
   const tables = new Set();
   for (const dir of dirs) {
     for (const file of walk(join(REPO_ROOT, dir))) {
       const src = readFileSync(file, 'utf8');
-      for (const m of src.matchAll(/\.from\(\s*['"]([a-z_][a-z0-9_]*)['"]\s*\)/g)) {
-        tables.add(m[1]);
+      for (const re of TABLE_PATTERNS) {
+        for (const m of src.matchAll(re)) tables.add(m[1]);
       }
     }
   }
@@ -73,14 +90,21 @@ test('every user-data table the app touches has an adversarial security test', (
     `expected to find the app's Supabase tables, found ${appTables.size}: ${[...appTables].join(', ')}`,
   );
 
-  // What the security suite actually exercises, read from the tests themselves
-  // rather than from a list someone has to remember to update.
+  // Coverage means the ATTACKER client touched the table, not that the table
+  // appears somewhere in the file. Counting any mention let a table qualify on
+  // the strength of its own setup or cleanup code — a table could be "covered"
+  // by a test that only ever reads its own rows, which asserts nothing about
+  // isolation (review finding, 2026-08-12).
+  //
+  // Throughout tests/security/, `sbB` is the second account attacking the
+  // first. Requiring `sbB.from('table')` is what distinguishes an adversarial
+  // assertion from fixture bookkeeping.
   let securitySrc = '';
   for (const f of readdirSync(SECURITY_DIR)) {
     if (f.endsWith('.test.mjs')) securitySrc += readFileSync(join(SECURITY_DIR, f), 'utf8');
   }
   const covered = new Set(
-    [...securitySrc.matchAll(/\.from\(\s*['"]([a-z_][a-z0-9_]*)['"]\s*\)/g)].map(m => m[1]),
+    [...securitySrc.matchAll(/sbB\s*\.from\(\s*['"]([a-z_][a-z0-9_]*)['"]\s*\)/g)].map(m => m[1]),
   );
 
   const uncovered = [...appTables]

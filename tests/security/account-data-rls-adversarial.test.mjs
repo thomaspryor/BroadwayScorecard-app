@@ -315,6 +315,39 @@ test('two-account account-data RLS adversarial test', async (t) => {
     );
   });
 
+  // ---- unmatched_imports ---------------------------------------------------
+
+  // Written fire-and-forget when an import row matches no known show
+  // (app/import.tsx:327). It is easy to read as mere telemetry, but each row
+  // carries a title, a venue and a date_seen against a user_id — that is the
+  // user's diary, for the shows we failed to match. It had no coverage at all
+  // until the table-coverage guard was taught about the supabaseRest* wrapper,
+  // because it is never written through `.from(` (review finding, 2026-08-12).
+  await t.test('BLOCKING: account B cannot read or forge account A unmatched imports', async () => {
+    const marker = `rls-adversarial-${Date.now()}`;
+    const { error: insErr } = await sbA.from('unmatched_imports').insert({
+      user_id: userAId,
+      source: 'rls-adversarial-test',
+      title: marker,
+      venue: 'Fixture Theatre',
+      date_seen: '2026-05-05',
+      mezz_show_id: null,
+    });
+    assert.equal(insErr, null, `account A should be able to log its own unmatched import: ${insErr?.message}`);
+
+    const { data: seen } = await sbB.from('unmatched_imports').select('title').eq('user_id', userAId);
+    assert.equal(seen?.length ?? 0, 0, 'account B must not read account A\'s unmatched imports');
+
+    assertWriteBlocked(
+      'account B logging an unmatched import under account A\'s user_id',
+      await sbB.from('unmatched_imports')
+        .insert({ user_id: userAId, source: 'forged-by-b', title: 'forged', venue: null, date_seen: null })
+        .select(),
+    );
+
+    await sbA.from('unmatched_imports').delete().eq('title', marker);
+  });
+
   // ---- push_tokens ---------------------------------------------------------
 
   // Tokens are device secrets: anyone holding one can push arbitrary
