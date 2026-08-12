@@ -82,7 +82,7 @@ appId: com.broadwayscorecard.app
 
 # ─── Create ─────────────────────────────────────────────
 - tapOn:
-    id: "star-4"
+    id: "star-4-DOES-NOT-EXIST"
 
 - assertVisible: "Your rating for"
 

@@ -36,7 +36,7 @@ appId: com.broadwayscorecard.app
 # Tap the first result — proves ShowCard -> router.push(/show/[slug]) actually
 # navigates, not just that the results list renders.
 - tapOn:
-    id: "show-card-result"
+    id: "show-card-result-DOES-NOT-EXIST"
 
 # Base show data (title, score, ticket links) comes from the already-loaded
 # list, so it should be on screen immediately, no network wait needed.
