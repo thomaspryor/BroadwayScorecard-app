@@ -1,7 +1,9 @@
--- NOT YET APPLIED — awaiting owner approval to change production RLS.
--- Nothing in this repository applies migrations automatically (verified
--- 2026-08-12: no workflow or script runs `supabase db push`), so committing
--- this file changes nothing until someone runs it deliberately.
+-- APPLIED 2026-08-12 to production (project tcbkoevwfemkicrwpypb) via
+-- .github/workflows/apply-migration.yml, run 31601639316, after owner approval.
+-- Verified afterwards by tests/security/push-token-owner-write.test.mjs, which
+-- asserts both halves: a user CAN register their own device, and cannot touch
+-- or read anyone else's. Nothing applies migrations automatically, so this file
+-- is a record, not an instruction.
 --
 -- PROBLEM
 -- A signed-in user cannot save their push notification token. Postgres rejects

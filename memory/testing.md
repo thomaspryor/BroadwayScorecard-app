@@ -92,13 +92,19 @@ would have been fixing the test by loosening the thing under test. The suite
 verifies the fixture row through the service role instead, which is fixture
 setup rather than a security claim.
 
-Status: the silent-swallow is fixed (the error is now inspected and reported to
-Sentry). The policy fix is written but **NOT applied** —
-`supabase/migrations/20260812013000_push_tokens_owner_insert.sql`, awaiting a
-deliberate decision to change production RLS. Nothing in this repo applies
-migrations automatically. Until it is applied, the fixture token is seeded with
-the service role by `scripts/seed-photo-test-accounts.js` so the isolation
-assertions still have a real row to test against.
+Status: **fixed and verified.** The silent swallow is fixed (the error is now
+inspected and reported to Sentry), and the policy half was applied to production
+on 2026-08-12 with owner approval —
+`supabase/migrations/20260812013000_push_tokens_owner_insert.sql`, via
+`.github/workflows/apply-migration.yml` run 31601639316.
+
+`tests/security/push-token-owner-write.test.mjs` now pins the policy from both
+sides on every push: a signed-in user CAN register their own device (the bug),
+and cannot write to another account, read anyone's tokens, or modify a row they
+do not own (the thing that must not have been opened while fixing it). Testing
+only the first half would pass against `with check (true)`, which is the obvious
+wrong fix; testing only the second half is what the suite did while the bug was
+live.
 
 The general lesson: **a Supabase write whose return value is ignored is not a
 write.** Grep for `.from(...).insert/update/upsert/delete` without an `error`
