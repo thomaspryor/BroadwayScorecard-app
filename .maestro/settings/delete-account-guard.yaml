@@ -38,7 +38,7 @@ appId: com.broadwayscorecard.app
 
 # The exact warning copy — if this ever stops matching, either the copy
 # changed (update this flow) or the dialog stopped describing what it does.
-- assertVisible: "This permanently deletes your account, ratings, watchlist, and lists. This cannot be undone. DELIBERATELY-WRONG-TEXT"
+- assertVisible: "This permanently deletes your account, ratings, watchlist, and lists. This cannot be undone."
 
 - tapOn: "Cancel"
 

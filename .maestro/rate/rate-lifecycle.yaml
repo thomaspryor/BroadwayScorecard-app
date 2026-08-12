@@ -73,23 +73,28 @@ appId: com.broadwayscorecard.app
     visible: "\\d+ results? for .*"
     timeout: 15000
 
+# 15s wasn't enough here on a loaded CI runner (this exact flow's fail-proof
+# dispatch, 2026-08-12: timed out on this assertion even with auth already
+# confirmed a few steps earlier) — widened to 20s.
 - tapOn:
     id: "show-card-result"
 
 - extendedWaitUntil:
     visible: "MY RATING & REVIEW"
-    timeout: 15000
+    timeout: 20000
 
 # ─── Create ─────────────────────────────────────────────
 - tapOn:
-    id: "star-4-DOES-NOT-EXIST"
+    id: "star-4"
 
 - assertVisible: "Your rating for"
 
-# Matches the field-label tap the fixture's save-flow.yaml already proves
-# works to focus this exact field (same label, same layout — rate/[showId]
-# just never had its own testID/accessibilityLabel-based hook to prefer instead).
-- tapOn: "Private Notes (optional)"
+# Tap the input's own accessibilityLabel, not the adjacent field-label Text
+# ("Private Notes (optional)") — that label isn't the TextInput, and tapping
+# it doesn't reliably focus the field next to it (caught in codex review,
+# 2026-08-12: the fixture's save-flow.yaml taps the same-looking label, but
+# that's a different screen and not a mechanism worth copying blind).
+- tapOn: "Private notes"
 - inputText: "MAESTRO E2E — safe to delete"
 
 - tapOn: "Save"
@@ -110,7 +115,13 @@ appId: com.broadwayscorecard.app
     id: "edit-rating"
 
 - assertVisible: "Editing your rating for"
-- assertVisible: "MAESTRO E2E — safe to delete"
+
+# Edit mode re-fetches the review from Supabase before populating the notes
+# field (app/rate/[showId].tsx's "Fetch existing review data when editing"
+# effect) — an immediate assertVisible here would race that fetch.
+- extendedWaitUntil:
+    visible: "MAESTRO E2E — safe to delete"
+    timeout: 15000
 
 # ─── Delete ─────────────────────────────────────────────
 - tapOn: "Delete rating"

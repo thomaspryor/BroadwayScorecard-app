@@ -36,18 +36,27 @@ appId: com.broadwayscorecard.app
 # Tap the first result — proves ShowCard -> router.push(/show/[slug]) actually
 # navigates, not just that the results list renders.
 - tapOn:
-    id: "show-card-result-DOES-NOT-EXIST"
+    id: "show-card-result"
 
-# Base show data (title, score, ticket links) comes from the already-loaded
-# list, so it should be on screen immediately, no network wait needed.
-- assertVisible: "Hamilton"
+# Base show data comes from the already-loaded list, so this should be near-
+# instant, but the navigation transition itself still needs a beat on a
+# loaded CI runner — a bare assertVisible's default timeout proved too tight
+# here (rate-lifecycle.yaml's fail-proof dispatch, 2026-08-12: the identical
+# "MY RATING & REVIEW" check timed out at 15s on that run even with auth
+# already confirmed, i.e. the widget itself wasn't the problem — the
+# navigation just needed more room).
+- extendedWaitUntil:
+    visible: "Hamilton"
+    timeout: 20000
 - assertVisible:
     text: "Score \\d+.*"
 - assertVisible: "Get Tickets"
 
 # Rating widget renders unconditionally once the show resolves — proves the
 # show page, not some other screen, is what's on screen.
-- assertVisible: "MY RATING & REVIEW"
+- extendedWaitUntil:
+    visible: "MY RATING & REVIEW"
+    timeout: 20000
 
 # Critic reviews come from a separate per-show CDN fetch — give it its own wait.
 - extendedWaitUntil:
