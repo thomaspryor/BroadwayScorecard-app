@@ -1,0 +1,103 @@
+name: CI
+
+# Runs the checks CLAUDE.md rule 4 makes mandatory before every commit, so
+# that they are actually ENFORCED rather than depending on whoever is at the
+# keyboard remembering them. Before this existed (2026-08-11 audit) the only
+# thing running on push was the gitleaks secret scan: no typecheck, no lint,
+# no bundle check, and the unit tests ran only inside eas-build.yml — i.e. at
+# ship time, hours after the mistake was made, or not at all.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  static:
+    name: Typecheck, lint, bundle
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: TypeScript
+        run: npm run typecheck
+
+      - name: ESLint
+        run: npm run lint
+
+      - name: Design lint (12pt font floor)
+        run: npm run lint:design
+
+      # Catches import errors and other failures that only surface when Metro
+      # actually resolves the graph — tsc alone does not.
+      - name: Expo export (iOS bundle)
+        run: npx expo export --platform ios
+
+  tests:
+    name: Unit + logic tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # Glob-based, NOT a hand-maintained list of files. eas-build.yml used to
+      # enumerate each test one step at a time and four test files had silently
+      # never run in CI as a result (themes, stats-aisle-mates,
+      # stats-scope-default, watchlist-slot — 2026-08-11 audit). A glob cannot
+      # rot that way: a new *.test.mjs runs the moment it is committed.
+      - name: Run test suite
+        run: npm run test:unit
+
+  security:
+    name: Supabase RLS gate (account data)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Secrets are not exposed to pull_request runs from forks; this repo is
+    # push-to-main so the gate still covers every real change.
+    if: github.event_name != 'pull_request'
+    env:
+      EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+      EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      FIXTURE_PHOTO_A_PASSWORD: ${{ secrets.FIXTURE_PHOTO_A_PASSWORD }}
+      FIXTURE_PHOTO_B_PASSWORD: ${{ secrets.FIXTURE_PHOTO_B_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Seed two-account fixtures
+        run: node scripts/seed-photo-test-accounts.js
+
+      # Proves one signed-in account cannot read or write another's rows, using
+      # two real accounts and the anon key exactly as the app does. This is the
+      # only kind of test that can catch a bad RLS policy — the client-side
+      # `.eq('user_id', me)` filter looks correct in every unit test even when
+      # the database would happily serve someone else's data.
+      - name: Adversarial RLS tests
+        run: npm run test:security

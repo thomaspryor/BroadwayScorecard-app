@@ -10,12 +10,11 @@ Never block a ship on owner approval or screenshot sign-off — design-review
 gates apply to feature direction and App Store releases, not beta builds.
 **JS-only changes ship over the air and produce NO TestFlight notification**
 (owner chose this 2026-08-03 over ~$1.85/change); the app applies them on the
-second launch. The push notification is still the owner's cue to go look, so
-it is now YOUR call when to buy one: dispatch with `-f force_build=true` for
-anything you actually want them to review — a visible redesign, a batch of
-beta-feedback fixes, anything you'd otherwise ask "can you check this?" about.
-Silent OTA is right for bug fixes, copy, and follow-ups to something they have
-already seen. See the Deployment section.
+second launch. That notification is the owner's cue to go look, so it is YOUR
+call when to buy one: dispatch with `-f force_build=true` for anything you
+actually want reviewed (a visible redesign, a batch of beta-feedback fixes,
+anything you'd otherwise ask "can you check this?" about). Silent OTA is right
+for bug fixes, copy, and follow-ups to something already seen.
 
 ### 2. Git Workflow
 - **Main branch only** — no PRs, no feature branches (matches web project).
@@ -29,12 +28,17 @@ All show data comes from the web project's public API or pre-built JSON. Never f
 
 ### 4. Test Before Committing (MANDATORY)
 Before EVERY commit touching `app/`, `components/`, `lib/`, or config:
-1. `npx tsc --noEmit` — zero TypeScript errors
-2. `npx expo lint` — no new warnings
-2b. `npm run lint:design` — 12pt font floor (owner decision 2026-07-12; sweep 2026-07-20)
-3. `npx expo export --platform ios` — must succeed (catches import/runtime errors)
-4. For UI: test on iOS Simulator (use dev auth bypass: `EXPO_PUBLIC_DEV_AUTO_SIGNIN=1`)
-5. **Before shipping UI changes: run `/review`** — the single source of truth for QA. Catches visual regressions, data bugs, and UX issues.
+1. `npm run typecheck` — zero TypeScript errors
+2. `npm run lint` and `npm run lint:design` — no new warnings; 12pt font floor
+3. `npm test` — full unit/logic suite, ~2s (RLS tests skip without fixture secrets)
+4. `npx expo export --platform ios` — must succeed (catches import/runtime errors)
+5. For UI: test on iOS Simulator (use dev auth bypass: `EXPO_PUBLIC_DEV_AUTO_SIGNIN=1`)
+6. **Before shipping UI changes: run `/review`** — the single source of truth for QA. Catches visual regressions, data bugs, and UX issues.
+
+`ci.yml` enforces 1-4 on every push to main; `maestro-e2e.yml` runs all 27 E2E
+flows nightly. **Never add a test by naming its file in a workflow step** —
+every suite is glob-driven so new tests run automatically. Full strategy, the
+three test layers, and the rules behind them: `memory/testing.md`.
 
 ### 5. Design System
 Replicate the web project's visual language:
@@ -56,22 +60,17 @@ Check `memory/feature-parity.md` for P0/P1 web features not yet in app. Note rel
 ---
 
 ## Architecture
-**Expo SDK 54** / React Native 0.81 / TypeScript strict / Expo Router / expo-image / reanimated.
+**Expo SDK 57** / React Native 0.86 / TypeScript strict / Expo Router / expo-image / reanimated.
 Data comes pre-computed from the web project (`https://broadwayscorecard.com/data/`);
-all scoring is server-side. Stack detail, the `ComputedShow` shape, the
-critic-vs-blended score rule, navigation structure and image URLs:
-`memory/architecture.md`.
+all scoring is server-side. Stack detail, the `ComputedShow` shape, the critic-vs-
+blended score rule, navigation structure and image URLs: `memory/architecture.md`.
 
 ## Repo Layout
-- **Web:** `~/Broadwayscore/` → GitHub: `thomaspryor/Broadwayscore`
-- **iOS app:** `~/BroadwayScorecard-app/` → GitHub: `thomaspryor/BroadwayScorecard-app`
-
-## Web Project Reference
-The source web project lives at: `~/Broadwayscore/` (repo: `thomaspryor/Broadwayscore`)
-- Types: `src/lib/engine.ts`, `src/lib/data-types.ts`
-- Scoring config: `src/config/scoring.ts`
-- Data loading: `src/lib/data-core.ts`
-- Components to replicate: `src/components/show-cards/`
+- **iOS app:** `~/BroadwayScorecard-app/` → `thomaspryor/BroadwayScorecard-app`
+- **Web (source of truth for data + visual language):** `~/Broadwayscore/` →
+  `thomaspryor/Broadwayscore`. Types `src/lib/engine.ts`, `src/lib/data-types.ts`;
+  scoring `src/config/scoring.ts`; data loading `src/lib/data-core.ts`;
+  components to replicate `src/components/show-cards/`.
 
 ---
 
@@ -81,10 +80,9 @@ The source web project lives at: `~/Broadwayscore/` (repo: `thomaspryor/Broadway
   `npx eas-cli build:list`. The workflow runs `scripts/ship.js`, which picks a
   native build ONLY when the native fingerprint moved and otherwise ships a free
   OTA update. Check locally first with `node scripts/ship.js --dry-run`.
-- **ONE ship per session, at the end.** Builds 69-72 were four separate
-  dispatches in a single session (2026-08-03) that shared one fingerprint — the
-  first three were pure waste. Batch fixes, ship once. Ship-check findings are
-  part of the same batch, not a reason to re-dispatch.
+- **ONE ship per session, at the end.** Builds 69-72 were four dispatches in one
+  session (2026-08-03) sharing a fingerprint; the first three were waste. Batch
+  fixes, ship once — ship-check findings belong to the same batch.
 - **Only these change the fingerprint** (i.e. actually need a build): a native
   dependency added/removed/upgraded, `app.json`/`app.config.*` native config, an
   SDK bump, a config plugin, app icon/splash. Everything in `app/`,
@@ -98,6 +96,5 @@ CLAUDE.md (**limit: 100 lines**). Keep it concise. Detailed notes → `memory/{t
 
 ## Design Proposals
 Fidelity rules, the owner-confirmed Claude Design venue + link format, and the
-publishing recipe live in `memory/design-proposals.md`. Read it before showing
-the owner any proposed design — HTML re-creations presented as designs have
-been rejected twice.
+publishing recipe: `memory/design-proposals.md`. Read it before showing the
+owner any proposed design — HTML re-creations have been rejected twice.

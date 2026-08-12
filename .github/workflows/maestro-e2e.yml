@@ -13,13 +13,26 @@ on:
           - my-shows
           - tabs
           - import
+  # Nightly full run at 05:40 UTC (01:40 ET) - before the 09:20 UTC eas-build
+  # drift check, so a regression is already visible when the auto-ship decides.
+  # 27 Maestro flows existed for months as dispatch-only, which meant they ran
+  # only when somebody remembered to run them (2026-08-11 audit). macOS runner
+  # minutes are billed at 10x, but this repository is PUBLIC and public repos
+  # get unmetered Actions minutes, so a nightly full E2E run is free.
+  schedule:
+    - cron: '40 5 * * *'
 
 jobs:
   e2e:
-    name: Maestro E2E (${{ inputs.suite }})
+    name: Maestro E2E (${{ inputs.suite || 'all' }})
     runs-on: macos-26
     timeout-minutes: 120
     env:
+      # Schedule triggers carry no inputs, so `inputs.suite` is '' there.
+      # Resolve the suite once here; without this every suite conditional
+      # below evaluates false on the nightly run and it executes zero flows
+      # while still reporting green.
+      SUITE: ${{ inputs.suite || 'all' }}
       EXPO_PUBLIC_DEV_AUTO_SIGNIN: '1'
       EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
       EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
@@ -132,7 +145,7 @@ jobs:
         # to suites that actually use it so an unrelated regression here can't
         # fail my-shows/tabs runs (the exact false-coupling this canary exists
         # to prevent, just inverted).
-        if: ${{ inputs.suite == 'all' || inputs.suite == 'show-rating' }}
+        if: ${{ env.SUITE == 'all' || env.SUITE == 'show-rating' }}
         run: |
           if ! maestro test .maestro/ci-canary-show-rating-fixture.yaml; then
             echo "::error::show-rating-fixture route did not render — may indicate __DEV__/EXPO_PUBLIC_DEV_AUTO_SIGNIN gating regressed (task #432/#403), but could also be an unrelated routing/render issue"
@@ -145,7 +158,7 @@ jobs:
         # picker's FileProvider index (verified live, task #436). Content-
         # Disposition forces Safari to prompt "Download" instead of rendering
         # the JSON inline.
-        if: ${{ inputs.suite == 'all' || inputs.suite == 'import' }}
+        if: ${{ env.SUITE == 'all' || env.SUITE == 'import' }}
         run: |
           cat > /tmp/fixture_server.py <<'PY'
           import http.server, socketserver
@@ -162,7 +175,7 @@ jobs:
 
       - name: Run Maestro tests
         run: |
-          case "${{ inputs.suite }}" in
+          case "$SUITE" in
             all)          PATTERN=".maestro/**/*.yaml" ;;
             show-rating)  PATTERN=".maestro/show-rating/*.yaml" ;;
             my-shows)     PATTERN=".maestro/my-shows/*.yaml" ;;
@@ -198,7 +211,7 @@ jobs:
         # run would pile up duplicate rows on the shared dev-test account
         # forever. Delete by show_id + the fixture's exact date_seen, so a
         # real dev-test Titanique review on any other date survives.
-        if: always() && (inputs.suite == 'all' || inputs.suite == 'import')
+        if: always() && (env.SUITE == 'all' || env.SUITE == 'import')
         run: |
           curl -s -X DELETE \
             "${EXPO_PUBLIC_SUPABASE_URL}/rest/v1/reviews?show_id=eq.titanique-2026&date_seen=eq.2026-05-05" \

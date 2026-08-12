@@ -84,69 +84,27 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Unit-test date math (closing-soon window, local-date persistence)
-        run: node --experimental-strip-types --import ./tests/register-alias.mjs --test tests/unit/date-utils.test.mjs
-
-      - name: Unit-test poster grid column math
-        run: node --experimental-strip-types --import ./tests/register-alias.mjs --test tests/unit/poster-grid.test.mjs
-
-      - name: Unit-test import matcher + diary catalog merge
-        run: node --experimental-strip-types --import ./tests/register-alias.mjs --test tests/unit/show-match.test.mjs
-
-      - name: Unit-test advanced filters
-        run: node --experimental-strip-types --import ./tests/register-alias.mjs --test scripts/advanced-filters.test.mjs
-
-      # Guards the OTA path against republishing the 2026-08-03 outage: an
-      # update bundled with empty Supabase credentials installs an app that
-      # launches and cannot sign in, and nothing else in CI notices.
-      - name: Unit-test OTA credential guard
-        run: node --test scripts/ship-credentials.test.mjs
-
-      # The two ship-gating path lists must agree, or a native-only commit
-      # decides should_build=false and nothing ships at all.
-      - name: Unit-test ship path lists agree
-        run: node --test scripts/ship-paths.test.mjs
+      # ONE glob-driven step, deliberately not a per-file list. The per-file
+      # list this replaced had rotted: themes, stats-aisle-mates,
+      # stats-scope-default and watchlist-slot were all committed as tests and
+      # then never ran anywhere, because adding the file and adding the CI step
+      # are two separate acts and only the first one is obvious (2026-08-11
+      # audit). `npm run test:unit` globs tests/unit/**/*.test.mjs and
+      # scripts/**/*.test.mjs, so a new test file is live the moment it lands.
+      #
+      # What this covers: date math and the closing-soon window, poster grid
+      # column math, the import matcher and diary catalog merge, advanced
+      # filters, the OTA credential guard (2026-08-03 outage — an update
+      # bundled with empty Supabase credentials installs an app that cannot
+      # sign in), agreement between the two ship-gating path lists, the
+      # beta-feedback approval / native-path / crash-log / visual gates, the
+      # web-parity diff, the TestFlight drift gate, and the vendored stats
+      # engine checksum.
+      - name: Unit + logic test suite
+        run: npm run test:unit
 
       - name: Design floor (12pt minimum text size)
         run: npm run lint:design
-
-      # These four are plain unit tests with no dependency on the TestFlight
-      # drift decision below — they were previously co-located in the `gate`
-      # job, which is schedule-only (line ~115) and therefore unguarded on a
-      # manual workflow_dispatch, exactly the hazard this job's own header
-      # comment warns about. Moved here so they run on every trigger.
-
-      # The overnight feedback autopilot auto-implements the OWNER's TestFlight
-      # feedback but must never auto-implement anyone else's. That split is one
-      # email comparison — test it here so it cannot regress unnoticed.
-      - name: Unit-test beta-feedback approval gate
-        run: node --test scripts/feedback/ledger.test.mjs
-
-      # And the guard that stops an unattended run merging a native change,
-      # which ship.js would then price at $1.85.
-      - name: Unit-test beta-feedback native-path guard
-        run: node --test scripts/feedback/overnight.test.mjs
-
-      # Crash submissions' log text lives behind a separate ASC relationship
-      # (task #1055) — locks the response-shape parsing and the ledger's
-      # attachment of the log file alongside screenshots.
-      - name: Unit-test beta-feedback crash log attachment
-        run: node --test scripts/feedback/crashlog.test.mjs
-
-      # The fail-closed decision that stops the overnight run merging a UI
-      # change nobody looked at: no captured screenshot for a touched screen
-      # means no merge, regardless of what the compile gates or the agent's
-      # own report say.
-      - name: Unit-test beta-feedback visual gate
-        run: node --test scripts/feedback/visual-gate.test.mjs
-
-      # Route mapping, vision-response parsing, and report formatting for the
-      # web-parity diff (task #1077) — the check that compares an app capture
-      # against a same-route web screenshot instead of an open-ended "find
-      # problems" prompt. No network/simulator here; that half is verified
-      # separately against real screenshots.
-      - name: Unit-test beta-feedback web-parity diff
-        run: node --test scripts/feedback/web-parity.test.mjs
 
   gate:
     name: TestFlight drift gate
@@ -171,19 +129,12 @@ jobs:
       - name: Install dependencies (pins eas-cli to package.json version)
         run: npm ci
 
-      - name: Unit-test gate logic
-        run: node --test scripts/check-testflight-drift.test.mjs
-
-      # Vendored stats engine (lib/stats/) must match its checksum manifest.
-      # The web-repo drift half auto-skips here (no Broadwayscore checkout on
-      # the runner); the tamper half is what stops an edited vendored copy from
-      # shipping to TestFlight.
-      - name: Unit-test vendored stats engine drift
-        run: node --test scripts/vendor-stats-lib.test.mjs
-
-      # ledger/overnight/crashlog/visual-gate unit tests moved to logic-gate
-      # (runs on every trigger) — this job is schedule-only (line ~115) and
-      # those tests have no dependency on the drift decision below.
+      # No unit tests here any more. This job is schedule-only (line ~111), so
+      # anything gated here alone is unguarded on the manual workflow_dispatch
+      # that beta-feedback batches actually ship through. Every test that used
+      # to live here — the drift-gate logic and the vendored stats-engine
+      # checksum included — is now inside logic-gate's glob, which runs on
+      # every trigger. This job decides drift and nothing else.
 
       - name: Decide whether TestFlight drifted
         id: gate
