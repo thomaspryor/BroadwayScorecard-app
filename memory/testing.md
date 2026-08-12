@@ -144,6 +144,31 @@ The general lesson: **a Supabase write whose return value is ignored is not a
 write.** Grep for `.from(...).insert/update/upsert/delete` without an `error`
 check before assuming any table is receiving data.
 
+## Open security finding: cross-account push token attach
+
+**Any signed-in user can register a push token onto someone else's account.**
+Measured, not inferred (`scripts/diagnose-push-token-insert.js`, run
+31602907198): signed in as fixture A, inserting a row with `user_id` set to
+fixture B SUCCEEDED. The attacker's device then receives the victim's
+notifications.
+
+Cause: the pre-existing `Anon can insert push tokens` policy validates the
+token's length and platform but never its owner, and permissive policies OR
+together — so it admits any well-formed row regardless of `user_id`. Adding the
+owner-scoped policy in 20260812013000 could never have closed this; an extra
+permissive policy only widens. The open policy has to be dropped and replaced.
+
+Fix written, **NOT applied**, awaiting owner approval because it DROPS a policy
+(unlike the additive one before it):
+`supabase/migrations/20260812094500_push_tokens_close_cross_account_attach.sql`.
+It preserves the shape validation verbatim and adds the owner pin, and keeps
+anonymous pre-sign-in registration working.
+
+The lesson worth keeping: **adding a permissive policy can never restrict
+anything.** The first migration was written on the assumption that the write
+was blocked and needed permitting. The write was never blocked — it was too
+permissive all along, in the opposite direction from the one assumed.
+
 ## Awaiting verification
 
 **RECHECK-AFTER: 2026-08-13** — two Maestro flow fixes are pushed but NOT yet

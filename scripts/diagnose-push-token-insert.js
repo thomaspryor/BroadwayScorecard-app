@@ -29,13 +29,18 @@ if (!URL || !ANON || !PW) {
   process.exit(1);
 }
 
+// Scoped to the run. push_tokens has no DELETE policy, so cleanup cannot
+// actually remove anything and every row this script writes is permanent. With
+// fixed names, run 2 onwards reported 23505 for everything and told us nothing
+// about the policies — the debris masqueraded as a result.
+const RUN = process.env.GITHUB_RUN_ID || 'local';
 const TOKENS = {
-  plain: 'ExponentPushToken[diag-plain]',
-  upsert: 'ExponentPushToken[diag-upsert]',
-  nullUser: 'ExponentPushToken[diag-nulluser]',
-  minimal: 'ExponentPushToken[diag-minimal]',
-  crossaccount: 'ExponentPushToken[diag-crossaccount]',
-  updateThenInsert: 'ExponentPushToken[diag-update-then-insert]',
+  plain: `ExponentPushToken[diag-${RUN}-plain]`,
+  upsert: `ExponentPushToken[diag-${RUN}-upsert]`,
+  nullUser: `ExponentPushToken[diag-${RUN}-nulluser]`,
+  minimal: `ExponentPushToken[diag-${RUN}-minimal]`,
+  crossaccount: `ExponentPushToken[diag-${RUN}-crossaccount]`,
+  insertFirst: `ExponentPushToken[diag-${RUN}-insert-first]`,
 };
 
 function report(label, { error }) {
@@ -84,21 +89,19 @@ function report(label, { error }) {
       { token: TOKENS.upsert, platform: 'ios', user_id: uid, updated_at: now },
       { onConflict: 'token' }));
 
-  // The replacement path in lib/notifications.ts: UPDATE first, INSERT if it
-  // matched nothing. Run twice — the second pass exercises the update branch,
-  // which is what every launch after the first one hits.
+  // The replacement path in lib/notifications.ts: INSERT, and on 23505 UPDATE.
+  // Run twice — the second pass is the re-registration case that every launch
+  // after the first one takes, and is exactly where update-then-insert broke.
   for (const pass of [1, 2]) {
-    const { data: updated, error: updErr } = await sb.from('push_tokens')
-      .update({ token: TOKENS.updateThenInsert, platform: 'ios', user_id: uid, updated_at: now })
-      .eq('token', TOKENS.updateThenInsert).select('token');
-    if (updErr) { report(`update-then-insert pass ${pass} (UPDATE leg)`, { error: updErr }); continue; }
-    if ((updated?.length ?? 0) === 0) {
-      report(`update-then-insert pass ${pass} (INSERT leg, no row matched)`,
-        await sb.from('push_tokens').insert(
-          { token: TOKENS.updateThenInsert, platform: 'ios', user_id: uid, updated_at: now }));
-    } else {
-      report(`update-then-insert pass ${pass} (UPDATE leg matched ${updated.length} row)`, { error: null });
+    let { error } = await sb.from('push_tokens').insert(
+      { token: TOKENS.insertFirst, platform: 'ios', user_id: uid, updated_at: now });
+    let leg = 'INSERT';
+    if (error && error.code === '23505') {
+      leg = 'INSERT hit 23505 -> UPDATE';
+      ({ error } = await sb.from('push_tokens').update(
+        { platform: 'ios', user_id: uid, updated_at: now }).eq('token', TOKENS.insertFirst));
     }
+    report(`insert-first pass ${pass} (${leg})`, { error });
   }
 
   // The pre-existing `Anon can insert push tokens` policy checks only token
@@ -121,7 +124,7 @@ function report(label, { error }) {
     console.log('\nCross-account attach (must be REJECTED):');
     report('INSERT a token owned by account B while signed in as A',
       await sb.from('push_tokens').insert(
-        { token: 'ExponentPushToken[diag-crossaccount]', platform: 'ios', user_id: OTHER_USER, updated_at: now }));
+        { token: TOKENS.crossaccount, platform: 'ios', user_id: OTHER_USER, updated_at: now }));
   } else {
     console.log('\nCross-account attach: SKIPPED (needs FIXTURE_PHOTO_B_PASSWORD)');
   }

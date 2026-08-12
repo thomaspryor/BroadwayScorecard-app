@@ -175,28 +175,30 @@ async function savePushTokenToServer(token: string): Promise<void> {
       updated_at: new Date().toISOString(),
     };
 
-    // Update-then-insert rather than `.upsert(..., { onConflict: 'token' })`.
+    // Insert first, fall back to update on a duplicate-key error.
     //
-    // The upsert form issues `INSERT ... ON CONFLICT (token) DO UPDATE`, and
-    // Postgres rejected that with 42501 for every signed-in user, so no device
-    // ever registered and nobody received a notification. Measured directly
-    // (scripts/diagnose-push-token-insert.js, run 31602536481): plain INSERT
-    // with the user's own id SUCCEEDS, plain INSERT with a null id SUCCEEDS,
-    // and only the ON CONFLICT form fails — the conflict path needs to read the
-    // row it would update, and `push_tokens` grants ordinary users no SELECT.
+    // NOT `.upsert(..., { onConflict: 'token' })`: that issues
+    // `INSERT ... ON CONFLICT (token) DO UPDATE`, which Postgres rejects with
+    // 42501 for every signed-in user, so no device ever registered and nobody
+    // received a notification. The conflict path has to read the row it would
+    // update, and push_tokens grants ordinary users no SELECT.
     //
-    // Both halves below are permitted by policies that already existed, so this
-    // needs no further production database change.
-    const { data: updated, error: updateErr } = await client
-      .from('push_tokens')
-      .update(row)
-      .eq('token', token)
-      .select('token');
+    // NOT update-then-insert either, which was this code's first replacement
+    // and was wrong for the same underlying reason: with no SELECT policy,
+    // `.update(...).select()` comes back empty whether it changed a row or not,
+    // so "no rows matched" cannot be distinguished from "matched but invisible".
+    // It then inserted and hit 23505 on every re-registration — measured, run
+    // 31602907198. Reading back a value RLS suppresses is the same mistake as
+    // ignoring the error return; it just fails one step later.
+    //
+    // Insert-first needs no read at all. The unique constraint on `token` is
+    // the signal, and 23505 is unambiguous.
+    let { error } = await client.from('push_tokens').insert(row);
 
-    let error = updateErr;
-    // No rows matched means this device is new to the server, so insert it.
-    if (!updateErr && (updated?.length ?? 0) === 0) {
-      ({ error } = await client.from('push_tokens').insert(row));
+    if (error && (error as { code?: string }).code === '23505') {
+      // Device already known to the server — this is the re-registration path,
+      // which every launch after the first one takes.
+      ({ error } = await client.from('push_tokens').update(row).eq('token', token));
     }
 
     // supabase-js RESOLVES with an { error } object instead of throwing, so the
