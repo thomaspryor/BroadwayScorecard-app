@@ -196,6 +196,48 @@ long-standing rather than new. It drives a real Safari download through the iOS
 document picker and the README documents how fragile that is; guessing at a fix
 without a simulator in front of me would be a coin flip.
 
+## Screen coverage map (audited 2026-08-12)
+
+Which screens an E2E flow actually opens, from `grep -rh openLink .maestro`:
+
+| Screen | E2E flows | Notes |
+|---|---|---|
+| `my-shows` (diary, watchlist, stats) | 10 | the best-covered area by far |
+| `(tabs)/watched` | 3 | |
+| `(tabs)/browse` + inline search | 3 | reaches the results list only |
+| `(tabs)/index` (home) | 1 | smoke test |
+| `import` | 2 | one of them long-broken |
+| `show/[slug]` | **0** | the show page — scores, critic reviews, ticket links |
+| `rate/[showId]` | **0** | the 6 "show-rating" flows drive `test/show-rating-fixture`, not this |
+| `settings` | **0** | sign in/out, account deletion, notification prefs |
+| `diary-show/[id]` | **0** | |
+| `(tabs)/lists` | **0** | |
+| `(tabs)/to-watch` | **0** | |
+
+**The important one: `show/[slug]` has no end-to-end coverage at all.** It is the
+screen the app exists for — the scores, the critic reviews, the ticket links —
+and no flow ever opens it. Browse and search stop at the results list without
+tapping through. A change that broke the show page would pass every check in
+this repo.
+
+Second: the show-rating suite tests a FIXTURE route, not the production rating
+screen. `test/show-rating-fixture.tsx` exercises the rating UI in isolation,
+which is useful, but `rate/[showId]` itself is never driven.
+
+Structural reason, and the reason this is not a quick fix: `show/[slug].tsx`,
+`rate/[showId].tsx` and `settings.tsx` contain **zero** `testID` attributes
+(verified by grep). They were never built to be driven by a test. Closing this
+means adding test hooks to product screens first, then writing flows, then a
+nightly cycle to verify each — well past a single session, and it touches
+screens the owner sees.
+
+What IS well covered, so the gap is narrower than the table alone suggests:
+- every user-data table has adversarial two-account isolation coverage
+- the data layer is unit-tested: date math, poster grid, import matcher,
+  advanced filters, stats, watchlist slots, show matching
+- `expo export` proves the whole graph resolves on every push, so an import
+  error on the show page is still caught, just not a rendering or data bug
+
 ## Known gaps
 
 - No React component/render tests. Deliberate: Maestro covers the same ground
