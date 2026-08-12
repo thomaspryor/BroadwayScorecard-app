@@ -1,0 +1,30 @@
+name: Inspect RLS state
+
+# READ-ONLY. Dumps the RLS flags, policies and table grants for one table, so a
+# security question can be answered by looking rather than by guessing.
+# SUPABASE_ACCESS_TOKEN is a repository secret, so this cannot be run locally.
+on:
+  workflow_dispatch:
+    inputs:
+      table:
+        description: 'Table in the public schema (e.g. push_tokens)'
+        required: true
+        type: string
+        default: push_tokens
+
+jobs:
+  inspect:
+    name: Inspect ${{ inputs.table }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Dump RLS state
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: node scripts/inspect-rls.js "${{ inputs.table }}"
