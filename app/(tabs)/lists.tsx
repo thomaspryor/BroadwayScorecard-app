@@ -7,9 +7,7 @@
 import React, { useEffect, useMemo, useCallback } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
-import Svg, { Path } from 'react-native-svg';
 import { useAuth } from '@/lib/auth-context';
 import { useUserLists } from '@/hooks/useUserLists';
 import { useShows } from '@/lib/data-context';
@@ -21,9 +19,8 @@ import { Skeleton } from '@/components/Skeleton';
 
 export default function ListsScreen() {
   const insets = useSafeAreaInsets();
-  const router = useRouter();
   const { user, isAuthenticated, loading: authLoading, showSignIn } = useAuth();
-  const { lists, getLists, loading: listsLoading } = useUserLists(user?.id || null);
+  const { getLists, loading: listsLoading } = useUserLists(user?.id || null);
   const { shows } = useShows();
 
   const showMap = useMemo(() => {

@@ -11,13 +11,16 @@ import { View, Text, StyleSheet, Share, Platform } from 'react-native';
 import { Image } from 'expo-image';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
-let ViewShot: any;
-try { ViewShot = require('react-native-view-shot').default; } catch { ViewShot = View; }
 import Svg, { Path } from 'react-native-svg';
-import { getScoreTier, getScoreColor, getContrastTextColor, getMarketMinReviews } from '@/lib/score-utils';
+import { getScoreTier, getMarketMinReviews } from '@/lib/score-utils';
 import { getImageUrl } from '@/lib/images';
 import { Colors, FontSize, BorderRadius, Spacing } from '@/constants/theme';
 import { trackShowShared } from '@/lib/analytics';
+let ViewShot: any;
+// Guarded require, not an ESM import: if the native module is missing the catch falls back to
+// a plain View. A static import would throw at module load and take the whole screen down.
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+try { ViewShot = require('react-native-view-shot').default; } catch { ViewShot = View; }
 
 interface ShareCardProps {
   show: {
@@ -39,150 +42,6 @@ interface ShareCardProps {
 const GOLD_GRADIENT: [string, string, string, string, string] = [
   '#DAA520', '#FFD700', '#FFF0A0', '#FFD700', '#DAA520',
 ];
-
-export function ShareCard({ show, onShared }: ShareCardProps) {
-  const viewShotRef = useRef<any>(null);
-
-  const handleShare = useCallback(async () => {
-    if (Platform.OS === 'ios') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    trackShowShared(show.id, show.title);
-
-    try {
-      const uri = await viewShotRef.current?.capture?.();
-      if (!uri) {
-        // Fallback to text share
-        await Share.share({
-          message: `Check out ${show.title} on Broadway Scorecard!\nhttps://broadwayscorecard.com/show/${show.slug}`,
-        });
-        return;
-      }
-
-      await Share.share(
-        Platform.OS === 'ios'
-          ? { url: uri }
-          : { message: `Check out ${show.title} on Broadway Scorecard!\nhttps://broadwayscorecard.com/show/${show.slug}` },
-      );
-      onShared?.();
-    } catch {
-      // User cancelled or share failed
-    }
-  }, [show, onShared]);
-
-  const posterUrl = getImageUrl(show.images.poster) || getImageUrl(show.images.thumbnail);
-  const score = show.compositeScore != null ? Math.round(show.compositeScore) : null;
-  const tier = getScoreTier(score, show.category);
-  const isGold = tier?.glow ?? false;
-  const reviewCount = show.criticScore?.reviewCount ?? 0;
-  const hasScore = score != null && reviewCount >= getMarketMinReviews(show.category);
-
-  return (
-    <>
-      {/* Hidden off-screen card for capture */}
-      <ViewShot
-        ref={viewShotRef}
-        options={{ format: 'png', quality: 1, result: 'tmpfile' }}
-        style={styles.offscreen}
-      >
-        <View style={styles.card}>
-          {/* Subtle gradient background */}
-          <LinearGradient
-            colors={['#16161e', '#0f0f14', '#0a0a0f']}
-            style={StyleSheet.absoluteFill}
-          />
-
-          {/* Top accent line */}
-          <View style={[styles.accentLine, { backgroundColor: hasScore ? (tier?.color ?? Colors.brand) : Colors.brand }]} />
-
-          {/* Main content */}
-          <View style={styles.cardContent}>
-            {/* Poster */}
-            {posterUrl ? (
-              <Image
-                source={{ uri: posterUrl }}
-                style={styles.poster}
-                contentFit="cover"
-              />
-            ) : (
-              <View style={[styles.poster, styles.posterPlaceholder]}>
-                <Text style={styles.posterInitial}>{show.title.charAt(0)}</Text>
-              </View>
-            )}
-
-            {/* Score section */}
-            <View style={styles.scoreSection}>
-              {hasScore ? (
-                <>
-                  {isGold ? (
-                    <LinearGradient
-                      colors={GOLD_GRADIENT}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      style={styles.scoreBadge}
-                    >
-                      <Text style={[styles.scoreNumber, { color: tier?.textColor ?? '#1a1a1a' }]}>
-                        {score}
-                      </Text>
-                    </LinearGradient>
-                  ) : (
-                    <View style={[styles.scoreBadge, { backgroundColor: tier?.color ?? Colors.score.none }]}>
-                      <Text style={[styles.scoreNumber, { color: tier?.textColor ?? '#ffffff' }]}>
-                        {score}
-                      </Text>
-                    </View>
-                  )}
-                  <Text style={[styles.tierLabel, { color: tier?.color ?? Colors.text.secondary }]}>
-                    {tier?.label}
-                  </Text>
-                </>
-              ) : (
-                <View style={[styles.scoreBadge, { backgroundColor: Colors.score.none }]}>
-                  <Text style={styles.scoreNumber}>—</Text>
-                </View>
-              )}
-            </View>
-
-            {/* Title + meta */}
-            <Text style={styles.cardTitle} numberOfLines={2}>{show.title}</Text>
-            {show.venue && (
-              <Text style={styles.cardVenue} numberOfLines={1}>{show.venue}</Text>
-            )}
-
-            {/* Review count + audience grade */}
-            <View style={styles.metaRow}>
-              {hasScore && (
-                <Text style={styles.metaText}>
-                  Based on {reviewCount} critic review{reviewCount !== 1 ? 's' : ''}
-                </Text>
-              )}
-              {show.audienceGrade && (
-                <View style={[styles.audiencePill, { backgroundColor: show.audienceGrade.color + '26' }]}>
-                  <Text style={[styles.audiencePillText, { color: show.audienceGrade.color }]}>
-                    Audience: {show.audienceGrade.grade}
-                  </Text>
-                </View>
-              )}
-            </View>
-          </View>
-
-          {/* Branding footer */}
-          <View style={styles.footer}>
-            <View style={styles.footerLine} />
-            <View style={styles.footerContent}>
-              <Svg width={16} height={16} viewBox="0 0 24 24" fill={Colors.brand}>
-                <Path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-              </Svg>
-              <Text style={styles.footerText}>Broadway Scorecard</Text>
-              <Text style={styles.footerUrl}>broadwayscorecard.com</Text>
-            </View>
-          </View>
-        </View>
-      </ViewShot>
-
-      {/* The actual share button rendered in parent */}
-      {/* Parent calls shareRef.current.share() */}
-    </>
-  );
-}
 
 /** Imperative handle for parent to trigger share */
 export interface ShareCardHandle {

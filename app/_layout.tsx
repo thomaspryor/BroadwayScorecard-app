@@ -3,8 +3,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { DarkTheme, ThemeProvider } from 'expo-router';
-import { Stack } from 'expo-router';
+import { DarkTheme, ThemeProvider , Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
 
@@ -98,6 +97,9 @@ function RootLayout() {
     // Check for OTA updates in background (non-blocking)
     if (!__DEV__) {
       try {
+        // Deliberately lazy: expo-updates is absent in Expo Go, and a static import would
+        // crash dev startup.
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
         const Updates = require('expo-updates');
         Updates.checkForUpdateAsync()
           .then(({ isAvailable }: { isAvailable: boolean }) => {
@@ -123,6 +125,9 @@ function RootLayout() {
     // (Recovers from app kill / iOS clearing notifications)
     (async () => {
       try {
+        // Loaded inside the try/catch so a storage failure degrades to a no-op rather than a
+        // launch crash.
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
         const AsyncStorage = require('@react-native-async-storage/async-storage').default;
         // Find the watchlist cache key (pattern: @bsc:watchlist:{userId})
         const keys = await AsyncStorage.getAllKeys();

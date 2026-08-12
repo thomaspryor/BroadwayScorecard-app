@@ -5,10 +5,9 @@
  */
 
 import React, { useMemo, useEffect, useState, useRef } from 'react';
-import { View, Text, ScrollView, StyleSheet, Pressable, Share, Platform, Linking } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Pressable, Linking } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, Stack, useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { useShows } from '@/lib/data-context';
@@ -19,7 +18,7 @@ import { getScoreColor, getContrastTextColor, getMarketMinReviews, getQualifiedS
 import { Show, ShowDetail, MobileShowDetail, mapShowDetail } from '@/lib/types';
 import { ScoreBadge, StatusBadge, FormatPill, ProductionPill, CategoryBadge } from '@/components/show-cards';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
-import { trackTicketTap, trackTicketLinksVisible, trackTicketBrowserOpened, trackTicketBrowserDismissed, trackShowDetailViewed, trackShowShared, trackFullReviewTapped } from '@/lib/analytics';
+import { trackTicketTap, trackTicketLinksVisible, trackTicketBrowserOpened, trackTicketBrowserDismissed, trackShowDetailViewed, trackFullReviewTapped } from '@/lib/analytics';
 import { buildTicketUrl, buildTicketEventProps, isAffiliatePlatform, chooseTicketOpenStrategy, type TicketSource } from '@/lib/ticket-utils';
 import { addSentryBreadcrumb, captureException } from '@/lib/sentry';
 import Svg, { Path, Rect, Circle, Line, Defs, LinearGradient as SvgLinearGradient, Stop } from 'react-native-svg';
@@ -45,7 +44,7 @@ interface SocialPulsePayload {
   wow: number | null;
   pl: { x: number; tt: number; ig: number; r?: number };
   xv?: number;
-  q: Array<{ t: string; p: string; a: string | null; u: string | null }>;
+  q: { t: string; p: string; a: string | null; u: string | null }[];
   u: string;
   r?: string;
 }
@@ -54,7 +53,6 @@ export default function ShowDetailScreen() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
   const { shows } = useShows();
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   const [detail, setDetail] = useState<ShowDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(true);
   const [showAllReviews, setShowAllReviews] = useState(false);
