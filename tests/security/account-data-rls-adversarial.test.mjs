@@ -78,15 +78,28 @@ test('two-account account-data RLS adversarial test', async (t) => {
 
   let userAId, userBId, reviewAId, listAId;
 
-  // Cleanup runs from the account that owns each row, so a passing RLS policy
-  // is what makes cleanup work — the teardown is itself a positive control.
+  // Deletes every fixture row this test could have created, by NAME rather
+  // than by the id of the row we happen to be holding — so it also sweeps
+  // debris left by an earlier run that died before its teardown. Runs from the
+  // account that owns the rows, so a passing RLS policy is what makes cleanup
+  // work: the teardown is itself a positive control.
+  async function purgeFixtureRows() {
+    if (!userAId) return;
+    const { data: staleLists } = await sbA
+      .from('lists').select('id').eq('user_id', userAId).eq('name', FIXTURE_LIST_NAME);
+    for (const { id } of staleLists ?? []) {
+      await sbA.from('list_items').delete().eq('list_id', id);
+      await sbA.from('lists').delete().eq('id', id);
+    }
+    await sbA.from('watchlist').delete().eq('user_id', userAId).eq('show_id', FIXTURE_SHOW_ID);
+  }
+
   t.after(async () => {
     try {
-      await sbA.from('list_items').delete().eq('list_id', listAId);
-      await sbA.from('lists').delete().eq('id', listAId);
-      await sbA.from('watchlist').delete().eq('user_id', userAId).eq('show_id', FIXTURE_SHOW_ID);
+      await purgeFixtureRows();
     } catch {
-      // Best-effort — a teardown failure doesn't invalidate the assertions above.
+      // Best-effort — a teardown failure doesn't invalidate the assertions
+      // above, and the next run's setup sweeps whatever is left behind.
     }
   });
 
@@ -94,6 +107,11 @@ test('two-account account-data RLS adversarial test', async (t) => {
     userAId = await signIn(sbA, ACCOUNT_A);
     userBId = await signIn(sbB, ACCOUNT_B);
     assert.notEqual(userAId, userBId, 'fixture accounts must be distinct users');
+
+    // `lists` has no natural unique key, so an insert per run would pile up a
+    // new row on the owner's real account every push if a teardown ever
+    // failed. Sweep first: setup is the only step guaranteed to run.
+    await purgeFixtureRows();
 
     const { data: reviews, error: reviewErr } = await sbA
       .from('reviews').select('id').eq('user_id', userAId).limit(1);
