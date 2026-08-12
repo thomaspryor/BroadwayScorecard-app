@@ -114,12 +114,11 @@ see the row it would update. `scripts/diagnose-push-token-insert.js`
 (workflow `diagnose-push-token.yml`) tries plain INSERT vs UPSERT side by side
 to settle it.
 
-**RECHECK-AFTER: 2026-08-13.** `tests/security/push-token-owner-write.test.mjs`
-is written and correct but is NOT on main — it asserts a state that is not true
-yet, and leaving it there kept `npm run test:security` red, which blocks the
-eas-build ship gate for every other change. It lives on branch
-`worktree-verify-push-token-policy` and goes back the moment the write works.
-Restoring it is part of the fix, not optional.
+**Resolved.** `tests/security/push-token-registration.test.mjs` is on main and
+green. It covers first launch AND relaunch, because a first-launch-only test
+would have passed against the broken update-then-insert attempt. The one
+assertion still held back is the cross-account attach, which currently fails
+for real — see the open security finding above; it goes in with the migration.
 
 The applied migration is being left in place: it is purely additive, and the
 account-data suite's BLOCKING assertions all still pass, so it demonstrably
