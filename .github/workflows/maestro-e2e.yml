@@ -231,13 +231,16 @@ jobs:
         # between Save and its own Delete step, which would otherwise leave a
         # permanent extra Hamilton viewing on the shared dev-test account —
         # and break the flow's "no prior rating" assumption on every run
-        # after. Same date_seen-scoped-delete pattern as the import cleanup
-        # above; new saves default date_seen to today, hence computing it here
-        # instead of hardcoding one.
+        # after. No date_seen filter (codex review, 2026-08-12): the app
+        # writes date_seen from the simulator's LOCAL date
+        # (lib/date-utils.ts toLocalYMD), the runner computes today's date in
+        # UTC — those silently diverge whenever the simulator's clock isn't
+        # UTC, which would make this backstop miss the exact row it exists to
+        # catch. The review_text marker is already a unique-enough key on its
+        # own; adding a possibly-wrong date filter only weakens it.
         if: always() && (env.SUITE == 'all' || env.SUITE == 'rate')
         run: |
-          TODAY=$(date -u +%F)
           curl -s -X DELETE \
-            "${EXPO_PUBLIC_SUPABASE_URL}/rest/v1/reviews?show_id=eq.hamilton-2015&date_seen=eq.${TODAY}&review_text=eq.MAESTRO%20E2E%20%E2%80%94%20safe%20to%20delete" \
+            "${EXPO_PUBLIC_SUPABASE_URL}/rest/v1/reviews?show_id=eq.hamilton-2015&review_text=eq.MAESTRO%20E2E%20%E2%80%94%20safe%20to%20delete" \
             -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" \
             -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" || true
