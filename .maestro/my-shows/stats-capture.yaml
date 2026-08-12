@@ -68,6 +68,18 @@ appId: com.broadwayscorecard.app
 - takeScreenshot: "12-stats-scroll-bottom"
 
 # ── House grid / theater chip drilldown ──
+# Return to the top first. The screenshot sweep above ends at the bottom of the
+# page, and `scrollUntilVisible ... direction: DOWN` cannot reveal an element it
+# has already scrolled past — it just scrolls into empty space until it times
+# out. stats-tab.yaml runs the identical DOWN search and passes because it
+# starts from the top, which is what proves the element itself renders fine.
+# Caught by the first nightly run (31571886484).
+- scrollUntilVisible:
+    element:
+      id: "stats-scope-pill"
+    direction: UP
+    visibilityPercentage: 20
+    timeout: 30000
 - scrollUntilVisible:
     element:
       id: "stats-house-grid"

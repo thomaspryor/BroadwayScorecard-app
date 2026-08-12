@@ -7,7 +7,13 @@
 appId: com.broadwayscorecard.app
 ---
 - launchApp
-- openLink: broadwayscorecard:///my-shows
+# /watched, not the legacy /my-shows route. `diary-list-view-toggle` lives in
+# app/(tabs)/watched.tsx; app/my-shows.tsx has only the older `view-toggle` id.
+# This flow kept opening the legacy route after the diary moved, so it failed
+# every run — invisibly, because the E2E suite was dispatch-only until
+# 2026-08-12 and nobody dispatched it. Caught by the first nightly run
+# (31571886484). stats-capture.yaml already targets /watched correctly.
+- openLink: broadwayscorecard:///watched
 - tapOn:
     text: "Open"
     optional: true

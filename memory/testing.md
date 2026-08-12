@@ -104,6 +104,30 @@ The general lesson: **a Supabase write whose return value is ignored is not a
 write.** Grep for `.from(...).insert/update/upsert/delete` without an `error`
 check before assuming any table is receiving data.
 
+## Awaiting verification
+
+**RECHECK-AFTER: 2026-08-13** — two Maestro flow fixes are pushed but NOT yet
+proven, because verifying them needs a simulator run this machine can't do
+quickly (prebuild + pod install + Release xcodebuild, ~45 min). The 05:40 UTC
+nightly is the check. If either still fails, the diagnosis below was wrong.
+
+- `.maestro/my-shows/diary-photo-feed.yaml` opened the legacy `/my-shows` route
+  and tapped `diary-list-view-toggle`, which lives in `app/(tabs)/watched.tsx`
+  (`app/my-shows.tsx` has only the older `view-toggle` id). Repointed at
+  `/watched`.
+- `.maestro/my-shows/stats-capture.yaml` scrolled to the bottom taking
+  screenshots and then ran `scrollUntilVisible ... direction: DOWN` for
+  `stats-house-grid`, which cannot reveal an element already scrolled past.
+  Now returns to the top via `stats-scope-pill` first. `stats-tab.yaml` runs the
+  same DOWN search from the top and passes, which is what proves the element
+  renders.
+
+Still failing, not attempted: `.maestro/import/mezzanine-import.yaml`
+(`"Downloads" is visible` assertion). It also failed on 2026-07-25, so it is
+long-standing rather than new. It drives a real Safari download through the iOS
+document picker and the README documents how fragile that is; guessing at a fix
+without a simulator in front of me would be a coin flip.
+
 ## Known gaps
 
 - No React component/render tests. Deliberate: Maestro covers the same ground
