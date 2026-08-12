@@ -157,11 +157,15 @@ together — so it admits any well-formed row regardless of `user_id`. Adding th
 owner-scoped policy in 20260812013000 could never have closed this; an extra
 permissive policy only widens. The open policy has to be dropped and replaced.
 
-Fix written, **NOT applied**, awaiting owner approval because it DROPS a policy
-(unlike the additive one before it):
-`supabase/migrations/20260812094500_push_tokens_close_cross_account_attach.sql`.
-It preserves the shape validation verbatim and adds the owner pin, and keeps
-anonymous pre-sign-in registration working.
+**CLOSED 2026-08-12.**
+`supabase/migrations/20260812094500_push_tokens_close_cross_account_attach.sql`
+applied with owner approval (run 31623215228) and verified by measurement
+immediately afterwards (run 31623332784): the cross-account attach now returns
+42501, while own-device, anonymous, first-launch and relaunch registration all
+still succeed. Because the migration DROPS policies, the three
+must-still-work paths were checked, not just the one that had to start failing.
+`tests/security/push-token-registration.test.mjs` now asserts both the attach
+and the owner-reassignment cases on every push.
 
 The lesson worth keeping: **adding a permissive policy can never restrict
 anything.** The first migration was written on the assumption that the write

@@ -1,5 +1,18 @@
--- NOT APPLIED — needs owner approval. This one DROPS a policy, so unlike
--- 20260812013000 (purely additive) it can change behaviour for real users.
+-- APPLIED 2026-08-12 to production (project tcbkoevwfemkicrwpypb) via
+-- .github/workflows/apply-migration.yml, run 31623215228, with owner approval.
+--
+-- Verified immediately afterwards by scripts/diagnose-push-token-insert.js
+-- (run 31623332784). The hole closed and nothing regressed:
+--   cross-account attach ...... 42501 REJECTED  (was SUCCEEDED)
+--   own-device INSERT ......... SUCCEEDED
+--   anonymous INSERT .......... SUCCEEDED       (pre-sign-in registration)
+--   first launch .............. SUCCEEDED
+--   relaunch (23505 -> UPDATE)  SUCCEEDED
+--
+-- This one DROPS policies, so unlike 20260812013000 (purely additive) it could
+-- have changed behaviour for real users — which is why the three
+-- must-still-work paths were checked, not just the one that had to start
+-- failing.
 --
 -- THE HOLE
 -- Any signed-in user can register a push token onto SOMEBODY ELSE'S account.

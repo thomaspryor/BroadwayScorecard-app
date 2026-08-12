@@ -106,13 +106,39 @@ test('push_tokens: a signed-in user can register their device, on first launch a
     assert.equal(byToken?.length ?? 0, 0, 'account B must not read account A\'s token by its value');
   });
 
-  // NOT TESTED HERE, DELIBERATELY: whether account B can register a device onto
-  // account A. It currently CAN — measured, run 31602907198 — because the
-  // pre-existing "Anon can insert push tokens" policy validates the token's
-  // shape but never its owner. The assertion lives in
-  // supabase/migrations/20260812094500_push_tokens_close_cross_account_attach.sql's
-  // header and goes in here the moment that migration is applied. It is left
-  // out rather than written-and-failing because tests/security/ gates the ship
-  // workflow, and a knowingly-red gate blocks every unrelated change from
-  // shipping. Tracked in memory/testing.md as an open finding, not forgotten.
+  // This assertion was held back until migration 20260812094500 was applied on
+  // 2026-08-12. Before it, account B COULD register a device onto account A —
+  // measured, run 31602907198 — because the old "Anon can insert push tokens"
+  // policy validated the token's shape but never its owner, and permissive
+  // policies OR together. Adding an owner-scoped policy could not close that;
+  // the open one had to be replaced.
+  await t.test('BLOCKING: a user cannot register a device onto another account', async () => {
+    const forged = `${TOKEN}-forged-by-b`;
+    const { data, error } = await sbB
+      .from('push_tokens')
+      .insert({ token: forged, platform: 'ios', user_id: userAId, updated_at: new Date().toISOString() })
+      .select('token');
+    const rows = Array.isArray(data) ? data.length : (data ? 1 : 0);
+    assert.ok(
+      error != null || rows === 0,
+      'account B registering a device under account A\'s user_id must be rejected — otherwise ' +
+      'anyone who knows a user id can attach their own phone and receive that user\'s notifications',
+    );
+  });
+
+  await t.test('BLOCKING: a user cannot reassign an existing row to someone else', async () => {
+    // The UPDATE policy uses `using (true)` so a device changing hands can claim
+    // its own token (sign out, hand the phone over, someone else signs in).
+    // WITH CHECK is what stops that being a way to hand a row to a third party.
+    const { data, error } = await sbB
+      .from('push_tokens')
+      .update({ user_id: userAId, updated_at: new Date().toISOString() })
+      .eq('token', TOKEN)
+      .select('token');
+    const rows = Array.isArray(data) ? data.length : (data ? 1 : 0);
+    assert.ok(
+      error != null || rows === 0,
+      'account B must not be able to set a token\'s owner to account A',
+    );
+  });
 });
