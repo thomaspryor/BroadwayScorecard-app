@@ -28,6 +28,7 @@ import { daysUntilDate, toLocalYMD } from '@/lib/date-utils';
 import { buildReviewIndex, classifyWatchlistEntry } from '@/lib/watchlist-slot';
 import { showTitleFallback } from '@/lib/show-format';
 import { PosterStatusPill } from '@/components/show-cards/PosterStatusPill';
+import { PosterPlaceholder } from '@/components/show-cards';
 import { OutOfMarketChip } from '@/components/show-cards/OutOfMarketChip';
 import { featureFlags } from '@/lib/feature-flags';
 import type { WatchlistEntry } from '@/lib/user-types';
@@ -264,9 +265,7 @@ export default function ToWatchScreen() {
           {posterUrl ? (
             <Image source={{ uri: posterUrl }} style={styles.gridPoster} contentFit="cover" transition={200} />
           ) : (
-            <View style={[styles.gridPoster, styles.cardPosterPlaceholder]}>
-              <Text style={styles.placeholderText}>{title.charAt(0)}</Text>
-            </View>
+            <PosterPlaceholder title={title} style={styles.gridPoster} />
           )}
           {/* Date as an overlaid poster tag, matching the Watched tab's grid
               (beta feedback 2026-08-02: bare text dates under Upcoming
@@ -311,9 +310,7 @@ export default function ToWatchScreen() {
             {posterUrl ? (
               <Image source={{ uri: posterUrl }} style={styles.gridPoster} contentFit="cover" transition={200} />
             ) : (
-              <View style={[styles.gridPoster, styles.cardPosterPlaceholder]}>
-                <Text style={styles.placeholderText}>{title.charAt(0)}</Text>
-              </View>
+              <PosterPlaceholder title={title} style={styles.gridPoster} />
             )}
             <PosterStatusPill show={show} />
             {/* No persistent empty-star strip (beta feedback 2026-07-25) —
@@ -348,9 +345,7 @@ export default function ToWatchScreen() {
         {posterUrl ? (
           <Image source={{ uri: posterUrl }} style={styles.listPoster} contentFit="cover" transition={200} />
         ) : (
-          <View style={[styles.listPoster, styles.cardPosterPlaceholder]}>
-            <Text style={styles.placeholderText}>{title.charAt(0)}</Text>
-          </View>
+          <PosterPlaceholder title={title} variant="thumb" style={styles.listPoster} />
         )}
         <View style={styles.listInfo}>
           <Text style={styles.listTitle} numberOfLines={1}>{title}</Text>
@@ -386,9 +381,7 @@ export default function ToWatchScreen() {
         {posterUrl ? (
           <Image source={{ uri: posterUrl }} style={styles.listPoster} contentFit="cover" transition={200} />
         ) : (
-          <View style={[styles.listPoster, styles.cardPosterPlaceholder]}>
-            <Text style={styles.placeholderText}>{title.charAt(0)}</Text>
-          </View>
+          <PosterPlaceholder title={title} variant="thumb" style={styles.listPoster} />
         )}
         <View style={styles.listInfo}>
           <Text style={styles.listTitle} numberOfLines={1}>{title}</Text>
@@ -677,13 +670,12 @@ const styles = StyleSheet.create({
     width: '100%', aspectRatio: 2 / 3, borderRadius: BorderRadius.md,
     backgroundColor: Colors.surface.overlay,
   },
-  cardPosterPlaceholder: { alignItems: 'center', justifyContent: 'center' },
-  placeholderText: { color: Colors.text.muted, fontSize: 18, fontWeight: '600' },
   // Centered overlaid date tag for Upcoming posters — mirrors the Watched
-  // tab's grid date scrim (beta feedback 2026-08-02).
+  // tab's grid date scrim (beta feedback 2026-08-02), including its move to
+  // the top edge of the poster (beta feedback 2026-08-10, ANIDtf6U).
   upcomingPosterWrap: { width: '100%' },
   upcomingDateOverlayWrap: {
-    position: 'absolute', left: 0, right: 0, bottom: 6,
+    position: 'absolute', left: 0, right: 0, top: 6,
     alignItems: 'center',
   },
   upcomingDateOverlay: {

@@ -137,6 +137,42 @@ export default function HomeScreen() {
     const nytPicks = marketShows.filter(s => isOpen(s) && s.tags.includes('nyt-pick')).sort(byScore).slice(0, 10);
     if (nytPicks.length >= 2) rows.push({ title: "New York Times Critic's Picks", shows: nytPicks });
 
+    // ─── Recently Opened, directly below NYT Critic's Picks (owner ask
+    // 2026-08-13, AFlPzGW8). Deliberately a 12-month window, not the 60 days
+    // "Just Opened" uses: Broadway opens in bursts around the spring Tony
+    // cutoff, and a 90-day window is empty for the whole of a normal summer
+    // (checked against live data 2026-08-13 — 0 Broadway openings in 90 days,
+    // 6 in 12 months), which would leave the shelf the owner asked for
+    // missing for months at a time.
+    const recentlyOpenedCutoff = toLocalDateStr(new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000));
+    const recentlyOpened = (category: string) => shows
+      .filter(s =>
+        s.category === category && s.status === 'open' &&
+        s.openingDate && s.openingDate >= recentlyOpenedCutoff && s.openingDate <= todayLocal
+      )
+      .sort((a, b) => (b.openingDate ?? '').localeCompare(a.openingDate ?? ''))
+      .slice(0, 10);
+    const openedSubtitle = (s: Show) => {
+      const d = shortDate(s.openingDate ?? '');
+      return d ? `Opened ${d}` : undefined;
+    };
+    if (market === 'nyc') {
+      const recentBway = recentlyOpened('broadway');
+      if (recentBway.length >= 2) {
+        rows.push({ title: 'Recently Opened on Broadway', shows: recentBway, getSubtitle: openedSubtitle });
+      }
+      const recentOffBway = recentlyOpened('off-broadway');
+      if (recentOffBway.length >= 2) {
+        rows.push({ title: 'Recently Opened Off Broadway', shows: recentOffBway, getSubtitle: openedSubtitle });
+      }
+    } else {
+      // London has no off-Broadway analogue — one shelf, same idea.
+      const recentWestEnd = recentlyOpened('west-end');
+      if (recentWestEnd.length >= 2) {
+        rows.push({ title: 'Recently Opened in the West End', shows: recentWestEnd, getSubtitle: openedSubtitle });
+      }
+    }
+
     // Tony Award Winners (open shows with tony-winner tag)
     const tonyWinners = marketShows.filter(s => isOpen(s) && s.tags.includes('tony-winner')).sort(byScore).slice(0, 10);
     if (tonyWinners.length >= 2) rows.push({ title: 'Tony Award Winners', shows: tonyWinners });

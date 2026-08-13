@@ -9,7 +9,7 @@ import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { Show } from '@/lib/types';
 import { getImageUrl } from '@/lib/images';
-import { ScoreBadge } from '@/components/show-cards';
+import { ScoreBadge, PosterPlaceholder } from '@/components/show-cards';
 import { getQualifiedScore } from '@/lib/score-utils';
 import { BookmarkOverlay } from '@/components/BookmarkOverlay';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
@@ -52,9 +52,7 @@ const FeaturedCard = memo(function FeaturedCard({ show, cardWidth, isWatchlisted
             transition={200}
           />
         ) : (
-          <View style={[styles.poster, styles.placeholderPoster]}>
-            <Text style={styles.placeholderText}>{show.title.charAt(0)}</Text>
-          </View>
+          <PosterPlaceholder title={show.title} style={styles.poster} />
         )}
 
         {/* Bookmark / rating chip — rendered AFTER image so it's on top (z-order) */}
@@ -136,16 +134,6 @@ const styles = StyleSheet.create({
   poster: {
     width: '100%',
     height: '100%',
-  },
-  placeholderPoster: {
-    backgroundColor: Colors.surface.overlay,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  placeholderText: {
-    color: Colors.text.muted,
-    fontSize: FontSize.title,
-    fontWeight: '600',
   },
   scoreOverlay: {
     position: 'absolute',

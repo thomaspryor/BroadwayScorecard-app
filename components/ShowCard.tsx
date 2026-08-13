@@ -15,7 +15,7 @@ import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { Show } from '@/lib/types';
 import { getImageUrl } from '@/lib/images';
-import { ScoreBadge, StatusBadge, FormatPill, ProductionPill, CategoryBadge, AudienceChip } from '@/components/show-cards';
+import { ScoreBadge, StatusBadge, FormatPill, ProductionPill, CategoryBadge, AudienceChip, PosterPlaceholder } from '@/components/show-cards';
 import { getContrastTextColor, getQualifiedScore } from '@/lib/score-utils';
 import { BookmarkOverlay } from '@/components/BookmarkOverlay';
 import { Colors, Spacing, BorderRadius, FontSize } from '@/constants/theme';
@@ -107,11 +107,7 @@ export const ShowCard = memo(function ShowCard({ show, scoreMode = 'critics', hi
             accessibilityLabel={`${show.title} poster`}
           />
         ) : (
-          <View style={[styles.showImage, styles.placeholderThumb]}>
-            <Text style={styles.placeholderText}>
-              {show.title.charAt(0)}
-            </Text>
-          </View>
+          <PosterPlaceholder title={show.title} variant="thumb" style={styles.showImage} />
         )}
         {/* Bookmark — rendered AFTER image so it's on top (z-order) */}
         {isWatchlisted !== undefined && onToggleWatchlist && (
@@ -190,16 +186,6 @@ const styles = StyleSheet.create({
     width: 72,
     height: 96,
     borderRadius: BorderRadius.sm,
-  },
-  placeholderThumb: {
-    backgroundColor: Colors.surface.overlay,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  placeholderText: {
-    color: Colors.text.muted,
-    fontSize: FontSize.xl,
-    fontWeight: '600',
   },
   info: {
     flex: 1,

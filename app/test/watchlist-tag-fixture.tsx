@@ -17,6 +17,7 @@ import React from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { PosterStatusPill } from '@/components/show-cards/PosterStatusPill';
 import { OutOfMarketChip } from '@/components/show-cards/OutOfMarketChip';
+import { PosterPlaceholder } from '@/components/show-cards';
 import type { Market } from '@/components/MarketPicker';
 import type { Show } from '@/lib/types';
 import { usePosterGrid } from '@/hooks/usePosterGrid';
@@ -53,7 +54,9 @@ function Card({ show, market }: { show: Show; market: Market }) {
   return (
     <View style={[styles.gridCard, { width: grid.cardWidth }]}>
       <View>
-        <View style={styles.gridPoster} />
+        {/* The shipping no-poster placeholder, at real grid geometry — every
+            fixture show has `images: {}`, so this is what the tab renders. */}
+        <PosterPlaceholder title={show.title} style={styles.gridPoster} />
         <PosterStatusPill show={show} />
       </View>
       <Text style={styles.gridTitle} numberOfLines={2}>{show.title}</Text>

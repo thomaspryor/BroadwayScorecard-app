@@ -14,6 +14,7 @@ import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Image } from 'expo-image';
 import MiniStars from '@/components/user/MiniStars';
+import { PosterPlaceholder } from '@/components/show-cards';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
 import type { Show } from '@/lib/types';
 import type { UserReview } from '@/lib/user-types';
@@ -87,9 +88,7 @@ function PosterThumb({ posterUrl, title }: { posterUrl: string | null; title: st
   return posterUrl ? (
     <Image source={{ uri: posterUrl }} style={styles.poster} contentFit="cover" transition={200} />
   ) : (
-    <View style={[styles.poster, styles.posterPlaceholder]}>
-      <Text style={styles.posterPlaceholderText}>{title.charAt(0)}</Text>
-    </View>
+    <PosterPlaceholder title={title} variant="thumb" style={styles.poster} />
   );
 }
 
@@ -226,8 +225,6 @@ const styles = StyleSheet.create({
     width: 40, height: 56, borderRadius: BorderRadius.sm,
     backgroundColor: Colors.surface.overlay,
   },
-  posterPlaceholder: { alignItems: 'center', justifyContent: 'center' },
-  posterPlaceholderText: { color: Colors.text.muted, fontSize: 16, fontWeight: '600' },
   info: { flex: 1, minWidth: 0, gap: 1 },
   title: { fontSize: FontSize.md, fontWeight: '700', color: Colors.text.primary },
   venue: { fontSize: FontSize.xs, color: Colors.text.muted },
