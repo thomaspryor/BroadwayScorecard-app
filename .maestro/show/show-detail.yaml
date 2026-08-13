@@ -38,27 +38,42 @@ appId: com.broadwayscorecard.app
 - tapOn:
     id: "show-card-result"
 
-# Base show data comes from the already-loaded list, so this should be near-
-# instant, but the navigation transition itself still needs a beat on a
-# loaded CI runner — a bare assertVisible's default timeout proved too tight
-# here (rate-lifecycle.yaml's fail-proof dispatch, 2026-08-12: the identical
-# "MY RATING & REVIEW" check timed out at 15s on that run even with auth
-# already confirmed, i.e. the widget itself wasn't the problem — the
-# navigation just needed more room).
+# Title + score badge are in the hero, on screen without scrolling.
 - extendedWaitUntil:
     visible: "Hamilton"
     timeout: 20000
 - assertVisible:
     text: "Score \\d+.*"
-- assertVisible: "Get Tickets"
+
+# Get Tickets, the rating widget, and critic reviews all sit BELOW the hero
+# on a real device — confirmed the hard way (2026-08-13 dispatch): a bare
+# assertVisible/extendedWaitUntil for "Get Tickets" failed even after 17s,
+# not because it was slow to render (title/score above asserted instantly)
+# but because it was never scrolled into the viewport. Widening a wait can't
+# fix a missing scroll — assertVisible/extendedWaitUntil only see what's
+# currently on screen; scrollUntilVisible is the command that moves the
+# viewport, same as .maestro/my-shows/stats-tab.yaml already does for the
+# same reason.
+- scrollUntilVisible:
+    element:
+      text: "Get Tickets"
+    direction: DOWN
+    timeout: 20000
+    visibilityPercentage: 20
 
 # Rating widget renders unconditionally once the show resolves — proves the
 # show page, not some other screen, is what's on screen.
-- extendedWaitUntil:
-    visible: "MY RATING & REVIEW"
+- scrollUntilVisible:
+    element:
+      text: "MY RATING & REVIEW"
+    direction: DOWN
     timeout: 20000
+    visibilityPercentage: 20
 
-# Critic reviews come from a separate per-show CDN fetch — give it its own wait.
-- extendedWaitUntil:
-    visible: "Critic Scorecard"
+# Critic reviews come from a separate per-show CDN fetch, further down still.
+- scrollUntilVisible:
+    element:
+      text: "Critic Scorecard"
+    direction: DOWN
     timeout: 20000
+    visibilityPercentage: 20

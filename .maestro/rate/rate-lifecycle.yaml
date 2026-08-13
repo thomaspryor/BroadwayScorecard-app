@@ -73,15 +73,20 @@ appId: com.broadwayscorecard.app
     visible: "\\d+ results? for .*"
     timeout: 15000
 
-# 15s wasn't enough here on a loaded CI runner (this exact flow's fail-proof
-# dispatch, 2026-08-12: timed out on this assertion even with auth already
-# confirmed a few steps earlier) — widened to 20s.
 - tapOn:
     id: "show-card-result"
 
-- extendedWaitUntil:
-    visible: "MY RATING & REVIEW"
+# Not a timing problem (widening 15s to 20s here didn't help, 2026-08-13
+# dispatch) — the rating widget is below the hero on a real device and
+# assertVisible/extendedWaitUntil don't scroll. scrollUntilVisible does, same
+# fix as show-detail.yaml and the same reasoning stats-tab.yaml already
+# established for stats-house-grid.
+- scrollUntilVisible:
+    element:
+      text: "MY RATING & REVIEW"
+    direction: DOWN
     timeout: 20000
+    visibilityPercentage: 20
 
 # ─── Create ─────────────────────────────────────────────
 - tapOn:
@@ -104,7 +109,10 @@ appId: com.broadwayscorecard.app
     timeout: 10000
 
 # Round-trip proof: the show page now reads the rating back from Supabase,
-# not just from the form we filled in.
+# not just from the form we filled in. No re-scroll here — assumes
+# expo-router keeps the show page's scroll position while the rate modal is
+# pushed/popped (it isn't unmounted, just covered). If this ever fails, that
+# assumption is the first thing to check, not the widget itself.
 - extendedWaitUntil:
     visible:
       id: "edit-rating"

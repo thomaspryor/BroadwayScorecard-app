@@ -1,6 +1,6 @@
 # Maestro E2E flows
 
-Run via `.github/workflows/maestro-e2e.yml` (`workflow_dispatch`, suites: `all` / `show-rating` / `my-shows` / `tabs` / `import`).
+Run via `.github/workflows/maestro-e2e.yml` (`workflow_dispatch`, suites: `all` / `show-rating` / `my-shows` / `tabs` / `import` / `show` / `rate` / `settings`).
 
 ## Gotchas
 
@@ -10,3 +10,4 @@ Run via `.github/workflows/maestro-e2e.yml` (`workflow_dispatch`, suites: `all` 
 - **`.maestro/` root-level files are excluded from the `.maestro/**/*.yaml` glob** the `all` suite uses (`Run Maestro tests` step in `maestro-e2e.yml`) — GitHub Actions' default bash has no `shopt -s globstar`, so `**` requires at least one directory segment between `.maestro/` and the filename. `ci-skip-onboarding.yaml`, `ci-connect-metro.yaml`, and `ci-canary-show-rating-fixture.yaml` all rely on this to run as one-off helper/gate steps instead of being swept into the main suite loop.
 - **`__DEV__` is `false`** in this workflow's Release `xcodebuild` build. Any CI-only route (fixtures, dev helpers) gated on `if (!__DEV__)` will silently render nothing in CI — check for `EXPO_PUBLIC_DEV_AUTO_SIGNIN === '1'` as well if the route needs to work here (see `app/test/show-rating-fixture.tsx`).
 - **Running `maestro` locally on the Mac Studio needs `JAVA_HOME` set explicitly** — `/usr/libexec/java_home` reports no registered JDK even though Homebrew has one installed. Use the Homebrew `openjdk@17` cellar directly: `export JAVA_HOME=/opt/homebrew/opt/openjdk@17` before any local `maestro test` invocation (CI doesn't need this — `mobile-dev-inc/action-maestro-cloud`/the runner image ships its own JDK).
+- **`assertVisible`/`extendedWaitUntil` never scroll — they only see what's currently on screen.** A longer timeout does nothing for an element that's below the fold; it just makes the failure slower. `.maestro/show/show-detail.yaml` and `.maestro/rate/rate-lifecycle.yaml` both hit this on `show/[slug].tsx` (2026-08-13): "Get Tickets" and the rating widget sit below the hero (title/score badge), so a bare wait failed even though the element rendered fine seconds later, off-screen. `scrollUntilVisible` (already used in `stats-tab.yaml`/`stats-capture.yaml` for the same reason) is the fix — `element: { text: "..." }` or `{ id: "..." }`, `direction: DOWN`. If a check for something you expect to be present keeps failing right at its timeout with no earlier signs of trouble, suspect the fold before suspecting the network.
