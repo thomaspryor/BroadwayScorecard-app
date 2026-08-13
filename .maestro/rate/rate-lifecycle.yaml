@@ -83,11 +83,14 @@ appId: com.broadwayscorecard.app
     id: "star-4"
 
 # Tap the input's own accessibilityLabel, not the adjacent field-label Text
-# ("Private Notes (optional)") — that label isn't the TextInput, and tapping
-# it doesn't reliably focus the field next to it (caught in codex review,
-# 2026-08-12: the fixture's save-flow.yaml taps the same-looking label, but
-# that's a different screen and not a mechanism worth copying blind).
-- tapOn: "Private notes"
+# ("Private Notes (optional)") — that label isn't the TextInput (codex
+# review, 2026-08-12). Needs a wildcard, not the bare label: confirmed via a
+# downloaded screen-hierarchy dump (2026-08-13, run 31660024187) that iOS
+# concatenates the label with the placeholder into one accessibility string,
+# "Private notes What did you think?" — the exact substring-vs-full-match
+# trap .maestro/README.md already documents for assertVisible, which
+# apparently applies to tapOn too.
+- tapOn: "Private notes.*"
 - inputText: "MAESTRO E2E — safe to delete"
 
 - tapOn: "Save"
