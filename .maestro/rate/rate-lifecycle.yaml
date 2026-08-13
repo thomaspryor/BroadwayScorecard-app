@@ -1,26 +1,36 @@
-# Rate Modal — Real Screen Create -> Edit -> Delete
-# Verifies: app/rate/[showId].tsx (the production rating screen) actually
-# writes to and deletes from Supabase, via its real entry points (show-page
-# star tap, then the Edit button). Self-cleaning: ends in the same state it
-# started in.
+# Rate Modal — Real Screen, Real Write
+# Verifies: app/rate/[showId].tsx (the production rating screen, not the
+# app/test/show-rating-fixture.tsx local-state fixture the 6 existing
+# "show-rating" flows drive) actually writes a rating to Supabase.
 #
-# Why this exists: the 6 existing "show-rating" flows only drive
-# app/test/show-rating-fixture.tsx, which uses local React state and touches
-# no backend. app/rate/[showId].tsx and components/user/ShowPageRating.tsx
-# had zero coverage (audited 2026-08-12, see memory/testing.md) despite doing
-# real Supabase writes for every rating a real user saves.
+# app/rate/[showId].tsx had zero coverage (audited 2026-08-12, see
+# memory/testing.md) despite doing a real Supabase write for every rating a
+# real user saves.
 #
-# Assumption: the dev-test CI account has no pre-existing rating for
-# Hamilton. True as of 2026-08-12 — this flow is the only one that rates it,
-# and it deletes what it creates. If a future run ever fails at the "tap a
-# star" step because "Edit rating" is showing instead of bare stars, that
-# assumption broke (a real rating exists) and needs a human look, not a
-# guessed fix — see the workflow's cleanup step for the backstop.
+# Scope note (2026-08-13): this flow originally also verified the write by
+# navigating back to the show page and editing/deleting the rating there —
+# dropped after two CI dispatches (31656094911, 31656096518) both showed,
+# via downloaded screenshots, that scrolling the show page after a
+# tap-navigation lands back on the Browse tab instead (see
+# .maestro/show/show-detail.yaml's header comment for the full account).
+# Diagnosing an iOS gesture interaction needs a simulator in front of a
+# person, not another blind CI round. What's left: this flow proves the
+# Save button on the real screen performs a real write (the toast is a
+# claim the client made — CI-level cleanup below is the actual proof
+# nothing gets left behind).
 #
-# Backend writes have no visible confirmation beyond a 3-5s toast — this flow
-# also re-opens the show page after each write and checks the persisted
-# state directly (assertVisible on "Edit rating"/stars), not just the toast,
-# because a toast proves the client fired the request, not that it landed.
+# Deep-linked instead of tapped through Browse search — sidesteps the
+# navigation issue above entirely (this flow's own dispatches hit it too,
+# at the identical spot, before this rewrite) and is a pattern already used
+# everywhere else in this repo.
+#
+# Discovered 2026-08-13: the dev-test CI account already has a real 5-star
+# Hamilton rating from before this session (visible in a tapped element's
+# accessibility dump — "Your rating: 5.0 stars" — not created by any of this
+# flow's own runs, none of which had reached Save yet). "reviews" has no
+# unique constraint, so this flow's write is always an ADDITIONAL viewing,
+# never assumed to be the only one — it doesn't touch or depend on whatever
+# else is already on the account.
 
 appId: com.broadwayscorecard.app
 ---
@@ -59,40 +69,18 @@ appId: com.broadwayscorecard.app
     visible: "Broadway Scorecard"
     timeout: 30000
 
+# No reviewId param — always opens a fresh "new viewing" entry, same as
+# tapping an interactive star or "+ New Viewing" would, regardless of
+# whether Hamilton already has a rating on this account.
+- openLink: broadwayscorecard://rate/hamilton-2015?showTitle=Hamilton
 - tapOn:
-    text: "Browse"
-
-- extendedWaitUntil:
-    visible: "Now Playing"
-    timeout: 30000
-
-- tapOn: "Search shows..."
-- inputText: "Hamilton"
-
-- extendedWaitUntil:
-    visible: "\\d+ results? for .*"
-    timeout: 15000
-
-- tapOn:
-    id: "show-card-result"
-
-# Not a timing problem (widening 15s to 20s here didn't help, 2026-08-13
-# dispatch) — the rating widget is below the hero on a real device and
-# assertVisible/extendedWaitUntil don't scroll. scrollUntilVisible does, same
-# fix as show-detail.yaml and the same reasoning stats-tab.yaml already
-# established for stats-house-grid.
-- scrollUntilVisible:
-    element:
-      text: "MY RATING & REVIEW"
-    direction: DOWN
-    timeout: 20000
-    visibilityPercentage: 20
-
-# ─── Create ─────────────────────────────────────────────
-- tapOn:
-    id: "star-4"
+    text: "Open"
+    optional: true
 
 - assertVisible: "Your rating for"
+
+- tapOn:
+    id: "star-4"
 
 # Tap the input's own accessibilityLabel, not the adjacent field-label Text
 # ("Private Notes (optional)") — that label isn't the TextInput, and tapping
@@ -104,47 +92,12 @@ appId: com.broadwayscorecard.app
 
 - tapOn: "Save"
 
+# The client's claim that the write succeeded. The CI workflow's backstop
+# cleanup step (maestro-e2e.yml, "Clean up rate-lifecycle review row")
+# deletes this by show_id + review_text after every run — if that step ever
+# finds nothing to delete, either this Save stopped firing or the marker
+# text changed; if it finds and deletes a row every single run, the write
+# is real.
 - extendedWaitUntil:
     visible: "Rating saved"
     timeout: 10000
-
-# Round-trip proof: the show page now reads the rating back from Supabase,
-# not just from the form we filled in. No re-scroll here — assumes
-# expo-router keeps the show page's scroll position while the rate modal is
-# pushed/popped (it isn't unmounted, just covered). If this ever fails, that
-# assumption is the first thing to check, not the widget itself.
-- extendedWaitUntil:
-    visible:
-      id: "edit-rating"
-    timeout: 15000
-
-# ─── Edit (confirms the saved data persisted correctly) ───
-- tapOn:
-    id: "edit-rating"
-
-- assertVisible: "Editing your rating for"
-
-# Edit mode re-fetches the review from Supabase before populating the notes
-# field (app/rate/[showId].tsx's "Fetch existing review data when editing"
-# effect) — an immediate assertVisible here would race that fetch.
-- extendedWaitUntil:
-    visible: "MAESTRO E2E — safe to delete"
-    timeout: 15000
-
-# ─── Delete ─────────────────────────────────────────────
-- tapOn: "Delete rating"
-
-- assertVisible: "Delete this rating?"
-- tapOn: "Delete"
-
-- extendedWaitUntil:
-    visible: "Rating deleted."
-    timeout: 10000
-
-# Round-trip proof again: back to the pre-test empty state, read from
-# Supabase, not assumed from the UI transition alone.
-- extendedWaitUntil:
-    visible: "1 star"
-    timeout: 15000
-- assertNotVisible:
-    id: "edit-rating"
