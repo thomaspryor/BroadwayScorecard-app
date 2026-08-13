@@ -251,45 +251,110 @@ What IS well covered, so the gap is narrower than the table alone suggests:
 - `expo export` proves the whole graph resolves on every push, so an import
   error on the show page is still caught, just not a rendering or data bug
 
-## Active work (2026-08-12): show/[slug], settings, rate/[showId]
+## Closed 2026-08-12/13: show/[slug], settings, rate/[showId]
 
 `memory/handoff-show-page-e2e.md` — the brief for closing the show-page
-coverage gap above, now closed (see that file for the final status). Three
-new flows: `.maestro/show/show-detail.yaml`, `.maestro/settings/delete-account-guard.yaml`,
-`.maestro/rate/rate-lifecycle.yaml`.
+coverage gap above, now closed. Three new flows, all confirmed green on
+branch `worktree-show-page-e2e` before merge: `.maestro/show/show-detail.yaml`
+(run 31660022949), `.maestro/settings/delete-account-guard.yaml` (run
+31652603999), `.maestro/rate/rate-lifecycle.yaml` (run 31669727699). Getting
+there took about 4 hours and roughly a dozen CI dispatch rounds — worth
+recording why, since every round found something real:
 
-**RECHECK-AFTER: 2026-08-13** — the corrected flows (after the fail-proof
-exercise below) were dispatched for green confirmation and hadn't resolved
-before this session ended. Check `gh run list --workflow=maestro-e2e.yml` for
-runs on branch `worktree-show-page-e2e` around 2026-08-12 23:55 UTC, or the
-2026-08-13 nightly if the branch was already merged by then.
+**1. Fail-proof exercise.** Per the repo's stated principle — a test that has
+only ever passed is untested — each flow's key selector was deliberately
+pointed at something nonexistent, dispatched, and confirmed it failed at
+exactly that step with every real prior step still passing (runs 31647918474,
+31647920396, 31647922662). That planted-break dispatch also surfaced a
+genuine bug the plant wasn't aimed at: `rate-lifecycle.yaml` failed one step
+*earlier* than intended, at `extendedWaitUntil` for `"MY RATING & REVIEW"`
+(15s) — misdiagnosed at first as a timing issue and widened to 20s (wrong
+fix, see #3).
 
-**Every flow was proven able to fail before being trusted** (the repo's
-stated principle — a test that has only ever passed is untested): each
-flow's key selector was deliberately pointed at something nonexistent,
-dispatched, and confirmed it failed at exactly that step with every real
-prior step still passing. That surfaced one genuine bug the plant wasn't
-aimed at: `rate-lifecycle.yaml` failed a step *earlier* than intended — its
-`extendedWaitUntil` for `"MY RATING & REVIEW"` (15s) timed out on a loaded CI
-runner before ever reaching the deliberately-broken star tap. Widened to 20s
-in both `rate-lifecycle.yaml` and `show-detail.yaml` (which had the identical
-assertion with no explicit wait at all — worse, not better).
+**2. Codex review before shipping.** An independent codex review (reading
+the actual component source, not just the diff) caught two more real bugs
+before any of this ever ran in CI: a copy-pasted "tap the field label" trick
+that doesn't actually focus the real notes `TextInput`, and an assertion
+racing an async Supabase re-fetch on entering edit mode.
 
-An independent codex review (reading the actual component source, not just
-the diff) caught two more real bugs before any of this shipped: a
-copy-pasted "tap the field label" trick that doesn't actually focus the real
-notes `TextInput` (its `accessibilityLabel` doesn't match the label text on
-this screen, only on the unrelated fixture screen it was copied from), and an
-assertion racing an async Supabase re-fetch on entering edit mode. Both fixed
-before the corrected-flow dispatch above.
+**3. The real bug behind the "MY RATING & REVIEW" timeout: scroll, not
+timing.** Widening the wait to 20s didn't help (runs 31652602767,
+31652605261) — it failed at the identical spot regardless. Downloaded the
+`maestro-test-results` CI artifact (`gh run download <id> -n
+maestro-test-results`) and looked at the actual screenshot: "Get Tickets"
+and the rating widget sit below the hero on a real device; `assertVisible`/
+`extendedWaitUntil` never scroll, only `scrollUntilVisible` does (same
+pattern as `stats-tab.yaml`). Fixed in both flows (commit 2ad6dfb).
 
-`rate-lifecycle.yaml` does real Supabase writes against the shared dev-test
-CI account (creates a Hamilton rating, then deletes it) — self-cleaning by
-design, with a CI-level backstop delete (`maestro-e2e.yml`, scoped to
-`review_text`, deliberately not `date_seen` — a UTC-vs-device-local-time
-mismatch would make a date filter miss the exact row it exists to catch).
-`delete-account-guard.yaml` never completes a real account deletion — it only
-confirms the warning dialog appears with the right copy and that Cancel
+**4. A real, unresolved app bug: scrolling on `show/[slug].tsx` can trigger
+a return to the previous screen.** After the scroll fix, `scrollUntilVisible`
+started actually scrolling — and TWO independent runs (31656094911,
+31656096518) then showed, via downloaded screenshots, the app landing back
+on the Browse tab with the search cleared, moments after the title and score
+badge had *just* asserted true (proving the show page had genuinely loaded
+first). The scroll gesture itself is what triggers the return. Most likely
+cause: `show/[slug].tsx` is a pushed stack screen with iOS's default
+interactive swipe-to-go-back gesture enabled, and Maestro's scroll swipe
+starts close enough to the left edge to be read as that gesture instead of a
+content scroll. **Not fixed** — this needs a simulator in front of a person
+to watch the actual gesture, not another blind CI round (commit 1903496 has
+the full writeup). Both flows were descoped to route around it:
+`show-detail.yaml` now stops at proving tap-through navigation plus the
+title/score render (no ticket CTA / rating widget / critic reviews
+coverage); `rate-lifecycle.yaml` was rewritten to reach the rating screen via
+`openLink` deep link instead of tapping through Browse search, so it never
+needs to scroll the show page at all.
+**Follow-up worth a future session**: this may affect other pushed-stack
+screens in the app too, not just this one — worth a repo-wide check once
+someone has a simulator in front of them.
+
+**5. Stale assumption: the dev-test account already had a Hamilton rating.**
+A downloaded accessibility dump (run 31656096518) showed the tapped Hamilton
+card's child element read "Your rating: 5.0 stars" — a real 5-star rating
+from before this session, unrelated to any of its own dispatches (none had
+reached Save yet). `rate-lifecycle.yaml`'s original "Hamilton starts unrated"
+assumption was wrong from the start, not just fragile. Rewritten to always
+create an *additional* viewing (reviews has no unique constraint) rather than
+assuming either starting state.
+
+**6. `tapOn` needs a full regex match too, not just `assertVisible`.** Run
+31663575924 got through auth, the deep-linked rate screen, and the star tap,
+then failed on `tapOn: "Private notes"` — Element not found, despite the
+field being genuinely on screen. A downloaded screen-hierarchy dump showed
+why: iOS concatenates a `TextInput`'s `accessibilityLabel` with its
+placeholder into one accessibility string, `"Private notes What did you
+think?"` — the bare label was a substring, not a full match. Same trap this
+file's README already documented for `assertVisible`, now confirmed to apply
+to `tapOn` too. Fixed with a wildcard (commit b5b57e9).
+
+**7. A 3-second toast is not a reliable thing to assert on after a
+navigation reset.** Run 31663575924's downloaded screenshot proved Save
+actually worked — landed cleanly on Home, no crash — but the `"Rating
+saved"` toast assertion still failed. This flow deep-links in cold (no real
+prior screen), so Save's `router.back()` resets to Home instead of a normal
+pop, and that reset likely competes with the toast for the same render pass.
+Replaced the toast assertion with a stable-landing-screen check; the CI
+workflow's backstop delete-by-marker step is the actual proof of the write
+(commit 72e1b48).
+
+**8. A deep link fired too early can be silently dropped.** Run 31665997151
+showed `openLink: broadwayscorecard://rate/hamilton-2015...` landing on
+plain Home instead of the rate screen — no error, the link just didn't take.
+`"Broadway Scorecard"` (the static brand header) can render before the
+router has finished hydrating enough to route a deep link; waiting for real
+content (`"Top Shows"`) instead is a stronger readiness signal (commit
+5d80232). That same screenshot also confirmed the Save from the *previous*
+run had genuinely persisted — Hamilton's Home card showed 4.0 stars, matching
+the rating just saved.
+
+`rate-lifecycle.yaml` does a real Supabase write against the shared dev-test
+CI account (creates an additional Hamilton viewing) — the CI workflow's
+backstop delete step (`maestro-e2e.yml`, scoped to `review_text`,
+deliberately not `date_seen` — a UTC-vs-device-local-time mismatch would make
+a date filter miss the row) is the cleanup and the proof, since the flow no
+longer round-trips through the UI to verify or delete its own write.
+`delete-account-guard.yaml` never completes a real account deletion — it
+only confirms the warning dialog appears with the right copy and that Cancel
 leaves the account untouched.
 
 ## Known gaps

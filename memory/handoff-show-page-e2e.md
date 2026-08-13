@@ -98,17 +98,30 @@ than reading:
   **measured**. That mistake was made on 2026-08-12 and cost a production
   database change that fixed nothing. See `measure-before-asking-approval.md`.
 
-## Closed 2026-08-12
+## Closed 2026-08-13
 
-All three screens now have a flow: `.maestro/show/show-detail.yaml`,
-`.maestro/settings/delete-account-guard.yaml`, `.maestro/rate/rate-lifecycle.yaml`.
-Each was proven able to fail (deliberate broken selector, dispatched,
-confirmed red at the right step) before being trusted — see
-`memory/testing.md`'s "Active work" section for the full account, including
-one real bug the fail-proof exercise caught that wasn't the one planted, and
-two more caught by an independent codex review before any of it shipped. The
-corrected flows were dispatched for a green-confirmation run; check
-`memory/testing.md`'s RECHECK-AFTER note for whether that landed and merged.
+All three screens now have a flow, all confirmed green and merged to main:
+`.maestro/show/show-detail.yaml` (run 31660022949), `.maestro/settings/delete-account-guard.yaml`
+(run 31652603999), `.maestro/rate/rate-lifecycle.yaml` (run 31669727699). Each
+was proven able to fail (deliberate broken selector, dispatched, confirmed
+red at the right step) before being trusted. Getting all three green took
+~4 hours and about a dozen CI dispatch rounds — full account, including 8
+distinct real bugs found along the way, is in `memory/testing.md`'s "Closed
+2026-08-12/13" section. Two are worth flagging specifically:
+
+- **Unresolved app bug**: scrolling on `app/show/[slug].tsx` right after
+  navigating there can trigger a return to the previous screen — looks like
+  Maestro's scroll gesture being read as iOS's swipe-to-go-back on this
+  pushed stack screen. Confirmed with two independent CI screenshots, not
+  guessed. Both new flows were rewritten to route around it (show-detail.yaml
+  stops before the scroll; rate-lifecycle.yaml deep-links past the show page
+  entirely) rather than fix it blind. Worth a look with a real simulator —
+  and worth checking whether other pushed-stack screens in the app have the
+  same issue, not just this one.
+- The dev-test CI account has a real, pre-existing 5-star Hamilton rating
+  from before this work, unrelated to anything this session did. Any future
+  flow touching Hamilton's rating should assume that and not depend on a
+  particular starting state.
 
 ## Other state as of 2026-08-12
 
