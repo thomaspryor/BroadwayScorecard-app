@@ -69,6 +69,16 @@ appId: com.broadwayscorecard.app
     visible: "Broadway Scorecard"
     timeout: 30000
 
+# "Broadway Scorecard" (the brand header) can render before the router has
+# finished mounting/hydrating enough to handle a deep link — confirmed
+# 2026-08-13 (run 31665997151, screenshot showed the openLink below landing
+# on plain Home instead of the rate screen, no error, just silently
+# ignored). Waiting for real content data (not just static brand text) is a
+# better readiness signal.
+- extendedWaitUntil:
+    visible: "Top Shows"
+    timeout: 30000
+
 # No reviewId param — always opens a fresh "new viewing" entry, same as
 # tapping an interactive star or "+ New Viewing" would, regardless of
 # whether Hamilton already has a rating on this account.
