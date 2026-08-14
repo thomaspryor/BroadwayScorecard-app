@@ -56,7 +56,7 @@ function Shelf({ entries, onOpenEntry }: { entries: CanonEntry[]; onOpenEntry: (
               />
             ) : (
               <View style={[styles.shelfPoster, styles.shelfPlaceholder, !e.seen && styles.shelfPosterUnseen]}>
-                <Text style={styles.shelfInitial}>{e.t.charAt(0)}</Text>
+                <Text style={styles.shelfInitial}>🎭</Text>
               </View>
             )}
             <Text style={[styles.shelfYear, TABULAR, !e.seen && styles.shelfYearUnseen]} numberOfLines={1}>

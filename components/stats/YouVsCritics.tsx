@@ -48,7 +48,7 @@ function PickRow({ pick, onPress }: { pick: ContrarianPick; onPress: () => void 
         <Image source={{ uri: poster }} style={styles.pickPoster} contentFit="cover" transition={150} />
       ) : (
         <View style={[styles.pickPoster, styles.pickPosterPlaceholder]}>
-          <Text style={styles.pickInitial}>{pick.title.charAt(0)}</Text>
+          <Text style={styles.pickInitial}>🎭</Text>
         </View>
       )}
       <View style={styles.pickText}>

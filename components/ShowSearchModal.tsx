@@ -316,6 +316,80 @@ export function ShowSearchModal({
     return `${parts.join(' · ')}${parts.length > 0 ? ' · ' : ''}No critic score`;
   };
 
+  // Shared row for a live Mezzanine candidate — used both when local results
+  // are entirely empty and (beta feedback 2026-08-14, AE2cV5mxGJgdIVWbvbFRLn0)
+  // appended below a non-empty local list, since fuzzy local matches can all
+  // be the wrong show and the wider-catalog option must still be reachable.
+  const renderLiveResultRow = useCallback((item: MezzanineCandidate) => {
+    const alreadyListed = !!excludeIds?.has(item.id);
+    return (
+      <Pressable
+        key={item.id}
+        style={({ pressed }) => [styles.resultRow, (alreadyListed || !!addingLiveId) && styles.resultRowMuted, pressed && styles.pressed]}
+        disabled={alreadyListed || !!addingLiveId}
+        onPress={() => selectLive(item)}
+        accessibilityRole="button"
+        accessibilityState={{ disabled: alreadyListed || !!addingLiveId }}
+        accessibilityLabel={alreadyListed ? `${item.title} — ${excludedLabel}` : item.title}
+      >
+        {item.posterUrl ? (
+          <Image source={{ uri: item.posterUrl }} style={styles.resultPoster} contentFit="cover" />
+        ) : (
+          <View style={[styles.resultPoster, styles.resultPlaceholder]}>
+            <Text style={styles.placeholderText}>🎭</Text>
+          </View>
+        )}
+        <View style={styles.resultInfo}>
+          <Text style={styles.resultTitle} numberOfLines={1}>{item.title}</Text>
+          {item.venue && <Text style={styles.resultVenue} numberOfLines={1}>{item.venue}</Text>}
+          {alreadyListed && (
+            <Text style={styles.resultAlready} numberOfLines={1}>{excludedLabel}</Text>
+          )}
+          <Text style={styles.resultMeta} numberOfLines={1}>
+            {[item.city, item.openingDate?.slice(0, 4)].filter(Boolean).join(' · ')}
+            {item.city || item.openingDate ? ' · ' : ''}No critic score
+          </Text>
+        </View>
+        <Text style={styles.liveAdd}>{addingLiveId === item.id ? 'Adding…' : '+ Add'}</Text>
+      </Pressable>
+    );
+  }, [excludeIds, excludedLabel, addingLiveId, selectLive]);
+
+  // Wider-catalog CTA + live results, appended below the local (scored +
+  // diary) results list so it's always reachable, not just when the local
+  // list is completely empty.
+  const renderLiveSection = useCallback(() => (
+    <View style={styles.liveSection}>
+      {liveState === 'idle' && (
+        <Pressable style={styles.liveSectionPadded} onPress={runLiveSearch} hitSlop={12} accessibilityRole="button">
+          <Text style={styles.liveLink}>Can{'’'}t find it? Search the wider theater catalog</Text>
+        </Pressable>
+      )}
+      {liveState === 'searching' && (
+        <Text style={[styles.liveStatus, styles.liveSectionPadded]}>Searching the wider catalog…</Text>
+      )}
+      {liveState === 'empty' && (
+        <Text style={[styles.liveStatus, styles.liveSectionPadded]}>
+          Not found in the wider catalog either. Try a different spelling.
+        </Text>
+      )}
+      {liveState === 'error' && (
+        <View style={styles.liveSectionPadded}>
+          <Text style={styles.liveErrorText}>{liveError}</Text>
+          <Pressable onPress={runLiveSearch} hitSlop={12} accessibilityRole="button">
+            <Text style={styles.liveLink}>Try again</Text>
+          </Pressable>
+        </View>
+      )}
+      {liveState === 'results' && (
+        <>
+          <Text style={styles.wideHeader}>From the wider theater catalog</Text>
+          {liveCandidates.map(renderLiveResultRow)}
+        </>
+      )}
+    </View>
+  ), [liveState, liveError, liveCandidates, runLiveSearch, renderLiveResultRow]);
+
   // "No shows found" (and its now-tappable wider-catalog CTA) must wait for
   // the debounce to settle — mid-typing, `results` is still computed from the
   // previous debouncedQuery, so gating on the immediate query would flash the
@@ -382,7 +456,7 @@ export function ShowSearchModal({
                     accessibilityLabel={alreadyListed ? `${candidate.title} — ${excludedLabel}` : candidate.title}
                   >
                     <View style={[styles.resultPoster, styles.resultPlaceholder]}>
-                      <Text style={styles.placeholderText}>{candidate.title.charAt(0)}</Text>
+                      <Text style={styles.placeholderText}>🎭</Text>
                     </View>
                     <View style={styles.resultInfo}>
                       <Text style={styles.resultTitle} numberOfLines={1}>{candidate.title}</Text>
@@ -418,7 +492,7 @@ export function ShowSearchModal({
                     <Image source={{ uri: posterUrl }} style={styles.resultPoster} contentFit="cover" />
                   ) : (
                     <View style={[styles.resultPoster, styles.resultPlaceholder]}>
-                      <Text style={styles.placeholderText}>{show.title.charAt(0)}</Text>
+                      <Text style={styles.placeholderText}>🎭</Text>
                     </View>
                   )}
                   <View style={styles.resultInfo}>
@@ -438,6 +512,7 @@ export function ShowSearchModal({
                 </Pressable>
               );
             }}
+            ListFooterComponent={renderLiveSection}
             contentContainerStyle={styles.list}
             showsVerticalScrollIndicator={false}
           />
@@ -449,39 +524,7 @@ export function ShowSearchModal({
             ListHeaderComponent={
               <Text style={styles.wideHeader}>From the wider theater catalog</Text>
             }
-            renderItem={({ item }) => {
-              const alreadyListed = !!excludeIds?.has(item.id);
-              return (
-                <Pressable
-                  style={({ pressed }) => [styles.resultRow, (alreadyListed || !!addingLiveId) && styles.resultRowMuted, pressed && styles.pressed]}
-                  disabled={alreadyListed || !!addingLiveId}
-                  onPress={() => selectLive(item)}
-                  accessibilityRole="button"
-                  accessibilityState={{ disabled: alreadyListed || !!addingLiveId }}
-                  accessibilityLabel={alreadyListed ? `${item.title} — ${excludedLabel}` : item.title}
-                >
-                  {item.posterUrl ? (
-                    <Image source={{ uri: item.posterUrl }} style={styles.resultPoster} contentFit="cover" />
-                  ) : (
-                    <View style={[styles.resultPoster, styles.resultPlaceholder]}>
-                      <Text style={styles.placeholderText}>{item.title.charAt(0)}</Text>
-                    </View>
-                  )}
-                  <View style={styles.resultInfo}>
-                    <Text style={styles.resultTitle} numberOfLines={1}>{item.title}</Text>
-                    {item.venue && <Text style={styles.resultVenue} numberOfLines={1}>{item.venue}</Text>}
-                    {alreadyListed && (
-                      <Text style={styles.resultAlready} numberOfLines={1}>{excludedLabel}</Text>
-                    )}
-                    <Text style={styles.resultMeta} numberOfLines={1}>
-                      {[item.city, item.openingDate?.slice(0, 4)].filter(Boolean).join(' · ')}
-                      {item.city || item.openingDate ? ' · ' : ''}No critic score
-                    </Text>
-                  </View>
-                  <Text style={styles.liveAdd}>{addingLiveId === item.id ? 'Adding…' : '+ Add'}</Text>
-                </Pressable>
-              );
-            }}
+            renderItem={({ item }) => renderLiveResultRow(item)}
             contentContainerStyle={styles.list}
             showsVerticalScrollIndicator={false}
           />
@@ -579,6 +622,22 @@ const styles = StyleSheet.create({
     color: Colors.text.muted,
     fontSize: FontSize.md,
     textAlign: 'center',
+  },
+  // Footer appended below a non-empty local results list — top border
+  // separates it from the last row above it. No alignItems:'center': the
+  // live-results branch renders full-width resultRow items that need to
+  // stretch, while the link/status text center themselves via textAlign.
+  liveSection: {
+    paddingTop: Spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border.subtle,
+    gap: Spacing.xs,
+  },
+  // Horizontal padding for the CTA/status text states only — the results
+  // rows below use resultRow's own paddingHorizontal instead.
+  liveSectionPadded: {
+    paddingHorizontal: Spacing.lg,
+    alignItems: 'center',
   },
   liveLink: {
     color: Colors.brand,

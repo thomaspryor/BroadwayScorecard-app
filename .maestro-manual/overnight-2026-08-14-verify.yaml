@@ -1,0 +1,76 @@
+# Verification screenshots for the 2026-08-14 overnight beta-feedback batch
+# (6 items). LOCAL-ONLY TOOL — outside .maestro/ so CI's glob never runs it.
+# Run: maestro test .maestro-manual/overnight-2026-08-14-verify.yaml
+
+appId: com.broadwayscorecard.app
+---
+- launchApp:
+    clearState: false
+- waitForAnimationToEnd:
+    timeout: 5000
+
+# ── Item 4: Home shelves — Recently Opened on Broadway / Off Broadway below NYT Critic's Picks
+- swipe:
+    direction: UP
+- waitForAnimationToEnd
+- takeScreenshot: /tmp/bwsc-verify/04-home-a
+- swipe:
+    direction: UP
+- waitForAnimationToEnd
+- takeScreenshot: /tmp/bwsc-verify/04-home-b
+- swipe:
+    direction: UP
+- waitForAnimationToEnd
+- takeScreenshot: /tmp/bwsc-verify/04-home-c
+- swipe:
+    direction: UP
+- waitForAnimationToEnd
+- takeScreenshot: /tmp/bwsc-verify/04-home-d
+- swipe:
+    direction: UP
+- waitForAnimationToEnd
+- takeScreenshot: /tmp/bwsc-verify/04-home-e
+
+# ── Item 3: Search modal — a query that returns fuzzy junk matches, not "no results"
+- openLink: broadwayscorecard:///to-watch
+- tapOn:
+    text: "Open"
+    optional: true
+- waitForAnimationToEnd
+- tapOn:
+    id: "add-to-watchlist-button"
+    optional: true
+- waitForAnimationToEnd
+- tapOn:
+    text: "Search shows..."
+- inputText: "one man musical"
+- waitForAnimationToEnd
+- takeScreenshot: /tmp/bwsc-verify/03-search-fuzzy-results
+- eraseText: 30
+- inputText: "zzqqxyz nonexistent show title"
+- waitForAnimationToEnd
+- takeScreenshot: /tmp/bwsc-verify/03-search-no-results
+- tapOn: "Cancel"
+- waitForAnimationToEnd
+
+# ── Items 5 + 6: Show detail — header share icon, section order/naming
+- openLink: broadwayscorecard:///show/hamilton
+- tapOn:
+    text: "Open"
+    optional: true
+- waitForAnimationToEnd
+- takeScreenshot: /tmp/bwsc-verify/05-show-header
+- swipe:
+    direction: UP
+- waitForAnimationToEnd
+- swipe:
+    direction: UP
+- waitForAnimationToEnd
+- swipe:
+    direction: UP
+- waitForAnimationToEnd
+- takeScreenshot: /tmp/bwsc-verify/06-show-sections-a
+- swipe:
+    direction: UP
+- waitForAnimationToEnd
+- takeScreenshot: /tmp/bwsc-verify/06-show-sections-b

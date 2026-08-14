@@ -265,7 +265,7 @@ export default function ToWatchScreen() {
             <Image source={{ uri: posterUrl }} style={styles.gridPoster} contentFit="cover" transition={200} />
           ) : (
             <View style={[styles.gridPoster, styles.cardPosterPlaceholder]}>
-              <Text style={styles.placeholderText}>{title.charAt(0)}</Text>
+              <Text style={styles.placeholderText}>🎭</Text>
             </View>
           )}
           {/* Date as an overlaid poster tag, matching the Watched tab's grid
@@ -312,7 +312,7 @@ export default function ToWatchScreen() {
               <Image source={{ uri: posterUrl }} style={styles.gridPoster} contentFit="cover" transition={200} />
             ) : (
               <View style={[styles.gridPoster, styles.cardPosterPlaceholder]}>
-                <Text style={styles.placeholderText}>{title.charAt(0)}</Text>
+                <Text style={styles.placeholderText}>🎭</Text>
               </View>
             )}
             <PosterStatusPill show={show} />
@@ -349,7 +349,7 @@ export default function ToWatchScreen() {
           <Image source={{ uri: posterUrl }} style={styles.listPoster} contentFit="cover" transition={200} />
         ) : (
           <View style={[styles.listPoster, styles.cardPosterPlaceholder]}>
-            <Text style={styles.placeholderText}>{title.charAt(0)}</Text>
+            <Text style={styles.placeholderText}>🎭</Text>
           </View>
         )}
         <View style={styles.listInfo}>
@@ -387,7 +387,7 @@ export default function ToWatchScreen() {
           <Image source={{ uri: posterUrl }} style={styles.listPoster} contentFit="cover" transition={200} />
         ) : (
           <View style={[styles.listPoster, styles.cardPosterPlaceholder]}>
-            <Text style={styles.placeholderText}>{title.charAt(0)}</Text>
+            <Text style={styles.placeholderText}>🎭</Text>
           </View>
         )}
         <View style={styles.listInfo}>
