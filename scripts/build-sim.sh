@@ -9,7 +9,32 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 DEVICE_ID="${1:-$(xcrun simctl list devices booted -j | python3 -c 'import json,sys; d=json.load(sys.stdin); print(next(dev["udid"] for devs in d["devices"].values() for dev in devs))')}"
-[ -d ios/Pods ] || (npx expo prebuild --platform ios && cd ios && pod install)
+# Pods can arrive already-installed via a worktree clone (visual-gate.js
+# captureScreens / memory ios-worktree-design-render-recipe.md) that deliberately
+# excludes ios/build/ — its derived-data products bake in the source repo's
+# absolute path (see the JSI cache comment below). CocoaPods' codegen step,
+# which use_react_native! runs INSIDE `pod install`, writes the ReactCodegen
+# sources straight into ios/build/generated and wires them into Pods.xcodeproj
+# as plain file references — not a build-time script phase — so a cloned Pods
+# dir with no matching ios/build/generated points xcodebuild at .mm files that
+# were never generated for THIS checkout:
+#
+#   error: Build input file cannot be found: '.../ios/build/generated/ios/
+#   ReactCodegen/rngesturehandler_codegen/rngesturehandler_codegen-generated.mm'.
+#   Did you forget to declare this file as an output of a script phase...
+#
+# ios/Pods existing is therefore not sufficient proof that codegen ran for
+# this checkout (BRO-201: observed in the overnight worktree 2026-08-12/13,
+# after the arch-pin + JSI-cache fixes below already landed). Require
+# ios/build/generated too, and re-run pod install (not a full prebuild) when
+# only that half is missing.
+if [ ! -d ios/Pods ]; then
+  npx expo prebuild --platform ios
+  (cd ios && pod install)
+elif [ ! -d ios/build/generated ]; then
+  echo "build-sim: ios/Pods present but ios/build/generated is missing (likely a cloned worktree) — re-running pod install"
+  (cd ios && pod install)
+fi
 
 # Drop a module cache that was precompiled for a DIFFERENT checkout path
 # (2026-08-09). expo-modules-jsi keeps its own DerivedData INSIDE node_modules,
