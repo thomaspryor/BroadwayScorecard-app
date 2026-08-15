@@ -1,0 +1,98 @@
+# Verification screenshots for the 2026-08-15 overnight beta-feedback batch (6 items).
+# LOCAL-ONLY TOOL — outside .maestro/ so CI's glob never runs it.
+# Pre-req: Release sim build installed with the worktree's JS bundle swapped in
+# (see memory/ios-worktree-design-render-recipe.md "fastest path").
+# Run: maestro test .maestro-manual/overnight-2026-08-15-verify.yaml
+#
+# Note: `tapOn: point:` percentages must be plain integers ("90%,9%") — a
+# decimal like "9.5%" throws a NumberFormatException and kills the session.
+
+appId: com.broadwayscorecard.app
+---
+- launchApp:
+    clearState: false
+
+- extendedWaitUntil:
+    visible:
+      text: "Broadway Scorecard"
+    timeout: 30000
+
+- runFlow:
+    when:
+      visible: "Skip"
+    commands:
+      - tapOn: "Skip"
+      - tapOn: "Skip"
+      - tapOn: "Skip"
+
+# ── Diary grid: item 1 (date badge pinned to top of poster) + item 2 (🎭
+# placeholder for shows with no image, replacing the plain-letter tile)
+- openLink: broadwayscorecard:///watched
+- tapOn:
+    text: "Open"
+    optional: true
+- waitForAnimationToEnd
+- takeScreenshot: /tmp/bwsc-overnight-verify/01-diary-grid-top
+- swipe:
+    direction: UP
+- waitForAnimationToEnd
+- takeScreenshot: /tmp/bwsc-overnight-verify/02-diary-grid-scroll
+
+# ── Rate search modal: item 3 — "Search the wider catalog" CTA always at the
+# bottom of the list, even when local/diary fuzzy matches exist
+- tapOn:
+    point: "93%,9%"
+- waitForAnimationToEnd
+- extendedWaitUntil:
+    visible: "Rate a Show"
+    timeout: 5000
+- tapOn:
+    point: "50%,10%"
+- inputText: "One man musical"
+- waitForAnimationToEnd
+- extendedWaitUntil:
+    notVisible: "Search for a show by name"
+    timeout: 5000
+- pressKey: Enter
+- waitForAnimationToEnd
+- swipe:
+    start: "50%,80%"
+    end: "50%,20%"
+- swipe:
+    start: "50%,80%"
+    end: "50%,20%"
+- swipe:
+    start: "50%,80%"
+    end: "50%,20%"
+- waitForAnimationToEnd
+- takeScreenshot: /tmp/bwsc-overnight-verify/03-rate-search-wider-cta
+- tapOn:
+    point: "50%,94%"
+- waitForAnimationToEnd
+- takeScreenshot: /tmp/bwsc-overnight-verify/04-rate-search-wider-triggered
+- tapOn: "Cancel"
+
+# ── Show detail: item 5 (share sends the URL, not the score-card image) +
+# item 6 (Critic Reviews above Audience Scorecard, renamed from "Critic
+# Scorecard")
+- openLink: broadwayscorecard:///
+- tapOn:
+    text: "Open"
+    optional: true
+- waitForAnimationToEnd
+- tapOn:
+    point: "30%,15%"
+- extendedWaitUntil:
+    visible: "Get Tickets"
+    timeout: 10000
+- waitForAnimationToEnd
+- takeScreenshot: /tmp/bwsc-overnight-verify/05-show-detail-top
+- swipe:
+    start: "50%,80%"
+    end: "50%,30%"
+- waitForAnimationToEnd
+- takeScreenshot: /tmp/bwsc-overnight-verify/06-show-detail-critic-reviews-order
+- tapOn:
+    point: "90%,9%"
+- waitForAnimationToEnd
+- takeScreenshot: /tmp/bwsc-overnight-verify/07-show-detail-share-sheet
