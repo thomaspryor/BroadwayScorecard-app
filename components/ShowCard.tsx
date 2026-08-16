@@ -15,6 +15,7 @@ import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { Show } from '@/lib/types';
 import { getImageUrl } from '@/lib/images';
+import { PosterPlaceholder } from '@/components/PosterPlaceholder';
 import { ScoreBadge, StatusBadge, FormatPill, ProductionPill, CategoryBadge, AudienceChip } from '@/components/show-cards';
 import { getContrastTextColor, getQualifiedScore } from '@/lib/score-utils';
 import { BookmarkOverlay } from '@/components/BookmarkOverlay';
@@ -110,11 +111,7 @@ export const ShowCard = memo(function ShowCard({ show, scoreMode = 'critics', hi
             accessibilityLabel={`${show.title} poster`}
           />
         ) : (
-          <View style={[styles.showImage, styles.placeholderThumb]}>
-            <Text style={styles.placeholderText}>
-              {show.title.charAt(0)}
-            </Text>
-          </View>
+          <PosterPlaceholder title={show.title} style={styles.showImage} />
         )}
         {/* Bookmark — rendered AFTER image so it's on top (z-order) */}
         {isWatchlisted !== undefined && onToggleWatchlist && (

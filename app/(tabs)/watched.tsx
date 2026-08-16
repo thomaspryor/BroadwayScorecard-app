@@ -50,6 +50,7 @@ import { PhotoWallGrid } from '@/components/user/PhotoWallGrid';
 import { DiaryCalendarMonth, buildDiaryCalendarMonths, buildReviewsByDate, buildUpcomingByDate } from '@/components/user/DiaryCalendarView';
 import { DiaryLedgerRow, UpcomingLedgerRow, MonthBand, groupReviewsByMonth } from '@/components/user/DiaryListView';
 import { usePhotoFeed } from '@/hooks/usePhotoFeed';
+import { PosterPlaceholder } from '@/components/PosterPlaceholder';
 import * as haptics from '@/lib/haptics';
 
 type DiarySort = 'date-desc' | 'date-asc' | 'rating-desc';
@@ -131,9 +132,7 @@ function GridPoster({ posterUrl, title, dateLabel }: { posterUrl: string | null;
       {posterUrl ? (
         <Image source={{ uri: posterUrl }} style={styles.gridPoster} contentFit="cover" transition={200} />
       ) : (
-        <View style={[styles.gridPoster, styles.cardPosterPlaceholder]}>
-          <Text style={styles.placeholderText}>{title.charAt(0)}</Text>
-        </View>
+        <PosterPlaceholder title={title} style={styles.gridPoster} />
       )}
       {!!dateLabel && (
         <View style={styles.gridDateOverlayWrap}>

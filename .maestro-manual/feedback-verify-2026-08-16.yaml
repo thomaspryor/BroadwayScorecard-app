@@ -1,0 +1,127 @@
+# Verification screenshots for the 2026-08-16 overnight beta-feedback batch.
+# LOCAL-ONLY TOOL — outside .maestro/ so CI's glob never runs it.
+# Pre-req: swapped-bundle sim app installed on bsc-feedback-verify sim.
+# Run: maestro test --udid <udid> .maestro-manual/feedback-verify-2026-08-16.yaml
+
+appId: com.broadwayscorecard.app
+---
+- launchApp:
+    clearState: false
+
+- extendedWaitUntil:
+    visible:
+      text: "Broadway Scorecard"
+    timeout: 30000
+
+- runFlow:
+    when:
+      visible: "Skip"
+    commands:
+      - tapOn: "Skip"
+      - tapOn: "Skip"
+      - tapOn: "Skip"
+
+# ── Home: scroll to the new Recently Opened shelves below NYT Critic's Picks (item 4)
+- openLink: broadwayscorecard:///
+- tapOn:
+    text: "Open"
+    optional: true
+- waitForAnimationToEnd
+- takeScreenshot: /tmp/bwsc-verify/01-home-top
+- swipe:
+    direction: UP
+- swipe:
+    direction: UP
+- swipe:
+    direction: UP
+- waitForAnimationToEnd
+- takeScreenshot: /tmp/bwsc-verify/02-home-mid
+- swipe:
+    direction: UP
+- waitForAnimationToEnd
+- takeScreenshot: /tmp/bwsc-verify/03-home-recently-opened
+
+# ── Watched (Diary): Upcoming shelf date-badge position (item 1)
+- openLink: broadwayscorecard:///watched
+- tapOn:
+    text: "Open"
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 5000
+- runFlow:
+    when:
+      visible: "Sign In to Get Started"
+    commands:
+      - tapOn: "Sign In to Get Started"
+      - extendedWaitUntil:
+          visible: "Sign in with email"
+          timeout: 10000
+      - tapOn: "Sign in with email"
+      - extendedWaitUntil:
+          visible:
+            text: "Email"
+          timeout: 5000
+      - tapOn:
+          text: "Email"
+      - inputText: "dev-test@broadwayscorecard.com"
+      - tapOn:
+          text: "Password"
+      - inputText: "dev-test-local-only-2024"
+      - hideKeyboard
+      - tapOn:
+          text: "^Sign In$"
+      - extendedWaitUntil:
+          notVisible: "Sign In to Get Started"
+          timeout: 25000
+      - runFlow:
+          when:
+            visible: "Save Password"
+          commands:
+            - tapOn: "Not Now"
+- openLink: broadwayscorecard:///watched
+- tapOn:
+    text: "Open"
+    optional: true
+- waitForAnimationToEnd
+- takeScreenshot: /tmp/bwsc-verify/04-watched-upcoming-dates
+
+# ── Rate a Show search modal — wider-catalog CTA always at bottom of list
+# (item 3) + diary-only placeholder look (item 2)
+- tapOn:
+    text: "Rate a show"
+- extendedWaitUntil:
+    visible: "Search shows..."
+    timeout: 5000
+- tapOn: "Search shows..."
+- inputText: "One man musical"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: /tmp/bwsc-verify/05-search-local-matches-with-cta
+- eraseText: 30
+- inputText: "zzzznonexistentshowzzzz"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: /tmp/bwsc-verify/06-search-no-matches-cta
+- tapOn: "Cancel"
+
+# ── Show detail: Critic Reviews above Audience Scorecard + renamed title (item 6)
+- openLink: broadwayscorecard:///show/hamilton
+- tapOn:
+    text: "Open"
+    optional: true
+- extendedWaitUntil:
+    visible: "Hamilton"
+    timeout: 10000
+- swipe:
+    direction: UP
+- swipe:
+    direction: UP
+- waitForAnimationToEnd
+- takeScreenshot: /tmp/bwsc-verify/07-show-detail-sections
+
+# ── Share button — should hand off the show URL, not an image (item 5)
+- tapOn: "Share this show"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: /tmp/bwsc-verify/08-share-sheet
+- pressKey: Back

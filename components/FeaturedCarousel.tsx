@@ -9,6 +9,7 @@ import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { Show } from '@/lib/types';
 import { getImageUrl } from '@/lib/images';
+import { PosterPlaceholder } from '@/components/PosterPlaceholder';
 import { ScoreBadge } from '@/components/show-cards';
 import { getQualifiedScore } from '@/lib/score-utils';
 import { BookmarkOverlay } from '@/components/BookmarkOverlay';
@@ -52,9 +53,7 @@ const FeaturedCard = memo(function FeaturedCard({ show, cardWidth, isWatchlisted
             transition={200}
           />
         ) : (
-          <View style={[styles.poster, styles.placeholderPoster]}>
-            <Text style={styles.placeholderText}>{show.title.charAt(0)}</Text>
-          </View>
+          <PosterPlaceholder title={show.title} style={styles.poster} />
         )}
 
         {/* Bookmark / rating chip — rendered AFTER image so it's on top (z-order) */}

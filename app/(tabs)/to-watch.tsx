@@ -37,6 +37,7 @@ import { Skeleton } from '@/components/Skeleton';
 import { ShowSearchModal } from '@/components/ShowSearchModal';
 import { ContextMenu } from '@/components/user/ContextMenu';
 import { PlannedDateSheet } from '@/components/user/PlannedDateSheet';
+import { PosterPlaceholder } from '@/components/PosterPlaceholder';
 import { usePosterGrid } from '@/hooks/usePosterGrid';
 import { POSTER_GRID_GAP, POSTER_GRID_ROW_GAP } from '@/lib/poster-grid';
 import * as haptics from '@/lib/haptics';
@@ -264,9 +265,7 @@ export default function ToWatchScreen() {
           {posterUrl ? (
             <Image source={{ uri: posterUrl }} style={styles.gridPoster} contentFit="cover" transition={200} />
           ) : (
-            <View style={[styles.gridPoster, styles.cardPosterPlaceholder]}>
-              <Text style={styles.placeholderText}>{title.charAt(0)}</Text>
-            </View>
+            <PosterPlaceholder title={title} style={styles.gridPoster} />
           )}
           {/* Date as an overlaid poster tag, matching the Watched tab's grid
               (beta feedback 2026-08-02: bare text dates under Upcoming
@@ -311,9 +310,7 @@ export default function ToWatchScreen() {
             {posterUrl ? (
               <Image source={{ uri: posterUrl }} style={styles.gridPoster} contentFit="cover" transition={200} />
             ) : (
-              <View style={[styles.gridPoster, styles.cardPosterPlaceholder]}>
-                <Text style={styles.placeholderText}>{title.charAt(0)}</Text>
-              </View>
+              <PosterPlaceholder title={title} style={styles.gridPoster} />
             )}
             <PosterStatusPill show={show} />
             {/* No persistent empty-star strip (beta feedback 2026-07-25) —
@@ -348,9 +345,7 @@ export default function ToWatchScreen() {
         {posterUrl ? (
           <Image source={{ uri: posterUrl }} style={styles.listPoster} contentFit="cover" transition={200} />
         ) : (
-          <View style={[styles.listPoster, styles.cardPosterPlaceholder]}>
-            <Text style={styles.placeholderText}>{title.charAt(0)}</Text>
-          </View>
+          <PosterPlaceholder title={title} style={styles.listPoster} />
         )}
         <View style={styles.listInfo}>
           <Text style={styles.listTitle} numberOfLines={1}>{title}</Text>
@@ -386,9 +381,7 @@ export default function ToWatchScreen() {
         {posterUrl ? (
           <Image source={{ uri: posterUrl }} style={styles.listPoster} contentFit="cover" transition={200} />
         ) : (
-          <View style={[styles.listPoster, styles.cardPosterPlaceholder]}>
-            <Text style={styles.placeholderText}>{title.charAt(0)}</Text>
-          </View>
+          <PosterPlaceholder title={title} style={styles.listPoster} />
         )}
         <View style={styles.listInfo}>
           <Text style={styles.listTitle} numberOfLines={1}>{title}</Text>
