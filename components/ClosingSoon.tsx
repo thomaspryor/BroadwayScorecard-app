@@ -82,7 +82,7 @@ export function ClosingSoon({ shows }: ClosingSoonProps) {
                   <Image source={{ uri: posterUrl }} style={[styles.poster, { height: cardHeight }]} contentFit="cover" transition={200} />
                 ) : (
                   <View style={[styles.poster, { height: cardHeight }, styles.posterPlaceholder]}>
-                    <Text style={styles.posterInitial}>{show.title.charAt(0)}</Text>
+                    <Text style={styles.posterInitial}>🎭</Text>
                   </View>
                 )}
 

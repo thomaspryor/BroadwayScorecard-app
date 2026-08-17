@@ -1,0 +1,117 @@
+# Verification screenshots for the 2026-08-17 overnight beta-feedback batch
+# (6 items: date-overlay position, poster placeholders, wider-catalog search
+# footer, Recently Opened Broadway/Off-Broadway shelves, URL share, Critic
+# Reviews section order+naming). LOCAL-ONLY TOOL — outside .maestro/ so CI's
+# glob never runs it.
+# Run: maestro --udid <udid> test .maestro-manual/overnight-2026-08-17-verify.yaml
+
+appId: com.broadwayscorecard.app
+---
+- launchApp:
+    clearState: false
+
+- extendedWaitUntil:
+    visible:
+      text: "Broadway Scorecard"
+    timeout: 30000
+
+- runFlow:
+    when:
+      visible: "Skip"
+    commands:
+      - tapOn: "Skip"
+      - tapOn: "Skip"
+      - tapOn: "Skip"
+
+- runFlow:
+    when:
+      visible: "Sign In to Get Started"
+    commands:
+      - tapOn: "Sign In to Get Started"
+      - extendedWaitUntil:
+          visible: "Sign in with email"
+          timeout: 10000
+      - tapOn: "Sign in with email"
+      - extendedWaitUntil:
+          visible:
+            text: "Email"
+          timeout: 5000
+      - tapOn:
+          text: "Email"
+      - inputText: "dev-test@broadwayscorecard.com"
+      - tapOn:
+          text: "Password"
+      - inputText: "dev-test-local-only-2024"
+      - hideKeyboard
+      - tapOn:
+          text: "^Sign In$"
+      - extendedWaitUntil:
+          notVisible: "Sign In to Get Started"
+          timeout: 25000
+      - runFlow:
+          when:
+            visible: "Save Password"
+          commands:
+            - tapOn: "Not Now"
+
+# ── Item 1 (date overlay at TOP of poster, not bottom): Watched > Upcoming
+- openLink: broadwayscorecard:///watched
+- tapOn:
+    text: "Open"
+    optional: true
+- waitForAnimationToEnd
+- takeScreenshot: /tmp/bwsc-overnight-verify/01-watched-upcoming
+
+# ── Item 2 + 3: search modal — 🎭 placeholder + always-visible wider-catalog
+# footer at the bottom of a non-empty results list
+- tapOn:
+    point: "91%,10%"
+- waitForAnimationToEnd:
+    timeout: 3000
+- inputText: "the lost boys"
+- extendedWaitUntil:
+    visible: "The Last"
+    timeout: 5000
+- swipe:
+    start: 50%, 45%
+    end: 50%, 20%
+- waitForAnimationToEnd
+- swipe:
+    start: 50%, 45%
+    end: 50%, 20%
+- waitForAnimationToEnd
+- takeScreenshot: /tmp/bwsc-overnight-verify/02-search-placeholder-and-footer
+- tapOn: "Cancel"
+
+# ── Item 4: Home shelves — Recently Opened Broadway/Off-Broadway below NYT Picks
+- openLink: broadwayscorecard:///
+- tapOn:
+    text: "Open"
+    optional: true
+- waitForAnimationToEnd
+- swipe:
+    direction: UP
+- waitForAnimationToEnd
+- swipe:
+    start: 50%, 30%
+    end: 50%, 55%
+- waitForAnimationToEnd
+- takeScreenshot: /tmp/bwsc-overnight-verify/03-home-nyt-recently-opened
+
+# ── Item 5 + 6: Show detail — URL share sheet + Critic Reviews above Audience
+- openLink: broadwayscorecard:///show/the-lost-boys
+- tapOn:
+    text: "Open"
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 8000
+- tapOn:
+    point: "90%,9%"
+- waitForAnimationToEnd:
+    timeout: 5000
+- takeScreenshot: /tmp/bwsc-overnight-verify/04-show-share-sheet-url
+- pressKey: Back
+- swipe:
+    direction: UP
+- waitForAnimationToEnd
+- takeScreenshot: /tmp/bwsc-overnight-verify/05-show-critic-reviews-above-audience

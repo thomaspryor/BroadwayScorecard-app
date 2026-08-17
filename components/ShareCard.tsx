@@ -103,7 +103,7 @@ export const ShareCardWithRef = React.forwardRef<ShareCardHandle, ShareCardProps
               <Image source={{ uri: posterUrl }} style={styles.poster} contentFit="cover" />
             ) : (
               <View style={[styles.poster, styles.posterPlaceholder]}>
-                <Text style={styles.posterInitial}>{props.show.title.charAt(0)}</Text>
+                <Text style={styles.posterInitial}>🎭</Text>
               </View>
             )}
 

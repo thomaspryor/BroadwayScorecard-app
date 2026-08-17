@@ -154,7 +154,7 @@ export function DiaryCalendarMonth({ year, month, reviewsByDate, upcomingByDate,
                 />
               ) : (
                 <View style={[styles.cellPoster, styles.cellPosterPlaceholder, cell.upcoming && styles.cellPosterUpcoming]}>
-                  <Text style={styles.cellPosterPlaceholderText}>{title.charAt(0)}</Text>
+                  <Text style={styles.cellPosterPlaceholderText}>🎭</Text>
                 </View>
               )}
               {/* Booked nights get a gold ring on top of the dimmed poster —

@@ -112,7 +112,7 @@ export const ShowCard = memo(function ShowCard({ show, scoreMode = 'critics', hi
         ) : (
           <View style={[styles.showImage, styles.placeholderThumb]}>
             <Text style={styles.placeholderText}>
-              {show.title.charAt(0)}
+              🎭
             </Text>
           </View>
         )}

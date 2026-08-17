@@ -316,6 +316,85 @@ export function ShowSearchModal({
     return `${parts.join(' · ')}${parts.length > 0 ? ' · ' : ''}No critic score`;
   };
 
+  const renderLiveRow = useCallback((item: MezzanineCandidate) => {
+    const alreadyListed = !!excludeIds?.has(item.id);
+    return (
+      <Pressable
+        key={item.id}
+        style={({ pressed }) => [styles.resultRow, (alreadyListed || !!addingLiveId) && styles.resultRowMuted, pressed && styles.pressed]}
+        disabled={alreadyListed || !!addingLiveId}
+        onPress={() => selectLive(item)}
+        accessibilityRole="button"
+        accessibilityState={{ disabled: alreadyListed || !!addingLiveId }}
+        accessibilityLabel={alreadyListed ? `${item.title} — ${excludedLabel}` : item.title}
+      >
+        {item.posterUrl ? (
+          <Image source={{ uri: item.posterUrl }} style={styles.resultPoster} contentFit="cover" />
+        ) : (
+          <View style={[styles.resultPoster, styles.resultPlaceholder]}>
+            <Text style={styles.placeholderText}>🎭</Text>
+          </View>
+        )}
+        <View style={styles.resultInfo}>
+          <Text style={styles.resultTitle} numberOfLines={1}>{item.title}</Text>
+          {item.venue && <Text style={styles.resultVenue} numberOfLines={1}>{item.venue}</Text>}
+          {alreadyListed && (
+            <Text style={styles.resultAlready} numberOfLines={1}>{excludedLabel}</Text>
+          )}
+          <Text style={styles.resultMeta} numberOfLines={1}>
+            {[item.city, item.openingDate?.slice(0, 4)].filter(Boolean).join(' · ')}
+            {item.city || item.openingDate ? ' · ' : ''}No critic score
+          </Text>
+        </View>
+        <Text style={styles.liveAdd}>{addingLiveId === item.id ? 'Adding…' : '+ Add'}</Text>
+      </Pressable>
+    );
+  }, [excludeIds, addingLiveId, excludedLabel, selectLive]);
+
+  // Wider-catalog CTA — always reachable at the bottom of the list, not just
+  // when local search comes up empty (beta feedback 2026-08-12, AE2cV5mx:
+  // "I searched for this musical and didn't find it in the list, but I was
+  // not offered the option to search the wider catalogue").
+  const renderWideCatalogFooter = useCallback(() => {
+    if (liveState === 'searching') {
+      return (
+        <View style={styles.wideCatalogFooter}>
+          <Text style={styles.liveStatus}>Searching the wider catalog…</Text>
+        </View>
+      );
+    }
+    if (liveState === 'results') {
+      return (
+        <View>
+          <Text style={styles.wideHeader}>From the wider theater catalog</Text>
+          {liveCandidates.map(renderLiveRow)}
+        </View>
+      );
+    }
+    if (liveState === 'empty') {
+      return (
+        <View style={styles.wideCatalogFooter}>
+          <Text style={styles.liveStatus}>Not found in the wider catalog either. Try a different spelling.</Text>
+        </View>
+      );
+    }
+    if (liveState === 'error') {
+      return (
+        <View style={styles.wideCatalogFooter}>
+          <Text style={styles.liveErrorText}>{liveError}</Text>
+          <Pressable onPress={runLiveSearch} hitSlop={12} accessibilityRole="button">
+            <Text style={styles.liveLink}>Try again</Text>
+          </Pressable>
+        </View>
+      );
+    }
+    return (
+      <Pressable onPress={runLiveSearch} hitSlop={12} accessibilityRole="button" style={styles.wideCatalogFooter}>
+        <Text style={styles.liveLink}>Can{'’'}t find it? Search the wider theater catalog</Text>
+      </Pressable>
+    );
+  }, [liveState, liveCandidates, liveError, renderLiveRow, runLiveSearch]);
+
   // "No shows found" (and its now-tappable wider-catalog CTA) must wait for
   // the debounce to settle — mid-typing, `results` is still computed from the
   // previous debouncedQuery, so gating on the immediate query would flash the
@@ -382,7 +461,7 @@ export function ShowSearchModal({
                     accessibilityLabel={alreadyListed ? `${candidate.title} — ${excludedLabel}` : candidate.title}
                   >
                     <View style={[styles.resultPoster, styles.resultPlaceholder]}>
-                      <Text style={styles.placeholderText}>{candidate.title.charAt(0)}</Text>
+                      <Text style={styles.placeholderText}>🎭</Text>
                     </View>
                     <View style={styles.resultInfo}>
                       <Text style={styles.resultTitle} numberOfLines={1}>{candidate.title}</Text>
@@ -418,7 +497,7 @@ export function ShowSearchModal({
                     <Image source={{ uri: posterUrl }} style={styles.resultPoster} contentFit="cover" />
                   ) : (
                     <View style={[styles.resultPoster, styles.resultPlaceholder]}>
-                      <Text style={styles.placeholderText}>{show.title.charAt(0)}</Text>
+                      <Text style={styles.placeholderText}>🎭</Text>
                     </View>
                   )}
                   <View style={styles.resultInfo}>
@@ -438,6 +517,7 @@ export function ShowSearchModal({
                 </Pressable>
               );
             }}
+            ListFooterComponent={renderWideCatalogFooter()}
             contentContainerStyle={styles.list}
             showsVerticalScrollIndicator={false}
           />
@@ -449,39 +529,7 @@ export function ShowSearchModal({
             ListHeaderComponent={
               <Text style={styles.wideHeader}>From the wider theater catalog</Text>
             }
-            renderItem={({ item }) => {
-              const alreadyListed = !!excludeIds?.has(item.id);
-              return (
-                <Pressable
-                  style={({ pressed }) => [styles.resultRow, (alreadyListed || !!addingLiveId) && styles.resultRowMuted, pressed && styles.pressed]}
-                  disabled={alreadyListed || !!addingLiveId}
-                  onPress={() => selectLive(item)}
-                  accessibilityRole="button"
-                  accessibilityState={{ disabled: alreadyListed || !!addingLiveId }}
-                  accessibilityLabel={alreadyListed ? `${item.title} — ${excludedLabel}` : item.title}
-                >
-                  {item.posterUrl ? (
-                    <Image source={{ uri: item.posterUrl }} style={styles.resultPoster} contentFit="cover" />
-                  ) : (
-                    <View style={[styles.resultPoster, styles.resultPlaceholder]}>
-                      <Text style={styles.placeholderText}>{item.title.charAt(0)}</Text>
-                    </View>
-                  )}
-                  <View style={styles.resultInfo}>
-                    <Text style={styles.resultTitle} numberOfLines={1}>{item.title}</Text>
-                    {item.venue && <Text style={styles.resultVenue} numberOfLines={1}>{item.venue}</Text>}
-                    {alreadyListed && (
-                      <Text style={styles.resultAlready} numberOfLines={1}>{excludedLabel}</Text>
-                    )}
-                    <Text style={styles.resultMeta} numberOfLines={1}>
-                      {[item.city, item.openingDate?.slice(0, 4)].filter(Boolean).join(' · ')}
-                      {item.city || item.openingDate ? ' · ' : ''}No critic score
-                    </Text>
-                  </View>
-                  <Text style={styles.liveAdd}>{addingLiveId === item.id ? 'Adding…' : '+ Add'}</Text>
-                </Pressable>
-              );
-            }}
+            renderItem={({ item }) => renderLiveRow(item)}
             contentContainerStyle={styles.list}
             showsVerticalScrollIndicator={false}
           />
@@ -586,6 +634,16 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     // Text (~18pt) + padding (16) + hitSlop (12×2) clears the 44pt HIG floor.
     paddingVertical: Spacing.sm,
+  },
+  // Footer under a non-empty results list — same CTA as the empty state, just
+  // reachable without exhausting local search first.
+  wideCatalogFooter: {
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
+    alignItems: 'center',
+    gap: Spacing.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: Colors.border.subtle,
   },
   liveStatus: {
     color: Colors.text.muted,

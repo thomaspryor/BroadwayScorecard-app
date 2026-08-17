@@ -5,7 +5,7 @@
  */
 
 import React, { useMemo, useEffect, useState, useRef } from 'react';
-import { View, Text, ScrollView, StyleSheet, Pressable, Linking } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Pressable, Linking, Share } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, Stack, useRouter } from 'expo-router';
@@ -18,7 +18,7 @@ import { getScoreColor, getContrastTextColor, getMarketMinReviews, getQualifiedS
 import { Show, ShowDetail, MobileShowDetail, mapShowDetail } from '@/lib/types';
 import { ScoreBadge, StatusBadge, FormatPill, ProductionPill, CategoryBadge } from '@/components/show-cards';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
-import { trackTicketTap, trackTicketLinksVisible, trackTicketBrowserOpened, trackTicketBrowserDismissed, trackShowDetailViewed, trackFullReviewTapped } from '@/lib/analytics';
+import { trackTicketTap, trackTicketLinksVisible, trackTicketBrowserOpened, trackTicketBrowserDismissed, trackShowDetailViewed, trackFullReviewTapped, trackShowShared } from '@/lib/analytics';
 import { buildTicketUrl, buildTicketEventProps, isAffiliatePlatform, chooseTicketOpenStrategy, type TicketSource } from '@/lib/ticket-utils';
 import { addSentryBreadcrumb, captureException } from '@/lib/sentry';
 import Svg, { Path, Rect, Circle, Line, Defs, LinearGradient as SvgLinearGradient, Stop } from 'react-native-svg';
@@ -111,6 +111,24 @@ export default function ShowDetailScreen() {
     if (!show) return;
     // Try image share card first, falls back to text internally
     await shareCardRef.current?.share();
+  };
+
+  // Header share button — the show's URL, not the score-card image (beta
+  // feedback 2026-08-13, ANDYIxNp: "The share button should send the URL to
+  // the show, not an image"). The dedicated "Share Score Card" button below
+  // the fold keeps sharing the branded image — that's its whole purpose.
+  const handleShareLink = async () => {
+    if (!show) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    trackShowShared(show.id, show.title);
+    try {
+      await Share.share({
+        message: `Check out ${show.title} on Broadway Scorecard!\nhttps://broadwayscorecard.com/show/${show.slug}`,
+        url: `https://broadwayscorecard.com/show/${show.slug}`,
+      });
+    } catch {
+      // User cancelled
+    }
   };
 
   /**
@@ -281,7 +299,7 @@ export default function ShowDetailScreen() {
           // fold; this makes sharing reachable from the top of every show).
           headerRight: () => (
             <Pressable
-              onPress={handleShare}
+              onPress={handleShareLink}
               hitSlop={10}
               accessibilityRole="button"
               accessibilityLabel="Share this show"
@@ -310,7 +328,7 @@ export default function ShowDetailScreen() {
                 />
               ) : (
                 <View style={[styles.posterCard, styles.posterPlaceholder]}>
-                  <Text style={styles.posterPlaceholderText}>{show.title.charAt(0)}</Text>
+                  <Text style={styles.posterPlaceholderText}>🎭</Text>
                 </View>
               )}
               {featureFlags.userAccounts && (
@@ -437,6 +455,28 @@ export default function ShowDetailScreen() {
 
           />
         </View>
+
+        {/* Critic Reviews List — collapsed by default. Rendered above Audience
+            Scorecard and titled "Critic Reviews" (beta feedback 2026-08-13,
+            AEOxuwE1: web parity — the website's Critic Reviews/Scorecard
+            section sits above Audience Scorecard). */}
+        {detail?.reviews && detail.reviews.length > 0 && (
+          <SectionCard title="Critic Reviews" meta={`${detail.reviews.length} reviews`}>
+            {(showAllReviews ? detail.reviews : detail.reviews.slice(0, 3)).map((review, i) => (
+              <ReviewRow key={i} review={review} showId={show.id} category={show.category} />
+            ))}
+            {!showAllReviews && detail.reviews.length > 3 && (
+              <Pressable
+                style={({ pressed }) => [styles.showAllButton, pressed && styles.pressed]}
+                onPress={() => setShowAllReviews(true)}
+              >
+                <Text style={styles.showAllText}>
+                  Show all {detail.reviews.length} reviews
+                </Text>
+              </Pressable>
+            )}
+          </SectionCard>
+        )}
 
         {/* Audience Scorecard — grade badge header + horizontal source cards */}
         {detail?.audience && show.audienceGrade && (
@@ -601,25 +641,6 @@ export default function ShowDetailScreen() {
           </SectionCard>
         )}
 
-        {/* Critic Reviews List — collapsed by default */}
-        {detail?.reviews && detail.reviews.length > 0 && (
-          <SectionCard title="Critic Scorecard" meta={`${detail.reviews.length} reviews`}>
-            {(showAllReviews ? detail.reviews : detail.reviews.slice(0, 3)).map((review, i) => (
-              <ReviewRow key={i} review={review} showId={show.id} category={show.category} />
-            ))}
-            {!showAllReviews && detail.reviews.length > 3 && (
-              <Pressable
-                style={({ pressed }) => [styles.showAllButton, pressed && styles.pressed]}
-                onPress={() => setShowAllReviews(true)}
-              >
-                <Text style={styles.showAllText}>
-                  Show all {detail.reviews.length} reviews
-                </Text>
-              </Pressable>
-            )}
-          </SectionCard>
-        )}
-
         {/* Loading skeleton for detail */}
         {detailLoading && (
           <ShowDetailSkeleton />
@@ -753,7 +774,7 @@ export default function ShowDetailScreen() {
                     <Image source={{ uri: prodPoster }} style={styles.relatedShowImage} contentFit="cover" transition={200} />
                   ) : (
                     <View style={[styles.relatedShowImage, styles.relatedShowPlaceholder]}>
-                      <Text style={styles.relatedShowPlaceholderText}>{prod.title.charAt(0)}</Text>
+                      <Text style={styles.relatedShowPlaceholderText}>🎭</Text>
                     </View>
                   )}
                   <View style={styles.relatedShowInfo}>
@@ -1058,7 +1079,7 @@ function RelatedShowRow({ show, onPress }: { show: Show; onPress: () => void }) 
         <Image source={{ uri: poster }} style={styles.relatedShowImage} contentFit="cover" transition={200} />
       ) : (
         <View style={[styles.relatedShowImage, styles.relatedShowPlaceholder]}>
-          <Text style={styles.relatedShowPlaceholderText}>{show.title.charAt(0)}</Text>
+          <Text style={styles.relatedShowPlaceholderText}>🎭</Text>
         </View>
       )}
       <View style={styles.relatedShowInfo}>

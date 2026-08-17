@@ -319,7 +319,7 @@ export default function MyShowsScreen() {
             <Image source={{ uri: posterUrl }} style={styles.cardPoster} contentFit="cover" transition={200} />
           ) : (
             <View style={[styles.cardPoster, styles.cardPosterPlaceholder]}>
-              <Text style={styles.placeholderText}>{title.charAt(0)}</Text>
+              <Text style={styles.placeholderText}>🎭</Text>
             </View>
           )}
           <View style={styles.cardInfo}>
@@ -360,7 +360,7 @@ export default function MyShowsScreen() {
           <Image source={{ uri: posterUrl }} style={styles.gridPoster} contentFit="cover" transition={200} />
         ) : (
           <View style={[styles.gridPoster, styles.cardPosterPlaceholder]}>
-            <Text style={styles.placeholderText}>{title.charAt(0)}</Text>
+            <Text style={styles.placeholderText}>🎭</Text>
           </View>
         )}
         <View style={styles.gridCardInfo}>
@@ -403,7 +403,7 @@ export default function MyShowsScreen() {
           <Image source={{ uri: posterUrl }} style={styles.gridPoster} contentFit="cover" transition={200} />
         ) : (
           <View style={[styles.gridPoster, styles.cardPosterPlaceholder]}>
-            <Text style={styles.placeholderText}>{title.charAt(0)}</Text>
+            <Text style={styles.placeholderText}>🎭</Text>
           </View>
         )}
         <Text style={styles.gridTitle} numberOfLines={2}>{title}</Text>
@@ -429,7 +429,7 @@ export default function MyShowsScreen() {
           <Image source={{ uri: posterUrl }} style={styles.cardPoster} contentFit="cover" transition={200} />
         ) : (
           <View style={[styles.cardPoster, styles.cardPosterPlaceholder]}>
-            <Text style={styles.placeholderText}>{title.charAt(0)}</Text>
+            <Text style={styles.placeholderText}>🎭</Text>
           </View>
         )}
         <View style={styles.cardInfo}>
@@ -817,7 +817,7 @@ function SwipeableWatchlistItem({
           <Image source={{ uri: posterUrl }} style={styles.cardPoster} contentFit="cover" transition={200} />
         ) : (
           <View style={[styles.cardPoster, styles.cardPosterPlaceholder]}>
-            <Text style={styles.placeholderText}>{title.charAt(0)}</Text>
+            <Text style={styles.placeholderText}>🎭</Text>
           </View>
         )}
         <View style={styles.cardInfo}>
