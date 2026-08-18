@@ -1,0 +1,93 @@
+# Verification screenshots for the 2026-08-18 overnight beta-feedback batch
+# (6 items: date-label position, image placeholder, wider-catalog CTA,
+# recently-opened shelves, share-link vs image, critic/audience order).
+# LOCAL-ONLY TOOL — outside .maestro/ so CI's glob never runs it.
+# Run: maestro test .maestro-manual/beta-feedback-overnight-0818-verify.yaml
+
+appId: com.broadwayscorecard.app
+---
+- launchApp:
+    clearState: false
+
+- extendedWaitUntil:
+    visible:
+      text: "Broadway Scorecard"
+    timeout: 30000
+
+- runFlow:
+    when:
+      visible: "Skip"
+    commands:
+      - tapOn: "Skip"
+      - tapOn: "Skip"
+      - tapOn: "Skip"
+
+# ── Home: item 4 (Recently Opened on Broadway / Off Broadway below NYT Critic's Picks)
+- openLink: broadwayscorecard:///
+- tapOn:
+    text: "Open"
+    optional: true
+- waitForAnimationToEnd
+- swipe:
+    direction: UP
+- swipe:
+    direction: UP
+- swipe:
+    direction: UP
+- waitForAnimationToEnd
+- takeScreenshot: /tmp/bwsc-verify-0818/01-home-mid
+- swipe:
+    direction: UP
+- waitForAnimationToEnd
+- takeScreenshot: /tmp/bwsc-verify-0818/02-home-recently-opened
+
+# ── Watched tab, Diary grid: item 1 (date at top), item 2 (image placeholder)
+- openLink: broadwayscorecard:///watched
+- tapOn:
+    text: "Open"
+    optional: true
+- waitForAnimationToEnd
+- takeScreenshot: /tmp/bwsc-verify-0818/03-watched-grid-top
+- swipe:
+    direction: UP
+- waitForAnimationToEnd
+- takeScreenshot: /tmp/bwsc-verify-0818/04-watched-grid-scrolled
+
+# ── Rate a Show search: item 3 (wider-catalog CTA always at bottom of list)
+- tapOn:
+    id: "diary-grid-view-toggle"
+    optional: true
+- scrollUntilVisible:
+    element:
+      text: "Rate a show"
+    direction: DOWN
+    optional: true
+- tapOn:
+    text: "Rate a show"
+    optional: true
+- extendedWaitUntil:
+    visible: "Rate a Show"
+    timeout: 5000
+- tapOn:
+    text: "Search shows..."
+- inputText: "Hamilton"
+- waitForAnimationToEnd
+- takeScreenshot: /tmp/bwsc-verify-0818/05-search-with-local-results
+- eraseText: 20
+- inputText: "zzzznonexistentshowxyz"
+- waitForAnimationToEnd
+- takeScreenshot: /tmp/bwsc-verify-0818/06-search-no-local-results
+
+# ── Show detail: item 5 (share = link), item 6 (Critic Reviews above Audience Scorecard)
+- openLink: broadwayscorecard:///show/hamilton
+- tapOn:
+    text: "Open"
+    optional: true
+- waitForAnimationToEnd
+- takeScreenshot: /tmp/bwsc-verify-0818/07-show-header
+- swipe:
+    direction: UP
+- swipe:
+    direction: UP
+- waitForAnimationToEnd
+- takeScreenshot: /tmp/bwsc-verify-0818/08-show-critic-audience-order
