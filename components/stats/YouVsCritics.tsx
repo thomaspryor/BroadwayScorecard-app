@@ -122,6 +122,7 @@ export function YouVsCritics({ bundle, onOpenAligned, onOpenPick, onOpenGold }: 
           need={`Rate ${MIN_RATED_WITH_SCORE - critics.comparable} more scored show${
             MIN_RATED_WITH_SCORE - critics.comparable === 1 ? '' : 's'
           } with critic scores to unlock your taste profile.`}
+          scopeLabel={bundle.scope.kind !== 'all' ? bundle.scope.label : undefined}
         />
         {goldBlock && <StatsCard>{goldBlock}</StatsCard>}
       </>

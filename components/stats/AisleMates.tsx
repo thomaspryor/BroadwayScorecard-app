@@ -104,6 +104,7 @@ export function AisleMates({ bundle, onOpenReviewer }: AisleMatesProps) {
       <ModuleLocked
         title="Aisle Mates"
         need={`Rate ${RISING_MIN_SHARED} or more shows that also have critic reviews to find the critics who see theater the way you do.`}
+        scopeLabel={bundle.scope.kind !== 'all' ? 'all time' : undefined}
       />
     );
   }

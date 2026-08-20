@@ -366,12 +366,24 @@ export function GhostState({
   );
 }
 
-/** Under-threshold placeholder for a single module. */
-export function ModuleLocked({ title, need }: { title: string; need: string }) {
+/**
+ * Under-threshold placeholder for a single module.
+ *
+ * `need` reads as a lifetime instruction ("Rate 5 more shows...") even when
+ * the count it's built from is scope-filtered — under a season/year scope
+ * that misleads: the owner may have rated 5+ shows overall, just not within
+ * the active window (build-61 sim QA). `scopeLabel` (pass `bundle.scope.kind
+ * !== 'all' ? bundle.scope.label : undefined`) appends the same scope-echo
+ * suffix already used on unlocked module captions.
+ */
+export function ModuleLocked({ title, need, scopeLabel }: { title: string; need: string; scopeLabel?: string }) {
   return (
     <StatsCard>
       <ModuleHeader title={title} />
-      <Text style={styles.lockedText}>{need}</Text>
+      <Text style={styles.lockedText}>
+        {need}
+        {scopeLabel ? ` (${scopeLabel})` : ''}
+      </Text>
     </StatsCard>
   );
 }

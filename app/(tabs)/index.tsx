@@ -7,6 +7,7 @@
 import React, { useMemo, useCallback, useState } from 'react';
 import { View, Text, FlatList, StyleSheet, RefreshControl, Pressable } from 'react-native';
 import { ShowListSkeleton } from '@/components/Skeleton';
+import { BottomScrim } from '@/components/BottomScrim';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import Svg, { Path, Circle } from 'react-native-svg';
@@ -23,7 +24,7 @@ import { filterByMarketCategory } from '@/components/MarketPicker';
 import { Show } from '@/lib/types';
 import { getQualifiedScore } from '@/lib/score-utils';
 import { StaleBanner } from '@/components/StaleBanner';
-import { Colors, Spacing, FontSize } from '@/constants/theme';
+import { Colors, Spacing, FontSize, TAB_BAR_CLEARANCE } from '@/constants/theme';
 import { trackDataRefreshed } from '@/lib/analytics';
 
 export default function HomeScreen() {
@@ -315,7 +316,7 @@ export default function HomeScreen() {
             </View>
           ) : null
         }
-        contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 72 }]}
+        contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + TAB_BAR_CLEARANCE }]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -325,6 +326,7 @@ export default function HomeScreen() {
           />
         }
       />
+      <BottomScrim height={insets.bottom + TAB_BAR_CLEARANCE / 2} />
     </View>
   );
 }

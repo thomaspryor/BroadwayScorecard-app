@@ -4,6 +4,15 @@
  * rendering the raw id string, which read as a broken/dead row.
  */
 
+/** Collapse internal whitespace runs and trim edges, e.g.
+ * "Sabrage / Lafayette  " -> "Sabrage / Lafayette" — venue strings synced
+ * from the web catalog occasionally carry a doubled space, which then shows
+ * up as a visible double space before the " · " separator wherever the venue
+ * is displayed (build-61 sim QA). */
+export function normalizeVenue(venue: string): string {
+  return venue.trim().replace(/\s+/g, ' ');
+}
+
 /** Turn a raw show_id slug into a readable title-ish fallback, e.g.
  * "hamilton-2015" -> "Hamilton 2015". */
 export function humanizeShowId(showId: string): string {

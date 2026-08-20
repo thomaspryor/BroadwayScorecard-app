@@ -14,6 +14,7 @@
 import React from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import { BorderRadius, Colors, FontSize, Spacing } from '@/constants/theme';
 import { getImageUrl } from '@/lib/images';
 import * as haptics from '@/lib/haptics';
@@ -31,41 +32,54 @@ export interface CanonChecklistsProps {
 }
 
 function Shelf({ entries, onOpenEntry }: { entries: CanonEntry[]; onOpenEntry: (e: CanonEntry) => void }) {
+  // Fixed-width shelf with no fade or trailing space read as "clipped" —
+  // the last poster ended flush at the card edge with nothing to signal more
+  // content was scrollable (build-61 sim QA). A trailing gradient plus real
+  // padding past the last item fixes both the visual clip and the affordance.
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.shelf}>
-      {entries.map((e) => {
-        const poster = getImageUrl(e.img ?? null);
-        return (
-          <Pressable
-            key={`${e.ceremony}:${e.id}`}
-            testID={e.seen ? 'stats-canon-poster-seen' : 'stats-canon-poster-unseen'}
-            onPress={() => {
-              haptics.tap();
-              onOpenEntry(e);
-            }}
-            accessibilityRole="button"
-            accessibilityLabel={`${e.t}, ${e.season}. ${e.seen ? 'Seen' : 'Not seen'}.`}
-            style={({ pressed }) => [styles.shelfItem, pressed && styles.pressed]}
-          >
-            {poster ? (
-              <Image
-                source={{ uri: poster }}
-                style={[styles.shelfPoster, !e.seen && styles.shelfPosterUnseen]}
-                contentFit="cover"
-                transition={150}
-              />
-            ) : (
-              <View style={[styles.shelfPoster, styles.shelfPlaceholder, !e.seen && styles.shelfPosterUnseen]}>
-                <Text style={styles.shelfInitial}>{e.t.charAt(0)}</Text>
-              </View>
-            )}
-            <Text style={[styles.shelfYear, TABULAR, !e.seen && styles.shelfYearUnseen]} numberOfLines={1}>
-              {e.season}
-            </Text>
-          </Pressable>
-        );
-      })}
-    </ScrollView>
+    <View style={styles.shelfWrap}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.shelf}>
+        {entries.map((e) => {
+          const poster = getImageUrl(e.img ?? null);
+          return (
+            <Pressable
+              key={`${e.ceremony}:${e.id}`}
+              testID={e.seen ? 'stats-canon-poster-seen' : 'stats-canon-poster-unseen'}
+              onPress={() => {
+                haptics.tap();
+                onOpenEntry(e);
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={`${e.t}, ${e.season}. ${e.seen ? 'Seen' : 'Not seen'}.`}
+              style={({ pressed }) => [styles.shelfItem, pressed && styles.pressed]}
+            >
+              {poster ? (
+                <Image
+                  source={{ uri: poster }}
+                  style={[styles.shelfPoster, !e.seen && styles.shelfPosterUnseen]}
+                  contentFit="cover"
+                  transition={150}
+                />
+              ) : (
+                <View style={[styles.shelfPoster, styles.shelfPlaceholder, !e.seen && styles.shelfPosterUnseen]}>
+                  <Text style={styles.shelfInitial}>{e.t.charAt(0)}</Text>
+                </View>
+              )}
+              <Text style={[styles.shelfYear, TABULAR, !e.seen && styles.shelfYearUnseen]} numberOfLines={1}>
+                {e.season}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+      <LinearGradient
+        pointerEvents="none"
+        colors={['transparent', Colors.surface.raised]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+        style={styles.shelfFade}
+      />
+    </View>
   );
 }
 
@@ -180,7 +194,11 @@ const styles = StyleSheet.create({
   },
   blockTitle: { color: Colors.text.primary, fontSize: FontSize.sm, fontWeight: '700' },
   blockValue: { color: Colors.text.secondary, fontSize: FontSize.sm, fontWeight: '700' },
-  shelf: { gap: Spacing.sm, paddingVertical: Spacing.md },
+  shelfWrap: { position: 'relative' },
+  shelf: { gap: Spacing.sm, paddingVertical: Spacing.md, paddingRight: Spacing.xl },
+  // Signals more posters are scrollable past the edge instead of the shelf
+  // just clipping mid-poster.
+  shelfFade: { position: 'absolute', top: 0, right: 0, bottom: 0, width: Spacing.xl },
   shelfItem: { width: 54 },
   shelfPoster: {
     width: 54,

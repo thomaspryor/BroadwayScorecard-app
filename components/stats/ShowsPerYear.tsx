@@ -19,21 +19,9 @@ import type { ScopeOption } from '@/lib/stats-scope';
 import { MIN_DATED_FOR_YEAR_CHART, type StatsBundle } from '@/hooks/useStatsData';
 import { STATS_LAYOUT } from '@/lib/stats-layout';
 import { GoldBar, ModuleHeader, ModuleLocked, RecordPill, StatsCard, TABULAR } from './StatsPrimitives';
-
-const MONTH_ABBR = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
-
-/** "2025-10" → "October 2025" */
-export function formatMonth(key: string): string {
-  const [y, m] = key.split('-');
-  const d = new Date(Number(y), Number(m) - 1, 1);
-  return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-}
-
-/** "2025-10" → "Oct" */
-function shortMonth(key: string): string {
-  const m = parseInt(key.slice(5, 7), 10);
-  return MONTH_ABBR[m - 1] ?? '?';
-}
+// Pure formatters live in lib/ so they're unit-testable outside a .tsx file.
+import { formatMonth, shortMonth } from '@/lib/stats-months';
+export { formatMonth, shortMonth };
 
 export interface ShowsPerYearProps {
   bundle: StatsBundle;
@@ -114,6 +102,7 @@ export function ShowsPerYear({ bundle, scope, onSelectYear, onOpenMonth, onOpenR
       <ModuleLocked
         title={byMonths ? 'Month by month' : 'Shows per year'}
         need={`Log ${need} more dated ${need === 1 ? 'entry' : 'entries'} to see this chart.`}
+        scopeLabel={scope.kind !== 'all' ? scope.label : undefined}
       />
     );
   }
@@ -124,7 +113,7 @@ export function ShowsPerYear({ bundle, scope, onSelectYear, onOpenMonth, onOpenR
   const scrolls = bars.length > 14;
 
   const chart = (
-    <View style={[styles.chart, scrolls && { minWidth: bars.length * 34 }]}>
+    <View style={[styles.chart, scrolls && { minWidth: bars.length * 38 }]}>
       {bars.map((b) => (
         <Pressable
           key={b.key}
@@ -142,9 +131,9 @@ export function ShowsPerYear({ bundle, scope, onSelectYear, onOpenMonth, onOpenR
           accessibilityLabel={b.a11y}
           style={({ pressed }) => [styles.barSlot, scrolls && styles.barSlotFixed, pressed && styles.pressed]}
         >
-          {/* Selective labelling: only the peak bar carries its count, so the
-              axis stays readable (spec §3.2). */}
-          <Text style={[styles.barCount, TABULAR, b.key !== peak?.key && styles.barCountHidden]}>{b.count}</Text>
+          {/* Every bar carries its count (build-61 sim QA: labelling only the
+              peak bar left every other value unreadable without a tap). */}
+          <Text style={[styles.barCount, TABULAR, b.key === peak?.key && styles.barCountPeak]}>{b.count}</Text>
           {/* Fixed-height track with px bar heights: the %-height chain
               (slot 100% → track flex → bar %) resolves against an undefined
               parent inside the horizontal ScrollView and collapsed every bar
@@ -216,10 +205,10 @@ const styles = StyleSheet.create({
     height: 148,
   },
   barSlot: { flex: 1, minWidth: 0, height: '100%', justifyContent: 'flex-end', alignItems: 'center' },
-  barSlotFixed: { flex: 0, width: 30 },
+  barSlotFixed: { flex: 0, width: 34 },
   barTrack: { width: '78%', height: TRACK_HEIGHT, justifyContent: 'flex-end' },
-  barCount: { color: Colors.text.secondary, fontSize: FontSize.xs, fontWeight: '700', marginBottom: 2 },
-  barCountHidden: { opacity: 0 },
+  barCount: { color: Colors.text.muted, fontSize: FontSize.xs, fontWeight: '600', marginBottom: 2 },
+  barCountPeak: { color: Colors.text.secondary, fontWeight: '700' },
   barLabel: { color: Colors.text.muted, fontSize: FontSize.xs, marginTop: Spacing.xs },
   records: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm, marginTop: Spacing.lg },
   pressed: { opacity: 0.7 },

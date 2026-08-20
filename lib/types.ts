@@ -6,6 +6,8 @@
  * there, update MobileShow and mapMobileShow() here.
  */
 
+import { normalizeVenue } from './show-format';
+
 // Expected schema versions
 export const EXPECTED_SCHEMA_VERSION = 1;
 // v3: aw (award score), vs.sum, acc, tlk (card-parity redesign). All new
@@ -406,7 +408,7 @@ export function mapMobileShow(raw: MobileShow): Show {
     id: raw.id,
     title: raw.t ?? 'Unknown Show',
     slug: raw.s ?? '',
-    venue: raw.v ?? '',
+    venue: normalizeVenue(raw.v ?? ''),
     status: raw.st ?? 'closed',
     type: raw.ty ?? 'play',
     category: raw.cat ?? 'broadway',

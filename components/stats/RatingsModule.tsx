@@ -35,6 +35,7 @@ export function RatingsModule({ bundle, onOpenBucket, onOpenUnrated }: RatingsMo
         need={`Rate ${MIN_RATED_FOR_HISTOGRAM - histogram.rated} more show${
           MIN_RATED_FOR_HISTOGRAM - histogram.rated === 1 ? '' : 's'
         } to see your distribution.`}
+        scopeLabel={bundle.scope.kind !== 'all' ? bundle.scope.label : undefined}
       />
     );
   }

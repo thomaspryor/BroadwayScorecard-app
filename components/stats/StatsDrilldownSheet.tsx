@@ -20,6 +20,8 @@ import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { getImageUrl } from '@/lib/images';
 import { showTitleFallback } from '@/lib/show-format';
+import { groupReviewsByVenue } from '@/lib/stats-drilldown';
+import { houseShortName } from './TheaterTracker';
 import { BorderRadius, Colors, FontSize, Spacing } from '@/constants/theme';
 import { ScoreBadge } from '@/components/show-cards';
 import MiniStars from '@/components/user/MiniStars';
@@ -54,6 +56,12 @@ export interface DrilldownPayload {
    * haven't seen" after a critic's shared-show agreement history.
    */
   showsLabel?: string;
+  /**
+   * Group `reviews` into per-venue sections (largest first) instead of one
+   * flat date-sorted list — e.g. the Theaters hero tile, where a 52-row flat
+   * list buried which houses you'd actually been to (build-61 sim QA).
+   */
+  groupByVenue?: boolean;
 }
 
 function formatDate(dateSeen: string | null): string {
@@ -84,8 +92,22 @@ export function StatsDrilldownSheet({
   const rows = useMemo<Row[]>(() => {
     if (!payload) return [];
     const out: Row[] = [];
-    for (const r of payload.reviews ?? []) {
-      out.push({ kind: 'review', key: `r:${r.id}`, review: r, show: showsById[r.show_id] });
+    if (payload.groupByVenue && payload.reviews?.length) {
+      const groups = groupReviewsByVenue(payload.reviews, (showId) => showsById[showId]?.venue);
+      for (const g of groups) {
+        out.push({
+          kind: 'divider',
+          key: `divider:${g.venue}`,
+          label: `${houseShortName(g.venue)} · ${g.reviews.length}`,
+        });
+        for (const r of g.reviews) {
+          out.push({ kind: 'review', key: `r:${r.id}`, review: r, show: showsById[r.show_id] });
+        }
+      }
+    } else {
+      for (const r of payload.reviews ?? []) {
+        out.push({ kind: 'review', key: `r:${r.id}`, review: r, show: showsById[r.show_id] });
+      }
     }
     const shows = payload.shows ?? [];
     // Divider only when both groups are present — a single-group payload

@@ -18,6 +18,7 @@
  */
 import type { MatchCandidate } from './show-match';
 import type { Show } from './types';
+import { normalizeVenue } from './show-format';
 
 export const DIARY_SEARCH_URL = 'https://broadwayscorecard.com/data/diary-search.json';
 
@@ -55,7 +56,7 @@ export function diaryEntryToCandidate(entry: DiarySearchEntry): MatchCandidate {
     id: entry.id,
     title: entry.title,
     slug: entry.slug ?? entry.id,
-    venue: entry.venue ?? null,
+    venue: entry.venue ? normalizeVenue(entry.venue) : null,
     category: entry.category ?? 'other',
     openingDate: entry.od ?? null,
     closingDate: null,

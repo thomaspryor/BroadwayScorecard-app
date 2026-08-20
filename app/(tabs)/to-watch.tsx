@@ -32,8 +32,9 @@ import { OutOfMarketChip } from '@/components/show-cards/OutOfMarketChip';
 import { featureFlags } from '@/lib/feature-flags';
 import type { WatchlistEntry } from '@/lib/user-types';
 import type { Show } from '@/lib/types';
-import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
+import { Colors, Spacing, FontSize, BorderRadius, TAB_BAR_CLEARANCE } from '@/constants/theme';
 import { Skeleton } from '@/components/Skeleton';
+import { BottomScrim } from '@/components/BottomScrim';
 import { ShowSearchModal } from '@/components/ShowSearchModal';
 import { ContextMenu } from '@/components/user/ContextMenu';
 import { PlannedDateSheet } from '@/components/user/PlannedDateSheet';
@@ -547,7 +548,7 @@ export default function ToWatchScreen() {
             </View>
           )}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: insets.bottom + 72 }}
+          contentContainerStyle={{ paddingBottom: insets.bottom + TAB_BAR_CLEARANCE }}
         />
       )}
 
@@ -612,6 +613,7 @@ export default function ToWatchScreen() {
         }}
         onClose={() => setShowSearchModal(false)}
       />
+      <BottomScrim height={insets.bottom + TAB_BAR_CLEARANCE / 2} />
     </GestureHandlerRootView>
   );
 }

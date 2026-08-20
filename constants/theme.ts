@@ -66,6 +66,17 @@ export const BorderRadius = {
   pill: 9999,
 } as const;
 
+/**
+ * Extra bottom clearance (added to `insets.bottom`) that scrollable lists
+ * need so their last row clears the floating NativeTabs bar. Previously a
+ * bare `72` duplicated across 4 screens (watched/browse/index/to-watch),
+ * with no margin for the bar's own padding/shadow — the last row could sit
+ * close enough that taps landed on the (native, RN-invisible) tab bar
+ * instead of the row (build-61 sim QA). One shared constant so a future
+ * tuning pass only has one number to change.
+ */
+export const TAB_BAR_CLEARANCE = 96;
+
 export const FontSize = {
   xs: 12,
   sm: 15,

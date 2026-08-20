@@ -7,6 +7,7 @@ import React, { useMemo, useState, useCallback, useRef } from 'react';
 import { View, Text, TextInput, FlatList, StyleSheet, ScrollView, Pressable, RefreshControl, Platform } from 'react-native';
 import Fuse, { IFuseOptions } from 'fuse.js';
 import { ShowListSkeleton } from '@/components/Skeleton';
+import { BottomScrim } from '@/components/BottomScrim';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useShows } from '@/lib/data-context';
@@ -21,7 +22,7 @@ import { StaleBanner } from '@/components/StaleBanner';
 import { useAuth } from '@/lib/auth-context';
 import { useWatchlist } from '@/hooks/useWatchlist';
 import { useMyRatingsMap } from '@/hooks/useMyRatingsMap';
-import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
+import { Colors, Spacing, FontSize, BorderRadius, TAB_BAR_CLEARANCE } from '@/constants/theme';
 import { trackFilterChanged, trackScoreModeToggled, trackMarketChanged, trackDataRefreshed } from '@/lib/analytics';
 import { AdvancedFiltersSheet } from '@/components/AdvancedFiltersSheet';
 import { applyAdvancedFilters, countActiveSelections, toggleSelection, AdvancedSelections } from '@/lib/advanced-filters';
@@ -349,7 +350,7 @@ export default function BrowseScreen() {
           </View>
           </View>
         }
-        contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 72 }]}
+        contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + TAB_BAR_CLEARANCE }]}
         showsVerticalScrollIndicator={false}
         windowSize={5}
         maxToRenderPerBatch={8}
@@ -378,6 +379,7 @@ export default function BrowseScreen() {
         onClearAll={handleAdvancedClearAll}
         onClose={() => setFiltersSheetOpen(false)}
       />
+      <BottomScrim height={insets.bottom + TAB_BAR_CLEARANCE / 2} />
     </View>
   );
 }

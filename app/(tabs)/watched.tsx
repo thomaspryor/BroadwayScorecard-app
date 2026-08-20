@@ -12,6 +12,7 @@ import {
   View,
   Text,
   FlatList,
+  SectionList,
   Pressable,
   RefreshControl,
   StyleSheet,
@@ -39,8 +40,9 @@ import { usePosterGrid } from '@/hooks/usePosterGrid';
 import { POSTER_GRID_GAP, POSTER_GRID_ROW_GAP } from '@/lib/poster-grid';
 import type { UserReview, WatchlistEntry } from '@/lib/user-types';
 import type { Show } from '@/lib/types';
-import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
+import { Colors, Spacing, FontSize, BorderRadius, TAB_BAR_CLEARANCE } from '@/constants/theme';
 import { Skeleton } from '@/components/Skeleton';
+import { BottomScrim } from '@/components/BottomScrim';
 import { ShowSearchModal } from '@/components/ShowSearchModal';
 import { ContextMenu } from '@/components/user/ContextMenu';
 import { StatsScreen } from '@/components/stats/StatsScreen';
@@ -229,10 +231,21 @@ export default function WatchedScreen() {
     push();
   }, []);
 
+  // Stats stays mounted (hidden, not unmounted) once opened — switching to
+  // Diary/Feed and back used to remount it fresh every time, resetting its
+  // scope selection, scroll position and canon cache (build-61 sim QA).
+  // Set alongside viewMode at both places that change it (the tap handler
+  // below and the AsyncStorage restore's resolved callback), never in a bare
+  // effect body — monotonic, so it's never reset to false once true.
+  const [statsMounted, setStatsMounted] = useState(viewMode === 'stats');
+
   // Restore the user's last view mode (web parity — persisted, not reset per session).
   useEffect(() => {
     AsyncStorage.getItem(VIEW_MODE_KEY).then(stored => {
-      if (VIEW_MODES.includes(stored as ViewMode)) setViewModeState(stored as ViewMode);
+      if (VIEW_MODES.includes(stored as ViewMode)) {
+        setViewModeState(stored as ViewMode);
+        if (stored === 'stats') setStatsMounted(true);
+      }
     }).catch(() => {});
     AsyncStorage.getItem(DIARY_LAYOUT_KEY).then(stored => {
       if (DIARY_LAYOUTS.includes(stored as DiaryLayout)) setGridSubViewState(stored as DiaryLayout);
@@ -241,6 +254,7 @@ export default function WatchedScreen() {
 
   const setViewMode = useCallback((mode: ViewMode) => {
     setViewModeState(mode);
+    if (mode === 'stats') setStatsMounted(true);
     AsyncStorage.setItem(VIEW_MODE_KEY, mode).catch(() => {});
   }, []);
 
@@ -350,6 +364,15 @@ export default function WatchedScreen() {
     });
   }, [reviewsByYear, diarySort]);
 
+  // Sections for the sticky-header SectionList (poster grid + year groups).
+  // One `data` item per year — the whole year's reviews render together in
+  // the existing flex-wrap grid, same as before — so this only restructures
+  // "iterate years" into SectionList form, it doesn't touch per-card layout.
+  const pastYearSections = useMemo(
+    () => sortedYears.map(year => ({ year, data: [reviewsByYear[year]] })),
+    [sortedYears, reviewsByYear],
+  );
+
   const showsSeen = new Set(reviews.map(r => r.show_id)).size;
 
   // Calendar sub-view data — months as FlatList items (virtualized above)
@@ -419,7 +442,7 @@ export default function WatchedScreen() {
 
   // Clearance for the native tab bar: FlatList content must scroll past it
   // (fixed Spacing.xxl left the last row hidden behind the bar).
-  const listBottomPad = insets.bottom + 72;
+  const listBottomPad = insets.bottom + TAB_BAR_CLEARANCE;
 
   if (!featureFlags.userAccounts) return null;
 
@@ -584,8 +607,10 @@ export default function WatchedScreen() {
   const hasOtherSections = upcomingWatchlistEntries.length > 0 || upcomingReviews.length > 0 || toBeRated.length > 0;
   const showYearHeaders = viewMode === 'grid' || sortedYears.length > 1 || hasOtherSections;
 
-  const diaryContent = (
-    <View>
+  // Extracted so the sticky-header SectionList path (poster grid, year-grouped)
+  // can reuse it as a ListHeaderComponent without duplicating this JSX.
+  const leadingSections = (
+    <>
       {/* To Be Rated — at top so users notice it */}
       {toBeRated.length > 0 && (
         <View style={styles.toBeRatedSection}>
@@ -680,6 +705,12 @@ export default function WatchedScreen() {
           )}
         </View>
       )}
+    </>
+  );
+
+  const diaryContent = (
+    <View>
+      {leadingSections}
 
       {/* Past shows — grouped by year, flat when sorting by rating */}
       {pastReviews.length > 0 && (
@@ -922,63 +953,108 @@ export default function WatchedScreen() {
             contentContainerStyle={[styles.gridContainer, { paddingBottom: listBottomPad }]}
           />
         </>
-      ) : viewMode === 'stats' ? (
-        <StatsScreen
-          /* pastReviews, not sortedReviews: a future-dated entry is a show you
-             have not sat through yet, so it must not count toward hours,
-             theaters or the season tile. */
-          reviews={pastReviews}
-          shows={shows}
-          /* Stats must never paint from a partial world: without these gates a
-             pre-catalog render showed "0 of 42 houses" then every number
-             jumped, and a failed diary fetch rendered the empty-diary ghost to
-             a 107-entry user (build-61 audit #6/#9). */
-          loading={showsLoading || reviewsLoading}
-          error={reviewsError}
-          onRetry={() => { invalidateCache(); getAllReviews(); }}
-          bottomPad={listBottomPad}
-          onRateShow={() => setShowSearchModal(true)}
-          refreshing={refreshing}
-          onRefresh={onRefresh}
-        />
-      ) : gridSubView === 'calendar' ? (
-        // Months are the FlatList items so the list can virtualize — a
-        // 3-year diary would otherwise mount ~1,300 cells at once.
-        <FlatList
-          data={calendarMonths}
-          keyExtractor={m => `${m.year}-${m.month}`}
-          renderItem={({ item }) => (
-            <DiaryCalendarMonth
-              year={item.year}
-              month={item.month}
-              reviewsByDate={calendarReviewsByDate}
-              upcomingByDate={calendarUpcomingByDate}
-              showMap={showMap}
-            />
-          )}
-          windowSize={5}
-          initialNumToRender={3}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.text.secondary} />}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={[styles.gridContainer, { paddingBottom: listBottomPad }]}
-        />
-      ) : isDiaryEmpty ? (
-        <EmptyState
-          emoji="🎭"
-          title="Your diary is empty"
-          subtitle="Rate shows you've seen to build your personal diary."
-          actionLabel="Rate a Show"
-          onAction={() => setShowSearchModal(true)}
-        />
       ) : (
-        <FlatList
-          data={['content']}
-          keyExtractor={() => 'content'}
-          renderItem={() => diaryContent}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.text.secondary} />}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={[styles.gridContainer, { paddingBottom: listBottomPad }]}
-        />
+        <>
+          {/* Kept mounted (display:none, not unmounted) once first opened —
+              see the statsMounted comment above. */}
+          {statsMounted && (
+            <View style={viewMode === 'stats' ? styles.statsPane : styles.statsPaneHidden}>
+              <StatsScreen
+                /* pastReviews, not sortedReviews: a future-dated entry is a
+                   show you have not sat through yet, so it must not count
+                   toward hours, theaters or the season tile. */
+                reviews={pastReviews}
+                shows={shows}
+                /* Stats must never paint from a partial world: without these
+                   gates a pre-catalog render showed "0 of 42 houses" then
+                   every number jumped, and a failed diary fetch rendered the
+                   empty-diary ghost to a 107-entry user (build-61 audit
+                   #6/#9). */
+                loading={showsLoading || reviewsLoading}
+                error={reviewsError}
+                onRetry={() => { invalidateCache(); getAllReviews(); }}
+                bottomPad={listBottomPad}
+                onRateShow={() => setShowSearchModal(true)}
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+              />
+            </View>
+          )}
+          {viewMode !== 'stats' &&
+            (gridSubView === 'calendar' ? (
+              // Months are the FlatList items so the list can virtualize — a
+              // 3-year diary would otherwise mount ~1,300 cells at once.
+              <FlatList
+                data={calendarMonths}
+                keyExtractor={m => `${m.year}-${m.month}`}
+                renderItem={({ item }) => (
+                  <DiaryCalendarMonth
+                    year={item.year}
+                    month={item.month}
+                    reviewsByDate={calendarReviewsByDate}
+                    upcomingByDate={calendarUpcomingByDate}
+                    showMap={showMap}
+                  />
+                )}
+                windowSize={5}
+                initialNumToRender={3}
+                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.text.secondary} />}
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={[styles.gridContainer, { paddingBottom: listBottomPad }]}
+              />
+            ) : isDiaryEmpty ? (
+              <EmptyState
+                emoji="🎭"
+                title="Your diary is empty"
+                subtitle="Rate shows you've seen to build your personal diary."
+                actionLabel="Rate a Show"
+                onAction={() => setShowSearchModal(true)}
+              />
+            ) : gridSubView === 'poster' && showYearGroups && pastReviews.length > 0 ? (
+              // Real SectionList (not the single-item-FlatList trick used
+              // below) so `stickySectionHeadersEnabled` can pin the current
+              // year in place while scrolling — a plain View of year blocks
+              // has no sticky behavior to give (owner ask 2026-07-26).
+              <SectionList
+                sections={pastYearSections}
+                keyExtractor={(_row, index) => `year-row-${index}`}
+                ListHeaderComponent={leadingSections}
+                renderSectionHeader={({ section }) =>
+                  showYearHeaders ? (
+                    <View style={[styles.sectionHeaderRow, styles.stickySectionHeaderRow]}>
+                      <Text style={styles.sectionLabel}>
+                        {section.year}{section.year === 'No date' ? ' — edit to add a date' : ''}
+                      </Text>
+                      <Text style={styles.sectionCount}>
+                        {section.data[0].length} {section.data[0].length === 1 ? 'entry' : 'entries'}
+                      </Text>
+                    </View>
+                  ) : null
+                }
+                renderItem={({ item: yearReviews, section }) => (
+                  <View style={styles.pastGrid}>
+                    {yearReviews.map(renderDiaryGridCard)}
+                    {section.year === sortedYears[sortedYears.length - 1] && (
+                      <AddShowCard label="Rate a show" onPress={() => setShowSearchModal(true)} cardWidth={grid.cardWidth} />
+                    )}
+                  </View>
+                )}
+                stickySectionHeadersEnabled
+                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.text.secondary} />}
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={[styles.gridContainer, { paddingBottom: listBottomPad }]}
+              />
+            ) : (
+              <FlatList
+                data={['content']}
+                keyExtractor={() => 'content'}
+                renderItem={() => diaryContent}
+                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.text.secondary} />}
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={[styles.gridContainer, { paddingBottom: listBottomPad }]}
+              />
+            ))}
+        </>
       )}
       {/* Long-press context menu — replaces raw Alert.alert confirms (Round 2,
           Option B pattern extended from To Watch to the diary/upcoming grids). */}
@@ -1043,6 +1119,7 @@ export default function WatchedScreen() {
         }}
         onClose={() => setShowSearchModal(false)}
       />
+      <BottomScrim height={insets.bottom + TAB_BAR_CLEARANCE / 2} />
     </GestureHandlerRootView>
   );
 }
@@ -1117,6 +1194,9 @@ const styles = StyleSheet.create({
     borderTopWidth: 1, borderBottomWidth: 1, borderColor: Colors.border.subtle,
   },
   sectionLabel: { color: Colors.text.primary, fontSize: 13, fontWeight: '700', letterSpacing: 0.6, textTransform: 'uppercase' },
+  // Sticky headers render in their own layer above scrolled content — needs
+  // an explicit z-index so the grid beneath doesn't paint over it on Android.
+  stickySectionHeaderRow: { zIndex: 1 },
   sectionCount: { color: Colors.text.muted, fontSize: 12 },
   upcomingSection: { marginBottom: Spacing.xl },
   // To Be Rated
@@ -1156,6 +1236,12 @@ const styles = StyleSheet.create({
   cardTitle: { color: Colors.text.primary, fontSize: FontSize.md, fontWeight: '600' },
   // Grid view
   gridContainer: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.md },
+  statsPane: { flex: 1 },
+  // display:'none' (not position:'absolute') — Stats' own internal FlatLists
+  // need a real layout pass once visible again, and 'none' fully removes the
+  // subtree from layout/hit-testing while it's hidden, unlike opacity/absolute
+  // which would still intercept touches meant for Diary/Feed underneath.
+  statsPaneHidden: { display: 'none' },
   pastGrid: {
     flexDirection: 'row', flexWrap: 'wrap',
     // Gutters come from lib/poster-grid so they stay in lockstep with the card

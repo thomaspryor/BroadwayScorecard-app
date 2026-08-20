@@ -185,6 +185,7 @@ export function StatsScreen({
         title: 'Theaters',
         caption: `${bundle.diary.distinctTheaters} venues${suffix} · ${bundle.diary.distinctBroadwayHouses} Broadway houses`,
         reviews: sortedInScope,
+        groupByVenue: true,
       });
       return;
     }
