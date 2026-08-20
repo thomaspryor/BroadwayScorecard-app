@@ -1,5 +1,6 @@
 /**
- * Category badge — shows OFF-BROADWAY (indigo) or WEST END (teal).
+ * Category badge — shows OFF-BROADWAY (indigo), WEST END (teal), or
+ * OFF-WEST END (teal, off-broadway's West End counterpart).
  * Only renders for non-broadway categories.
  */
 
@@ -14,6 +15,7 @@ interface CategoryBadgeProps {
 const CAT_STYLES: Record<string, { color: string; border: string; bg: string; label: string }> = {
   'off-broadway': { color: '#818cf8', border: 'rgba(99, 102, 241, 0.3)', bg: 'rgba(99, 102, 241, 0.15)', label: 'OFF-BROADWAY' },
   'west-end': { color: '#2dd4bf', border: 'rgba(20, 184, 166, 0.3)', bg: 'rgba(20, 184, 166, 0.15)', label: 'WEST END' },
+  'off-west-end': { color: '#2dd4bf', border: 'rgba(20, 184, 166, 0.3)', bg: 'rgba(20, 184, 166, 0.15)', label: 'OFF-WEST END' },
 };
 
 export function CategoryBadge({ category }: CategoryBadgeProps) {

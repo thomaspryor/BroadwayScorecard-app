@@ -192,6 +192,10 @@ export default function BrowseScreen() {
 
   const handleMarketChange = useCallback((m: Market) => {
     setMarket(m);
+    // includeOB means different things per market (NYC: swap to Off-Broadway-only;
+    // London: add Off-West-End on top of West End) — reset so it doesn't carry a
+    // surprising effect across the switch (BRO-139 review).
+    setIncludeOB(false);
     trackMarketChanged(m, 'browse');
   }, [setMarket]);
 
@@ -216,10 +220,14 @@ export default function BrowseScreen() {
   }, []);
 
   const handleOBToggle = useCallback(() => {
-    const newVal = !includeOB;
-    setIncludeOB(newVal);
-    trackFilterChanged('off_broadway', String(newVal), 'browse');
-  }, [includeOB]);
+    // Functional update: rapid consecutive taps compose instead of the second
+    // tap clobbering the first (same rationale as handleAdvancedToggle above).
+    setIncludeOB(prev => {
+      const newVal = !prev;
+      trackFilterChanged('off_broadway', `${market}:${newVal}`, 'browse');
+      return newVal;
+    });
+  }, [market]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
