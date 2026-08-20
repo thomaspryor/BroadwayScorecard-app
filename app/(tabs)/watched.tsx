@@ -955,31 +955,6 @@ export default function WatchedScreen() {
         </>
       ) : (
         <>
-          {/* Kept mounted (display:none, not unmounted) once first opened —
-              see the statsMounted comment above. */}
-          {statsMounted && (
-            <View style={viewMode === 'stats' ? styles.statsPane : styles.statsPaneHidden}>
-              <StatsScreen
-                /* pastReviews, not sortedReviews: a future-dated entry is a
-                   show you have not sat through yet, so it must not count
-                   toward hours, theaters or the season tile. */
-                reviews={pastReviews}
-                shows={shows}
-                /* Stats must never paint from a partial world: without these
-                   gates a pre-catalog render showed "0 of 42 houses" then
-                   every number jumped, and a failed diary fetch rendered the
-                   empty-diary ghost to a 107-entry user (build-61 audit
-                   #6/#9). */
-                loading={showsLoading || reviewsLoading}
-                error={reviewsError}
-                onRetry={() => { invalidateCache(); getAllReviews(); }}
-                bottomPad={listBottomPad}
-                onRateShow={() => setShowSearchModal(true)}
-                refreshing={refreshing}
-                onRefresh={onRefresh}
-              />
-            </View>
-          )}
           {viewMode !== 'stats' &&
             (gridSubView === 'calendar' ? (
               // Months are the FlatList items so the list can virtualize — a
@@ -1017,7 +992,14 @@ export default function WatchedScreen() {
               // has no sticky behavior to give (owner ask 2026-07-26).
               <SectionList
                 sections={pastYearSections}
-                keyExtractor={(_row, index) => `year-row-${index}`}
+                // `index` here is relative to EACH section's own data array
+                // (every section has exactly one item, so it's always 0) —
+                // but RN's SectionList internally prefixes this key with the
+                // section's own index before using it for reconciliation
+                // (VirtualizedSectionList#_subExtractor: `sectionKey + ':' +
+                // keyExtractor(item, itemIndex)`), so same-looking keys
+                // across sections do not actually collide.
+                keyExtractor={(row) => `year-row-${row[0]?.id ?? 'empty'}`}
                 ListHeaderComponent={leadingSections}
                 renderSectionHeader={({ section }) =>
                   showYearHeaders ? (
@@ -1055,6 +1037,34 @@ export default function WatchedScreen() {
               />
             ))}
         </>
+      )}
+      {/* Kept mounted (display:none, not unmounted) once first opened, as a
+          sibling of the Feed/Diary branch above rather than nested inside
+          its "not Feed" half — nesting it there meant switching to Feed
+          still unmounted Stats same as before (only Diary↔Stats persisted),
+          which was half the point of this fix (build-61 sim QA). */}
+      {statsMounted && (
+        <View style={viewMode === 'stats' ? styles.statsPane : styles.statsPaneHidden}>
+          <StatsScreen
+            /* pastReviews, not sortedReviews: a future-dated entry is a
+               show you have not sat through yet, so it must not count
+               toward hours, theaters or the season tile. */
+            reviews={pastReviews}
+            shows={shows}
+            /* Stats must never paint from a partial world: without these
+               gates a pre-catalog render showed "0 of 42 houses" then
+               every number jumped, and a failed diary fetch rendered the
+               empty-diary ghost to a 107-entry user (build-61 audit
+               #6/#9). */
+            loading={showsLoading || reviewsLoading}
+            error={reviewsError}
+            onRetry={() => { invalidateCache(); getAllReviews(); }}
+            bottomPad={listBottomPad}
+            onRateShow={() => setShowSearchModal(true)}
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+          />
+        </View>
       )}
       {/* Long-press context menu — replaces raw Alert.alert confirms (Round 2,
           Option B pattern extended from To Watch to the diary/upcoming grids). */}
