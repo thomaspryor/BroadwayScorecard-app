@@ -316,6 +316,80 @@ export function ShowSearchModal({
     return `${parts.join(' · ')}${parts.length > 0 ? ' · ' : ''}No critic score`;
   };
 
+  // Shared with the always-visible footer below (beta feedback 2026-08-12,
+  // AE2cV5mxGJgdIVWbvbFRLn0) and the legacy all-local-results-empty screen.
+  const renderLiveRow = (item: MezzanineCandidate) => {
+    const alreadyListed = !!excludeIds?.has(item.id);
+    return (
+      <Pressable
+        key={item.id}
+        style={({ pressed }) => [styles.resultRow, (alreadyListed || !!addingLiveId) && styles.resultRowMuted, pressed && styles.pressed]}
+        disabled={alreadyListed || !!addingLiveId}
+        onPress={() => selectLive(item)}
+        accessibilityRole="button"
+        accessibilityState={{ disabled: alreadyListed || !!addingLiveId }}
+        accessibilityLabel={alreadyListed ? `${item.title} — ${excludedLabel}` : item.title}
+      >
+        {item.posterUrl ? (
+          <Image source={{ uri: item.posterUrl }} style={styles.resultPoster} contentFit="cover" />
+        ) : (
+          <View style={[styles.resultPoster, styles.resultPlaceholder]}>
+            <Text style={styles.placeholderText}>{item.title.charAt(0)}</Text>
+          </View>
+        )}
+        <View style={styles.resultInfo}>
+          <Text style={styles.resultTitle} numberOfLines={1}>{item.title}</Text>
+          {item.venue && <Text style={styles.resultVenue} numberOfLines={1}>{item.venue}</Text>}
+          {alreadyListed && (
+            <Text style={styles.resultAlready} numberOfLines={1}>{excludedLabel}</Text>
+          )}
+          <Text style={styles.resultMeta} numberOfLines={1}>
+            {[item.city, item.openingDate?.slice(0, 4)].filter(Boolean).join(' · ')}
+            {item.city || item.openingDate ? ' · ' : ''}No critic score
+          </Text>
+        </View>
+        <Text style={styles.liveAdd}>{addingLiveId === item.id ? 'Adding…' : '+ Add'}</Text>
+      </Pressable>
+    );
+  };
+
+  // Always-visible footer on the main results list — offering the wider
+  // catalogue only on total-empty (below) missed the case where local/diary
+  // results exist but aren't the show the user meant (beta feedback
+  // 2026-08-12, AE2cV5mxGJgdIVWbvbFRLn0: "not offered the option to search
+  // the wider catalogue... should always see that option at the bottom").
+  const renderWiderCatalogFooter = () => (
+    <View style={styles.wideFooter}>
+      {liveState === 'idle' && (
+        <Pressable onPress={runLiveSearch} hitSlop={12} accessibilityRole="button">
+          <Text style={styles.liveLink}>Can{'’'}t find it? Search the wider theater catalog</Text>
+        </Pressable>
+      )}
+      {liveState === 'searching' && (
+        <Text style={styles.liveStatus}>Searching the wider catalog…</Text>
+      )}
+      {liveState === 'empty' && (
+        <Text style={styles.liveStatus}>
+          Not found in the wider catalog either. Try a different spelling.
+        </Text>
+      )}
+      {liveState === 'error' && (
+        <>
+          <Text style={styles.liveErrorText}>{liveError}</Text>
+          <Pressable onPress={runLiveSearch} hitSlop={12} accessibilityRole="button">
+            <Text style={styles.liveLink}>Try again</Text>
+          </Pressable>
+        </>
+      )}
+      {liveState === 'results' && (
+        <>
+          <Text style={[styles.wideHeader, styles.wideHeaderInFooter]}>From the wider theater catalog</Text>
+          {liveCandidates.map(renderLiveRow)}
+        </>
+      )}
+    </View>
+  );
+
   // "No shows found" (and its now-tappable wider-catalog CTA) must wait for
   // the debounce to settle — mid-typing, `results` is still computed from the
   // previous debouncedQuery, so gating on the immediate query would flash the
@@ -440,6 +514,7 @@ export function ShowSearchModal({
             }}
             contentContainerStyle={styles.list}
             showsVerticalScrollIndicator={false}
+            ListFooterComponent={renderWiderCatalogFooter}
           />
         ) : liveState === 'results' ? (
           <FlatList
@@ -449,39 +524,7 @@ export function ShowSearchModal({
             ListHeaderComponent={
               <Text style={styles.wideHeader}>From the wider theater catalog</Text>
             }
-            renderItem={({ item }) => {
-              const alreadyListed = !!excludeIds?.has(item.id);
-              return (
-                <Pressable
-                  style={({ pressed }) => [styles.resultRow, (alreadyListed || !!addingLiveId) && styles.resultRowMuted, pressed && styles.pressed]}
-                  disabled={alreadyListed || !!addingLiveId}
-                  onPress={() => selectLive(item)}
-                  accessibilityRole="button"
-                  accessibilityState={{ disabled: alreadyListed || !!addingLiveId }}
-                  accessibilityLabel={alreadyListed ? `${item.title} — ${excludedLabel}` : item.title}
-                >
-                  {item.posterUrl ? (
-                    <Image source={{ uri: item.posterUrl }} style={styles.resultPoster} contentFit="cover" />
-                  ) : (
-                    <View style={[styles.resultPoster, styles.resultPlaceholder]}>
-                      <Text style={styles.placeholderText}>{item.title.charAt(0)}</Text>
-                    </View>
-                  )}
-                  <View style={styles.resultInfo}>
-                    <Text style={styles.resultTitle} numberOfLines={1}>{item.title}</Text>
-                    {item.venue && <Text style={styles.resultVenue} numberOfLines={1}>{item.venue}</Text>}
-                    {alreadyListed && (
-                      <Text style={styles.resultAlready} numberOfLines={1}>{excludedLabel}</Text>
-                    )}
-                    <Text style={styles.resultMeta} numberOfLines={1}>
-                      {[item.city, item.openingDate?.slice(0, 4)].filter(Boolean).join(' · ')}
-                      {item.city || item.openingDate ? ' · ' : ''}No critic score
-                    </Text>
-                  </View>
-                  <Text style={styles.liveAdd}>{addingLiveId === item.id ? 'Adding…' : '+ Add'}</Text>
-                </Pressable>
-              );
-            }}
+            renderItem={({ item }) => renderLiveRow(item)}
             contentContainerStyle={styles.list}
             showsVerticalScrollIndicator={false}
           />
@@ -606,6 +649,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
     paddingTop: Spacing.md,
     paddingBottom: Spacing.xs,
+  },
+  // Persistent footer on the main results list — the CTA is always reachable
+  // even when local/diary results exist but aren't the show the user meant.
+  wideFooter: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: Colors.border.subtle,
+    marginTop: Spacing.sm,
+    paddingTop: Spacing.sm,
+    paddingBottom: Spacing.md,
+    gap: Spacing.xs,
+  },
+  wideHeaderInFooter: {
+    paddingTop: 0,
   },
   liveAdd: {
     color: Colors.brand,

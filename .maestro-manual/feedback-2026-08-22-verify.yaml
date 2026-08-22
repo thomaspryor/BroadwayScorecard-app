@@ -1,0 +1,74 @@
+# Verification screenshots for the overnight 2026-08-22 beta-feedback batch
+# (6 items). LOCAL-ONLY TOOL — outside .maestro/ so CI's glob never runs it.
+# Pre-req: Release sim build installed, EXPO_PUBLIC_DEV_AUTO_SIGNIN handled by
+# the dev-test sign-in fallback (see beta-feedback-verify.yaml for the sign-in
+# flow if the sim's session has expired).
+# Run: maestro test .maestro-manual/feedback-2026-08-22-verify.yaml
+#
+# Covers:
+#   1 (ANIDtf6U9sjqeZmHC8FIKnI) — date label on TOP of poster (Watched grid)
+#   2 (ANFWPxJxRJF6PJmtTOMaO-I) — new no-image placeholder look
+#   4 (AFlPzGW8awRQBMSAO3omMxk) — Recently Opened shelves below NYT Picks
+#   5 (ANDYIxNpx3lmYZhb9EFZEyA) — header share = URL, not image
+#   6 (AEOxuwE1ErL4VzeQLqlhcs0) — Critic Reviews above Audience Scorecard
+# Item 3 (search wider-catalog CTA) needs typing + keyboard dismissal that
+# doesn't screenshot cleanly in a scripted flow — verify that one manually:
+# Watched → "+" → search "One man musical" → press the keyboard's return key
+# → scroll to the bottom of the results list.
+
+appId: com.broadwayscorecard.app
+---
+- launchApp:
+    clearState: false
+
+- extendedWaitUntil:
+    visible:
+      text: "Broadway Scorecard"
+    timeout: 30000
+
+- runFlow:
+    when:
+      visible: "Skip"
+    commands:
+      - tapOn: "Skip"
+      - tapOn: "Skip"
+      - tapOn: "Skip"
+
+# ── Watched (Diary, poster grid): item 1 (date on top) + item 2 (placeholder)
+- openLink: broadwayscorecard:///watched
+- tapOn:
+    text: "Open"
+    optional: true
+- waitForAnimationToEnd
+- takeScreenshot: /tmp/bwsc-verify-0822/01-watched-grid-top
+
+# ── Show detail: item 5 (header share) + item 6 (Critic Reviews order)
+- openLink: "broadwayscorecard:///show/hamilton"
+- tapOn:
+    text: "Open"
+    optional: true
+- waitForAnimationToEnd
+- swipe:
+    start: "50%,70%"
+    end: "50%,25%"
+    duration: 400
+- waitForAnimationToEnd
+- takeScreenshot: /tmp/bwsc-verify-0822/02-show-detail-critic-reviews
+
+# ── Home: item 4 (Recently Opened shelves below NYT Critic's Picks)
+- openLink: broadwayscorecard:///
+- tapOn:
+    text: "Open"
+    optional: true
+- waitForAnimationToEnd
+- swipe:
+    start: "50%,70%"
+    end: "50%,25%"
+    duration: 350
+- waitForAnimationToEnd
+- swipe:
+    start: "50%,70%"
+    end: "50%,25%"
+    duration: 350
+- waitForAnimationToEnd
+- takeScreenshot: /tmp/bwsc-verify-0822/03-home-nyt-and-recently-opened

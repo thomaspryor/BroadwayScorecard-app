@@ -138,6 +138,40 @@ export default function HomeScreen() {
     const nytPicks = marketShows.filter(s => isOpen(s) && s.tags.includes('nyt-pick')).sort(byScore).slice(0, 10);
     if (nytPicks.length >= 2) rows.push({ title: "New York Times Critic's Picks", shows: nytPicks });
 
+    // Recently Opened on Broadway / Off Broadway (beta feedback 2026-08-13,
+    // AFlPzGW8awRQBMSAO3omMxk) — split by category since Home's market filter
+    // already excludes off-broadway from marketShows for the NYC market; the
+    // existing "Just Opened" shelf near the top mixes both. NYC-only, same as
+    // Best Off-Broadway below — the Broadway/Off-Broadway split isn't a London
+    // concept.
+    if (market === 'nyc') {
+      const recentlyOpenedBroadway = shows
+        .filter(s => s.category === 'broadway' && s.status === 'open' && s.openingDate && s.openingDate >= sixtyDaysAgo && s.openingDate <= todayLocal)
+        .sort((a, b) => (b.openingDate ?? '').localeCompare(a.openingDate ?? ''))
+        .slice(0, 10);
+      if (recentlyOpenedBroadway.length >= 2) rows.push({
+        title: 'Recently Opened on Broadway',
+        shows: recentlyOpenedBroadway,
+        getSubtitle: (s) => {
+          const d = shortDate(s.openingDate ?? '');
+          return d ? `Opened ${d}` : undefined;
+        },
+      });
+
+      const recentlyOpenedOffBroadway = shows
+        .filter(s => s.category === 'off-broadway' && s.status === 'open' && s.openingDate && s.openingDate >= sixtyDaysAgo && s.openingDate <= todayLocal)
+        .sort((a, b) => (b.openingDate ?? '').localeCompare(a.openingDate ?? ''))
+        .slice(0, 10);
+      if (recentlyOpenedOffBroadway.length >= 2) rows.push({
+        title: 'Recently Opened Off Broadway',
+        shows: recentlyOpenedOffBroadway,
+        getSubtitle: (s) => {
+          const d = shortDate(s.openingDate ?? '');
+          return d ? `Opened ${d}` : undefined;
+        },
+      });
+    }
+
     // Tony Award Winners (open shows with tony-winner tag)
     const tonyWinners = marketShows.filter(s => isOpen(s) && s.tags.includes('tony-winner')).sort(byScore).slice(0, 10);
     if (tonyWinners.length >= 2) rows.push({ title: 'Tony Award Winners', shows: tonyWinners });

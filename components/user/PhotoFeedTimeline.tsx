@@ -14,6 +14,7 @@ import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
 import { getImageUrl } from '@/lib/images';
 import * as haptics from '@/lib/haptics';
 import MiniStars from '@/components/user/MiniStars';
+import { ShowPosterPlaceholder } from '@/components/ShowPosterPlaceholder';
 import type { FeedMonthGroup } from '@/hooks/usePhotoFeed';
 import type { Show } from '@/lib/types';
 
@@ -75,8 +76,8 @@ export function PhotoFeedTimeline({ monthGroups, signedUrls, showMap, onDismissN
                   {posterUrl ? (
                     <Image source={{ uri: posterUrl }} style={styles.poster} contentFit="cover" transition={200} />
                   ) : (
-                    <View style={[styles.poster, styles.posterPlaceholder]}>
-                      <Text style={styles.posterPlaceholderText}>{title.charAt(0)}</Text>
+                    <View style={[styles.poster, styles.posterClip]}>
+                      <ShowPosterPlaceholder />
                     </View>
                   )}
                   <View style={styles.info}>
@@ -164,8 +165,7 @@ const styles = StyleSheet.create({
     width: 40, height: 56, borderRadius: BorderRadius.sm,
     backgroundColor: Colors.surface.overlay,
   },
-  posterPlaceholder: { alignItems: 'center', justifyContent: 'center' },
-  posterPlaceholderText: { color: Colors.text.muted, fontSize: 16, fontWeight: '600' },
+  posterClip: { overflow: 'hidden' },
   info: { flex: 1, minWidth: 0, gap: 1 },
   title: { fontSize: FontSize.md, fontWeight: '700', color: Colors.text.primary },
   venue: { fontSize: FontSize.xs, color: Colors.text.muted },

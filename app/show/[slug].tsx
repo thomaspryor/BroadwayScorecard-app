@@ -5,7 +5,7 @@
  */
 
 import React, { useMemo, useEffect, useState, useRef } from 'react';
-import { View, Text, ScrollView, StyleSheet, Pressable, Linking } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Pressable, Linking, Share, Platform } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, Stack, useRouter } from 'expo-router';
@@ -111,6 +111,23 @@ export default function ShowDetailScreen() {
     if (!show) return;
     // Try image share card first, falls back to text internally
     await shareCardRef.current?.share();
+  };
+
+  // Header share button — beta feedback 2026-08-13 (ANDYIxNpx3lmYZhb9EFZEyA):
+  // "should send the URL to the show, not an image". The lower "Share Score
+  // Card" CTA is explicitly about the image card and keeps handleShare.
+  const handleShareLink = async () => {
+    if (!show) return;
+    const url = `https://broadwayscorecard.com/show/${show.slug}`;
+    try {
+      await Share.share(
+        Platform.OS === 'ios'
+          ? { url, message: show.title }
+          : { message: `Check out ${show.title} on Broadway Scorecard!\n${url}` },
+      );
+    } catch {
+      // User cancelled
+    }
   };
 
   /**
@@ -281,7 +298,7 @@ export default function ShowDetailScreen() {
           // fold; this makes sharing reachable from the top of every show).
           headerRight: () => (
             <Pressable
-              onPress={handleShare}
+              onPress={handleShareLink}
               hitSlop={10}
               accessibilityRole="button"
               accessibilityLabel="Share this show"
@@ -437,6 +454,27 @@ export default function ShowDetailScreen() {
 
           />
         </View>
+
+        {/* Critic Reviews List — collapsed by default (beta feedback
+            2026-08-13, AEOxuwE1ErL4VzeQLqlhcs0: above Audience Scorecard,
+            renamed from "Critic Scorecard") */}
+        {detail?.reviews && detail.reviews.length > 0 && (
+          <SectionCard title="Critic Reviews" meta={`${detail.reviews.length} reviews`}>
+            {(showAllReviews ? detail.reviews : detail.reviews.slice(0, 3)).map((review, i) => (
+              <ReviewRow key={i} review={review} showId={show.id} category={show.category} />
+            ))}
+            {!showAllReviews && detail.reviews.length > 3 && (
+              <Pressable
+                style={({ pressed }) => [styles.showAllButton, pressed && styles.pressed]}
+                onPress={() => setShowAllReviews(true)}
+              >
+                <Text style={styles.showAllText}>
+                  Show all {detail.reviews.length} reviews
+                </Text>
+              </Pressable>
+            )}
+          </SectionCard>
+        )}
 
         {/* Audience Scorecard — grade badge header + horizontal source cards */}
         {detail?.audience && show.audienceGrade && (
@@ -597,25 +635,6 @@ export default function ShowDetailScreen() {
                   </View>
                 )}
               </View>
-            )}
-          </SectionCard>
-        )}
-
-        {/* Critic Reviews List — collapsed by default */}
-        {detail?.reviews && detail.reviews.length > 0 && (
-          <SectionCard title="Critic Scorecard" meta={`${detail.reviews.length} reviews`}>
-            {(showAllReviews ? detail.reviews : detail.reviews.slice(0, 3)).map((review, i) => (
-              <ReviewRow key={i} review={review} showId={show.id} category={show.category} />
-            ))}
-            {!showAllReviews && detail.reviews.length > 3 && (
-              <Pressable
-                style={({ pressed }) => [styles.showAllButton, pressed && styles.pressed]}
-                onPress={() => setShowAllReviews(true)}
-              >
-                <Text style={styles.showAllText}>
-                  Show all {detail.reviews.length} reviews
-                </Text>
-              </Pressable>
             )}
           </SectionCard>
         )}
