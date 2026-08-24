@@ -438,6 +438,27 @@ export default function ShowDetailScreen() {
           />
         </View>
 
+        {/* Critic Reviews List — collapsed by default. Rendered above Audience
+            Scorecard, and titled "Critic Reviews" not "Critic Scorecard"
+            (beta feedback 2026-08-13, AEOxuwE1ErL4VzeQLqlhcs0). */}
+        {detail?.reviews && detail.reviews.length > 0 && (
+          <SectionCard title="Critic Reviews" meta={`${detail.reviews.length} reviews`}>
+            {(showAllReviews ? detail.reviews : detail.reviews.slice(0, 3)).map((review, i) => (
+              <ReviewRow key={i} review={review} showId={show.id} category={show.category} />
+            ))}
+            {!showAllReviews && detail.reviews.length > 3 && (
+              <Pressable
+                style={({ pressed }) => [styles.showAllButton, pressed && styles.pressed]}
+                onPress={() => setShowAllReviews(true)}
+              >
+                <Text style={styles.showAllText}>
+                  Show all {detail.reviews.length} reviews
+                </Text>
+              </Pressable>
+            )}
+          </SectionCard>
+        )}
+
         {/* Audience Scorecard — grade badge header + horizontal source cards */}
         {detail?.audience && show.audienceGrade && (
           <SectionCard
@@ -597,25 +618,6 @@ export default function ShowDetailScreen() {
                   </View>
                 )}
               </View>
-            )}
-          </SectionCard>
-        )}
-
-        {/* Critic Reviews List — collapsed by default */}
-        {detail?.reviews && detail.reviews.length > 0 && (
-          <SectionCard title="Critic Scorecard" meta={`${detail.reviews.length} reviews`}>
-            {(showAllReviews ? detail.reviews : detail.reviews.slice(0, 3)).map((review, i) => (
-              <ReviewRow key={i} review={review} showId={show.id} category={show.category} />
-            ))}
-            {!showAllReviews && detail.reviews.length > 3 && (
-              <Pressable
-                style={({ pressed }) => [styles.showAllButton, pressed && styles.pressed]}
-                onPress={() => setShowAllReviews(true)}
-              >
-                <Text style={styles.showAllText}>
-                  Show all {detail.reviews.length} reviews
-                </Text>
-              </Pressable>
             )}
           </SectionCard>
         )}

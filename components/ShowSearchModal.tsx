@@ -32,7 +32,7 @@ import Fuse, { IFuseOptions } from 'fuse.js';
 import { useShows } from '@/lib/data-context';
 import { useAuth } from '@/lib/auth-context';
 import { getImageUrl } from '@/lib/images';
-import { ScoreBadge } from '@/components/show-cards';
+import { ScoreBadge, PosterPlaceholder } from '@/components/show-cards';
 import { getQualifiedScore } from '@/lib/score-utils';
 import {
   fetchDiaryCatalog,
@@ -322,6 +322,79 @@ export function ShowSearchModal({
   // empty state (and invite a live search) on every keystroke.
   const querySettled = debouncedQuery.trim() === query.trim();
 
+  const renderLiveRow = useCallback(
+    (item: MezzanineCandidate) => {
+      const alreadyListed = !!excludeIds?.has(item.id);
+      return (
+        <Pressable
+          key={item.id}
+          style={({ pressed }) => [styles.resultRow, (alreadyListed || !!addingLiveId) && styles.resultRowMuted, pressed && styles.pressed]}
+          disabled={alreadyListed || !!addingLiveId}
+          onPress={() => selectLive(item)}
+          accessibilityRole="button"
+          accessibilityState={{ disabled: alreadyListed || !!addingLiveId }}
+          accessibilityLabel={alreadyListed ? `${item.title} — ${excludedLabel}` : item.title}
+        >
+          {item.posterUrl ? (
+            <Image source={{ uri: item.posterUrl }} style={styles.resultPoster} contentFit="cover" />
+          ) : (
+            <PosterPlaceholder style={styles.resultPoster} />
+          )}
+          <View style={styles.resultInfo}>
+            <Text style={styles.resultTitle} numberOfLines={1}>{item.title}</Text>
+            {item.venue && <Text style={styles.resultVenue} numberOfLines={1}>{item.venue}</Text>}
+            {alreadyListed && (
+              <Text style={styles.resultAlready} numberOfLines={1}>{excludedLabel}</Text>
+            )}
+            <Text style={styles.resultMeta} numberOfLines={1}>
+              {[item.city, item.openingDate?.slice(0, 4)].filter(Boolean).join(' · ')}
+              {item.city || item.openingDate ? ' · ' : ''}No critic score
+            </Text>
+          </View>
+          <Text style={styles.liveAdd}>{addingLiveId === item.id ? 'Adding…' : '+ Add'}</Text>
+        </Pressable>
+      );
+    },
+    [excludeIds, excludedLabel, addingLiveId, selectLive],
+  );
+
+  // Always-visible footer offering the wider-catalog search, not just for the
+  // "no local results" empty state — a query that DOES match local shows/diary
+  // entries (just not the one the user meant) used to hide this option
+  // entirely (beta feedback 2026-08-12, AE2cV5mxGJgdIVWbvbFRLn0: "I should
+  // always see that option at the bottom of the list").
+  const liveSearchFooter = (
+    <View style={styles.liveFooter}>
+      {liveState === 'idle' && (
+        <Pressable onPress={runLiveSearch} hitSlop={12} accessibilityRole="button" style={styles.liveFooterText}>
+          <Text style={styles.liveLink}>Can{'’'}t find it? Search the wider theater catalog</Text>
+        </Pressable>
+      )}
+      {liveState === 'searching' && (
+        <Text style={[styles.liveStatus, styles.liveFooterText]}>Searching the wider catalog…</Text>
+      )}
+      {liveState === 'empty' && (
+        <Text style={[styles.liveStatus, styles.liveFooterText]}>
+          Not found in the wider catalog either. Try a different spelling.
+        </Text>
+      )}
+      {liveState === 'error' && (
+        <View style={styles.liveFooterText}>
+          <Text style={styles.liveErrorText}>{liveError}</Text>
+          <Pressable onPress={runLiveSearch} hitSlop={12} accessibilityRole="button">
+            <Text style={styles.liveLink}>Try again</Text>
+          </Pressable>
+        </View>
+      )}
+      {liveState === 'results' && (
+        <>
+          <Text style={styles.wideHeader}>From the wider theater catalog</Text>
+          {liveCandidates.map(renderLiveRow)}
+        </>
+      )}
+    </View>
+  );
+
   return (
     <Modal
       visible={visible}
@@ -381,9 +454,7 @@ export function ShowSearchModal({
                     accessibilityState={{ disabled: alreadyListed }}
                     accessibilityLabel={alreadyListed ? `${candidate.title} — ${excludedLabel}` : candidate.title}
                   >
-                    <View style={[styles.resultPoster, styles.resultPlaceholder]}>
-                      <Text style={styles.placeholderText}>{candidate.title.charAt(0)}</Text>
-                    </View>
+                    <PosterPlaceholder style={styles.resultPoster} />
                     <View style={styles.resultInfo}>
                       <Text style={styles.resultTitle} numberOfLines={1}>{candidate.title}</Text>
                       {candidate.venue && <Text style={styles.resultVenue} numberOfLines={1}>{candidate.venue}</Text>}
@@ -417,9 +488,7 @@ export function ShowSearchModal({
                   {posterUrl ? (
                     <Image source={{ uri: posterUrl }} style={styles.resultPoster} contentFit="cover" />
                   ) : (
-                    <View style={[styles.resultPoster, styles.resultPlaceholder]}>
-                      <Text style={styles.placeholderText}>{show.title.charAt(0)}</Text>
-                    </View>
+                    <PosterPlaceholder style={styles.resultPoster} />
                   )}
                   <View style={styles.resultInfo}>
                     <Text style={styles.resultTitle} numberOfLines={1}>{show.title}</Text>
@@ -440,6 +509,7 @@ export function ShowSearchModal({
             }}
             contentContainerStyle={styles.list}
             showsVerticalScrollIndicator={false}
+            ListFooterComponent={liveSearchFooter}
           />
         ) : liveState === 'results' ? (
           <FlatList
@@ -449,39 +519,7 @@ export function ShowSearchModal({
             ListHeaderComponent={
               <Text style={styles.wideHeader}>From the wider theater catalog</Text>
             }
-            renderItem={({ item }) => {
-              const alreadyListed = !!excludeIds?.has(item.id);
-              return (
-                <Pressable
-                  style={({ pressed }) => [styles.resultRow, (alreadyListed || !!addingLiveId) && styles.resultRowMuted, pressed && styles.pressed]}
-                  disabled={alreadyListed || !!addingLiveId}
-                  onPress={() => selectLive(item)}
-                  accessibilityRole="button"
-                  accessibilityState={{ disabled: alreadyListed || !!addingLiveId }}
-                  accessibilityLabel={alreadyListed ? `${item.title} — ${excludedLabel}` : item.title}
-                >
-                  {item.posterUrl ? (
-                    <Image source={{ uri: item.posterUrl }} style={styles.resultPoster} contentFit="cover" />
-                  ) : (
-                    <View style={[styles.resultPoster, styles.resultPlaceholder]}>
-                      <Text style={styles.placeholderText}>{item.title.charAt(0)}</Text>
-                    </View>
-                  )}
-                  <View style={styles.resultInfo}>
-                    <Text style={styles.resultTitle} numberOfLines={1}>{item.title}</Text>
-                    {item.venue && <Text style={styles.resultVenue} numberOfLines={1}>{item.venue}</Text>}
-                    {alreadyListed && (
-                      <Text style={styles.resultAlready} numberOfLines={1}>{excludedLabel}</Text>
-                    )}
-                    <Text style={styles.resultMeta} numberOfLines={1}>
-                      {[item.city, item.openingDate?.slice(0, 4)].filter(Boolean).join(' · ')}
-                      {item.city || item.openingDate ? ' · ' : ''}No critic score
-                    </Text>
-                  </View>
-                  <Text style={styles.liveAdd}>{addingLiveId === item.id ? 'Adding…' : '+ Add'}</Text>
-                </Pressable>
-              );
-            }}
+            renderItem={({ item }) => renderLiveRow(item)}
             contentContainerStyle={styles.list}
             showsVerticalScrollIndicator={false}
           />
@@ -597,6 +635,15 @@ const styles = StyleSheet.create({
     fontSize: FontSize.sm,
     textAlign: 'center',
   },
+  liveFooter: {
+    paddingVertical: Spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border.subtle,
+    marginTop: Spacing.sm,
+  },
+  liveFooterText: {
+    paddingHorizontal: Spacing.lg,
+  },
   wideHeader: {
     color: Colors.text.muted,
     fontSize: FontSize.xs,
@@ -639,15 +686,6 @@ const styles = StyleSheet.create({
     height: 58,
     borderRadius: BorderRadius.sm,
     backgroundColor: Colors.surface.overlay,
-  },
-  resultPlaceholder: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  placeholderText: {
-    color: Colors.text.muted,
-    fontSize: 18,
-    fontWeight: '600',
   },
   resultInfo: {
     flex: 1,

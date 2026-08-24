@@ -57,19 +57,15 @@ export const ShareCardWithRef = React.forwardRef<ShareCardHandle, ShareCardProps
       trackShowShared(props.show.id, props.show.title);
 
       try {
-        const uri = await viewShotRef.current?.capture?.();
-        if (!uri) {
-          await Share.share({
-            message: `Check out ${props.show.title} on Broadway Scorecard!\nhttps://broadwayscorecard.com/show/${props.show.slug}`,
-          });
-          return;
-        }
-
-        await Share.share(
-          Platform.OS === 'ios'
-            ? { url: uri }
-            : { message: `Check out ${props.show.title} on Broadway Scorecard!\nhttps://broadwayscorecard.com/show/${props.show.slug}` },
-        );
+        // Share the show's URL as text, not the rendered card image — a
+        // shared PNG attachment doesn't carry a tappable link to the show
+        // (beta feedback 2026-08-13, ANDYIxNpx3lmYZhb9EFZEyA: "the share
+        // button should send the URL to the show, not an image"). The card
+        // above is still rendered off-screen for a future image-share option
+        // but isn't captured here.
+        await Share.share({
+          message: `Check out ${props.show.title} on Broadway Scorecard!\nhttps://broadwayscorecard.com/show/${props.show.slug}`,
+        });
         props.onShared?.();
       } catch {
         // User cancelled

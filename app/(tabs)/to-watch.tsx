@@ -29,6 +29,7 @@ import { buildReviewIndex, classifyWatchlistEntry } from '@/lib/watchlist-slot';
 import { showTitleFallback } from '@/lib/show-format';
 import { PosterStatusPill } from '@/components/show-cards/PosterStatusPill';
 import { OutOfMarketChip } from '@/components/show-cards/OutOfMarketChip';
+import { PosterPlaceholder } from '@/components/show-cards';
 import { featureFlags } from '@/lib/feature-flags';
 import type { WatchlistEntry } from '@/lib/user-types';
 import type { Show } from '@/lib/types';
@@ -265,9 +266,7 @@ export default function ToWatchScreen() {
           {posterUrl ? (
             <Image source={{ uri: posterUrl }} style={styles.gridPoster} contentFit="cover" transition={200} />
           ) : (
-            <View style={[styles.gridPoster, styles.cardPosterPlaceholder]}>
-              <Text style={styles.placeholderText}>{title.charAt(0)}</Text>
-            </View>
+            <PosterPlaceholder style={styles.gridPoster} upcoming />
           )}
           {/* Date as an overlaid poster tag, matching the Watched tab's grid
               (beta feedback 2026-08-02: bare text dates under Upcoming
@@ -312,9 +311,7 @@ export default function ToWatchScreen() {
             {posterUrl ? (
               <Image source={{ uri: posterUrl }} style={styles.gridPoster} contentFit="cover" transition={200} />
             ) : (
-              <View style={[styles.gridPoster, styles.cardPosterPlaceholder]}>
-                <Text style={styles.placeholderText}>{title.charAt(0)}</Text>
-              </View>
+              <PosterPlaceholder style={styles.gridPoster} />
             )}
             <PosterStatusPill show={show} />
             {/* No persistent empty-star strip (beta feedback 2026-07-25) —
@@ -349,9 +346,7 @@ export default function ToWatchScreen() {
         {posterUrl ? (
           <Image source={{ uri: posterUrl }} style={styles.listPoster} contentFit="cover" transition={200} />
         ) : (
-          <View style={[styles.listPoster, styles.cardPosterPlaceholder]}>
-            <Text style={styles.placeholderText}>{title.charAt(0)}</Text>
-          </View>
+          <PosterPlaceholder style={styles.listPoster} />
         )}
         <View style={styles.listInfo}>
           <Text style={styles.listTitle} numberOfLines={1}>{title}</Text>
@@ -387,9 +382,7 @@ export default function ToWatchScreen() {
         {posterUrl ? (
           <Image source={{ uri: posterUrl }} style={styles.listPoster} contentFit="cover" transition={200} />
         ) : (
-          <View style={[styles.listPoster, styles.cardPosterPlaceholder]}>
-            <Text style={styles.placeholderText}>{title.charAt(0)}</Text>
-          </View>
+          <PosterPlaceholder style={styles.listPoster} />
         )}
         <View style={styles.listInfo}>
           <Text style={styles.listTitle} numberOfLines={1}>{title}</Text>

@@ -138,6 +138,36 @@ export default function HomeScreen() {
     const nytPicks = marketShows.filter(s => isOpen(s) && s.tags.includes('nyt-pick')).sort(byScore).slice(0, 10);
     if (nytPicks.length >= 2) rows.push({ title: "New York Times Critic's Picks", shows: nytPicks });
 
+    // Recently Opened on/off Broadway — split shelves right below NYT Critic's
+    // Picks (beta feedback 2026-08-13, AFlPzGW8awRQBMSAO3omMxk). "Broadway" and
+    // "Off Broadway" are NYC-only category labels (same category split as the
+    // Best Off-Broadway shelf above), so both are gated to the nyc market —
+    // there's no West End equivalent to split into.
+    if (market === 'nyc') {
+      const recentByCategory = (category: Show['category']) => shows
+        .filter(s => s.category === category && s.status === 'open' && s.openingDate && s.openingDate >= sixtyDaysAgo && s.openingDate <= todayLocal)
+        .sort((a, b) => (b.openingDate ?? '').localeCompare(a.openingDate ?? ''))
+        .slice(0, 10);
+      const recentOpenSubtitle = (s: Show) => {
+        const d = shortDate(s.openingDate ?? '');
+        return d ? `Opened ${d}` : undefined;
+      };
+
+      const recentlyOpenedBroadway = recentByCategory('broadway');
+      if (recentlyOpenedBroadway.length >= 2) rows.push({
+        title: 'Recently Opened on Broadway',
+        shows: recentlyOpenedBroadway,
+        getSubtitle: recentOpenSubtitle,
+      });
+
+      const recentlyOpenedOffBroadway = recentByCategory('off-broadway');
+      if (recentlyOpenedOffBroadway.length >= 2) rows.push({
+        title: 'Recently Opened Off Broadway',
+        shows: recentlyOpenedOffBroadway,
+        getSubtitle: recentOpenSubtitle,
+      });
+    }
+
     // Tony Award Winners (open shows with tony-winner tag)
     const tonyWinners = marketShows.filter(s => isOpen(s) && s.tags.includes('tony-winner')).sort(byScore).slice(0, 10);
     if (tonyWinners.length >= 2) rows.push({ title: 'Tony Award Winners', shows: tonyWinners });
