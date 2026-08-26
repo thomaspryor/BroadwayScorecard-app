@@ -4,7 +4,7 @@
  */
 
 import React, { useMemo, useState, useCallback, useRef } from 'react';
-import { View, Text, TextInput, FlatList, StyleSheet, ScrollView, Pressable, RefreshControl, Platform } from 'react-native';
+import { View, Text, TextInput, FlatList, StyleSheet, ScrollView, Pressable, RefreshControl, Platform, useWindowDimensions } from 'react-native';
 import Fuse, { IFuseOptions } from 'fuse.js';
 import { ShowListSkeleton } from '@/components/Skeleton';
 import { BottomScrim } from '@/components/BottomScrim';
@@ -26,6 +26,7 @@ import { Colors, Spacing, FontSize, BorderRadius, TAB_BAR_CLEARANCE } from '@/co
 import { trackFilterChanged, trackScoreModeToggled, trackMarketChanged, trackDataRefreshed } from '@/lib/analytics';
 import { AdvancedFiltersSheet } from '@/components/AdvancedFiltersSheet';
 import { applyAdvancedFilters, countActiveSelections, toggleSelection, AdvancedSelections } from '@/lib/advanced-filters';
+import { filterGroupMaxWidth, SCORE_TOGGLE_WIDTH } from '@/lib/browse-score-toggle';
 
 // Grade ordering: A+ is best (0), then A (1), A- (2), B+ (3), etc.
 const GRADE_ORDER: Record<string, number> = {
@@ -95,6 +96,11 @@ export default function BrowseScreen() {
   const { shows, isLoading, refresh, error } = useShows();
   const [refreshing, setRefreshing] = useState(false);
   const insets = useSafeAreaInsets();
+  const { width: windowWidth } = useWindowDimensions();
+  // Measured live (BRO-270 — a hardcoded estimate undershot the real width
+  // and still let the filter row overlap); SCORE_TOGGLE_WIDTH only covers
+  // the single frame before this fires.
+  const [scoreToggleWidth, setScoreToggleWidth] = useState(SCORE_TOGGLE_WIDTH);
   const { market, setMarket } = useMarket();
   const [scoreMode, setScoreMode] = useState<ScoreMode>('critics');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('open');
@@ -297,7 +303,11 @@ export default function BrowseScreen() {
 
             {/* Status filter + Score toggle (hidden during search) */}
             {!searchResults && <View style={styles.statusRow}>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterGroup}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={[styles.filterGroup, { maxWidth: filterGroupMaxWidth(windowWidth, scoreToggleWidth) }]}
+              >
                 {STATUS_OPTIONS.map(opt => (
                   <FilterPill
                     key={opt.key}
@@ -307,7 +317,9 @@ export default function BrowseScreen() {
                   />
                 ))}
               </ScrollView>
-              <ScoreToggle mode={scoreMode} onChange={handleScoreModeChange} />
+              <View onLayout={e => setScoreToggleWidth(e.nativeEvent.layout.width)}>
+                <ScoreToggle mode={scoreMode} onChange={handleScoreModeChange} />
+              </View>
             </View>
 
             }

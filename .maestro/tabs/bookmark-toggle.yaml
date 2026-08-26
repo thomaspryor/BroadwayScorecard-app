@@ -1,6 +1,8 @@
 # Bookmark Toggle Test — Browse Tab
 # Verifies: tapping bookmark overlay doesn't crash, toggles watchlist state
 # Tests Gate 2 (async error handling) and Gate 4 (auth handling)
+# BRO-270: scrolls to the first unrated card instead of assuming index 0 is
+# unrated — see the scrollUntilVisible step below for why.
 
 appId: com.broadwayscorecard.app
 ---
@@ -31,7 +33,22 @@ appId: com.broadwayscorecard.app
     visible: "Now Playing"
     timeout: 45000
 
-# Tap the bookmark overlay on the first show card
+# Scroll until an unrated show card is on screen. The shared CI dev-test
+# account accumulates real ratings over time (BRO-270: Hamilton, Book of
+# Mormon, Oh Mary!, Chicago were all rated, permanently red-ing this flow) —
+# BookmarkOverlay renders testID "my-rating-chip" instead of
+# "bookmark-overlay" for any show the signed-in user has rated, and the
+# FlatList only renders the first few cards, so a fixed index 0 can end up
+# with zero "bookmark-overlay" matches anywhere in the current view. Scrolling
+# until one is visible is immune to however many top cards happen to be
+# rated, without touching the account's rating data.
+- scrollUntilVisible:
+    element:
+      id: "bookmark-overlay"
+    direction: DOWN
+    timeout: 20000
+
+# Tap the bookmark overlay on the first unrated show card now on screen
 # Uses testID since iOS collapses nested Pressable accessibility labels
 - tapOn:
     id: "bookmark-overlay"
