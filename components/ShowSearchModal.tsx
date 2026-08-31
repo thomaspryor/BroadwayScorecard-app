@@ -363,11 +363,19 @@ export function ShowSearchModal({
           <View style={styles.emptyState}>
             <Text style={styles.emptyText}>Search for a show by name</Text>
           </View>
-        ) : results.length > 0 ? (
+        ) : (
           <FlatList
+            style={styles.resultsList}
             data={results}
             keyExtractor={item => (item.kind === 'show' ? item.show.id : item.candidate.id)}
             keyboardShouldPersistTaps="handled"
+            // A long fuzzy-matched result set can push the wider-catalog
+            // footer below the keyboard with no room left to scroll past it
+            // (contentSize ends right at the footer, keyboard covers the
+            // rest) — dismiss on drag so it's always reachable, not just on
+            // an empty result set (verified via sim: "One man musical" scroll
+            // stalled at the last row with the keyboard still up).
+            keyboardDismissMode="on-drag"
             renderItem={({ item }) => {
               if (item.kind === 'diary') {
                 const { candidate } = item;
@@ -438,84 +446,99 @@ export function ShowSearchModal({
                 </Pressable>
               );
             }}
-            contentContainerStyle={styles.list}
-            showsVerticalScrollIndicator={false}
-          />
-        ) : liveState === 'results' ? (
-          <FlatList
-            data={liveCandidates}
-            keyExtractor={item => item.id}
-            keyboardShouldPersistTaps="handled"
-            ListHeaderComponent={
-              <Text style={styles.wideHeader}>From the wider theater catalog</Text>
+            // Debounce still settling — hold a blank empty state instead of
+            // flashing "No shows found" against a stale result set.
+            ListEmptyComponent={
+              querySettled ? (
+                <View style={styles.emptyState}>
+                  <Text style={styles.emptyText}>
+                    No shows found for {'“'}{query.trim()}{'”'}
+                  </Text>
+                </View>
+              ) : null
             }
-            renderItem={({ item }) => {
-              const alreadyListed = !!excludeIds?.has(item.id);
-              return (
-                <Pressable
-                  style={({ pressed }) => [styles.resultRow, (alreadyListed || !!addingLiveId) && styles.resultRowMuted, pressed && styles.pressed]}
-                  disabled={alreadyListed || !!addingLiveId}
-                  onPress={() => selectLive(item)}
-                  accessibilityRole="button"
-                  accessibilityState={{ disabled: alreadyListed || !!addingLiveId }}
-                  accessibilityLabel={alreadyListed ? `${item.title} — ${excludedLabel}` : item.title}
-                >
-                  {item.posterUrl ? (
-                    <Image source={{ uri: item.posterUrl }} style={styles.resultPoster} contentFit="cover" />
-                  ) : (
-                    <View style={[styles.resultPoster, styles.resultPlaceholder]}>
-                      <Text style={styles.placeholderText}>{item.title.charAt(0)}</Text>
+            // The wider-catalog option lives at the bottom of the list
+            // UNCONDITIONALLY, not just when the local catalog comes up
+            // empty — a fuzzy match can fill the list with loosely-related
+            // titles that bury the one the user actually wants, with no way
+            // to reach the wider catalog (beta feedback 2026-08-12,
+            // AE2cV5mxGJgdIVWbvbFRLn0: "I should always see that option at
+            // the bottom of the list").
+            ListFooterComponent={
+              querySettled ? (
+                <View style={styles.wideCatalogFooter}>
+                  {liveState === 'idle' && (
+                    <View style={styles.wideCatalogPrompt}>
+                      <Pressable onPress={runLiveSearch} hitSlop={12} accessibilityRole="button">
+                        <Text style={styles.liveLink}>Can{'’'}t find it? Search the wider theater catalog</Text>
+                      </Pressable>
                     </View>
                   )}
-                  <View style={styles.resultInfo}>
-                    <Text style={styles.resultTitle} numberOfLines={1}>{item.title}</Text>
-                    {item.venue && <Text style={styles.resultVenue} numberOfLines={1}>{item.venue}</Text>}
-                    {alreadyListed && (
-                      <Text style={styles.resultAlready} numberOfLines={1}>{excludedLabel}</Text>
-                    )}
-                    <Text style={styles.resultMeta} numberOfLines={1}>
-                      {[item.city, item.openingDate?.slice(0, 4)].filter(Boolean).join(' · ')}
-                      {item.city || item.openingDate ? ' · ' : ''}No critic score
-                    </Text>
-                  </View>
-                  <Text style={styles.liveAdd}>{addingLiveId === item.id ? 'Adding…' : '+ Add'}</Text>
-                </Pressable>
-              );
-            }}
-            contentContainerStyle={styles.list}
+                  {liveState === 'searching' && (
+                    <View style={styles.wideCatalogPrompt}>
+                      <Text style={styles.liveStatus}>Searching the wider catalog…</Text>
+                    </View>
+                  )}
+                  {liveState === 'results' && (
+                    <>
+                      <Text style={styles.wideHeader}>From the wider theater catalog</Text>
+                      {liveCandidates.map(item => {
+                        const alreadyListed = !!excludeIds?.has(item.id);
+                        return (
+                          <Pressable
+                            key={item.id}
+                            style={({ pressed }) => [styles.resultRow, (alreadyListed || !!addingLiveId) && styles.resultRowMuted, pressed && styles.pressed]}
+                            disabled={alreadyListed || !!addingLiveId}
+                            onPress={() => selectLive(item)}
+                            accessibilityRole="button"
+                            accessibilityState={{ disabled: alreadyListed || !!addingLiveId }}
+                            accessibilityLabel={alreadyListed ? `${item.title} — ${excludedLabel}` : item.title}
+                          >
+                            {item.posterUrl ? (
+                              <Image source={{ uri: item.posterUrl }} style={styles.resultPoster} contentFit="cover" />
+                            ) : (
+                              <View style={[styles.resultPoster, styles.resultPlaceholder]}>
+                                <Text style={styles.placeholderText}>{item.title.charAt(0)}</Text>
+                              </View>
+                            )}
+                            <View style={styles.resultInfo}>
+                              <Text style={styles.resultTitle} numberOfLines={1}>{item.title}</Text>
+                              {item.venue && <Text style={styles.resultVenue} numberOfLines={1}>{item.venue}</Text>}
+                              {alreadyListed && (
+                                <Text style={styles.resultAlready} numberOfLines={1}>{excludedLabel}</Text>
+                              )}
+                              <Text style={styles.resultMeta} numberOfLines={1}>
+                                {[item.city, item.openingDate?.slice(0, 4)].filter(Boolean).join(' · ')}
+                                {item.city || item.openingDate ? ' · ' : ''}No critic score
+                              </Text>
+                            </View>
+                            <Text style={styles.liveAdd}>{addingLiveId === item.id ? 'Adding…' : '+ Add'}</Text>
+                          </Pressable>
+                        );
+                      })}
+                    </>
+                  )}
+                  {liveState === 'empty' && (
+                    <View style={styles.wideCatalogPrompt}>
+                      <Text style={styles.liveStatus}>
+                        Not found in the wider catalog either. Try a different spelling.
+                      </Text>
+                    </View>
+                  )}
+                  {liveState === 'error' && (
+                    <View style={styles.wideCatalogPrompt}>
+                      <Text style={styles.liveErrorText}>{liveError}</Text>
+                      <Pressable onPress={runLiveSearch} hitSlop={12} accessibilityRole="button">
+                        <Text style={styles.liveLink}>Try again</Text>
+                      </Pressable>
+                    </View>
+                  )}
+                </View>
+              ) : null
+            }
+            contentContainerStyle={[styles.list, results.length === 0 && styles.listEmptyGrow]}
             showsVerticalScrollIndicator={false}
           />
-        ) : !querySettled ? (
-          // Debounce still settling — hold a blank frame instead of flashing
-          // "No shows found" + the live-search CTA against a stale result set.
-          <View style={styles.emptyState} />
-        ) : (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyText}>
-              No shows found for {'“'}{query.trim()}{'”'}
-            </Text>
-            {liveState === 'idle' && (
-              <Pressable onPress={runLiveSearch} hitSlop={12} accessibilityRole="button">
-                <Text style={styles.liveLink}>Can{'’'}t find it? Search the wider theater catalog</Text>
-              </Pressable>
-            )}
-            {liveState === 'searching' && (
-              <Text style={styles.liveStatus}>Searching the wider catalog…</Text>
-            )}
-            {liveState === 'empty' && (
-              <Text style={styles.liveStatus}>
-                Not found in the wider catalog either. Try a different spelling.
-              </Text>
-            )}
-            {liveState === 'error' && (
-              <>
-                <Text style={styles.liveErrorText}>{liveError}</Text>
-                <Pressable onPress={runLiveSearch} hitSlop={12} accessibilityRole="button">
-                  <Text style={styles.liveLink}>Try again</Text>
-                </Pressable>
-              </>
-            )}
-          </View>
         )}
       </KeyboardAvoidingView>
     </Modal>
@@ -612,8 +635,24 @@ const styles = StyleSheet.create({
     fontSize: FontSize.sm,
     fontWeight: '600',
   },
+  resultsList: {
+    flex: 1,
+  },
   list: {
     paddingBottom: Spacing.xxl,
+  },
+  listEmptyGrow: {
+    flexGrow: 1,
+  },
+  wideCatalogFooter: {
+    marginTop: Spacing.sm,
+    paddingTop: Spacing.lg,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border.subtle,
+  },
+  wideCatalogPrompt: {
+    paddingHorizontal: Spacing.xl,
+    gap: Spacing.sm,
   },
   resultRow: {
     flexDirection: 'row',

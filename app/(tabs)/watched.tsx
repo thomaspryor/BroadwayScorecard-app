@@ -19,6 +19,7 @@ import {
   Alert,
 } from 'react-native';
 import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter , useFocusEffect } from 'expo-router';
@@ -122,6 +123,35 @@ function EmptyState({ emoji, title, subtitle, actionLabel, onAction }: {
   );
 }
 
+// No-poster fallback: a title-derived gradient panel with a faint marquee
+// star watermark and the show's initial, replacing the old flat gray box +
+// letter (beta feedback 2026-08-12, ANFWPxJxRJF6PJmtTOMaO-I: "figure out
+// better look placeholders"). Star path reused from the Rate button below —
+// already a vetted shape in this file, no new icon dependency needed.
+const POSTER_PLACEHOLDER_GRADIENTS: readonly [string, string][] = [
+  ['#3a2f28', '#1a1a24'],
+  ['#2a2038', '#1a1a24'],
+  ['#1f2a3a', '#1a1a24'],
+  ['#1f3a2f', '#1a1a24'],
+  ['#3a1f2a', '#1a1a24'],
+];
+function hashTitle(title: string): number {
+  let h = 0;
+  for (let i = 0; i < title.length; i++) h = (h * 31 + title.charCodeAt(i)) >>> 0;
+  return h;
+}
+function PosterFallback({ title }: { title: string }) {
+  const [start, end] = POSTER_PLACEHOLDER_GRADIENTS[hashTitle(title) % POSTER_PLACEHOLDER_GRADIENTS.length];
+  return (
+    <LinearGradient colors={[start, end]} style={[styles.gridPoster, styles.posterFallback]}>
+      <Svg width={40} height={40} viewBox="0 0 24 24" style={styles.posterFallbackStar}>
+        <Path fill={Colors.text.primary} d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+      </Svg>
+      <Text style={styles.posterFallbackText}>{title.charAt(0).toUpperCase()}</Text>
+    </LinearGradient>
+  );
+}
+
 // ─── Grid poster + date overlay (Round 2, Grid Direction B modified) ──
 // Venue text dropped entirely; the date moves off the text block and onto
 // the poster as a small low-alpha corner scrim instead (title + stars stay
@@ -133,9 +163,7 @@ function GridPoster({ posterUrl, title, dateLabel }: { posterUrl: string | null;
       {posterUrl ? (
         <Image source={{ uri: posterUrl }} style={styles.gridPoster} contentFit="cover" transition={200} />
       ) : (
-        <View style={[styles.gridPoster, styles.cardPosterPlaceholder]}>
-          <Text style={styles.placeholderText}>{title.charAt(0)}</Text>
-        </View>
+        <PosterFallback title={title} />
       )}
       {!!dateLabel && (
         <View style={styles.gridDateOverlayWrap}>
@@ -1273,9 +1301,11 @@ const styles = StyleSheet.create({
   // Date lives on the poster now, not the text block below (venue dropped
   // entirely) — small low-alpha corner scrim, unobtrusive by design.
   // Horizontally centered so the tag lines up with the centered title/stars
-  // below the poster (beta feedback 2026-08-02).
+  // below the poster (beta feedback 2026-08-02). Pinned to the TOP edge, not
+  // bottom — bottom placement collided with poster art/taglines (beta
+  // feedback 2026-08-13, ANIDtf6U9sjqeZmHC8FIKnI).
   gridDateOverlayWrap: {
-    position: 'absolute', left: 0, right: 0, bottom: 6,
+    position: 'absolute', left: 0, right: 0, top: 6,
     alignItems: 'center',
   },
   gridDateOverlay: {
@@ -1283,6 +1313,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.45)',
   },
   gridDateOverlayText: { color: '#fff', fontSize: 12, fontWeight: '700' },
+  posterFallback: { alignItems: 'center', justifyContent: 'center' },
+  posterFallbackStar: { position: 'absolute', opacity: 0.12 },
+  posterFallbackText: { color: Colors.text.primary, fontSize: 28, fontWeight: '700' },
   gridCardInfo: { marginTop: 4, alignItems: 'center' },
   gridTitle: {
     color: Colors.text.secondary, fontSize: 12, fontWeight: '500',
