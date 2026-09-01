@@ -360,7 +360,7 @@ export default function MyShowsScreen() {
           <Image source={{ uri: posterUrl }} style={styles.gridPoster} contentFit="cover" transition={200} />
         ) : (
           <View style={[styles.gridPoster, styles.cardPosterPlaceholder]}>
-            <Text style={styles.placeholderText}>{title.charAt(0)}</Text>
+            <Text style={styles.gridPlaceholderIcon}>🎭</Text>
           </View>
         )}
         <View style={styles.gridCardInfo}>
@@ -403,7 +403,7 @@ export default function MyShowsScreen() {
           <Image source={{ uri: posterUrl }} style={styles.gridPoster} contentFit="cover" transition={200} />
         ) : (
           <View style={[styles.gridPoster, styles.cardPosterPlaceholder]}>
-            <Text style={styles.placeholderText}>{title.charAt(0)}</Text>
+            <Text style={styles.gridPlaceholderIcon}>🎭</Text>
           </View>
         )}
         <Text style={styles.gridTitle} numberOfLines={2}>{title}</Text>
@@ -1200,6 +1200,14 @@ const styles = StyleSheet.create({
     aspectRatio: 2 / 3,
     borderRadius: BorderRadius.sm,
     backgroundColor: Colors.surface.overlay,
+  },
+  // A bare initial letter on a flat grey box read as broken/empty (beta
+  // feedback 2026-08-12, ANFWPxJxRJF6PJmtTOMaO-I) — a muted masks icon
+  // reads as "no poster yet" instead. Title is already printed below the
+  // tile, so the icon doesn't need to carry the show's identity.
+  gridPlaceholderIcon: {
+    fontSize: 32,
+    opacity: 0.4,
   },
   gridCardInfo: {
     alignItems: 'center',

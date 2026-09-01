@@ -56,20 +56,14 @@ export const ShareCardWithRef = React.forwardRef<ShareCardHandle, ShareCardProps
       if (Platform.OS === 'ios') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       trackShowShared(props.show.id, props.show.title);
 
+      // Share the show's URL, not the rendered card image — sharing the
+      // image (via `url: <captured png>`) dropped the link entirely on iOS,
+      // so recipients had no way back to the show (beta feedback 2026-08-13,
+      // ANDYIxNpx3lmYZhb9EFZEyA).
       try {
-        const uri = await viewShotRef.current?.capture?.();
-        if (!uri) {
-          await Share.share({
-            message: `Check out ${props.show.title} on Broadway Scorecard!\nhttps://broadwayscorecard.com/show/${props.show.slug}`,
-          });
-          return;
-        }
-
-        await Share.share(
-          Platform.OS === 'ios'
-            ? { url: uri }
-            : { message: `Check out ${props.show.title} on Broadway Scorecard!\nhttps://broadwayscorecard.com/show/${props.show.slug}` },
-        );
+        await Share.share({
+          message: `Check out ${props.show.title} on Broadway Scorecard!\nhttps://broadwayscorecard.com/show/${props.show.slug}`,
+        });
         props.onShared?.();
       } catch {
         // User cancelled
