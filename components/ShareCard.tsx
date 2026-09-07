@@ -57,19 +57,9 @@ export const ShareCardWithRef = React.forwardRef<ShareCardHandle, ShareCardProps
       trackShowShared(props.show.id, props.show.title);
 
       try {
-        const uri = await viewShotRef.current?.capture?.();
-        if (!uri) {
-          await Share.share({
-            message: `Check out ${props.show.title} on Broadway Scorecard!\nhttps://broadwayscorecard.com/show/${props.show.slug}`,
-          });
-          return;
-        }
-
-        await Share.share(
-          Platform.OS === 'ios'
-            ? { url: uri }
-            : { message: `Check out ${props.show.title} on Broadway Scorecard!\nhttps://broadwayscorecard.com/show/${props.show.slug}` },
-        );
+        await Share.share({
+          message: `Check out ${props.show.title} on Broadway Scorecard!\nhttps://broadwayscorecard.com/show/${props.show.slug}`,
+        });
         props.onShared?.();
       } catch {
         // User cancelled

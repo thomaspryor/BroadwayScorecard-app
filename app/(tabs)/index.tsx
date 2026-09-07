@@ -138,6 +138,38 @@ export default function HomeScreen() {
     const nytPicks = marketShows.filter(s => isOpen(s) && s.tags.includes('nyt-pick')).sort(byScore).slice(0, 10);
     if (nytPicks.length >= 2) rows.push({ title: "New York Times Critic's Picks", shows: nytPicks });
 
+    // Recently Opened — Broadway / Off-Broadway split (beta feedback
+    // AFlPzGW8awRQBMSAO3omMxk). NYC-only: "on Broadway" / "Off Broadway" are
+    // NYC-market concepts, same gate as Best Off-Broadway above. Reuses the
+    // Just Opened windowing (60-day trailing, local-date strings).
+    if (market === 'nyc') {
+      const recentlyOpenedBway = marketShows
+        .filter(s => s.status === 'open' && s.openingDate && s.openingDate >= sixtyDaysAgo && s.openingDate <= todayLocal)
+        .sort((a, b) => (b.openingDate ?? '').localeCompare(a.openingDate ?? ''))
+        .slice(0, 10);
+      if (recentlyOpenedBway.length >= 2) rows.push({
+        title: 'Recently Opened on Broadway',
+        shows: recentlyOpenedBway,
+        getSubtitle: (s) => {
+          const d = shortDate(s.openingDate ?? '');
+          return d ? `Opened ${d}` : undefined;
+        },
+      });
+
+      const recentlyOpenedOffBway = shows
+        .filter(s => s.category === 'off-broadway' && s.status === 'open' && s.openingDate && s.openingDate >= sixtyDaysAgo && s.openingDate <= todayLocal)
+        .sort((a, b) => (b.openingDate ?? '').localeCompare(a.openingDate ?? ''))
+        .slice(0, 10);
+      if (recentlyOpenedOffBway.length >= 2) rows.push({
+        title: 'Recently Opened Off Broadway',
+        shows: recentlyOpenedOffBway,
+        getSubtitle: (s) => {
+          const d = shortDate(s.openingDate ?? '');
+          return d ? `Opened ${d}` : undefined;
+        },
+      });
+    }
+
     // Tony Award Winners (open shows with tony-winner tag)
     const tonyWinners = marketShows.filter(s => isOpen(s) && s.tags.includes('tony-winner')).sort(byScore).slice(0, 10);
     if (tonyWinners.length >= 2) rows.push({ title: 'Tony Award Winners', shows: tonyWinners });

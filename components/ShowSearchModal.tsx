@@ -316,6 +316,78 @@ export function ShowSearchModal({
     return `${parts.join(' · ')}${parts.length > 0 ? ' · ' : ''}No critic score`;
   };
 
+  // Shared between the wider-catalog-only results list and the always-visible
+  // footer below the local results — same row, two places it can appear.
+  const renderLiveRow = (item: MezzanineCandidate) => {
+    const alreadyListed = !!excludeIds?.has(item.id);
+    return (
+      <Pressable
+        key={item.id}
+        style={({ pressed }) => [styles.resultRow, (alreadyListed || !!addingLiveId) && styles.resultRowMuted, pressed && styles.pressed]}
+        disabled={alreadyListed || !!addingLiveId}
+        onPress={() => selectLive(item)}
+        accessibilityRole="button"
+        accessibilityState={{ disabled: alreadyListed || !!addingLiveId }}
+        accessibilityLabel={alreadyListed ? `${item.title} — ${excludedLabel}` : item.title}
+      >
+        {item.posterUrl ? (
+          <Image source={{ uri: item.posterUrl }} style={styles.resultPoster} contentFit="cover" />
+        ) : (
+          <View style={[styles.resultPoster, styles.resultPlaceholder]}>
+            <Text style={styles.placeholderText}>{item.title.charAt(0)}</Text>
+          </View>
+        )}
+        <View style={styles.resultInfo}>
+          <Text style={styles.resultTitle} numberOfLines={1}>{item.title}</Text>
+          {item.venue && <Text style={styles.resultVenue} numberOfLines={1}>{item.venue}</Text>}
+          {alreadyListed && (
+            <Text style={styles.resultAlready} numberOfLines={1}>{excludedLabel}</Text>
+          )}
+          <Text style={styles.resultMeta} numberOfLines={1}>
+            {[item.city, item.openingDate?.slice(0, 4)].filter(Boolean).join(' · ')}
+            {item.city || item.openingDate ? ' · ' : ''}No critic score
+          </Text>
+        </View>
+        <Text style={styles.liveAdd}>{addingLiveId === item.id ? 'Adding…' : '+ Add'}</Text>
+      </Pressable>
+    );
+  };
+
+  // Same idle/searching/results/empty/error states as the no-local-results
+  // branch, but always reachable — feedback: the wider-catalog option must
+  // show at the bottom of the list even when local/diary matches exist.
+  const renderLiveFooter = () => (
+    <View style={styles.liveFooterWrap}>
+      {liveState === 'idle' && (
+        <Pressable onPress={runLiveSearch} hitSlop={12} accessibilityRole="button">
+          <Text style={styles.liveLink}>Can{'’'}t find it? Search the wider theater catalog</Text>
+        </Pressable>
+      )}
+      {liveState === 'searching' && (
+        <Text style={styles.liveStatus}>Searching the wider catalog…</Text>
+      )}
+      {liveState === 'empty' && (
+        <Text style={styles.liveStatus}>
+          Not found in the wider catalog either. Try a different spelling.
+        </Text>
+      )}
+      {liveState === 'error' && (
+        <>
+          <Text style={styles.liveErrorText}>{liveError}</Text>
+          <Pressable onPress={runLiveSearch} hitSlop={12} accessibilityRole="button">
+            <Text style={styles.liveLink}>Try again</Text>
+          </Pressable>
+        </>
+      )}
+      {liveState === 'results' && (
+        <>
+          <Text style={styles.wideHeader}>From the wider theater catalog</Text>
+          {liveCandidates.map(renderLiveRow)}
+        </>
+      )}
+    </View>
+  );
+
   // "No shows found" (and its now-tappable wider-catalog CTA) must wait for
   // the debounce to settle — mid-typing, `results` is still computed from the
   // previous debouncedQuery, so gating on the immediate query would flash the
@@ -440,6 +512,7 @@ export function ShowSearchModal({
             }}
             contentContainerStyle={styles.list}
             showsVerticalScrollIndicator={false}
+            ListFooterComponent={querySettled ? renderLiveFooter : null}
           />
         ) : liveState === 'results' ? (
           <FlatList
@@ -449,39 +522,7 @@ export function ShowSearchModal({
             ListHeaderComponent={
               <Text style={styles.wideHeader}>From the wider theater catalog</Text>
             }
-            renderItem={({ item }) => {
-              const alreadyListed = !!excludeIds?.has(item.id);
-              return (
-                <Pressable
-                  style={({ pressed }) => [styles.resultRow, (alreadyListed || !!addingLiveId) && styles.resultRowMuted, pressed && styles.pressed]}
-                  disabled={alreadyListed || !!addingLiveId}
-                  onPress={() => selectLive(item)}
-                  accessibilityRole="button"
-                  accessibilityState={{ disabled: alreadyListed || !!addingLiveId }}
-                  accessibilityLabel={alreadyListed ? `${item.title} — ${excludedLabel}` : item.title}
-                >
-                  {item.posterUrl ? (
-                    <Image source={{ uri: item.posterUrl }} style={styles.resultPoster} contentFit="cover" />
-                  ) : (
-                    <View style={[styles.resultPoster, styles.resultPlaceholder]}>
-                      <Text style={styles.placeholderText}>{item.title.charAt(0)}</Text>
-                    </View>
-                  )}
-                  <View style={styles.resultInfo}>
-                    <Text style={styles.resultTitle} numberOfLines={1}>{item.title}</Text>
-                    {item.venue && <Text style={styles.resultVenue} numberOfLines={1}>{item.venue}</Text>}
-                    {alreadyListed && (
-                      <Text style={styles.resultAlready} numberOfLines={1}>{excludedLabel}</Text>
-                    )}
-                    <Text style={styles.resultMeta} numberOfLines={1}>
-                      {[item.city, item.openingDate?.slice(0, 4)].filter(Boolean).join(' · ')}
-                      {item.city || item.openingDate ? ' · ' : ''}No critic score
-                    </Text>
-                  </View>
-                  <Text style={styles.liveAdd}>{addingLiveId === item.id ? 'Adding…' : '+ Add'}</Text>
-                </Pressable>
-              );
-            }}
+            renderItem={({ item }) => renderLiveRow(item)}
             contentContainerStyle={styles.list}
             showsVerticalScrollIndicator={false}
           />
@@ -611,6 +652,12 @@ const styles = StyleSheet.create({
     color: Colors.brand,
     fontSize: FontSize.sm,
     fontWeight: '600',
+  },
+  liveFooterWrap: {
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.md,
+    paddingBottom: Spacing.xl,
+    gap: Spacing.sm,
   },
   list: {
     paddingBottom: Spacing.xxl,
