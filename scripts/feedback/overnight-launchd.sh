@@ -24,39 +24,23 @@ LOG="$STATE/launchd.log"
 export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/Applications/cmux.app/Contents/Resources/bin:$HOME/.local/bin"
 
 # Same reason as PATH above: launchd hands this script a minimal environment,
-# not a login shell's. PATH was set for that and LANG was missed, which broke
-# the visual gate for a month in a way that looked like a different bug.
+# not a login shell's. PATH was set for that; LANG was missed, and that broke
+# the overnight visual gate for a month in a way that looked like another bug.
 #
-# CocoaPods calls String#unicode_normalize on the installation root, and with
-# no LANG that string is ASCII-8BIT, so Ruby raises
-#   Encoding::CompatibilityError: Unicode Normalization not appropriate for ASCII-8BIT
-# and `pod install` dies. scripts/build-sim.sh runs `pod install` whenever
-# ios/build/generated is missing (always true in a fresh overnight worktree),
-# so build-sim fails, captureScreens gets no screenshots, and decideVisualGate
-# fails CLOSED — correctly, but on a cause nothing in the log points at.
-# Observed verbatim in runs/2026-09-07T06-15-07.log, alongside CocoaPods' own
-# advice: "CocoaPods requires your terminal to be using UTF-8 encoding."
+# With no LANG, Ruby's default_external is US-ASCII, so CocoaPods'
+# String#unicode_normalize on the installation root raises
+# Encoding::CompatibilityError and `pod install` dies. build-sim.sh runs pod
+# install whenever ios/build/generated is missing (always true in a fresh
+# overnight worktree), so captureScreens gets nothing and decideVisualGate
+# fails CLOSED on a cause nothing in the log names. Seen in
+# runs/2026-09-07T06-15-07.log.
 #
-# This is the SECOND of the two refusals that stranded the beta-feedback
-# branches; BRO-2986 fixed the first (app/show/[slug].tsx had no deep-linkable
-# example, so most nights were refused before capture mattered).
-#
-# CORRECTION to what this comment said when it landed: it claimed BRO-2986's
-# pinning is what MADE this locale bug binding, implying it was secondary until
-# then. That ordering is wrong, and a review caught it. runs/2026-09-07T06-15-07.log
-# line 18 shows only the six tab screens were attempted and build-sim died
-# before ANY capture, so the locale bug was ALREADY binding that night,
-# independently. Both refusals were live at once. Left as a correction rather
-# than a silent rewrite because an overstated causal claim in a comment is the
-# kind of thing the next reader would reason from.
-#
-# LANG alone is sufficient and LC_ALL is deliberately NOT set. LC_ALL outranks
-# every per-category LC_*, so exporting it would take a blunt override on all
-# of them to fix one encoding problem, and it silently shifts collation for
-# every child (pod, xcodebuild, node, maestro, git) from the C/POSIX ordering
-# they ran under before. The repro is unambiguous that LANG carries it:
-#   env -u LANG -u LC_ALL ruby -e 'p Encoding.default_external'  -> US-ASCII
-#   env LANG=en_US.UTF-8   ruby -e 'p Encoding.default_external' -> UTF-8
+# LANG only, deliberately not LC_ALL: LC_ALL outranks explicitly-set
+# per-category LC_*, and nothing here sets any, so it would buy nothing. Note
+# it does NOT avoid a collation change -- `export LANG` alone already moves
+# children off C/POSIX ordering (`printf 'b\nA\na\nB\n' | sort` gives
+# "a A b B" with LANG vs "A B a b" without). An empty inherited LC_ALL is
+# harmless; macOS libc treats it as unset.
 export LANG="${LANG:-en_US.UTF-8}"
 
 mkdir -p "$STATE"
