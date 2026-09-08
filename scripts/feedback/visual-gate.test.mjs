@@ -6,6 +6,9 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
@@ -196,10 +199,10 @@ test('Show Detail is reachable from the exported SCREENS list', () => {
 // a loaded screen from an empty one, so the flow itself has to.
 
 test('a screen with assertText waits for that text before the shutter fires', () => {
-  const flow = buildFlow('com.example.app', [{ label: 'Show Detail', route: 'show/oh-mary', assertText: 'MY RATING & REVIEW' }], '/tmp/out');
+  const flow = buildFlow('com.example.app', [{ label: 'Show Detail', route: 'show/oh-mary', assertText: 'Oh, Mary!' }], '/tmp/out');
   assert.match(flow, /- openLink: broadwayscorecard:\/\/\/show\/oh-mary/);
   assert.match(flow, /- extendedWaitUntil:/);
-  assert.match(flow, /visible: "MY RATING & REVIEW"/);
+  assert.match(flow, /visible: "Oh, Mary!"/);
   // Ordering is the whole point: asserting AFTER the screenshot proves
   // nothing. Scope to the text AFTER the openLink -- indexOf on the whole
   // flow matches the launchApp preamble's own extendedWaitUntil, which is
@@ -239,6 +242,38 @@ test('a screen with no assertText still screenshots (tab screens are unchanged)'
   const plain = buildFlow('com.example.app', [{ label: 'Watched', route: 'watched' }], '/tmp/out');
   assert.match(plain, /takeScreenshot/);
   assert.equal(count(plain), 1, 'only the launch wait; no per-screen assertion added');
-  const asserted = buildFlow('com.example.app', [{ label: 'Show Detail', route: 'show/oh-mary', assertText: 'MY RATING & REVIEW' }], '/tmp/out');
+  const asserted = buildFlow('com.example.app', [{ label: 'Show Detail', route: 'show/oh-mary', assertText: 'Oh, Mary!' }], '/tmp/out');
   assert.equal(count(asserted), 2, 'launch wait plus the per-screen content assertion');
+});
+
+// ---- the pinned fixture must actually resolve -------------------------
+// Without this, `route` and `assertText` are just two strings that happen to
+// sit next to each other: an earlier version asserted on 'MY RATING & REVIEW',
+// which appears NOWHERE in the app, and every test still passed because
+// nothing checked the fixture against real data. A fixture that rots (show
+// pulled, slug renamed, title changed) must fail HERE, in CI, not silently at
+// 02:15 by timing out and stranding the night.
+
+test('the pinned Show Detail slug resolves in the shipped seed data, and assertText is its title', () => {
+  const HERE = path.dirname(fileURLToPath(import.meta.url));
+  const seedPath = path.join(HERE, '..', '..', 'assets', 'seed-data.json');
+  // SETUP ASSERTION: a missing or reshaped seed file must FAIL, not skip —
+  // otherwise this test reads as green while checking nothing.
+  assert.ok(fs.existsSync(seedPath), `seed data missing at ${seedPath}`);
+  const seed = JSON.parse(fs.readFileSync(seedPath, 'utf8'));
+  const rows = seed.shows;
+  assert.ok(Array.isArray(rows) && rows.length > 0, 'seed-data.json must carry a non-empty shows array');
+  // Keys are abbreviated in the shipped seed: s = slug, t = title, st = status.
+  assert.ok(rows[0].s !== undefined && rows[0].t !== undefined,
+    'seed rows must expose s (slug) and t (title); the shape changed');
+
+  const detail = SCREENS.find((sc) => sc.label === 'Show Detail');
+  assert.ok(detail, 'Show Detail must be pinned in SCREENS');
+  const slugFromRoute = detail.route.replace(/^show\//, '');
+  assert.notEqual(slugFromRoute, detail.route, 'route must be of the form show/<slug>');
+
+  const row = rows.find((r) => r.s === slugFromRoute);
+  assert.ok(row, `pinned slug '${slugFromRoute}' does not exist in seed-data.json — the fixture has rotted`);
+  assert.equal(detail.assertText, row.t,
+    `assertText must be the show's title so it discriminates loaded from "Show not found"; expected ${JSON.stringify(row.t)}`);
 });

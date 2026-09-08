@@ -66,11 +66,23 @@ const SCREENS = [
   // waitForAnimationToEnd returns as soon as animations settle rather than
   // when data arrives.
   //
-  // 'MY RATING & REVIEW' is lifted from the flow this gate mirrors
-  // (.maestro-manual/beta-feedback-r3-verify2.yaml:76-78, timeout 15000). I
-  // copied the openLink from there and dropped this assertion; that was the
-  // whole defect.
-  { label: 'Show Detail', route: 'show/oh-mary', assertText: 'MY RATING & REVIEW' },
+  // assertText is the SHOW TITLE, because that is precisely the
+  // loaded-vs-not-found discriminator: [slug].tsx:277 sets the Stack.Screen
+  // header to show.title, and the !show branch returns at :260 before ever
+  // reaching it. If the title is on screen, the data resolved.
+  //
+  // It is NOT 'MY RATING & REVIEW'. I used that first, copied from
+  // .maestro-manual/beta-feedback-r3-verify2.yaml:76-78, and that string
+  // appears NOWHERE in the current app -- a grep for it across app/ and
+  // components/ returns nothing. An assertion that can never match is worse
+  // than none: extendedWaitUntil would burn its timeout, produce no
+  // screenshot, and strand EVERY night, which is the exact bug this whole
+  // line of work exists to fix.
+  //
+  // assertText and route must stay in sync; the colocated test validates the
+  // pinned slug against assets/seed-data.json and asserts the title matches,
+  // so a rotted fixture fails in CI rather than at 02:15.
+  { label: 'Show Detail', route: 'show/oh-mary', assertText: 'Oh, Mary!' },
 ];
 
 const SCREEN_FILES = {
