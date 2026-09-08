@@ -91,7 +91,9 @@ test('a change under lib/, hooks/, or constants/ also counts as shared', () => {
 });
 
 test('a file that matches no screen and is not shared maps to nothing', () => {
-  assert.deepEqual(screensForFiles(['app/show/[slug].tsx']), []);
+  // show/[slug] used to be the example here; it is now PINNED (BRO-2986), so
+  // these use screens that are still unpinned on purpose.
+  assert.deepEqual(screensForFiles(['app/import.tsx']), []);
   assert.deepEqual(screensForFiles(['app/rate/[showId].tsx']), []);
 });
 
@@ -111,7 +113,9 @@ test('the root and tab layouts wrap every screen, same as a shared component', (
 // example (show/[slug], rate/[showId]) — but [] must never read as "verified".
 // unverifiableFiles is what stops that class of file from fail-opening.
 test('detail routes with no deep-linkable example are flagged unverifiable, not silently passed', () => {
-  const files = ['app/show/[slug].tsx', 'app/diary-show/[id].tsx', 'app/rate/[showId].tsx', 'app/my-shows.tsx', 'app/import.tsx', 'app/search.tsx'];
+  // show/[slug].tsx deliberately absent: it is pinned now (BRO-2986). The
+  // rest are still unpinned and must still be flagged.
+  const files = ['app/diary-show/[id].tsx', 'app/rate/[showId].tsx', 'app/my-shows.tsx', 'app/import.tsx', 'app/search.tsx'];
   for (const f of files) {
     assert.deepEqual(screensForFiles([f]), [], `${f} has no known screen mapping`);
     assert.deepEqual(unverifiableFiles([f]), [f], `${f} must be flagged unverifiable`);
@@ -123,9 +127,9 @@ test('ordinary tab and shared files are never flagged unverifiable', () => {
 });
 
 test('an unverifiable file blocks the merge even when the rest of the diff has no known screen', () => {
-  const decision = decideVisualGate([], [], ['app/show/[slug].tsx']);
+  const decision = decideVisualGate([], [], ['app/import.tsx']);
   assert.equal(decision.ok, false);
-  assert.match(decision.reason, /show\/\[slug\]/);
+  assert.match(decision.reason, /app\/import\.tsx/);
 });
 
 test('an unverifiable file blocks the merge even when every mapped screen was captured cleanly', () => {
@@ -138,4 +142,48 @@ test('an unverifiable file blocks the merge even when every mapped screen was ca
 test('no unverifiable files and no screens still passes (unchanged default behavior)', () => {
   assert.equal(decideVisualGate([], [], []).ok, true);
   assert.equal(decideVisualGate([], []).ok, true);
+});
+
+// ---- BRO-2986: the show detail screen is pinned, not unverifiable --------
+// For about a month every night that touched app/show/[slug].tsx was refused
+// with "no deep-linkable example" and its branch left unmerged, because that
+// file sat in UNVERIFIABLE_APP_FILES while .maestro-manual/
+// beta-feedback-r3-verify2.yaml already deep-linked show/oh-mary. These pin
+// the fix in both directions: detail is now capturable, AND a screen that is
+// still unpinned must still refuse.
+
+test('show detail maps to a pinned screen instead of being unverifiable', () => {
+  const files = ['app/show/[slug].tsx'];
+  const screens = screensForFiles(files);
+  assert.deepEqual(screens.map((s) => s.label), ['Show Detail']);
+  assert.equal(screens[0].route, 'show/oh-mary', 'route must be a concrete deep-linkable instance');
+  assert.deepEqual(unverifiableFiles(files), [], 'show detail must no longer be unverifiable');
+});
+
+test('show detail passes only with a real capture, and still fails closed without one', () => {
+  const files = ['app/show/[slug].tsx'];
+  const screens = screensForFiles(files);
+  const unver = unverifiableFiles(files);
+  const good = decideVisualGate(screens, [{ label: 'Show Detail', ok: true, path: '/tmp/shot.png' }], unver);
+  assert.equal(good.ok, true, good.reason);
+  // Pinning must not weaken fail-closed: no capture is still a refusal.
+  assert.equal(decideVisualGate(screens, [], unver).ok, false);
+  assert.equal(decideVisualGate(screens, [{ label: 'Show Detail', ok: false, path: null }], unver).ok, false);
+});
+
+test('a screen that is still unpinned continues to refuse', () => {
+  // Deliberately NOT fixing every screen at once. If this ever starts
+  // passing, someone emptied UNVERIFIABLE_APP_FILES instead of pinning a
+  // fixture, which is the failure mode that silently merges unseen UI.
+  for (const f of ['app/import.tsx', 'app/search.tsx', 'app/my-shows.tsx']) {
+    const unver = unverifiableFiles([f]);
+    assert.deepEqual(unver, [f], `${f} must still be unverifiable`);
+    assert.equal(decideVisualGate(screensForFiles([f]), [], unver).ok, false);
+  }
+});
+
+test('Show Detail is reachable from the exported SCREENS list', () => {
+  const detail = SCREENS.find((s) => s.label === 'Show Detail');
+  assert.ok(detail, 'SCREENS must carry Show Detail so buildFlow deep-links it');
+  assert.match(detail.route, /^show\/[a-z0-9-]+$/, 'route must be a concrete slug, not a template');
 });

@@ -36,6 +36,24 @@ const SCREENS = [
   { label: 'Browse', route: 'browse' },
   { label: 'Lists', route: 'lists' },
   { label: 'Settings', route: 'settings' },
+  // Show Detail is pinned to a fixture slug rather than left unverifiable.
+  // The comment above used to say detail screens are "not deep-linkable to a
+  // specific example without guessing" -- but this repo already deep-links
+  // one: .maestro-manual/beta-feedback-r3-verify2.yaml:75 opens
+  // broadwayscorecard:///show/oh-mary, in the very flow this gate mirrors.
+  // There was nothing to guess.
+  //
+  // Why this cost a month: app/show/[slug].tsx is the most-edited screen in
+  // the app, so most nights touched it, the gate refused with "no
+  // deep-linkable example", and overnight.js left the branch unmerged. 15
+  // stranded worktrees accumulated between 2026-08-09 and 2026-09-07 and
+  // nothing shipped (BRO-2986).
+  //
+  // FIXTURE: 'oh-mary' is the slug of oh-mary-2024, status open. If it ever
+  // stops resolving, swap in another long-runner's slug ('hamilton' for
+  // hamilton-2015, open since 2015) -- do NOT move this back to
+  // UNVERIFIABLE_APP_FILES, which is what silently stopped the loop.
+  { label: 'Show Detail', route: 'show/oh-mary' },
 ];
 
 const SCREEN_FILES = {
@@ -45,6 +63,7 @@ const SCREEN_FILES = {
   Browse: [/^app\/\(tabs\)\/browse\.tsx$/],
   Lists: [/^app\/\(tabs\)\/lists\.tsx$/],
   Settings: [/^app\/settings\.tsx$/],
+  'Show Detail': [/^app\/show\/\[slug\]\.tsx$/],
 };
 
 // A shared component, hook, or lib helper can render on any tab — this is
@@ -59,13 +78,14 @@ const SHARED_PREFIXES = [
   /^app\/_layout\.tsx$/, /^app\/\(tabs\)\/_layout\.tsx$/,
 ];
 
-// Screen files with no fixed deep-linkable instance (a specific show slug, a
-// specific diary entry) or that this gate has not been taught a route for.
+// Screen files this gate has not yet been taught a route for. Each one that
+// stays here blocks every night whose work touches it, so this list is a
+// backlog, not a resting place -- pin a fixture and move it into SCREENS
+// (see Show Detail above) rather than leaving it to refuse forever.
 // screensForFiles correctly returns [] for these — there is no screen to
 // capture — but [] must not read as "nothing to verify". unverifiableFiles
 // flags them so decideVisualGate can refuse instead of merging blind.
 const UNVERIFIABLE_APP_FILES = [
-  /^app\/show\/\[slug\]\.tsx$/,
   /^app\/diary-show\/\[id\]\.tsx$/,
   /^app\/rate\/\[showId\]\.tsx$/,
   /^app\/my-shows\.tsx$/,
