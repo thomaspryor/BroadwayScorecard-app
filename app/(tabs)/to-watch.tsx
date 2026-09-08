@@ -266,7 +266,7 @@ export default function ToWatchScreen() {
             <Image source={{ uri: posterUrl }} style={styles.gridPoster} contentFit="cover" transition={200} />
           ) : (
             <View style={[styles.gridPoster, styles.cardPosterPlaceholder]}>
-              <Text style={styles.placeholderText}>{title.charAt(0)}</Text>
+              <Text style={styles.placeholderText}>🎭</Text>
             </View>
           )}
           {/* Date as an overlaid poster tag, matching the Watched tab's grid
@@ -313,7 +313,7 @@ export default function ToWatchScreen() {
               <Image source={{ uri: posterUrl }} style={styles.gridPoster} contentFit="cover" transition={200} />
             ) : (
               <View style={[styles.gridPoster, styles.cardPosterPlaceholder]}>
-                <Text style={styles.placeholderText}>{title.charAt(0)}</Text>
+                <Text style={styles.placeholderText}>🎭</Text>
               </View>
             )}
             <PosterStatusPill show={show} />
@@ -350,7 +350,7 @@ export default function ToWatchScreen() {
           <Image source={{ uri: posterUrl }} style={styles.listPoster} contentFit="cover" transition={200} />
         ) : (
           <View style={[styles.listPoster, styles.cardPosterPlaceholder]}>
-            <Text style={styles.placeholderText}>{title.charAt(0)}</Text>
+            <Text style={styles.placeholderText}>🎭</Text>
           </View>
         )}
         <View style={styles.listInfo}>
@@ -388,7 +388,7 @@ export default function ToWatchScreen() {
           <Image source={{ uri: posterUrl }} style={styles.listPoster} contentFit="cover" transition={200} />
         ) : (
           <View style={[styles.listPoster, styles.cardPosterPlaceholder]}>
-            <Text style={styles.placeholderText}>{title.charAt(0)}</Text>
+            <Text style={styles.placeholderText}>🎭</Text>
           </View>
         )}
         <View style={styles.listInfo}>
@@ -682,10 +682,11 @@ const styles = StyleSheet.create({
   cardPosterPlaceholder: { alignItems: 'center', justifyContent: 'center' },
   placeholderText: { color: Colors.text.muted, fontSize: 18, fontWeight: '600' },
   // Centered overlaid date tag for Upcoming posters — mirrors the Watched
-  // tab's grid date scrim (beta feedback 2026-08-02).
+  // tab's grid date scrim (beta feedback 2026-08-02). Pinned to the TOP edge
+  // (beta feedback 2026-08-10, ANIDtf6U9sjqeZmHC8FIKnI).
   upcomingPosterWrap: { width: '100%' },
   upcomingDateOverlayWrap: {
-    position: 'absolute', left: 0, right: 0, bottom: 6,
+    position: 'absolute', left: 0, right: 0, top: 6,
     alignItems: 'center',
   },
   upcomingDateOverlay: {

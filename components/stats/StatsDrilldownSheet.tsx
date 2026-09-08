@@ -171,7 +171,7 @@ export function StatsDrilldownSheet({
           <Image source={{ uri: posterUrl }} style={styles.poster} contentFit="cover" transition={150} />
         ) : (
           <View style={[styles.poster, styles.posterPlaceholder]}>
-            <Text style={styles.posterInitial}>{title.charAt(0)}</Text>
+            <Text style={styles.posterInitial}>🎭</Text>
           </View>
         )}
         <View style={styles.rowText}>

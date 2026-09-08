@@ -76,7 +76,7 @@ export function PhotoFeedTimeline({ monthGroups, signedUrls, showMap, onDismissN
                     <Image source={{ uri: posterUrl }} style={styles.poster} contentFit="cover" transition={200} />
                   ) : (
                     <View style={[styles.poster, styles.posterPlaceholder]}>
-                      <Text style={styles.posterPlaceholderText}>{title.charAt(0)}</Text>
+                      <Text style={styles.posterPlaceholderText}>🎭</Text>
                     </View>
                   )}
                   <View style={styles.info}>

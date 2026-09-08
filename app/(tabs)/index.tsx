@@ -138,6 +138,37 @@ export default function HomeScreen() {
     const nytPicks = marketShows.filter(s => isOpen(s) && s.tags.includes('nyt-pick')).sort(byScore).slice(0, 10);
     if (nytPicks.length >= 2) rows.push({ title: "New York Times Critic's Picks", shows: nytPicks });
 
+    // Recently Opened, split by segment (beta feedback 2026-08-13,
+    // AFlPzGW8awRQBMSAO3omMxk: two shelves here, Broadway and Off-Broadway).
+    // "Just Opened" above already covers this ground per-market; these two
+    // give NYC users the Broadway/Off-Broadway split by name. West End has no
+    // Off-Broadway equivalent, so NYC-only like Best Off-Broadway above.
+    if (market === 'nyc') {
+      const recentlyOpenedSubtitle = (s: Show) => {
+        const d = shortDate(s.openingDate ?? '');
+        return d ? `Opened ${d}` : undefined;
+      };
+      const recentlyOpenedBroadway = shows
+        .filter(s => s.category === 'broadway' && s.status === 'open' && s.openingDate && s.openingDate >= sixtyDaysAgo && s.openingDate <= todayLocal)
+        .sort((a, b) => (b.openingDate ?? '').localeCompare(a.openingDate ?? ''))
+        .slice(0, 10);
+      if (recentlyOpenedBroadway.length >= 2) rows.push({
+        title: 'Recently Opened on Broadway',
+        shows: recentlyOpenedBroadway,
+        getSubtitle: recentlyOpenedSubtitle,
+      });
+
+      const recentlyOpenedOffBroadway = shows
+        .filter(s => s.category === 'off-broadway' && s.status === 'open' && s.openingDate && s.openingDate >= sixtyDaysAgo && s.openingDate <= todayLocal)
+        .sort((a, b) => (b.openingDate ?? '').localeCompare(a.openingDate ?? ''))
+        .slice(0, 10);
+      if (recentlyOpenedOffBroadway.length >= 2) rows.push({
+        title: 'Recently Opened Off Broadway',
+        shows: recentlyOpenedOffBroadway,
+        getSubtitle: recentlyOpenedSubtitle,
+      });
+    }
+
     // Tony Award Winners (open shows with tony-winner tag)
     const tonyWinners = marketShows.filter(s => isOpen(s) && s.tags.includes('tony-winner')).sort(byScore).slice(0, 10);
     if (tonyWinners.length >= 2) rows.push({ title: 'Tony Award Winners', shows: tonyWinners });
