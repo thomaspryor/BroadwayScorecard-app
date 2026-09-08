@@ -71,13 +71,21 @@ const SCREENS = [
   // header to show.title, and the !show branch returns at :260 before ever
   // reaching it. If the title is on screen, the data resolved.
   //
-  // It is NOT 'MY RATING & REVIEW'. I used that first, copied from
-  // .maestro-manual/beta-feedback-r3-verify2.yaml:76-78, and that string
-  // appears NOWHERE in the current app -- a grep for it across app/ and
-  // components/ returns nothing. An assertion that can never match is worse
-  // than none: extendedWaitUntil would burn its timeout, produce no
-  // screenshot, and strand EVERY night, which is the exact bug this whole
-  // line of work exists to fix.
+  // CORRECTION: an earlier revision of this comment claimed
+  // 'MY RATING & REVIEW' (the string used first, from
+  // .maestro-manual/beta-feedback-r3-verify2.yaml:76-78) "appears NOWHERE in
+  // the current app". That was FALSE. It is at
+  // components/user/ShowPageRating.tsx:244 and renders as visible text. The
+  // grep behind the claim ended in `head -8`, which truncated before those
+  // matches -- a truncated result read as proof of absence, which is the same
+  // mistake that let this card's original bug survive for a month.
+  //
+  // The title is still the better assertion, on its own merits rather than
+  // that false one: 'MY RATING & REVIEW' sits behind
+  // `if (!featureFlags.userAccounts) return null` (ShowPageRating.tsx:236),
+  // so it is one flag flip away from never matching, whereas the title is
+  // unconditional for any loaded show AND is validated against
+  // assets/seed-data.json by the colocated test.
   //
   // assertText and route must stay in sync; the colocated test validates the
   // pinned slug against assets/seed-data.json and asserts the title matches,

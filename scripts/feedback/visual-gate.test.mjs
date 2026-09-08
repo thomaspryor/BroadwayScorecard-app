@@ -277,3 +277,43 @@ test('the pinned Show Detail slug resolves in the shipped seed data, and assertT
   assert.equal(detail.assertText, row.t,
     `assertText must be the show's title so it discriminates loaded from "Show not found"; expected ${JSON.stringify(row.t)}`);
 });
+
+// ---- the emitted flow must be VALID YAML, and mean what it says ---------
+// Review finding: de-indenting `visible:` or `timeout:` by two spaces leaves
+// the whole suite green while the `yaml` parser rejects the output ("All
+// mapping items must start at the same column") — it degrades to
+// {extendedWaitUntil: null, visible: ...}. A one-space slip would strand
+// every night silently, which is exactly the bug this card exists to fix.
+// `yaml` is already a dependency, so parse the flow instead of regexing it.
+
+test('buildFlow emits YAML that actually parses, with the assertion nested correctly', async () => {
+  const YAML = await import('yaml');
+  const detail = SCREENS.find((s) => s.label === 'Show Detail');
+  const flow = buildFlow('com.example.app', [detail], '/tmp/out');
+  // A Maestro flow is two documents separated by ---; the second is the steps.
+  const docs = YAML.parseAllDocuments(flow);
+  for (const d of docs) {
+    assert.deepEqual(d.errors, [], `emitted flow is not valid YAML: ${d.errors.map((e) => e.message).join('; ')}`);
+  }
+  const steps = docs[docs.length - 1].toJS();
+  assert.ok(Array.isArray(steps), 'the steps document must be a list');
+
+  const wait = steps.find((st) => st && typeof st === 'object' && 'extendedWaitUntil' in st
+    && st.extendedWaitUntil && st.extendedWaitUntil.visible === detail.assertText);
+  assert.ok(wait, `no extendedWaitUntil carrying visible: ${JSON.stringify(detail.assertText)} — check indentation, a de-indent parses as a sibling key`);
+  assert.equal(wait.extendedWaitUntil.timeout, 15000, 'the assertion needs a real timeout, not a truncated one');
+
+  // And it must come before the screenshot, in the PARSED structure.
+  const waitIdx = steps.indexOf(wait);
+  const shotIdx = steps.findIndex((st) => st && typeof st === 'object' && 'takeScreenshot' in st);
+  assert.ok(shotIdx > waitIdx && waitIdx > -1, 'the content assertion must precede takeScreenshot');
+});
+
+test('the pinned assertText is safe as a Maestro text selector', () => {
+  // Maestro matches text selectors as REGEXES. JSON.stringify handles YAML
+  // quoting, not regex metacharacters, so a fixture retitled "& Juliet" or
+  // "Cats (2026)" would mis-match and time out every night.
+  const detail = SCREENS.find((s) => s.label === 'Show Detail');
+  assert.doesNotMatch(detail.assertText, /[.*+?^${}()|[\]\\]/,
+    `assertText ${JSON.stringify(detail.assertText)} contains a regex metacharacter; escape it or pick another fixture`);
+});
