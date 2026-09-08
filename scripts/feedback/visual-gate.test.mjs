@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
-const { screensForFiles, unverifiableFiles, decideVisualGate, SCREENS } = require('./visual-gate.js');
+const { screensForFiles, unverifiableFiles, decideVisualGate, buildFlow, SCREENS } = require('./visual-gate.js');
 
 test('no screenshots captured => do not merge', () => {
   const screens = [{ label: 'Watched', route: 'watched' }];
@@ -186,4 +186,59 @@ test('Show Detail is reachable from the exported SCREENS list', () => {
   const detail = SCREENS.find((s) => s.label === 'Show Detail');
   assert.ok(detail, 'SCREENS must carry Show Detail so buildFlow deep-links it');
   assert.match(detail.route, /^show\/[a-z0-9-]+$/, 'route must be a concrete slug, not a template');
+});
+
+// ---- buildFlow: the screenshot must prove the screen rendered -----------
+// buildFlow had ZERO tests, which is how the Show Detail fail-open shipped:
+// app/show/[slug].tsx renders "Show not found" on a slug miss, that renders
+// perfectly, captureScreens sets ok purely on the file existing, and
+// decideVisualGate never looks at image content. Nothing downstream can tell
+// a loaded screen from an empty one, so the flow itself has to.
+
+test('a screen with assertText waits for that text before the shutter fires', () => {
+  const flow = buildFlow('com.example.app', [{ label: 'Show Detail', route: 'show/oh-mary', assertText: 'MY RATING & REVIEW' }], '/tmp/out');
+  assert.match(flow, /- openLink: broadwayscorecard:\/\/\/show\/oh-mary/);
+  assert.match(flow, /- extendedWaitUntil:/);
+  assert.match(flow, /visible: "MY RATING & REVIEW"/);
+  // Ordering is the whole point: asserting AFTER the screenshot proves
+  // nothing. Scope to the text AFTER the openLink -- indexOf on the whole
+  // flow matches the launchApp preamble's own extendedWaitUntil, which is
+  // always before the screenshot, making the check a tautology that passes
+  // even when the per-screen assertion is moved after the shutter.
+  const body = flow.slice(flow.indexOf('- openLink:'));
+  const wait = body.indexOf('extendedWaitUntil');
+  const shot = body.indexOf('takeScreenshot');
+  assert.ok(wait > -1, 'the per-screen assertion must exist after the openLink');
+  assert.ok(shot > wait, 'the content assertion must precede takeScreenshot');
+});
+
+test('the pinned Show Detail screen actually carries an assertion', () => {
+  // Guards the specific regression: pinning a data-dependent screen WITHOUT
+  // assertText is what makes a "Show not found" render pass the gate.
+  const detail = SCREENS.find((s) => s.label === 'Show Detail');
+  assert.ok(detail, 'Show Detail must be in SCREENS');
+  assert.ok(detail.assertText && detail.assertText.length > 0,
+    'Show Detail is data-dependent, so it MUST assert on rendered content');
+  const flow = buildFlow('com.example.app', [detail], '/tmp/out');
+  assert.match(flow, /extendedWaitUntil/);
+});
+
+test('the emitted deep link keeps the three-slash scheme form', () => {
+  // broadwayscorecard://show/x and broadwayscorecard:///show/x are not the
+  // same URL; nothing else in the suite pinned this.
+  const flow = buildFlow('com.example.app', [{ label: 'Browse', route: 'browse' }], '/tmp/out');
+  assert.match(flow, /- openLink: broadwayscorecard:\/\/\/browse/);
+  assert.doesNotMatch(flow, /openLink: broadwayscorecard:\/\/[^/]/);
+});
+
+test('a screen with no assertText still screenshots (tab screens are unchanged)', () => {
+  // The launchApp preamble always emits one extendedWaitUntil on "Broadway
+  // Scorecard", so count rather than match: a screen without assertText must
+  // add NO second one, while one with assertText must.
+  const count = (f) => (f.match(/extendedWaitUntil:/g) || []).length;
+  const plain = buildFlow('com.example.app', [{ label: 'Watched', route: 'watched' }], '/tmp/out');
+  assert.match(plain, /takeScreenshot/);
+  assert.equal(count(plain), 1, 'only the launch wait; no per-screen assertion added');
+  const asserted = buildFlow('com.example.app', [{ label: 'Show Detail', route: 'show/oh-mary', assertText: 'MY RATING & REVIEW' }], '/tmp/out');
+  assert.equal(count(asserted), 2, 'launch wait plus the per-screen content assertion');
 });

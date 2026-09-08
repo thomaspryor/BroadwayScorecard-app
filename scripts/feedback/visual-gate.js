@@ -53,7 +53,24 @@ const SCREENS = [
   // stops resolving, swap in another long-runner's slug ('hamilton' for
   // hamilton-2015, open since 2015) -- do NOT move this back to
   // UNVERIFIABLE_APP_FILES, which is what silently stopped the loop.
-  { label: 'Show Detail', route: 'show/oh-mary' },
+  // assertText is REQUIRED for any data-dependent screen. app/show/[slug].tsx
+  // renders <Text>Show not found</Text> when the slug misses, and a
+  // not-found screen screenshots perfectly happily: captureScreens sets ok
+  // purely on the file existing, and decideVisualGate only checks ok+path,
+  // never image content. So without a content assertion this screen
+  // FAIL-OPENS -- it would pass the gate showing nothing.
+  //
+  // On a fresh simulator that is not hypothetical: lib/data-context.tsx
+  // starts `shows` at [] and populates from an awaited CDN fetch, so the
+  // not-found branch renders for the whole network round-trip, and
+  // waitForAnimationToEnd returns as soon as animations settle rather than
+  // when data arrives.
+  //
+  // 'MY RATING & REVIEW' is lifted from the flow this gate mirrors
+  // (.maestro-manual/beta-feedback-r3-verify2.yaml:76-78, timeout 15000). I
+  // copied the openLink from there and dropped this assertion; that was the
+  // whole defect.
+  { label: 'Show Detail', route: 'show/oh-mary', assertText: 'MY RATING & REVIEW' },
 ];
 
 const SCREEN_FILES = {
@@ -166,6 +183,14 @@ function buildFlow(appId, screens, outDir) {
   for (const s of screens) {
     lines.push(`- openLink: broadwayscorecard:///${s.route}`);
     lines.push('- tapOn:', '    text: "Open"', '    optional: true');
+    // A screen carrying assertText must PROVE it rendered before the shutter
+    // fires. waitForAnimationToEnd alone returns when animations settle, not
+    // when data arrives, so it cannot tell a loaded screen from an empty or
+    // not-found one -- and every downstream check (ok, path) is blind to
+    // image content.
+    if (s.assertText) {
+      lines.push('- extendedWaitUntil:', `    visible: ${JSON.stringify(s.assertText)}`, '    timeout: 15000');
+    }
     lines.push('- waitForAnimationToEnd:', '    timeout: 8000');
     lines.push(`- takeScreenshot: ${path.join(outDir, slug(s.label))}`);
   }
@@ -294,4 +319,4 @@ function captureScreens({ repoRoot, wtPath, screens, outDir, buildTimeoutMs = 25
   return { ok: captures.every((c) => c.ok), captures, error: null };
 }
 
-module.exports = { SCREENS, screensForFiles, unverifiableFiles, decideVisualGate, captureScreens, slug };
+module.exports = { SCREENS, screensForFiles, unverifiableFiles, decideVisualGate, captureScreens, buildFlow, slug };
