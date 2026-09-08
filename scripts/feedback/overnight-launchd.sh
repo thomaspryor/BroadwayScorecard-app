@@ -23,6 +23,29 @@ LOG="$STATE/launchd.log"
 
 export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/Applications/cmux.app/Contents/Resources/bin:$HOME/.local/bin"
 
+# Same reason as PATH above: launchd hands this script a minimal environment,
+# not a login shell's. PATH was set for that and LANG was missed, which broke
+# the visual gate for a month in a way that looked like a different bug.
+#
+# CocoaPods calls String#unicode_normalize on the installation root, and with
+# no LANG that string is ASCII-8BIT, so Ruby raises
+#   Encoding::CompatibilityError: Unicode Normalization not appropriate for ASCII-8BIT
+# and `pod install` dies. scripts/build-sim.sh runs `pod install` whenever
+# ios/build/generated is missing (always true in a fresh overnight worktree),
+# so build-sim fails, captureScreens gets no screenshots, and decideVisualGate
+# fails CLOSED — correctly, but on a cause nothing in the log points at.
+# Observed verbatim in runs/2026-09-07T06-15-07.log, alongside CocoaPods' own
+# advice: "CocoaPods requires your terminal to be using UTF-8 encoding."
+#
+# This is the SECOND of the two refusals that stranded the beta-feedback
+# branches. BRO-2986 fixed the first (app/show/[slug].tsx had no deep-linkable
+# example). With that one pinned the gate now ATTEMPTS a Show Detail capture,
+# which makes this locale bug the new binding constraint rather than a
+# secondary annoyance: no capture is still a refusal
+# (visual-gate.test.mjs: "still fails closed without one").
+export LANG="${LANG:-en_US.UTF-8}"
+export LC_ALL="${LC_ALL:-en_US.UTF-8}"
+
 mkdir -p "$STATE"
 ts() { date '+%Y-%m-%d %H:%M:%S'; }
 log() { echo "[$(ts)] $*" >> "$LOG"; }
