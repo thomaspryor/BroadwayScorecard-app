@@ -38,13 +38,26 @@ export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/App
 # advice: "CocoaPods requires your terminal to be using UTF-8 encoding."
 #
 # This is the SECOND of the two refusals that stranded the beta-feedback
-# branches. BRO-2986 fixed the first (app/show/[slug].tsx had no deep-linkable
-# example). With that one pinned the gate now ATTEMPTS a Show Detail capture,
-# which makes this locale bug the new binding constraint rather than a
-# secondary annoyance: no capture is still a refusal
-# (visual-gate.test.mjs: "still fails closed without one").
+# branches; BRO-2986 fixed the first (app/show/[slug].tsx had no deep-linkable
+# example, so most nights were refused before capture mattered).
+#
+# CORRECTION to what this comment said when it landed: it claimed BRO-2986's
+# pinning is what MADE this locale bug binding, implying it was secondary until
+# then. That ordering is wrong, and a review caught it. runs/2026-09-07T06-15-07.log
+# line 18 shows only the six tab screens were attempted and build-sim died
+# before ANY capture, so the locale bug was ALREADY binding that night,
+# independently. Both refusals were live at once. Left as a correction rather
+# than a silent rewrite because an overstated causal claim in a comment is the
+# kind of thing the next reader would reason from.
+#
+# LANG alone is sufficient and LC_ALL is deliberately NOT set. LC_ALL outranks
+# every per-category LC_*, so exporting it would take a blunt override on all
+# of them to fix one encoding problem, and it silently shifts collation for
+# every child (pod, xcodebuild, node, maestro, git) from the C/POSIX ordering
+# they ran under before. The repro is unambiguous that LANG carries it:
+#   env -u LANG -u LC_ALL ruby -e 'p Encoding.default_external'  -> US-ASCII
+#   env LANG=en_US.UTF-8   ruby -e 'p Encoding.default_external' -> UTF-8
 export LANG="${LANG:-en_US.UTF-8}"
-export LC_ALL="${LC_ALL:-en_US.UTF-8}"
 
 mkdir -p "$STATE"
 ts() { date '+%Y-%m-%d %H:%M:%S'; }
