@@ -76,29 +76,19 @@ export default function HomeScreen() {
     // Ranked shelves only admit shows whose score clears the market min-review
     // gate — a 1-review 98 must not top the shelf (Gruffalo, beta 2026-08-01).
     const byScore = (a: Show, b: Show) => (getQualifiedScore(b) ?? 0) - (getQualifiedScore(a) ?? 0);
-
-    // Top Shows (overall)
-    const top = marketShows.filter(s => isOpen(s) && getQualifiedScore(s) != null).sort(byScore).slice(0, 10);
-    if (top.length > 0) rows.push({ title: 'Top Shows', shows: top });
-
-    // Just Opened — second shelf, most recently opened first (owner ask 2026-08-01)
     // Local-date strings, not toISOString (UTC): in the ET evening UTC is
     // already tomorrow, which would show "Opened <tomorrow>".
     const toLocalDateStr = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     const todayLocal = toLocalDateStr(now);
     const sixtyDaysAgo = toLocalDateStr(new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000));
-    const justOpened = marketShows
-      .filter(s => s.status === 'open' && s.openingDate && s.openingDate >= sixtyDaysAgo && s.openingDate <= todayLocal)
-      .sort((a, b) => (b.openingDate ?? '').localeCompare(a.openingDate ?? ''))
-      .slice(0, 10);
-    if (justOpened.length >= 2) rows.push({
-      title: 'Just Opened',
-      shows: justOpened,
-      getSubtitle: (s) => {
-        const d = shortDate(s.openingDate ?? '');
-        return d ? `Opened ${d}` : undefined;
-      },
-    });
+    const recentlyOpenedSubtitle = (s: Show) => {
+      const d = shortDate(s.openingDate ?? '');
+      return d ? `Opened ${d}` : undefined;
+    };
+
+    // Top Shows (overall)
+    const top = marketShows.filter(s => isOpen(s) && getQualifiedScore(s) != null).sort(byScore).slice(0, 10);
+    if (top.length > 0) rows.push({ title: 'Top Shows', shows: top });
 
     // ─── Shelves 3-5 (owner ask 2026-08-03, ADnQ3mUB: "move these three
     // shelves to be the 3rd, 4th and 5th") — Best Off-Broadway, Starting Soon,
@@ -137,6 +127,33 @@ export default function HomeScreen() {
     // NYT Critic's Picks
     const nytPicks = marketShows.filter(s => isOpen(s) && s.tags.includes('nyt-pick')).sort(byScore).slice(0, 10);
     if (nytPicks.length >= 2) rows.push({ title: "New York Times Critic's Picks", shows: nytPicks });
+
+    // Recently Opened on Broadway / Off Broadway — two shelves right below NYT
+    // Picks (beta feedback 2026-08-13, AFlPzGW8awRQBMSAO3omMxk). NYC-only, like
+    // Best Off-Broadway above: these are NYC-specific market splits, not
+    // meaningful on the West End home screen. Replaces the old single "Just
+    // Opened" shelf — Off Broadway recency wasn't surfaced anywhere before.
+    if (market === 'nyc') {
+      const recentlyOpenedBroadway = shows
+        .filter(s => s.category === 'broadway' && s.status === 'open' && s.openingDate && s.openingDate >= sixtyDaysAgo && s.openingDate <= todayLocal)
+        .sort((a, b) => (b.openingDate ?? '').localeCompare(a.openingDate ?? ''))
+        .slice(0, 10);
+      if (recentlyOpenedBroadway.length >= 2) rows.push({
+        title: 'Recently Opened on Broadway',
+        shows: recentlyOpenedBroadway,
+        getSubtitle: recentlyOpenedSubtitle,
+      });
+
+      const recentlyOpenedOffBroadway = shows
+        .filter(s => s.category === 'off-broadway' && s.status === 'open' && s.openingDate && s.openingDate >= sixtyDaysAgo && s.openingDate <= todayLocal)
+        .sort((a, b) => (b.openingDate ?? '').localeCompare(a.openingDate ?? ''))
+        .slice(0, 10);
+      if (recentlyOpenedOffBroadway.length >= 2) rows.push({
+        title: 'Recently Opened Off Broadway',
+        shows: recentlyOpenedOffBroadway,
+        getSubtitle: recentlyOpenedSubtitle,
+      });
+    }
 
     // Tony Award Winners (open shows with tony-winner tag)
     const tonyWinners = marketShows.filter(s => isOpen(s) && s.tags.includes('tony-winner')).sort(byScore).slice(0, 10);
@@ -202,10 +219,13 @@ export default function HomeScreen() {
       .sort((a, b) => (a.closingDate ?? '').localeCompare(b.closingDate ?? ''));
   }, [marketShows]);
 
-  // Closing Soon renders as the 5th shelf — after featuredRows[3] (owner ask
-  // 2026-08-03, ADnQ3mUB). Clamped so a short row list still renders it once.
+  // Closing Soon renders as the 5th shelf — after featuredRows[2] (owner ask
+  // 2026-08-03, ADnQ3mUB; index shifted down by one 2026-09-09 when the old
+  // "Just Opened" shelf — always the 2nd row — was replaced by the Recently
+  // Opened Broadway/Off Broadway shelves lower down). Clamped so a short row
+  // list still renders it once.
   const showClosingSoon = closingSoon.length >= 2;
-  const closingSoonAfterIndex = Math.min(3, featuredRows.length - 1);
+  const closingSoonAfterIndex = Math.min(2, featuredRows.length - 1);
 
   const scoredCount = useMemo(() =>
     marketShows.filter(s => s.compositeScore != null).length,
