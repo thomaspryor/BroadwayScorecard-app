@@ -19,6 +19,7 @@ import {
   Alert,
 } from 'react-native';
 import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter , useFocusEffect } from 'expo-router';
@@ -122,6 +123,25 @@ function EmptyState({ emoji, title, subtitle, actionLabel, onAction }: {
   );
 }
 
+// Deterministic per-title gradient so a show without a poster still reads as
+// "its own card" rather than a generic gray box (beta feedback 2026-08-12:
+// "figure out better look placeholders for shows that don't have images").
+// Same title always gets the same pair, so it doesn't flicker between renders.
+const PLACEHOLDER_GRADIENTS: readonly [string, string][] = [
+  ['#4c3a63', '#1a1a24'],
+  ['#2f4a4f', '#1a1a24'],
+  ['#5a3d2f', '#1a1a24'],
+  ['#2f3d5a', '#1a1a24'],
+  ['#5a2f45', '#1a1a24'],
+  ['#3d5a2f', '#1a1a24'],
+];
+
+function placeholderGradientFor(title: string): readonly [string, string] {
+  let hash = 0;
+  for (let i = 0; i < title.length; i++) hash = (hash * 31 + title.charCodeAt(i)) >>> 0;
+  return PLACEHOLDER_GRADIENTS[hash % PLACEHOLDER_GRADIENTS.length];
+}
+
 // ─── Grid poster + date overlay (Round 2, Grid Direction B modified) ──
 // Venue text dropped entirely; the date moves off the text block and onto
 // the poster as a small low-alpha corner scrim instead (title + stars stay
@@ -133,9 +153,14 @@ function GridPoster({ posterUrl, title, dateLabel }: { posterUrl: string | null;
       {posterUrl ? (
         <Image source={{ uri: posterUrl }} style={styles.gridPoster} contentFit="cover" transition={200} />
       ) : (
-        <View style={[styles.gridPoster, styles.cardPosterPlaceholder]}>
-          <Text style={styles.placeholderText}>{title.charAt(0)}</Text>
-        </View>
+        <LinearGradient
+          colors={placeholderGradientFor(title)}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[styles.gridPoster, styles.cardPosterPlaceholder]}
+        >
+          <Text style={styles.placeholderLetter}>{title.charAt(0).toUpperCase()}</Text>
+        </LinearGradient>
       )}
       {!!dateLabel && (
         <View style={styles.gridDateOverlayWrap}>
@@ -1242,6 +1267,7 @@ const styles = StyleSheet.create({
   },
   cardPosterPlaceholder: { alignItems: 'center', justifyContent: 'center' },
   placeholderText: { color: Colors.text.muted, fontSize: 18, fontWeight: '600' },
+  placeholderLetter: { color: 'rgba(255,255,255,0.85)', fontSize: 28, fontWeight: '700' },
   cardInfo: { flex: 1, gap: 2 },
   cardTitle: { color: Colors.text.primary, fontSize: FontSize.md, fontWeight: '600' },
   // Grid view
@@ -1275,7 +1301,7 @@ const styles = StyleSheet.create({
   // Horizontally centered so the tag lines up with the centered title/stars
   // below the poster (beta feedback 2026-08-02).
   gridDateOverlayWrap: {
-    position: 'absolute', left: 0, right: 0, bottom: 6,
+    position: 'absolute', left: 0, right: 0, top: 6,
     alignItems: 'center',
   },
   gridDateOverlay: {
