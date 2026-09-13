@@ -259,14 +259,14 @@ export default function ToWatchScreen() {
         key={item.id}
         style={({ pressed }) => [styles.gridCard, gridCardStyle, pressed && styles.pressed]}
         onPress={() => goToShow(show, item.show_id)}
-        onLongPress={() => { setPendingDate(new Date()); setDatePickingShowId(item.show_id); }}
+        onLongPress={() => showWatchlistActionSheet(item, title)}
       >
         <View style={styles.upcomingPosterWrap}>
           {posterUrl ? (
             <Image source={{ uri: posterUrl }} style={styles.gridPoster} contentFit="cover" transition={200} />
           ) : (
             <View style={[styles.gridPoster, styles.cardPosterPlaceholder]}>
-              <Text style={styles.placeholderText}>{title.charAt(0)}</Text>
+              <Text style={styles.placeholderText}>🎭</Text>
             </View>
           )}
           {/* Date as an overlaid poster tag, matching the Watched tab's grid
@@ -313,7 +313,7 @@ export default function ToWatchScreen() {
               <Image source={{ uri: posterUrl }} style={styles.gridPoster} contentFit="cover" transition={200} />
             ) : (
               <View style={[styles.gridPoster, styles.cardPosterPlaceholder]}>
-                <Text style={styles.placeholderText}>{title.charAt(0)}</Text>
+                <Text style={styles.placeholderText}>🎭</Text>
               </View>
             )}
             <PosterStatusPill show={show} />
@@ -344,13 +344,13 @@ export default function ToWatchScreen() {
         key={item.id}
         style={({ pressed }) => [styles.listRow, pressed && styles.pressed]}
         onPress={() => goToShow(show, item.show_id)}
-        onLongPress={() => { setPendingDate(new Date()); setDatePickingShowId(item.show_id); }}
+        onLongPress={() => showWatchlistActionSheet(item, title)}
       >
         {posterUrl ? (
           <Image source={{ uri: posterUrl }} style={styles.listPoster} contentFit="cover" transition={200} />
         ) : (
           <View style={[styles.listPoster, styles.cardPosterPlaceholder]}>
-            <Text style={styles.placeholderText}>{title.charAt(0)}</Text>
+            <Text style={styles.placeholderText}>🎭</Text>
           </View>
         )}
         <View style={styles.listInfo}>
@@ -388,7 +388,7 @@ export default function ToWatchScreen() {
           <Image source={{ uri: posterUrl }} style={styles.listPoster} contentFit="cover" transition={200} />
         ) : (
           <View style={[styles.listPoster, styles.cardPosterPlaceholder]}>
-            <Text style={styles.placeholderText}>{title.charAt(0)}</Text>
+            <Text style={styles.placeholderText}>🎭</Text>
           </View>
         )}
         <View style={styles.listInfo}>
@@ -576,8 +576,11 @@ export default function ToWatchScreen() {
             onPress: () => goToShow(showMap[menuEntry.item.show_id], menuEntry.item.show_id),
           },
           {
-            label: 'Set reminder date',
-            onPress: () => { setPendingDate(new Date()); setDatePickingShowId(menuEntry.item.show_id); },
+            label: menuEntry.item.planned_date ? 'Change date' : 'Set reminder date',
+            onPress: () => {
+              setPendingDate(menuEntry.item.planned_date ? new Date(menuEntry.item.planned_date + 'T00:00:00') : new Date());
+              setDatePickingShowId(menuEntry.item.show_id);
+            },
           },
           {
             label: 'Remove from Watchlist',
@@ -680,12 +683,16 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface.overlay,
   },
   cardPosterPlaceholder: { alignItems: 'center', justifyContent: 'center' },
-  placeholderText: { color: Colors.text.muted, fontSize: 18, fontWeight: '600' },
+  // Theater masks, not a bare initial letter — matches the web's no-image
+  // fallback (beta feedback 2026-08-12: "figure out better look placeholders").
+  placeholderText: { fontSize: 26 },
   // Centered overlaid date tag for Upcoming posters — mirrors the Watched
   // tab's grid date scrim (beta feedback 2026-08-02).
   upcomingPosterWrap: { width: '100%' },
   upcomingDateOverlayWrap: {
-    position: 'absolute', left: 0, right: 0, bottom: 6,
+    // Top, not bottom — matches the Watched tab's grid date scrim (beta
+    // feedback 2026-08-10: date labels belong at the top of the poster).
+    position: 'absolute', left: 0, right: 0, top: 6,
     alignItems: 'center',
   },
   upcomingDateOverlay: {

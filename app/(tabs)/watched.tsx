@@ -134,7 +134,7 @@ function GridPoster({ posterUrl, title, dateLabel }: { posterUrl: string | null;
         <Image source={{ uri: posterUrl }} style={styles.gridPoster} contentFit="cover" transition={200} />
       ) : (
         <View style={[styles.gridPoster, styles.cardPosterPlaceholder]}>
-          <Text style={styles.placeholderText}>{title.charAt(0)}</Text>
+          <Text style={styles.placeholderText}>🎭</Text>
         </View>
       )}
       {!!dateLabel && (
@@ -1241,7 +1241,9 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface.overlay,
   },
   cardPosterPlaceholder: { alignItems: 'center', justifyContent: 'center' },
-  placeholderText: { color: Colors.text.muted, fontSize: 18, fontWeight: '600' },
+  // Theater masks, not a bare initial letter — matches the web's no-image
+  // fallback (beta feedback 2026-08-12: "figure out better look placeholders").
+  placeholderText: { fontSize: 26 },
   cardInfo: { flex: 1, gap: 2 },
   cardTitle: { color: Colors.text.primary, fontSize: FontSize.md, fontWeight: '600' },
   // Grid view
@@ -1275,7 +1277,9 @@ const styles = StyleSheet.create({
   // Horizontally centered so the tag lines up with the centered title/stars
   // below the poster (beta feedback 2026-08-02).
   gridDateOverlayWrap: {
-    position: 'absolute', left: 0, right: 0, bottom: 6,
+    // Top, not bottom (beta feedback 2026-08-10: date labels belong at the
+    // top of the poster).
+    position: 'absolute', left: 0, right: 0, top: 6,
     alignItems: 'center',
   },
   gridDateOverlay: {

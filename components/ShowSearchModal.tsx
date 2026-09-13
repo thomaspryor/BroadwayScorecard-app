@@ -316,6 +316,81 @@ export function ShowSearchModal({
     return `${parts.join(' · ')}${parts.length > 0 ? ' · ' : ''}No critic score`;
   };
 
+  const renderLiveResultRow = (item: MezzanineCandidate) => {
+    const alreadyListed = !!excludeIds?.has(item.id);
+    return (
+      <Pressable
+        key={item.id}
+        style={({ pressed }) => [styles.resultRow, (alreadyListed || !!addingLiveId) && styles.resultRowMuted, pressed && styles.pressed]}
+        disabled={alreadyListed || !!addingLiveId}
+        onPress={() => selectLive(item)}
+        accessibilityRole="button"
+        accessibilityState={{ disabled: alreadyListed || !!addingLiveId }}
+        accessibilityLabel={alreadyListed ? `${item.title} — ${excludedLabel}` : item.title}
+      >
+        {item.posterUrl ? (
+          <Image source={{ uri: item.posterUrl }} style={styles.resultPoster} contentFit="cover" />
+        ) : (
+          <View style={[styles.resultPoster, styles.resultPlaceholder]}>
+            <Text style={styles.placeholderText}>🎭</Text>
+          </View>
+        )}
+        <View style={styles.resultInfo}>
+          <Text style={styles.resultTitle} numberOfLines={1}>{item.title}</Text>
+          {item.venue && <Text style={styles.resultVenue} numberOfLines={1}>{item.venue}</Text>}
+          {alreadyListed && (
+            <Text style={styles.resultAlready} numberOfLines={1}>{excludedLabel}</Text>
+          )}
+          <Text style={styles.resultMeta} numberOfLines={1}>
+            {[item.city, item.openingDate?.slice(0, 4)].filter(Boolean).join(' · ')}
+            {item.city || item.openingDate ? ' · ' : ''}No critic score
+          </Text>
+        </View>
+        <Text style={styles.liveAdd}>{addingLiveId === item.id ? 'Adding…' : '+ Add'}</Text>
+      </Pressable>
+    );
+  };
+
+  // Offered at the bottom of the LOCAL results list too, not just the "no
+  // matches" empty state — a screenful of weak fuzzy matches is functionally
+  // the same as no matches (beta feedback 2026-08-12, AE2cV5mxGJgdIVWbvbFRLn0:
+  // "didn't find it in the list, but wasn't offered the option to search the
+  // wider catalogue").
+  const renderWideCatalogFooter = () => (
+    <View style={styles.wideCatalogFooter}>
+      {liveState === 'results' ? (
+        <>
+          <Text style={styles.wideHeader}>From the wider theater catalog</Text>
+          {liveCandidates.map(renderLiveResultRow)}
+        </>
+      ) : (
+        <View style={styles.wideCatalogCta}>
+          {liveState === 'idle' && (
+            <Pressable onPress={runLiveSearch} hitSlop={12} accessibilityRole="button">
+              <Text style={styles.liveLink}>Can{'’'}t find it? Search the wider theater catalog</Text>
+            </Pressable>
+          )}
+          {liveState === 'searching' && (
+            <Text style={styles.liveStatus}>Searching the wider catalog…</Text>
+          )}
+          {liveState === 'empty' && (
+            <Text style={styles.liveStatus}>
+              Not found in the wider catalog either. Try a different spelling.
+            </Text>
+          )}
+          {liveState === 'error' && (
+            <>
+              <Text style={styles.liveErrorText}>{liveError}</Text>
+              <Pressable onPress={runLiveSearch} hitSlop={12} accessibilityRole="button">
+                <Text style={styles.liveLink}>Try again</Text>
+              </Pressable>
+            </>
+          )}
+        </View>
+      )}
+    </View>
+  );
+
   // "No shows found" (and its now-tappable wider-catalog CTA) must wait for
   // the debounce to settle — mid-typing, `results` is still computed from the
   // previous debouncedQuery, so gating on the immediate query would flash the
@@ -382,7 +457,7 @@ export function ShowSearchModal({
                     accessibilityLabel={alreadyListed ? `${candidate.title} — ${excludedLabel}` : candidate.title}
                   >
                     <View style={[styles.resultPoster, styles.resultPlaceholder]}>
-                      <Text style={styles.placeholderText}>{candidate.title.charAt(0)}</Text>
+                      <Text style={styles.placeholderText}>🎭</Text>
                     </View>
                     <View style={styles.resultInfo}>
                       <Text style={styles.resultTitle} numberOfLines={1}>{candidate.title}</Text>
@@ -418,7 +493,7 @@ export function ShowSearchModal({
                     <Image source={{ uri: posterUrl }} style={styles.resultPoster} contentFit="cover" />
                   ) : (
                     <View style={[styles.resultPoster, styles.resultPlaceholder]}>
-                      <Text style={styles.placeholderText}>{show.title.charAt(0)}</Text>
+                      <Text style={styles.placeholderText}>🎭</Text>
                     </View>
                   )}
                   <View style={styles.resultInfo}>
@@ -438,6 +513,7 @@ export function ShowSearchModal({
                 </Pressable>
               );
             }}
+            ListFooterComponent={querySettled ? renderWideCatalogFooter : undefined}
             contentContainerStyle={styles.list}
             showsVerticalScrollIndicator={false}
           />
@@ -464,7 +540,7 @@ export function ShowSearchModal({
                     <Image source={{ uri: item.posterUrl }} style={styles.resultPoster} contentFit="cover" />
                   ) : (
                     <View style={[styles.resultPoster, styles.resultPlaceholder]}>
-                      <Text style={styles.placeholderText}>{item.title.charAt(0)}</Text>
+                      <Text style={styles.placeholderText}>🎭</Text>
                     </View>
                   )}
                   <View style={styles.resultInfo}>
@@ -596,6 +672,18 @@ const styles = StyleSheet.create({
     color: Colors.score.red,
     fontSize: FontSize.sm,
     textAlign: 'center',
+  },
+  // Horizontal padding lives on the CTA text/rows themselves (resultRow,
+  // wideHeader, liveLink already carry it) — this wrapper only adds the
+  // divider and vertical breathing room, so it must not double it up.
+  wideCatalogFooter: {
+    borderTopWidth: 1,
+    borderTopColor: Colors.border.subtle,
+    paddingVertical: Spacing.md,
+  },
+  wideCatalogCta: {
+    paddingHorizontal: Spacing.lg,
+    gap: Spacing.sm,
   },
   wideHeader: {
     color: Colors.text.muted,

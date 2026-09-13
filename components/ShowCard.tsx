@@ -112,7 +112,7 @@ export const ShowCard = memo(function ShowCard({ show, scoreMode = 'critics', hi
         ) : (
           <View style={[styles.showImage, styles.placeholderThumb]}>
             <Text style={styles.placeholderText}>
-              {show.title.charAt(0)}
+              🎭
             </Text>
           </View>
         )}
@@ -199,10 +199,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  // Theater masks, not a bare initial letter — matches the web's no-image
+  // fallback (beta feedback 2026-08-12: "figure out better look placeholders").
   placeholderText: {
-    color: Colors.text.muted,
-    fontSize: FontSize.xl,
-    fontWeight: '600',
+    fontSize: 28,
   },
   info: {
     flex: 1,
