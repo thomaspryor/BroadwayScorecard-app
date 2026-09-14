@@ -22,7 +22,8 @@ import { Image } from 'expo-image';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter , useFocusEffect } from 'expo-router';
-import Svg, { Path } from 'react-native-svg';
+import Svg, { Path, Rect, Circle } from 'react-native-svg';
+import { LinearGradient } from 'expo-linear-gradient';
 import ReanimatedSwipeable from 'react-native-gesture-handler/ReanimatedSwipeable';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, { SharedValue, useAnimatedStyle } from 'react-native-reanimated';
@@ -134,6 +135,17 @@ function GridPoster({ posterUrl, title, dateLabel }: { posterUrl: string | null;
         <Image source={{ uri: posterUrl }} style={styles.gridPoster} contentFit="cover" transition={200} />
       ) : (
         <View style={[styles.gridPoster, styles.cardPosterPlaceholder]}>
+          <LinearGradient
+            colors={[Colors.surface.elevated, Colors.surface.overlay]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
+          <Svg width={26} height={26} viewBox="0 0 24 24" fill="none" stroke={Colors.text.muted} strokeWidth={1.5} opacity={0.5}>
+            <Rect x={3} y={3} width={18} height={18} rx={2} />
+            <Circle cx={8.5} cy={8.5} r={1.5} />
+            <Path strokeLinecap="round" strokeLinejoin="round" d="M21 15l-5-5L5 21" />
+          </Svg>
           <Text style={styles.placeholderText}>{title.charAt(0)}</Text>
         </View>
       )}
@@ -1240,7 +1252,7 @@ const styles = StyleSheet.create({
     width: 48, height: 64, borderRadius: BorderRadius.sm,
     backgroundColor: Colors.surface.overlay,
   },
-  cardPosterPlaceholder: { alignItems: 'center', justifyContent: 'center' },
+  cardPosterPlaceholder: { alignItems: 'center', justifyContent: 'center', gap: 4 },
   placeholderText: { color: Colors.text.muted, fontSize: 18, fontWeight: '600' },
   cardInfo: { flex: 1, gap: 2 },
   cardTitle: { color: Colors.text.primary, fontSize: FontSize.md, fontWeight: '600' },
@@ -1273,9 +1285,11 @@ const styles = StyleSheet.create({
   // Date lives on the poster now, not the text block below (venue dropped
   // entirely) — small low-alpha corner scrim, unobtrusive by design.
   // Horizontally centered so the tag lines up with the centered title/stars
-  // below the poster (beta feedback 2026-08-02).
+  // below the poster. Pinned to the top edge, not the bottom (beta feedback
+  // 2026-08-10, ANIDtf6U9sjqeZmHC8FIKnI): the bottom collided visually with
+  // poster artwork that itself runs dark/text-heavy along the lower edge.
   gridDateOverlayWrap: {
-    position: 'absolute', left: 0, right: 0, bottom: 6,
+    position: 'absolute', left: 0, right: 0, top: 6,
     alignItems: 'center',
   },
   gridDateOverlay: {

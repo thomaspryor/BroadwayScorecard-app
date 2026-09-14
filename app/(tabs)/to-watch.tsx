@@ -259,7 +259,7 @@ export default function ToWatchScreen() {
         key={item.id}
         style={({ pressed }) => [styles.gridCard, gridCardStyle, pressed && styles.pressed]}
         onPress={() => goToShow(show, item.show_id)}
-        onLongPress={() => { setPendingDate(new Date()); setDatePickingShowId(item.show_id); }}
+        onLongPress={() => showWatchlistActionSheet(item, title)}
       >
         <View style={styles.upcomingPosterWrap}>
           {posterUrl ? (
@@ -344,7 +344,7 @@ export default function ToWatchScreen() {
         key={item.id}
         style={({ pressed }) => [styles.listRow, pressed && styles.pressed]}
         onPress={() => goToShow(show, item.show_id)}
-        onLongPress={() => { setPendingDate(new Date()); setDatePickingShowId(item.show_id); }}
+        onLongPress={() => showWatchlistActionSheet(item, title)}
       >
         {posterUrl ? (
           <Image source={{ uri: posterUrl }} style={styles.listPoster} contentFit="cover" transition={200} />

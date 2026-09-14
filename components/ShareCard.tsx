@@ -57,19 +57,12 @@ export const ShareCardWithRef = React.forwardRef<ShareCardHandle, ShareCardProps
       trackShowShared(props.show.id, props.show.title);
 
       try {
-        const uri = await viewShotRef.current?.capture?.();
-        if (!uri) {
-          await Share.share({
-            message: `Check out ${props.show.title} on Broadway Scorecard!\nhttps://broadwayscorecard.com/show/${props.show.slug}`,
-          });
-          return;
-        }
-
-        await Share.share(
-          Platform.OS === 'ios'
-            ? { url: uri }
-            : { message: `Check out ${props.show.title} on Broadway Scorecard!\nhttps://broadwayscorecard.com/show/${props.show.slug}` },
-        );
+        // Share the show's URL, not the rendered image (beta feedback
+        // 2026-08-13, ANDYIxNpx3lmYZhb9EFZEyA) — recipients need a link they
+        // can tap into the app/site, not a picture.
+        await Share.share({
+          message: `Check out ${props.show.title} on Broadway Scorecard!\nhttps://broadwayscorecard.com/show/${props.show.slug}`,
+        });
         props.onShared?.();
       } catch {
         // User cancelled
