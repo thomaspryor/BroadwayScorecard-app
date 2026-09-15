@@ -53,7 +53,7 @@ const FeaturedCard = memo(function FeaturedCard({ show, cardWidth, isWatchlisted
           />
         ) : (
           <View style={[styles.poster, styles.placeholderPoster]}>
-            <Text style={styles.placeholderText}>{show.title.charAt(0)}</Text>
+            <Text style={styles.placeholderText}>🎭</Text>
           </View>
         )}
 

@@ -134,7 +134,7 @@ function GridPoster({ posterUrl, title, dateLabel }: { posterUrl: string | null;
         <Image source={{ uri: posterUrl }} style={styles.gridPoster} contentFit="cover" transition={200} />
       ) : (
         <View style={[styles.gridPoster, styles.cardPosterPlaceholder]}>
-          <Text style={styles.placeholderText}>{title.charAt(0)}</Text>
+          <Text style={styles.placeholderText}>🎭</Text>
         </View>
       )}
       {!!dateLabel && (
@@ -1275,7 +1275,8 @@ const styles = StyleSheet.create({
   // Horizontally centered so the tag lines up with the centered title/stars
   // below the poster (beta feedback 2026-08-02).
   gridDateOverlayWrap: {
-    position: 'absolute', left: 0, right: 0, bottom: 6,
+    // Top, not bottom (beta feedback 2026-08-10, ANIDtf6U9sjqeZmHC8FIKnI).
+    position: 'absolute', left: 0, right: 0, top: 6,
     alignItems: 'center',
   },
   gridDateOverlay: {
