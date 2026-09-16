@@ -177,7 +177,13 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # eas-cli's own dependency tree (@oclif/plugin-autocomplete >=3.3.0)
+          # requires Node >=22 — Node 20 here made every run since 2026-09-14
+          # fail at `yarn add eas-cli` with an "incompatible module" error
+          # before EAS ever ran, silently killing both the native-build and
+          # OTA ship paths. The other three jobs in this workflow already run
+          # on 22; this one was missed.
+          node-version: 22
           cache: npm
 
       # Must run BEFORE the fingerprint is computed — it reflects installed
