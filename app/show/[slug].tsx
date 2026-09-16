@@ -5,7 +5,7 @@
  */
 
 import React, { useMemo, useEffect, useState, useRef } from 'react';
-import { View, Text, ScrollView, StyleSheet, Pressable, Linking } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Pressable, Linking, Share } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, Stack, useRouter } from 'expo-router';
@@ -18,7 +18,7 @@ import { getScoreColor, getContrastTextColor, getMarketMinReviews, getQualifiedS
 import { Show, ShowDetail, MobileShowDetail, mapShowDetail } from '@/lib/types';
 import { ScoreBadge, StatusBadge, FormatPill, ProductionPill, CategoryBadge } from '@/components/show-cards';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
-import { trackTicketTap, trackTicketLinksVisible, trackTicketBrowserOpened, trackTicketBrowserDismissed, trackShowDetailViewed, trackFullReviewTapped } from '@/lib/analytics';
+import { trackTicketTap, trackTicketLinksVisible, trackTicketBrowserOpened, trackTicketBrowserDismissed, trackShowDetailViewed, trackFullReviewTapped, trackShowShared } from '@/lib/analytics';
 import { buildTicketUrl, buildTicketEventProps, isAffiliatePlatform, chooseTicketOpenStrategy, type TicketSource } from '@/lib/ticket-utils';
 import { addSentryBreadcrumb, captureException } from '@/lib/sentry';
 import Svg, { Path, Rect, Circle, Line, Defs, LinearGradient as SvgLinearGradient, Stop } from 'react-native-svg';
@@ -107,10 +107,27 @@ export default function ShowDetailScreen() {
   const relatedShowsOpen = useMemo(() => relatedBase.filter(s => s.status === 'open' || s.status === 'previews').slice(0, 6), [relatedBase]);
   const relatedShowsClosed = useMemo(() => relatedBase.filter(s => s.status === 'closed').slice(0, 6), [relatedBase]);
 
-  const handleShare = async () => {
+  // Bottom "Share Score Card" CTA — captures the branded score-card image.
+  const handleShareCard = async () => {
     if (!show) return;
-    // Try image share card first, falls back to text internally
     await shareCardRef.current?.share();
+  };
+
+  // Header share icon — a plain link share, not the score-card image. The
+  // header icon reads as "share this page" (owner ask 2026-07-31); sharing a
+  // PNG there surprised testers expecting the show's URL (beta feedback
+  // 2026-08-13, ANDYIxNpx3lmYZhb9EFZEyA).
+  const handleShareLink = async () => {
+    if (!show) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    trackShowShared(show.id, show.title);
+    try {
+      await Share.share({
+        message: `Check out ${show.title} on Broadway Scorecard!\nhttps://broadwayscorecard.com/show/${show.slug}`,
+      });
+    } catch {
+      // User cancelled
+    }
   };
 
   /**
@@ -281,7 +298,7 @@ export default function ShowDetailScreen() {
           // fold; this makes sharing reachable from the top of every show).
           headerRight: () => (
             <Pressable
-              onPress={handleShare}
+              onPress={handleShareLink}
               hitSlop={10}
               accessibilityRole="button"
               accessibilityLabel="Share this show"
@@ -843,7 +860,7 @@ export default function ShowDetailScreen() {
         <View style={styles.actionButtons}>
           <Pressable
             style={({ pressed }) => [styles.shareButton, pressed && styles.pressed]}
-            onPress={handleShare}
+            onPress={handleShareCard}
           >
             <Svg width={18} height={18} viewBox="0 0 24 24" fill={Colors.text.primary} style={{ marginRight: 6 }}>
               <Path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92-1.31-2.92-2.92-2.92z" />
