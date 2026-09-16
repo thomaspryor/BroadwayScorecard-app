@@ -68,6 +68,12 @@ jobs:
       - name: Run test suite
         run: npm run test:unit
 
+      # Structural guard for the show/[slug], settings, rate/[showId] Maestro
+      # coverage (BRO-2014) — file reads only, no simulator, so it belongs
+      # here rather than in the nightly maestro-e2e.yml run.
+      - name: Run E2E coverage guard
+        run: npm run test:e2e-coverage
+
   security:
     name: Supabase RLS gate (account data)
     runs-on: ubuntu-latest

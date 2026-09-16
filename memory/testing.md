@@ -42,9 +42,10 @@ unmetered Actions minutes even at the 10x macOS multiplier.
 ## Commands
 
 ```
-npm test              # everything (~2s)
-npm run test:unit     # logic only, no network
-npm run test:security # adversarial RLS (skips locally, needs fixture secrets)
+npm test               # everything (~2s)
+npm run test:unit      # logic only, no network
+npm run test:security  # adversarial RLS (skips locally, needs fixture secrets)
+npm run test:e2e-coverage # structural guard on the show/rate/settings Maestro flows, no simulator
 npm run typecheck
 npm run lint && npm run lint:design
 npx expo export --platform ios
@@ -356,6 +357,22 @@ longer round-trips through the UI to verify or delete its own write.
 `delete-account-guard.yaml` never completes a real account deletion — it
 only confirms the warning dialog appears with the right copy and that Cancel
 leaves the account untouched.
+
+**BRO-2014, closed:** the coverage above shipped without the structural guard
+its own acceptance criteria called for. Added `tests/e2e/ios_maestro_coverage.test.mjs`
+(new `test:e2e-coverage` npm script, `tests/e2e/**/*.test.mjs`, wired into
+`ci.yml` right after `test:unit` — file reads only, no simulator, so it
+belongs on every push rather than the nightly Maestro run). It checks
+properties a live CI run can't catch structurally: the show/rate flows drive
+the real screens and not the 6 pre-existing show-rating-fixture routes, the
+rate flow's write has a CI backstop delete, every `id:` selector in the three
+flows resolves to a real `testID` in `app/`/`components/` (catches a rename
+before it burns a simulator run), and — the one that actually matters if
+someone "improves" `delete-account-guard.yaml` later — the only tap allowed
+after "Delete Account" opens the warning dialog is "Cancel", never a second
+destructive confirm. Proven able to fail: temporarily added a `"Yes, Delete"`
+tap after the guard's `"Cancel"` step, confirmed the flow's own test failed
+with `found ["Cancel","Yes, Delete"]`, reverted.
 
 ## Known gaps
 
