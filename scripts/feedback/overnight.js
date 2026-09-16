@@ -79,10 +79,75 @@ function preflight() {
   // overnight commit nobody reviewed.
   if (dirty) return `working tree is dirty:\n${dirty.split('\n').slice(0, 10).join('\n')}`;
 
+  const unlanded = checkPriorNightLanded();
+  if (unlanded) return unlanded;
+
   const auth = checkAgentAuth();
   if (auth) return auth;
 
   return null;
+}
+
+const OVERNIGHT_BRANCH_PREFIX = 'worktree-feedback-overnight-';
+
+/**
+ * Branch names are `worktree-feedback-overnight-<ISO stamp>`, so lexical sort
+ * order is chronological order — no need to touch commit dates.
+ */
+function mostRecentOvernightBranch(branchNames) {
+  const sorted = branchNames.filter(Boolean).slice().sort();
+  return sorted.length ? sorted[sorted.length - 1] : null;
+}
+
+/**
+ * Pure decision: given the set of overnight branches and a way to ask whether
+ * a given branch has landed, return the branch to block on, or null to
+ * proceed. Kept separate from the git calls below so it can be unit tested
+ * without a real repo.
+ */
+function priorNightUnlandedBranch(branchNames, isAncestor) {
+  const latest = mostRecentOvernightBranch(branchNames);
+  if (!latest) return null;
+  return isAncestor(latest) ? null : latest;
+}
+
+// Uses sh(), not tryShell() — an unexpected git failure here must crash the
+// run (main()'s top-level catch) rather than silently read as "no prior
+// branches", which would fail the guard open exactly when it can't verify
+// anything.
+function listOvernightBranches() {
+  return sh('git', ['branch', '--list', `${OVERNIGHT_BRANCH_PREFIX}*`, '--format=%(refname:short)'])
+    .trim().split('\n').filter(Boolean);
+}
+
+/**
+ * "Commits ahead of main" is the wrong measure here (per the card): it can't
+ * tell a branch whose work already landed (`mergeAndShip` always merges
+ * `--no-ff`, so a landed tip stays reachable from origin/main) from one that
+ * was abandoned outright — both can read as "nothing to show". `merge-base
+ * --is-ancestor` answers reachability directly instead of inferring it from a
+ * commit range.
+ */
+function branchLandedOnOriginMain(branch) {
+  tryShell('git', ['fetch', 'origin', 'main']); // best-effort; stale origin/main just re-checks tomorrow
+  return tryShell('git', ['merge-base', '--is-ancestor', branch, 'origin/main']).ok;
+}
+
+/**
+ * Every unmerged feedback-overnight-* branch holds a near-duplicate of the
+ * same fix, redone because nothing checked whether last night's branch had
+ * been reviewed yet (BRO-2819). If the most recent one is still unlanded,
+ * skip tonight's run rather than opening another worktree on top of it.
+ */
+function checkPriorNightLanded() {
+  const unlanded = priorNightUnlandedBranch(listOvernightBranches(), branchLandedOnOriginMain);
+  if (!unlanded) return null;
+  return `previous night's branch '${unlanded}' has not landed on origin/main yet `
+    + `(git merge-base --is-ancestor says no) — skipping so tonight's run does not redo the same work. `
+    + `Review and merge it normally (a squash or cherry-pick won't register as landed here — `
+    + `merge --no-ff into main and push, or delete the branch and its worktree if abandoned):\n`
+    + `  git -C ${REPO} log origin/main..${unlanded}\n`
+    + `  git -C ${REPO} worktree list | grep ${unlanded.replace(OVERNIGHT_BRANCH_PREFIX, '')}`;
 }
 
 /**
@@ -1047,7 +1112,10 @@ function copyScreenshots(visual) {
     .filter(Boolean);
 }
 
-module.exports = { FORBIDDEN_PATHS, forbiddenIn, crashLogExcerpt, reportBody, computeThemeSummary };
+module.exports = {
+  FORBIDDEN_PATHS, forbiddenIn, crashLogExcerpt, reportBody, computeThemeSummary,
+  OVERNIGHT_BRANCH_PREFIX, mostRecentOvernightBranch, priorNightUnlandedBranch,
+};
 if (require.main === module) {
   main().catch((e) => { log('FAILED:', e.stack || e.message); process.exit(1); });
 }
