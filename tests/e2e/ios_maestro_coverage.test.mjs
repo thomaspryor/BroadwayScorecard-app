@@ -65,22 +65,28 @@ test('rate/[showId] flow has a CI backstop that deletes what it writes', () => {
 test('settings delete-account flow can never complete a real account deletion', () => {
   const yaml = read(SETTINGS_FLOW);
 
-  // Parse the tapOn steps in order (both "tapOn: text" and "tapOn:\n text:"
-  // forms appear across this repo's flows).
-  const tapTexts = [...yaml.matchAll(/tapOn:\s*\n?\s*(?:text:\s*)?"([^"]+)"/g)].map(m => m[1]);
-  assert.ok(tapTexts.length > 0, 'expected at least one tapOn step in the delete-account-guard flow');
+  // Parse every tapOn step in order, whichever selector shape it uses —
+  // "tapOn: text", "tapOn:\n text:", or "tapOn:\n id:". A destructive tap
+  // added via an id: selector (the same style this repo already uses for
+  // "show-card-result"/"star-4") must be just as visible here as a text one,
+  // or the whole point of this test — that nothing can tap past the warning
+  // dialog — has a blind spot.
+  const taps = [...yaml.matchAll(/tapOn:\s*(?:\n\s*(?:text:\s*"([^"]+)"|id:\s*"([^"]+)")|\s*"([^"]+)")/g)]
+    .map(m => (m[1] ? `text:${m[1]}` : m[2] ? `id:${m[2]}` : `text:${m[3]}`));
+  assert.ok(taps.length > 0, 'expected at least one tapOn step in the delete-account-guard flow');
 
-  const deleteIndex = tapTexts.findIndex(t => /delete account/i.test(t));
+  const deleteIndex = taps.findIndex(t => /^text:.*delete account/i.test(t));
   assert.ok(deleteIndex >= 0, 'expected a tap on "Delete Account" to open the confirmation dialog');
 
   // The one and only tap allowed after opening the warning dialog is Cancel.
   // A future edit that adds a second destructive tap (a "Yes"/"Confirm"/
-  // second "Delete" button) here would complete a REAL deletion against the
-  // shared dev-test account every other signed-in flow depends on.
-  const tapsAfterWarning = tapTexts.slice(deleteIndex + 1);
+  // second "Delete" button, by text OR by id:) here would complete a REAL
+  // deletion against the shared dev-test account every other signed-in flow
+  // depends on.
+  const tapsAfterWarning = taps.slice(deleteIndex + 1);
   assert.deepEqual(
     tapsAfterWarning,
-    ['Cancel'],
+    ['text:Cancel'],
     `the only tap after "Delete Account" must be "Cancel" — found ${JSON.stringify(tapsAfterWarning)}. ` +
     'This flow must never complete a real deletion.',
   );
@@ -148,7 +154,7 @@ test('maestro-e2e.yml can dispatch the show, rate, and settings suites independe
   const workflow = read(join(REPO_ROOT, '.github/workflows/maestro-e2e.yml'));
   for (const suite of ['show', 'rate', 'settings']) {
     assert.match(
-      new RegExp(`^\\s*-\\s*${suite}\\s*$`, 'm').test(workflow) ? workflow : '',
+      workflow,
       new RegExp(`^\\s*-\\s*${suite}\\s*$`, 'm'),
       `expected "${suite}" as a workflow_dispatch input option`,
     );
