@@ -7,8 +7,21 @@
  * see app/import.tsx's matchShow).
  */
 import { File } from 'expo-file-system';
+import * as ImageManipulator from 'expo-image-manipulator';
 import { getSupabaseClient } from './supabase';
 import { sanitizeRating } from './rating';
+import {
+  THEATR_BATCH_SIZE,
+  THEATR_ERROR_COPY,
+  THEATR_MAX_EDGE,
+  THEATR_MAX_SCREENSHOTS,
+  chunk,
+  dedupeTheatrRows,
+  theatrNotices,
+  theatrRowsToEntries,
+  type TheatrRow,
+  type TheatrScreenshotResponse,
+} from './theatr-import';
 
 /** One seen-show / want-to-see entry, normalized across sources. */
 export interface RawImportEntry {
@@ -182,4 +195,89 @@ export async function acquireFromMezzanine(fileUri: string): Promise<ImportAcqui
   }
 
   return { entries, notices: [] };
+}
+
+// ---------------------------------------------------------------------------
+// Theatr (screenshots) — pure helpers live in ./theatr-import
+// ---------------------------------------------------------------------------
+
+export interface PickedScreenshot {
+  uri: string;
+  width?: number;
+  height?: number;
+}
+
+/** Downscale + re-encode a screenshot to the JPEG the edge function accepts.
+ *  Re-encoding also strips EXIF, as in lib/photo-image-pipeline.ts. */
+async function screenshotToJpegBase64(shot: PickedScreenshot): Promise<{ mediaType: string; data: string }> {
+  const { width, height } = shot;
+  const needsResize = !width || !height || Math.max(width, height) > THEATR_MAX_EDGE;
+  const actions: ImageManipulator.Action[] = needsResize
+    ? [{ resize: width && height && width < height ? { height: THEATR_MAX_EDGE } : { width: THEATR_MAX_EDGE } }]
+    : [];
+  const out = await ImageManipulator.manipulateAsync(shot.uri, actions, {
+    compress: 0.85,
+    format: ImageManipulator.SaveFormat.JPEG,
+    base64: true,
+  });
+  if (!out.base64) throw new Error('invalid_images');
+  return { mediaType: 'image/jpeg', data: out.base64 };
+}
+
+/** Read Theatr screenshots via the theatr-screenshot-import function, two
+ *  batches at a time. Throws Error with user-ready copy when nothing usable
+ *  came back. */
+export async function acquireFromTheatrScreenshots(
+  shots: PickedScreenshot[],
+  onProgress?: (done: number, total: number) => void,
+): Promise<ImportAcquireResult> {
+  if (shots.length === 0) throw new Error(THEATR_ERROR_COPY.no_shows);
+  const supabase = getSupabaseClient();
+  if (!supabase) throw new Error(THEATR_ERROR_COPY.unauthorized);
+
+  const picked = shots.slice(0, THEATR_MAX_SCREENSHOTS);
+  const batches = chunk(picked, THEATR_BATCH_SIZE);
+  const rows: TheatrRow[] = [];
+  let unreadable = 0;
+  let failedScreenshots = 0;
+  let firstError: string | null = null;
+  let done = 0;
+  onProgress?.(0, picked.length);
+
+  const runBatch = async (batch: PickedScreenshot[]) => {
+    try {
+      let images: { mediaType: string; data: string }[];
+      try {
+        images = await Promise.all(batch.map(screenshotToJpegBase64));
+      } catch {
+        throw new Error('invalid_images');
+      }
+      const { data, error } = await supabase.functions.invoke<TheatrScreenshotResponse>('theatr-screenshot-import', {
+        body: { images },
+      });
+      if (error || !data) throw new Error('internal');
+      if (!data.ok) throw new Error(data.error || 'internal');
+      rows.push(...(data.entries || []));
+      unreadable += data.unreadableImages || 0;
+    } catch (err) {
+      failedScreenshots += batch.length;
+      if (!firstError) firstError = err instanceof Error ? err.message : 'internal';
+    } finally {
+      done += batch.length;
+      onProgress?.(done, picked.length);
+    }
+  };
+
+  let next = 0;
+  await Promise.all(Array.from({ length: Math.min(2, batches.length) }, async () => {
+    while (next < batches.length) await runBatch(batches[next++]);
+  }));
+
+  const deduped = dedupeTheatrRows(rows);
+  if (deduped.length === 0) {
+    const code = firstError || 'no_shows';
+    throw new Error(THEATR_ERROR_COPY[code] || THEATR_ERROR_COPY.internal);
+  }
+  const entries = theatrRowsToEntries(deduped);
+  return { entries, notices: theatrNotices(entries, { picked: shots.length, failedScreenshots, unreadable }) };
 }

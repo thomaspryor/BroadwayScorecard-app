@@ -1,5 +1,5 @@
 /**
- * Import shows from Mezzanine or Show Score — web parity port of
+ * Import shows from Mezzanine, Show Score or Theatr (screenshots) — web parity port of
  * src/app/my-shows/ImportShows.tsx (see Broadwayscore commits 992f58bc046,
  * 187f8601e30). Date-aware matchShow picks the production whose run CONTAINS
  * the user's date-seen instead of grabbing the first same-title match — the
@@ -31,6 +31,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
+import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '@/lib/auth-context';
 import { useShows } from '@/lib/data-context';
@@ -38,6 +39,7 @@ import { supabaseRestInsert } from '@/lib/supabase-rest';
 import {
   acquireFromMezzanine,
   acquireFromShowScore,
+  acquireFromTheatrScreenshots,
   type ImportAcquireResult,
   type RawImportEntry,
 } from '@/lib/show-import';
@@ -48,6 +50,7 @@ import {
   MATCH_THRESHOLD,
   type MatchCandidate,
 } from '@/lib/show-match';
+import { THEATR_MAX_SCREENSHOTS } from '@/lib/theatr-import';
 import {
   searchMezzanineCatalog,
   resolveMezzanineShow,
@@ -65,7 +68,7 @@ import type { DiaryShowMeta } from '@/lib/show-format';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
 import * as haptics from '@/lib/haptics';
 
-type ImportSourceId = 'mezzanine' | 'show-score';
+type ImportSourceId = 'mezzanine' | 'show-score' | 'theatr';
 type ImportStep = 'source' | 'matching' | 'preview' | 'importing' | 'done';
 
 export interface MatchedEntry {
@@ -180,6 +183,7 @@ export default function ImportScreen() {
   const [entries, setEntries] = useState<MatchedEntry[]>([]);
   const [notices, setNotices] = useState<string[]>([]);
   const [profileInput, setProfileInput] = useState('');
+  const [theatrProgress, setTheatrProgress] = useState<{ done: number; total: number } | null>(null);
   const [importStats, setImportStats] = useState({ imported: 0, skipped: 0, errors: 0 });
   const [importProgress, setImportProgress] = useState({ done: 0, total: 0 });
   const [error, setError] = useState<string | null>(null);
@@ -346,6 +350,34 @@ export default function ImportScreen() {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to parse file');
       setStep('source');
+    }
+  }, [matchAndPreview]);
+
+  const handlePickTheatrScreenshots = useCallback(async () => {
+    // The system photo picker runs out of process, so no library permission
+    // prompt is needed to read the screenshots the user picks.
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsMultipleSelection: true,
+      selectionLimit: THEATR_MAX_SCREENSHOTS,
+      orderedSelection: true,
+      quality: 1,
+      exif: false,
+    });
+    if (result.canceled || !result.assets?.length) return;
+    setSource('theatr');
+    setStep('matching');
+    setError(null);
+    setTheatrProgress({ done: 0, total: Math.min(result.assets.length, THEATR_MAX_SCREENSHOTS) });
+    try {
+      const shots = result.assets.map(a => ({ uri: a.uri, width: a.width, height: a.height }));
+      const acquired = await acquireFromTheatrScreenshots(shots, (done, total) => setTheatrProgress({ done, total }));
+      await matchAndPreview(acquired, 'theatr');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Import failed. Try again.');
+      setStep('source');
+    } finally {
+      setTheatrProgress(null);
     }
   }, [matchAndPreview]);
 
@@ -622,7 +654,7 @@ export default function ImportScreen() {
         </Pressable>
         <Text style={styles.headerTitle}>
           {step === 'source' && 'Import your shows'}
-          {step === 'matching' && (source === 'show-score' ? 'Fetching your profile…' : 'Matching shows…')}
+          {step === 'matching' && (source === 'show-score' ? 'Fetching your profile…' : source === 'theatr' ? 'Reading screenshots…' : 'Matching shows…')}
           {step === 'preview' && 'Review Import'}
           {step === 'importing' && 'Importing…'}
           {step === 'done' && 'Import Complete'}
@@ -690,6 +722,24 @@ export default function ImportScreen() {
               </Pressable>
             </View>
 
+            <View style={styles.divider}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.dividerText}>or</Text>
+              <View style={styles.dividerLine} />
+            </View>
+
+            <View>
+              <Text style={styles.sourceLabel}>📸 Theatr</Text>
+              <Text style={styles.sourceHint}>
+                Theatr has no export, so pick screenshots instead. In the app: Profile → Collection → Attended (and
+                Interested), then screenshot the list as you scroll. Up to {THEATR_MAX_SCREENSHOTS} screenshots. We only
+                read the show names and dates; the images aren&apos;t saved.
+              </Text>
+              <Pressable style={styles.smallBtnGhost} onPress={handlePickTheatrScreenshots}>
+                <Text style={styles.smallBtnGhostText}>Choose Screenshots</Text>
+              </Pressable>
+            </View>
+
             {error && <Text style={styles.errorText}>{error}</Text>}
           </View>
         )}
@@ -698,7 +748,11 @@ export default function ImportScreen() {
           <View style={styles.centerBlock}>
             <ActivityIndicator color={Colors.brand} />
             <Text style={styles.mutedText}>
-              {source === 'show-score' ? 'Fetching and matching your Show Score reviews…' : 'Matching your shows…'}
+              {source === 'show-score'
+                ? 'Fetching and matching your Show Score reviews…'
+                : source === 'theatr' && theatrProgress && theatrProgress.done < theatrProgress.total
+                  ? `Reading your screenshots (${theatrProgress.done} of ${theatrProgress.total})…`
+                  : 'Matching your shows…'}
             </Text>
           </View>
         )}

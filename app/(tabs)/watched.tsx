@@ -807,7 +807,7 @@ export default function WatchedScreen() {
             style={({ pressed }) => [styles.addButton, pressed && styles.pressed]}
             onPress={() => router.push('/import' as any)}
             hitSlop={8}
-            accessibilityLabel="Import shows from Show Score or Mezzanine"
+            accessibilityLabel="Import shows from Show Score, Mezzanine or Theatr"
             testID="import-shows-button"
           >
             {/* Arrow INTO the tray (import), not the share-out icon (beta
