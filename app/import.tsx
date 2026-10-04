@@ -676,7 +676,7 @@ export default function ImportScreen() {
         </Pressable>
         <Text style={styles.headerTitle}>
           {step === 'source' && 'Import your shows'}
-          {step === 'matching' && (source === 'show-score' ? 'Fetching your profile…' : source === 'theatr' ? 'Reading screenshots…' : 'Matching shows…')}
+          {step === 'matching' && (source === 'show-score' ? 'Fetching your profile…' : source === 'theatr' && theatrProgress && theatrProgress.done < theatrProgress.total ? 'Reading screenshots…' : 'Matching shows…')}
           {step === 'preview' && 'Review Import'}
           {step === 'importing' && 'Importing…'}
           {step === 'done' && 'Import Complete'}

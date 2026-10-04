@@ -245,9 +245,14 @@ export async function acquireFromTheatrScreenshots(
 
   const runBatch = async (batchIndex: number) => {
     const batch = batches[batchIndex];
-    // One unreadable image must not sink the other screenshots in its batch.
-    const encoded = await Promise.allSettled(batch.map(screenshotToJpegBase64));
-    const images = encoded.flatMap((r) => (r.status === 'fulfilled' ? [r.value] : []));
+    // One at a time (a 48MP photo decodes to ~200MB; twelve in parallel can
+    // get the app killed), and one unreadable image must not sink the rest.
+    const images: { mediaType: string; data: string }[] = [];
+    for (const shot of batch) {
+      try {
+        images.push(await screenshotToJpegBase64(shot));
+      } catch { /* counted below */ }
+    }
     failedScreenshots += batch.length - images.length;
     if (images.length < batch.length && !firstError) firstError = 'invalid_images';
     try {
