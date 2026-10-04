@@ -35,7 +35,7 @@ import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '@/lib/auth-context';
 import { useShows } from '@/lib/data-context';
-import { supabaseRestInsert } from '@/lib/supabase-rest';
+import { supabaseRestInsert, supabaseRestUpdate } from '@/lib/supabase-rest';
 import {
   acquireFromMezzanine,
   acquireFromShowScore,
@@ -69,6 +69,21 @@ import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
 import * as haptics from '@/lib/haptics';
 
 type ImportSourceId = 'mezzanine' | 'show-score' | 'theatr';
+
+/** A seen-but-unrated show the user already had on their watchlist (saved
+ *  before they went) hits the watchlist unique key on insert. Give that row
+ *  the date seen so it moves to To Be Rated, instead of leaving it undated in
+ *  To Watch. Never overwrites a date the user already set. Web twin:
+ *  dateExistingWatchlistRow in Broadwayscore src/app/my-shows/ImportShows.tsx. */
+async function dateExistingWatchlistRow(userId: string, showId: string, dateSeen: string | null | undefined): Promise<boolean> {
+  if (!dateSeen) return false;
+  const { data, error } = await supabaseRestUpdate(
+    'watchlist',
+    `user_id=eq.${encodeURIComponent(userId)}&show_id=eq.${encodeURIComponent(showId)}&planned_date=is.null`,
+    { planned_date: dateSeen },
+  );
+  return !error && !!data;
+}
 type ImportStep = 'source' | 'matching' | 'preview' | 'importing' | 'done';
 
 export interface MatchedEntry {
@@ -356,14 +371,20 @@ export default function ImportScreen() {
   const handlePickTheatrScreenshots = useCallback(async () => {
     // The system photo picker runs out of process, so no library permission
     // prompt is needed to read the screenshots the user picks.
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsMultipleSelection: true,
-      selectionLimit: THEATR_MAX_SCREENSHOTS,
-      orderedSelection: true,
-      quality: 1,
-      exif: false,
-    });
+    let result: ImagePicker.ImagePickerResult;
+    try {
+      result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsMultipleSelection: true,
+        selectionLimit: THEATR_MAX_SCREENSHOTS,
+        orderedSelection: true,
+        quality: 1,
+        exif: false,
+      });
+    } catch {
+      setError('Couldn\u2019t open your photos. Try again.');
+      return;
+    }
     if (result.canceled || !result.assets?.length) return;
     setSource('theatr');
     setStep('matching');
@@ -566,8 +587,9 @@ export default function ImportScreen() {
           : { user_id: user!.id, show_id: plan.showId, ...(plan.plannedDate ? { planned_date: plan.plannedDate } : {}) };
         const { error: insertErr } = await supabaseRestInsert(table, row);
         if (insertErr) {
-          if (insertErr.code === '23505') stats.skipped++;
-          else stats.errors++;
+          if (insertErr.code !== '23505') stats.errors++;
+          else if (plan.type === 'watchlist' && await dateExistingWatchlistRow(user!.id, plan.showId, plan.plannedDate)) stats.imported++;
+          else stats.skipped++;
         } else {
           stats.imported++;
         }

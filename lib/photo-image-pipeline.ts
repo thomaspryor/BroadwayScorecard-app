@@ -75,22 +75,28 @@ export async function processPhotoAsset(
   originalWidth?: number,
   originalHeight?: number,
 ): Promise<ProcessedPhoto> {
-  const needsResize =
-    !originalWidth || !originalHeight ||
-    Math.max(originalWidth, originalHeight) > PHOTO_MAX_DIMENSION;
+  const out = await downscaleToJpeg(uri, { maxEdge: PHOTO_MAX_DIMENSION, compress: 0.82, width: originalWidth, height: originalHeight });
+  return { uri: out.uri, width: out.width, height: out.height };
+}
 
+/**
+ * Downscale (long edge ≤ maxEdge) and re-encode to JPEG, which also strips
+ * EXIF. Shared by the diary photo pipeline and the Theatr screenshot import.
+ * Pass the original dimensions when known so already-small images aren't
+ * upscaled; without them the image is fitted to maxEdge wide.
+ */
+export async function downscaleToJpeg(
+  uri: string,
+  opts: { maxEdge: number; compress: number; width?: number; height?: number; base64?: boolean },
+): Promise<ImageManipulator.ImageResult> {
+  const { maxEdge, width, height } = opts;
+  const needsResize = !width || !height || Math.max(width, height) > maxEdge;
   const actions: ImageManipulator.Action[] = needsResize
-    ? [{
-        resize: originalWidth && originalHeight && originalWidth < originalHeight
-          ? { height: PHOTO_MAX_DIMENSION }
-          : { width: PHOTO_MAX_DIMENSION },
-      }]
+    ? [{ resize: width && height && width < height ? { height: maxEdge } : { width: maxEdge } }]
     : [];
-
-  const manipulated = await ImageManipulator.manipulateAsync(
-    uri,
-    actions,
-    { compress: 0.82, format: ImageManipulator.SaveFormat.JPEG },
-  );
-  return { uri: manipulated.uri, width: manipulated.width, height: manipulated.height };
+  return ImageManipulator.manipulateAsync(uri, actions, {
+    compress: opts.compress,
+    format: ImageManipulator.SaveFormat.JPEG,
+    base64: opts.base64 ?? false,
+  });
 }

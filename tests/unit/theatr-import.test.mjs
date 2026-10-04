@@ -7,7 +7,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   chunk,
-  dedupeTheatrRows,
+  mergeTheatrRows,
+  invokeErrorCode,
   theatrRowsToEntries,
   theatrNotices,
   THEATR_BATCH_SIZE,
@@ -29,7 +30,7 @@ test('interested rows become dateless watchlist entries', () => {
 });
 
 test('dedupe collapses repeats, keeps a venue from either copy, keeps distinct viewings', () => {
-  const rows = dedupeTheatrRows([
+  const rows = mergeTheatrRows([
     { title: 'Six', venue: null, date: '2024-04-01', list: 'attended' },
     { title: 'SIX', venue: 'Lena Horne Theatre', date: '2024-04-01', list: 'attended' },
     { title: 'Six', venue: null, date: '2025-02-01', list: 'attended' },
@@ -55,4 +56,19 @@ test('notices explain To Be Rated, undated rows, truncation and failures', () =>
   assert.match(n.join(' '), /To Be Rated/);
   assert.match(n.join(' '), /first 30 screenshots/);
   assert.equal(theatrNotices([], { picked: 3, failedScreenshots: 0, unreadable: 0 }).length, 0);
+});
+
+test('an undated attended copy folds into the dated one in either order', () => {
+  for (const rows of [
+    [{ title: 'Six', venue: null, date: null, list: 'attended' }, { title: 'Six', venue: null, date: '2024-04-01', list: 'attended' }],
+    [{ title: 'Six', venue: null, date: '2024-04-01', list: 'attended' }, { title: 'six', venue: 'Lena Horne', date: null, list: 'attended' }],
+  ]) {
+    assert.deepEqual(mergeTheatrRows(rows).map(r => r.date), ['2024-04-01']);
+  }
+});
+
+test('a gateway 401 maps to the sign-in copy, anything else to internal', () => {
+  assert.equal(invokeErrorCode({ context: { status: 401 } }), 'unauthorized');
+  assert.equal(invokeErrorCode({ context: { status: 546 } }), 'internal');
+  assert.equal(invokeErrorCode(null), 'internal');
 });
