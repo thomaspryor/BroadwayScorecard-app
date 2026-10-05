@@ -5,7 +5,7 @@
  * Adds AsyncStorage cache layer for offline-first behavior.
  */
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Crypto from 'expo-crypto';
 import { getSupabaseClient } from '@/lib/supabase';
@@ -19,6 +19,9 @@ export function useUserReviews(userId: string | null) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const mutationVersion = useRef(0);
+  // Lets deleteReview find the show for a review id without re-creating itself.
+  const reviewsRef = useRef(reviews);
+  useEffect(() => { reviewsRef.current = reviews; }, [reviews]);
 
   const getReviewsForShow = useCallback(
     async (showId: string): Promise<UserReview[]> => {
@@ -229,6 +232,7 @@ export function useUserReviews(userId: string | null) {
       if (!client || !userId) return;
 
       setError(null);
+      const showId = reviewsRef.current.find(r => r.id === reviewId)?.show_id;
       try {
         const { error: err } = await client
           .from('reviews')
@@ -237,6 +241,12 @@ export function useUserReviews(userId: string | null) {
           .eq('user_id', userId);
 
         if (err) throw err;
+        // A welcome "seen it" pick (seen_unrated) for this show would otherwise
+        // put it back under To Be Rated as "Date not set" (web parity, BRO-4633).
+        if (showId) {
+          client.from('seen_unrated').delete().eq('user_id', userId).eq('show_id', showId)
+            .then(() => {}, () => {});
+        }
         mutationVersion.current++;
         setReviews(prev => prev.filter(r => r.id !== reviewId));
         await AsyncStorage.removeItem(CACHE_KEY(userId)).catch(() => {});

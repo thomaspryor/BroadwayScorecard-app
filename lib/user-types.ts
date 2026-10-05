@@ -10,6 +10,8 @@ export interface UserProfile {
   default_visibility: 'public' | 'private';
   created_at: string;
   updated_at: string;
+  /** When the welcome step was claimed (claim_onboarding); null = not yet. */
+  onboarding_seen_at?: string | null;
 }
 
 export interface UserReview {

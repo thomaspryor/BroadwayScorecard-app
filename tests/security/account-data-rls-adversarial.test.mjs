@@ -4,7 +4,7 @@
 // Why this exists (2026-08-11 audit): tests/security/photo-rls-adversarial.test.mjs
 // covered `user_review_photos` and the diary-photos storage bucket. The app
 // also reads and writes `watchlist`, `reviews`, `lists`, `list_items`,
-// `profiles` and `push_tokens`, and none of those had an adversarial test. A
+// `profiles` and `push_tokens` (and, since BRO-4727, `seen_unrated`), and none of those had an adversarial test. A
 // client-side `.eq('user_id', me)` filter looks correct in every unit test and
 // in every Maestro flow even when the database would happily serve — or
 // accept a write to — somebody else's rows. Only a second real account can
@@ -112,6 +112,7 @@ test('two-account account-data RLS adversarial test', async (t) => {
       await sbA.from('lists').delete().eq('id', id);
     }
     await sbA.from('watchlist').delete().eq('user_id', userAId).eq('show_id', FIXTURE_SHOW_ID);
+    await sbA.from('seen_unrated').delete().eq('user_id', userAId).eq('show_id', FIXTURE_SHOW_ID);
     // Deliberately NOT deleting the push token: it is seeded fixture state
     // (like the review and the profile), not per-run debris, and account A
     // cannot recreate it under the current policy.
@@ -199,6 +200,13 @@ test('two-account account-data RLS adversarial test', async (t) => {
       .upsert({ user_id: userAId, show_id: FIXTURE_SHOW_ID }, { onConflict: 'user_id,show_id' });
     assert.equal(watchErr, null, `account A watchlist insert should succeed: ${watchErr?.message}`);
 
+    // seen_unrated has no UPDATE policy, so a plain insert (the purge above
+    // cleared any leftover) rather than an upsert, which would need one.
+    const { error: seenErr } = await sbA
+      .from('seen_unrated')
+      .insert({ user_id: userAId, show_id: FIXTURE_SHOW_ID });
+    assert.equal(seenErr, null, `account A seen_unrated insert should succeed: ${seenErr?.message}`);
+
     const { data: list, error: listErr } = await sbA
       .from('lists')
       .insert({ user_id: userAId, name: FIXTURE_LIST_NAME, description: null, is_ranked: false })
@@ -238,6 +246,33 @@ test('two-account account-data RLS adversarial test', async (t) => {
     const { data } = await sbA.from('watchlist').select('show_id')
       .eq('user_id', userAId).eq('show_id', FIXTURE_SHOW_ID);
     assert.equal(data?.length, 1, 'account A\'s watchlist row must still exist after account B\'s delete attempt');
+  });
+
+  // ---- seen_unrated ("seen it, date not set" from the welcome step) --------
+
+  await t.test('BLOCKING: account B cannot read account A seen_unrated rows', async () => {
+    await assertOnlyOwnerCanSee(
+      'seen_unrated',
+      () => sbA.from('seen_unrated').select('*').eq('user_id', userAId),
+      () => sbB.from('seen_unrated').select('*').eq('user_id', userAId),
+    );
+  });
+
+  await t.test('BLOCKING: account B cannot write a seen_unrated row owned by account A', async () => {
+    assertWriteBlocked(
+      'account B inserting a seen_unrated row with account A\'s user_id',
+      await sbB.from('seen_unrated').insert({ user_id: userAId, show_id: 'forged-by-b' }).select(),
+    );
+  });
+
+  await t.test('BLOCKING: account B cannot delete account A seen_unrated rows', async () => {
+    assertWriteBlocked(
+      'account B deleting account A\'s seen_unrated rows',
+      await sbB.from('seen_unrated').delete().eq('user_id', userAId).select(),
+    );
+    const { data } = await sbA.from('seen_unrated').select('show_id')
+      .eq('user_id', userAId).eq('show_id', FIXTURE_SHOW_ID);
+    assert.equal(data?.length, 1, 'account A\'s seen_unrated row must still exist after account B\'s delete attempt');
   });
 
   // ---- reviews (the diary) -------------------------------------------------

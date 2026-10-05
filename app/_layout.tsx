@@ -13,6 +13,7 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { Onboarding, hasSeenOnboarding } from '@/components/Onboarding';
 import { AuthProvider } from '@/lib/auth-context';
 import { LocalWatchlistMigrator } from '@/hooks/useLocalWatchlistMigration';
+import WelcomeGate from '@/components/onboarding/WelcomeGate';
 import { MarketProvider } from '@/lib/market-context';
 import { ToastProvider } from '@/lib/toast-context';
 import Toast from '@/components/Toast';
@@ -267,6 +268,7 @@ function RootLayout() {
           <AuthProvider>
             {appContent}
             <LocalWatchlistMigrator />
+            <WelcomeGate />
           </AuthProvider>
         ) : (
           appContent

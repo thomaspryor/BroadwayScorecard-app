@@ -52,6 +52,9 @@ import { PhotoWallGrid } from '@/components/user/PhotoWallGrid';
 import { DiaryCalendarMonth, buildDiaryCalendarMonths, buildReviewsByDate, buildUpcomingByDate } from '@/components/user/DiaryCalendarView';
 import { DiaryLedgerRow, UpcomingLedgerRow, MonthBand, groupReviewsByMonth } from '@/components/user/DiaryListView';
 import { usePhotoFeed } from '@/hooks/usePhotoFeed';
+import { useSeenUnrated } from '@/hooks/useSeenUnrated';
+import { seenUnratedToRate } from '@/lib/welcome-onboarding';
+import { importSourceNames } from '@/lib/import-sources';
 import * as haptics from '@/lib/haptics';
 
 type DiarySort = 'date-desc' | 'date-asc' | 'rating-desc';
@@ -105,8 +108,9 @@ function SwipeDeleteAction({ onDelete, drag }: { onDelete: () => void; drag: Sha
 }
 
 // ─── Empty state ──────────────────────────────────────
-function EmptyState({ emoji, title, subtitle, actionLabel, onAction }: {
+function EmptyState({ emoji, title, subtitle, actionLabel, onAction, secondaryLabel, onSecondary }: {
   emoji: string; title: string; subtitle: string; actionLabel?: string; onAction?: () => void;
+  secondaryLabel?: string; onSecondary?: () => void;
 }) {
   return (
     <View style={styles.emptyState}>
@@ -116,6 +120,11 @@ function EmptyState({ emoji, title, subtitle, actionLabel, onAction }: {
       {actionLabel && onAction && (
         <Pressable style={({ pressed }) => [styles.emptyAction, pressed && styles.pressed]} onPress={onAction}>
           <Text style={styles.emptyActionText}>{actionLabel}</Text>
+        </Pressable>
+      )}
+      {secondaryLabel && onSecondary && (
+        <Pressable style={({ pressed }) => [styles.emptySecondary, pressed && styles.pressed]} onPress={onSecondary} accessibilityRole="button">
+          <Text style={styles.emptySecondaryText}>{secondaryLabel}</Text>
         </Pressable>
       )}
     </View>
@@ -167,12 +176,26 @@ function AddShowCard({ label, onPress, cardWidth }: { label: string; onPress: ()
   );
 }
 
+/** What a long-press on a poster grid opened the context menu for. */
+type GridMenuTarget =
+  | { kind: 'review'; review: UserReview }
+  | { kind: 'upcoming'; entry: WatchlistEntry }
+  | { kind: 'toBeRated'; entry: WatchlistEntry }
+  | { kind: 'seenUnrated'; showId: string };
+
+function gridMenuShowId(m: GridMenuTarget): string {
+  if (m.kind === 'review') return m.review.show_id;
+  if (m.kind === 'seenUnrated') return m.showId;
+  return m.entry.show_id;
+}
+
 export default function WatchedScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user, isAuthenticated, loading: authLoading, showSignIn } = useAuth();
   const { reviews, getAllReviews, deleteReview, loading: reviewsLoading, error: reviewsError, invalidateCache } = useUserReviews(user?.id || null);
   const { watchlist, getWatchlist, removeFromWatchlist, loading: watchlistLoading } = useWatchlist(user?.id || null);
+  const { seenUnrated, refreshSeenUnrated, removeSeenUnrated } = useSeenUnrated(user?.id || null);
   const { shows, isLoading: showsLoading } = useShows();
 
   // A show absent from useShows() is either diary-only (matched at import
@@ -193,11 +216,11 @@ export default function WatchedScreen() {
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      await Promise.all([getAllReviews(), getWatchlist()]);
+      await Promise.all([getAllReviews(), getWatchlist(), refreshSeenUnrated()]);
     } finally {
       setRefreshing(false);
     }
-  }, [getAllReviews, getWatchlist]);
+  }, [getAllReviews, getWatchlist, refreshSeenUnrated]);
 
   // 3-up poster grid; exact column width, no stranded right-hand gap.
   const grid = usePosterGrid(3);
@@ -211,12 +234,7 @@ export default function WatchedScreen() {
   const [showSearchModal, setShowSearchModal] = useState(false);
   // Long-press context menu for poster grids — replaces raw Alert.alert
   // confirms (Round 2, Option B pattern extended from To Watch).
-  const [gridMenu, setGridMenu] = useState<
-    | { kind: 'review'; review: UserReview }
-    | { kind: 'upcoming'; entry: WatchlistEntry }
-    | { kind: 'toBeRated'; entry: WatchlistEntry }
-    | null
-  >(null);
+  const [gridMenu, setGridMenu] = useState<GridMenuTarget | null>(null);
 
   // Guards nested-Pressable rows (card + its rating chip) against a rapid
   // double-tap firing two router.push calls for the SAME row (e.g. a
@@ -281,8 +299,9 @@ export default function WatchedScreen() {
       if (isAuthenticated && user) {
         getAllReviews();
         getWatchlist();
+        refreshSeenUnrated();
       }
-    }, [isAuthenticated, user, getAllReviews, getWatchlist]),
+    }, [isAuthenticated, user, getAllReviews, getWatchlist, refreshSeenUnrated]),
   );
 
   const loading = authLoading || reviewsLoading || watchlistLoading;
@@ -323,6 +342,18 @@ export default function WatchedScreen() {
       .filter(w => classifyWatchlistEntry(w, reviewIndex, today) === 'to-be-rated')
       .sort((a, b) => (b.planned_date || '').localeCompare(a.planned_date || ''));
   }, [watchlist, today, reviewIndex]);
+
+  // Welcome "seen it" picks with no stars and no date (seen_unrated), after the
+  // dated ones, labelled "Date not set" (BRO-4633, web parity).
+  const undatedToRate = useMemo(
+    () => seenUnratedToRate(
+      seenUnrated,
+      new Set(reviews.map(r => r.show_id)),
+      new Set(toBeRated.map(w => w.show_id)),
+    ),
+    [seenUnrated, reviews, toBeRated],
+  );
+  const toBeRatedCount = toBeRated.length + undatedToRate.length;
 
   // Upcoming — watchlist entries with a future (or today) planned date.
   const upcomingWatchlistEntries = useMemo(() => {
@@ -603,8 +634,8 @@ export default function WatchedScreen() {
     );
   };
 
-  const isDiaryEmpty = sortedReviews.length === 0 && toBeRated.length === 0 && upcomingWatchlistEntries.length === 0;
-  const hasOtherSections = upcomingWatchlistEntries.length > 0 || upcomingReviews.length > 0 || toBeRated.length > 0;
+  const isDiaryEmpty = sortedReviews.length === 0 && toBeRatedCount === 0 && upcomingWatchlistEntries.length === 0;
+  const hasOtherSections = upcomingWatchlistEntries.length > 0 || upcomingReviews.length > 0 || toBeRatedCount > 0;
   const showYearHeaders = viewMode === 'grid' || sortedYears.length > 1 || hasOtherSections;
 
   // Extracted so the sticky-header SectionList path (poster grid, year-grouped)
@@ -612,12 +643,12 @@ export default function WatchedScreen() {
   const leadingSections = (
     <>
       {/* To Be Rated — at top so users notice it */}
-      {toBeRated.length > 0 && (
+      {toBeRatedCount > 0 && (
         <View style={styles.toBeRatedSection}>
           <View style={styles.toBeRatedHeader}>
             <Text style={styles.toBeRatedLabel}>TO BE RATED</Text>
             <View style={styles.toBeRatedDot} />
-            <Text style={styles.toBeRatedCount}>{toBeRated.length}</Text>
+            <Text style={styles.toBeRatedCount}>{toBeRatedCount}</Text>
           </View>
           <View style={styles.toBeRatedGrid}>
             {toBeRated.map(item => {
@@ -647,6 +678,28 @@ export default function WatchedScreen() {
                       month: 'short', day: 'numeric',
                     }) : 'Rate'}
                   />
+                  <Text style={styles.gridTitle} numberOfLines={2}>{title}</Text>
+                </Pressable>
+              );
+            })}
+            {undatedToRate.map(row => {
+              const show = showMap[row.show_id];
+              const title = show?.title || showTitleFallback(row.show_id);
+              const posterUrl = show?.images ? (getImageUrl(show.images.poster) || getImageUrl(show.images.thumbnail)) : null;
+              return (
+                <Pressable
+                  key={`seen-${row.show_id}`}
+                  style={({ pressed }) => [styles.gridCardFixed, gridCardStyle, pressed && styles.pressed]}
+                  onPress={() => router.push({
+                    pathname: '/rate/[showId]' as any,
+                    params: { showId: row.show_id, showTitle: title },
+                  })}
+                  onLongPress={() => { haptics.action(); setGridMenu({ kind: 'seenUnrated', showId: row.show_id }); }}
+                  accessibilityHint="Long press for more actions"
+                  accessibilityActions={[{ name: 'delete', label: 'Remove — didn’t see it' }]}
+                  onAccessibilityAction={(e) => { if (e.nativeEvent.actionName === 'delete') removeSeenUnrated(row.show_id).catch(() => {}); }}
+                >
+                  <GridPoster posterUrl={posterUrl} title={title} dateLabel="Date not set" />
                   <Text style={styles.gridTitle} numberOfLines={2}>{title}</Text>
                 </Pressable>
               );
@@ -984,6 +1037,9 @@ export default function WatchedScreen() {
                 subtitle="Rate shows you've seen to build your personal diary."
                 actionLabel="Rate a Show"
                 onAction={() => setShowSearchModal(true)}
+                // Import was only reachable from the header button (BRO-4727).
+                secondaryLabel={`Import from ${importSourceNames()}`}
+                onSecondary={() => router.push('/import' as any)}
               />
             ) : gridSubView === 'poster' && showYearGroups && pastReviews.length > 0 ? (
               // Real SectionList (not the single-item-FlatList trick used
@@ -1072,8 +1128,7 @@ export default function WatchedScreen() {
         visible={!!gridMenu}
         title={
           gridMenu
-            ? (showMap[gridMenu.kind === 'review' ? gridMenu.review.show_id : gridMenu.entry.show_id]?.title
-              || showTitleFallback(gridMenu.kind === 'review' ? gridMenu.review.show_id : gridMenu.entry.show_id))
+            ? (showMap[gridMenuShowId(gridMenu)]?.title || showTitleFallback(gridMenuShowId(gridMenu)))
             : undefined
         }
         onClose={() => setGridMenu(null)}
@@ -1092,6 +1147,21 @@ export default function WatchedScreen() {
                 }),
               },
               { label: 'Delete rating', destructive: true, onPress: () => handleDeleteDiaryItem(review) },
+            ];
+          }
+          if (gridMenu.kind === 'seenUnrated') {
+            const { showId } = gridMenu;
+            const show = showMap[showId];
+            return [
+              {
+                label: 'Rate this show',
+                onPress: () => router.push({
+                  pathname: '/rate/[showId]' as any,
+                  params: { showId, showTitle: show?.title || '' },
+                }),
+              },
+              { label: 'View show', onPress: () => goToShow(show, showId) },
+              { label: 'Didn’t see it — remove', destructive: true, onPress: () => { removeSeenUnrated(showId).catch(() => {}); } },
             ];
           }
           const { entry } = gridMenu;
@@ -1319,6 +1389,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.xl, paddingVertical: Spacing.sm,
   },
   emptyActionText: { color: '#0d0d1a', fontSize: FontSize.md, fontWeight: '600' },
+  emptySecondary: { marginTop: Spacing.sm, minHeight: 44, justifyContent: 'center', paddingHorizontal: Spacing.md },
+  emptySecondaryText: { color: Colors.brand, fontSize: FontSize.sm, fontWeight: '600', textAlign: 'center' },
   // CTA (not signed in)
   ctaContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: Spacing.xxl },
   ctaEmoji: { fontSize: 64, marginBottom: Spacing.lg },
