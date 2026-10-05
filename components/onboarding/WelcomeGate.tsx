@@ -34,8 +34,13 @@ class SheetBoundary extends Component<{ children: ReactNode }, { failed: boolean
 
 const FIRST_CHECK_MS = 1200;
 const BUSY_RETRY_MS = 1500;
-/** Stop waiting after about 30 s of busy screens; the next launch tries again. */
-const MAX_BUSY_RETRIES = 20;
+/**
+ * How long a pending sign-in action holds the welcome back: about 30 s. One
+ * that is never replayed (it lives up to an hour) must not cost a new
+ * account its welcome, so after that the sheet opens anyway.
+ */
+const MAX_PENDING_RETRIES = 20;
+/** Screens the sheet waits for, however long they stay open. */
 const BUSY_ROUTES = ['/rate', '/import'];
 
 function isPreviewRequest(): boolean {
@@ -69,16 +74,17 @@ export default function WelcomeGate() {
     let tries = 0;
     const key = welcomeSeenKey(userId);
 
-    const busy = async () => {
-      if (await getPendingAction()) return true;
+    const busy = async (): Promise<'route' | 'pending' | null> => {
       const path = pathRef.current || '';
-      return BUSY_ROUTES.some(r => path.startsWith(r));
+      if (BUSY_ROUTES.some(r => path.startsWith(r))) return 'route';
+      return (await getPendingAction()) ? 'pending' : null;
     };
 
     const attempt = async () => {
       if (cancelled) return;
-      if (await busy()) {
-        if (++tries <= MAX_BUSY_RETRIES && !cancelled) timer = setTimeout(attempt, BUSY_RETRY_MS);
+      const reason = await busy();
+      if (reason === 'route' || (reason === 'pending' && ++tries <= MAX_PENDING_RETRIES)) {
+        if (!cancelled) timer = setTimeout(attempt, BUSY_RETRY_MS);
         return;
       }
       const client = getSupabaseClient();

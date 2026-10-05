@@ -19,16 +19,18 @@ import { useWatchlist, invalidateWatchlistCache } from '@/hooks/useWatchlist';
 
 let inFlight: { userId: string; promise: Promise<number> } | null = null;
 // A show that keeps failing (not a duplicate) must not re-run on every
-// sign-in event; a few tries per app launch, then the next launch retries.
-const MAX_RUNS = 3;
-let runs = 0;
+// sign-in event; a few failed tries per app launch, then the next launch
+// retries. Runs with nothing left over don't count, so signing in and out
+// a few times never blocks a later save from moving over.
+const MAX_FAILED_RUNS = 3;
+let failedRuns = 0;
 
-async function migrate(userId: string): Promise<number> {
+async function migrate(userId: string): Promise<{ added: number; failed: number }> {
   await loadLocalWatchlist();
   const local = getLocalWatchlist();
-  if (local.length === 0) return 0;
+  if (local.length === 0) return { added: 0, failed: 0 };
   const client = getSupabaseClient();
-  if (!client) return 0;
+  if (!client) return { added: 0, failed: 0 };
   const [account, rated] = await Promise.all([
     client.from('watchlist').select('show_id').eq('user_id', userId),
     client.from('reviews').select('show_id').eq('user_id', userId),
@@ -39,6 +41,7 @@ async function migrate(userId: string): Promise<number> {
   const toAdd = showsToMigrate(local, (account.data || []).map((w: { show_id: string }) => w.show_id))
     .filter(id => !ratedIds.has(id));
   let added = 0;
+  let failed = 0;
   for (const showId of toAdd) {
     if (!getLocalWatchlist().some(e => e.showId === showId)) continue;
     const { error } = await client.from('watchlist').insert({ user_id: userId, show_id: showId });
@@ -46,23 +49,31 @@ async function migrate(userId: string): Promise<number> {
     if (!error || error.code === '23505') {
       if (!error) added++;
       await removeLocalShow(showId);
+    } else {
+      failed++;
     }
   }
   // Skipped shows (already on the account, or rated) are done too.
   for (const e of local) {
     if (!toAdd.includes(e.showId)) await removeLocalShow(e.showId);
   }
-  trackEvent('watchlist_local_migrated', { local_count: local.length, added, failed: toAdd.length - added });
+  trackEvent('watchlist_local_migrated', { local_count: local.length, added, failed });
   if (added > 0) await invalidateWatchlistCache(userId);
-  return added;
+  return { added, failed };
 }
 
 function migrateOnce(userId: string): Promise<number> {
   if (!inFlight || inFlight.userId !== userId) {
-    if (runs >= MAX_RUNS) return Promise.resolve(0);
-    runs++;
+    if (failedRuns >= MAX_FAILED_RUNS) return Promise.resolve(0);
     const promise: Promise<number> = migrate(userId)
-      .catch(() => 0)
+      .then(({ added, failed }) => {
+        if (failed > 0) failedRuns++;
+        return added;
+      })
+      .catch(() => {
+        failedRuns++;
+        return 0;
+      })
       .finally(() => {
         if (inFlight?.promise === promise) inFlight = null;
       });

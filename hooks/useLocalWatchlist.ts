@@ -5,7 +5,7 @@
  * used to open the sign-in sheet.
  *
  * The save always happens first. Then the sign-in sheet opens (at most once per
- * cooldown); other saves get a toast with a "Keep them" sign-in action.
+ * cooldown); other saves get a toast with a "Keep them" (or "Keep it") sign-in action.
  */
 
 import { useCallback, useEffect, useState } from 'react';
@@ -56,7 +56,7 @@ export function useLocalWatchlist() {
       return;
     }
     showToast('Saved on this phone', 'success', {
-      actionLabel: 'Keep them',
+      actionLabel: next.length === 1 ? 'Keep it' : 'Keep them',
       onAction: () => showSignIn('watchlist_local', 'watchlist_toast'),
     });
   }, [showSignIn, showToast]);

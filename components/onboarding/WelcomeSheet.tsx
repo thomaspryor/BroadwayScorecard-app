@@ -26,6 +26,7 @@ import { IMPORT_SOURCES, importSourceNames } from '@/lib/import-sources';
 import {
   nextWelcomeStep,
   pickWelcomeShows,
+  welcomeDoneMessage,
   welcomeFinishDestination,
   welcomeWriteFor,
   type WelcomeShow,
@@ -38,6 +39,13 @@ import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
 
 /** Where a show already being in My Shows makes its poster unpickable. */
 const EXISTING_TABLES = ['reviews', 'watchlist', 'seen_unrated'] as const;
+/**
+ * Where a pick is already recorded as seen, so writing it again would
+ * duplicate. The watchlist is not one: a show saved to watch that turns out
+ * to be seen (it can land there mid-sheet, when shows saved before sign-in
+ * move over) still gets its stars.
+ */
+const SEEN_TABLES = ['reviews', 'seen_unrated'] as const;
 const SAVE_ERROR = 'We could not save those just now. Check your connection and try again.';
 
 interface WelcomeSheetProps {
@@ -61,6 +69,8 @@ export default function WelcomeSheet({ userId, onClose }: WelcomeSheetProps) {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveFailed, setSaveFailed] = useState(0);
   const [showsAdded, setShowsAdded] = useState(0);
+  // Of showsAdded, how many went in without stars (they wait under To Be Rated).
+  const [unratedAdded, setUnratedAdded] = useState(0);
 
   const shows: WelcomeShow[] = useMemo(() => pickWelcomeShows(
     allShows.map(s => ({
@@ -126,6 +136,7 @@ export default function WelcomeSheet({ userId, onClose }: WelcomeSheetProps) {
     const client = getSupabaseClient();
     if (preview || !client) {
       setShowsAdded(entries.length);
+      setUnratedAdded(entries.length - rated);
       track('welcome_step_completed', { step: 'shows', shows_added: entries.length, rated });
       if (thenClose) onClose();
       else go(nextWelcomeStep('shows'), entries.length);
@@ -139,7 +150,7 @@ export default function WelcomeSheet({ userId, onClose }: WelcomeSheetProps) {
     const ids = entries.map(([id]) => id);
     let have: Set<string>;
     try {
-      const results = await Promise.all(EXISTING_TABLES.map(t =>
+      const results = await Promise.all(SEEN_TABLES.map(t =>
         client.from(t).select('show_id').eq('user_id', userId as string).in('show_id', ids)));
       if (results.some(r => r.error)) throw new Error('lookup failed');
       have = new Set(results.flatMap(r => (r.data || []) as { show_id: string }[]).map(r => r.show_id));
@@ -149,15 +160,21 @@ export default function WelcomeSheet({ userId, onClose }: WelcomeSheetProps) {
       setSaveError(SAVE_ERROR);
       return;
     }
+    // Only new writes count as added; a show already seen is left as it was.
     let added = 0;
+    let addedUnrated = 0;
     let failed = 0;
     for (const [showId, rating] of entries) {
-      if (have.has(showId)) { added++; continue; }
+      if (have.has(showId)) continue;
       const write = welcomeWriteFor({ showId, rating });
       try {
         const { error } = await client.from(write.table).insert({ user_id: userId, ...write.row });
-        if (!error || error.code === '23505') added++;
-        else failed++;
+        if (!error) {
+          added++;
+          if (write.table === 'seen_unrated') addedUnrated++;
+        } else if (error.code !== '23505') {
+          failed++;
+        }
       } catch {
         failed++;
       }
@@ -168,6 +185,7 @@ export default function WelcomeSheet({ userId, onClose }: WelcomeSheetProps) {
       return;
     }
     setShowsAdded(added);
+    setUnratedAdded(addedUnrated);
     setSaveFailed(failed);
     track('welcome_step_completed', { step: 'shows', shows_added: added, rated, failed });
     if (thenClose) onClose();
@@ -243,6 +261,7 @@ export default function WelcomeSheet({ userId, onClose }: WelcomeSheetProps) {
                     const already = existing.has(show.id);
                     const picked = picks.has(show.id);
                     const stars = picks.get(show.id);
+                    const starsLabel = typeof stars === 'number' ? `, ${stars} ${stars === 1 ? 'star' : 'stars'}` : '';
                     const uri = getImageUrl(show.image);
                     return (
                       <View key={show.id} style={cardStyle}>
@@ -251,7 +270,7 @@ export default function WelcomeSheet({ userId, onClose }: WelcomeSheetProps) {
                           disabled={already}
                           accessibilityRole="button"
                           accessibilityState={{ selected: picked || already, disabled: already }}
-                          accessibilityLabel={already ? `${show.title}, already in My Shows` : `${show.title}${picked ? ', seen' : ''}`}
+                          accessibilityLabel={already ? `${show.title}, already in My Shows` : `${show.title}${picked ? `, seen${starsLabel}` : ''}`}
                           style={[styles.poster, picked && styles.posterPicked]}
                         >
                           {uri ? (
@@ -357,9 +376,7 @@ export default function WelcomeSheet({ userId, onClose }: WelcomeSheetProps) {
           <>
             <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
               <Text style={styles.bodyText}>
-                {showsAdded > 0
-                  ? `${showsAdded} ${showsAdded === 1 ? 'show' : 'shows'} added. Shows without stars wait for you under To Be Rated, where you can add the date and stars.`
-                  : 'Rate a show from its page any time, and it lands in your diary.'}
+                {welcomeDoneMessage({ showsAdded, unratedAdded })}
               </Text>
               <Text style={styles.listText}>Your diary lives in the Watched tab, and your watchlist in To Watch.</Text>
               <Text style={styles.listText}>Import from {importSourceNames()} there whenever you like.</Text>

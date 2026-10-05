@@ -176,6 +176,22 @@ export function welcomeFinishDestination(input: { showsAdded: number }): 'my-sho
   return input.showsAdded > 0 ? 'my-shows' : 'stay';
 }
 
+/**
+ * The done step's first line. Only mentions To Be Rated when some picks went
+ * in without stars, and says which ones when only some did.
+ */
+export function welcomeDoneMessage(input: { showsAdded: number; unratedAdded: number }): string {
+  const { showsAdded } = input;
+  if (showsAdded <= 0) return 'Rate a show from its page any time, and it lands in your diary.';
+  const unrated = Math.min(Math.max(input.unratedAdded, 0), showsAdded);
+  const added = `${showsAdded} ${showsAdded === 1 ? 'show' : 'shows'} added`;
+  if (unrated === 0) return `${added} to your diary.`;
+  const who = unrated === showsAdded
+    ? (showsAdded === 1 ? 'It waits' : 'They wait')
+    : (unrated === 1 ? 'The one without stars waits' : `The ${unrated} without stars wait`);
+  return `${added}. ${who} for you under To Be Rated, where you can add the date and stars.`;
+}
+
 // ─── To Be Rated ────────────────────────────────────────────────────────
 
 export interface SeenUnratedRow {

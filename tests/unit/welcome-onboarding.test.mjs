@@ -17,6 +17,7 @@ import {
   pickWelcomeShows,
   seenUnratedToRate,
   shouldOfferWelcome,
+  welcomeDoneMessage,
   welcomeFinishDestination,
   welcomeSeenKey,
   welcomeWriteFor,
@@ -115,6 +116,18 @@ test('a rated pick is a diary entry with no date; an unrated pick is "seen, date
 test('finishing goes to the diary only when something was added', () => {
   assert.equal(welcomeFinishDestination({ showsAdded: 0 }), 'stay');
   assert.equal(welcomeFinishDestination({ showsAdded: 2 }), 'my-shows');
+});
+
+test('done message mentions To Be Rated only for picks without stars', () => {
+  assert.equal(welcomeDoneMessage({ showsAdded: 0, unratedAdded: 0 }), 'Rate a show from its page any time, and it lands in your diary.');
+  assert.equal(welcomeDoneMessage({ showsAdded: 3, unratedAdded: 0 }), '3 shows added to your diary.');
+  assert.equal(welcomeDoneMessage({ showsAdded: 1, unratedAdded: 0 }), '1 show added to your diary.');
+  assert.match(welcomeDoneMessage({ showsAdded: 1, unratedAdded: 1 }), /^1 show added\. It waits for you under To Be Rated/);
+  assert.match(welcomeDoneMessage({ showsAdded: 3, unratedAdded: 3 }), /^3 shows added\. They wait for you under To Be Rated/);
+  assert.match(welcomeDoneMessage({ showsAdded: 3, unratedAdded: 1 }), /^3 shows added\. The one without stars waits for you under To Be Rated/);
+  assert.match(welcomeDoneMessage({ showsAdded: 3, unratedAdded: 2 }), /^3 shows added\. The 2 without stars wait for you under To Be Rated/);
+  // A bad count never claims more unrated shows than were added.
+  assert.match(welcomeDoneMessage({ showsAdded: 2, unratedAdded: 5 }), /^2 shows added\. They wait/);
 });
 
 test('To Be Rated lists undated picks newest first, minus rated or already listed shows', () => {
