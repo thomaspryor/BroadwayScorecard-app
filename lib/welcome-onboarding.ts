@@ -171,6 +171,19 @@ export function welcomeWriteFor(pick: WelcomePick): WelcomeWrite {
   return { table: 'seen_unrated', row: { show_id: pick.showId } };
 }
 
+/**
+ * Saving one pick, given where the show already is. Already seen (a review or
+ * an earlier pick): nothing to write. On the watchlist only (e.g. a show saved
+ * before sign-in that moved over mid-sheet): it is written all the same, stars
+ * kept, and the watchlist row goes, as rating a show does (app/rate, owner
+ * rule 2026-07-12), so it is not listed as both seen and still to see.
+ * Web parity: Broadwayscore src/lib/welcome-onboarding.ts welcomeSaveStep.
+ */
+export function welcomeSaveStep(pick: WelcomePick, where: { seen: boolean; watchlisted: boolean }): { write: WelcomeWrite | null; clearWatchlist: boolean } {
+  if (where.seen) return { write: null, clearWatchlist: false };
+  return { write: welcomeWriteFor(pick), clearWatchlist: where.watchlisted };
+}
+
 /** "Done" leads to My Shows when there is now something there to look at. */
 export function welcomeFinishDestination(input: { showsAdded: number }): 'my-shows' | 'stay' {
   return input.showsAdded > 0 ? 'my-shows' : 'stay';

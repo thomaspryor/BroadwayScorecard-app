@@ -27,7 +27,11 @@ export function useReviewPhotos(reviewId: string | null, userId: string | null) 
   const [signedUrls, setSignedUrls] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const mounted = useRef(true);
-  useEffect(() => () => { mounted.current = false; }, []);
+  // Set on every mount: React's dev double-mount runs the cleanup once first.
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
 
   const totalCount = photos.length + pending.length;
 

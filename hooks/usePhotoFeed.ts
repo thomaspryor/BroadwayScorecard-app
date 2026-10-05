@@ -34,7 +34,11 @@ export function usePhotoFeed(userId: string | null, reviews: UserReview[]) {
   const [dismissedNudges, setDismissedNudges] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const mounted = useRef(true);
-  useEffect(() => () => { mounted.current = false; }, []);
+  // Set on every mount: React's dev double-mount runs the cleanup once first.
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
 
   const refresh = useCallback(async () => {
     if (!userId) return;

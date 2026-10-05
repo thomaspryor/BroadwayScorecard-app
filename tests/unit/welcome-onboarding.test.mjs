@@ -19,6 +19,7 @@ import {
   shouldOfferWelcome,
   welcomeDoneMessage,
   welcomeFinishDestination,
+  welcomeSaveStep,
   welcomeSeenKey,
   welcomeWriteFor,
 } from '../../lib/welcome-onboarding.ts';
@@ -111,6 +112,18 @@ test('a rated pick is a diary entry with no date; an unrated pick is "seen, date
   // Out-of-range stars never become a review.
   assert.equal(welcomeWriteFor({ showId: 'x', rating: 0 }).table, 'seen_unrated');
   assert.equal(welcomeWriteFor({ showId: 'x', rating: 6 }).table, 'seen_unrated');
+});
+
+test('a show on the watchlist still gets its pick, and leaves the watchlist; seen shows are not written twice', () => {
+  const rated = { showId: 'wicked', rating: 4 };
+  const unrated = { showId: 'wicked', rating: null };
+  assert.deepEqual(welcomeSaveStep(rated, { seen: false, watchlisted: true }),
+    { write: { table: 'reviews', row: { show_id: 'wicked', rating: 4, date_seen: null } }, clearWatchlist: true });
+  assert.deepEqual(welcomeSaveStep(unrated, { seen: false, watchlisted: true }),
+    { write: { table: 'seen_unrated', row: { show_id: 'wicked' } }, clearWatchlist: true });
+  assert.equal(welcomeSaveStep(rated, { seen: false, watchlisted: false }).clearWatchlist, false);
+  assert.deepEqual(welcomeSaveStep(rated, { seen: true, watchlisted: true }), { write: null, clearWatchlist: false });
+  assert.deepEqual(welcomeSaveStep(unrated, { seen: true, watchlisted: false }), { write: null, clearWatchlist: false });
 });
 
 test('finishing goes to the diary only when something was added', () => {

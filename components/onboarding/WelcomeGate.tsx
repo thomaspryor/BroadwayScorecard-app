@@ -62,7 +62,11 @@ export default function WelcomeGate() {
   const createdAt = profile?.created_at ?? null;
   const profileLoaded = !!profile;
   const mounted = useRef(true);
-  useEffect(() => () => { mounted.current = false; }, []);
+  // Set on every mount: React's dev double-mount runs the cleanup once first.
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
   // Read inside the retry loop without restarting it on every navigation.
   const pathRef = useRef(pathname);
   useEffect(() => { pathRef.current = pathname; }, [pathname]);

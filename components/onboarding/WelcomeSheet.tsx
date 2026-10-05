@@ -28,24 +28,22 @@ import {
   pickWelcomeShows,
   welcomeDoneMessage,
   welcomeFinishDestination,
+  welcomeSaveStep,
   welcomeWriteFor,
   type WelcomeShow,
   type WelcomeStep,
 } from '@/lib/welcome-onboarding';
 import { usePosterGrid } from '@/hooks/usePosterGrid';
+import { useWatchlist } from '@/hooks/useWatchlist';
 import { POSTER_GRID_GAP, POSTER_GRID_ROW_GAP } from '@/lib/poster-grid';
 import StarRating from '@/components/user/StarRating';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
 
-/** Where a show already being in My Shows makes its poster unpickable. */
-const EXISTING_TABLES = ['reviews', 'watchlist', 'seen_unrated'] as const;
 /**
- * Where a pick is already recorded as seen, so writing it again would
- * duplicate. The watchlist is not one: a show saved to watch that turns out
- * to be seen (it can land there mid-sheet, when shows saved before sign-in
- * move over) still gets its stars.
+ * Where a show already being in My Shows makes its poster unpickable. At save
+ * time only reviews and seen_unrated skip a pick (welcomeSaveStep).
  */
-const SEEN_TABLES = ['reviews', 'seen_unrated'] as const;
+const EXISTING_TABLES = ['reviews', 'watchlist', 'seen_unrated'] as const;
 const SAVE_ERROR = 'We could not save those just now. Check your connection and try again.';
 
 interface WelcomeSheetProps {
@@ -60,6 +58,8 @@ export default function WelcomeSheet({ userId, onClose }: WelcomeSheetProps) {
   const { shows: allShows } = useShows();
   const grid = usePosterGrid(3);
   const preview = userId === null;
+  // Only its remove is used: the shared list, its cache and the offline queue stay in step.
+  const { removeFromWatchlist } = useWatchlist(userId);
   const [step, setStep] = useState<WelcomeStep>('shows');
   const [existing, setExisting] = useState<Set<string>>(new Set());
   // showId -> stars (null = "seen it", no stars). Map keeps tap order.
@@ -136,7 +136,7 @@ export default function WelcomeSheet({ userId, onClose }: WelcomeSheetProps) {
     const client = getSupabaseClient();
     if (preview || !client) {
       setShowsAdded(entries.length);
-      setUnratedAdded(entries.length - rated);
+      setUnratedAdded(entries.filter(([showId, rating]) => welcomeWriteFor({ showId, rating }).table === 'seen_unrated').length);
       track('welcome_step_completed', { step: 'shows', shows_added: entries.length, rated });
       if (thenClose) onClose();
       else go(nextWelcomeStep('shows'), entries.length);
@@ -148,12 +148,16 @@ export default function WelcomeSheet({ userId, onClose }: WelcomeSheetProps) {
     // show may have been added since. reviews allows several rows per show, so
     // a second write would duplicate.
     const ids = entries.map(([id]) => id);
-    let have: Set<string>;
+    let seen: Set<string>;
+    let watchlisted: Set<string>;
     try {
-      const results = await Promise.all(SEEN_TABLES.map(t =>
+      const results = await Promise.all(EXISTING_TABLES.map(t =>
         client.from(t).select('show_id').eq('user_id', userId as string).in('show_id', ids)));
       if (results.some(r => r.error)) throw new Error('lookup failed');
-      have = new Set(results.flatMap(r => (r.data || []) as { show_id: string }[]).map(r => r.show_id));
+      const idsIn = (t: (typeof EXISTING_TABLES)[number]) =>
+        ((results[EXISTING_TABLES.indexOf(t)].data || []) as { show_id: string }[]).map(r => r.show_id);
+      watchlisted = new Set(idsIn('watchlist'));
+      seen = new Set([...idsIn('reviews'), ...idsIn('seen_unrated')]);
     } catch {
       setSaving(false);
       if (thenClose) { onClose(); return; }
@@ -165,18 +169,25 @@ export default function WelcomeSheet({ userId, onClose }: WelcomeSheetProps) {
     let addedUnrated = 0;
     let failed = 0;
     for (const [showId, rating] of entries) {
-      if (have.has(showId)) continue;
-      const write = welcomeWriteFor({ showId, rating });
+      const { write, clearWatchlist } = welcomeSaveStep({ showId, rating }, { seen: seen.has(showId), watchlisted: watchlisted.has(showId) });
+      if (!write) continue;
+      let saved = false;
       try {
         const { error } = await client.from(write.table).insert({ user_id: userId, ...write.row });
         if (!error) {
           added++;
+          saved = true;
           if (write.table === 'seen_unrated') addedUnrated++;
-        } else if (error.code !== '23505') {
+        } else if (error.code === '23505') {
+          saved = true; // already there: kept, not new
+        } else {
           failed++;
         }
       } catch {
         failed++;
+      }
+      if (saved && clearWatchlist) {
+        await removeFromWatchlist(showId).catch(() => { /* pick saved; watchlist cleanup is best-effort */ });
       }
     }
     setSaving(false);
