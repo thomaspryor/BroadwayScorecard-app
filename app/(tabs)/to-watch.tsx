@@ -22,6 +22,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useAuth } from '@/lib/auth-context';
 import { useUserReviews } from '@/hooks/useUserReviews';
 import { useWatchlist } from '@/hooks/useWatchlist';
+import { useLocalWatchlist } from '@/hooks/useLocalWatchlist';
 import { useShows } from '@/lib/data-context';
 import { getImageUrl } from '@/lib/images';
 import { daysUntilDate, toLocalYMD } from '@/lib/date-utils';
@@ -72,6 +73,7 @@ export default function ToWatchScreen() {
   const { reviews, getAllReviews } = useUserReviews(user?.id || null);
   const { watchlist, getWatchlist, addToWatchlist, removeFromWatchlist, updatePlannedDate, loading: watchlistLoading } = useWatchlist(user?.id || null);
   const { shows } = useShows();
+  const { localList } = useLocalWatchlist();
   // 3-up, width derived from the screen so the row has no stranded right-hand
   // gap (beta feedback 2026-08-03) and the web-worded status chips fit.
   const grid = usePosterGrid(3);
@@ -208,6 +210,72 @@ export default function ToWatchScreen() {
 
   if (!featureFlags.userAccounts) return null;
 
+  // Signed out with shows saved on this phone (BRO-4727, save first, ask
+  // after): list them, with sign-in offered as the way to keep them.
+  if (!authLoading && !isAuthenticated && localList.length > 0) {
+    return (
+      <View style={[styles.container, { paddingTop: insets.top }]}>
+        <Text style={styles.pageTitle}>To Watch</Text>
+        <FlatList
+          data={['content']}
+          keyExtractor={() => 'content'}
+          renderItem={() => (
+            <View>
+              <View style={styles.localBanner}>
+                <Text style={styles.localBannerTitle}>Saved on this phone</Text>
+                <Text style={styles.localBannerText}>
+                  Sign in to keep your list and see it on the website too. We{"'"}ll move these over for you.
+                </Text>
+                <Pressable
+                  style={({ pressed }) => [styles.localBannerButton, pressed && styles.pressed]}
+                  onPress={() => showSignIn('watchlist_local', 'to_watch')}
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.ctaButtonText}>Sign In to Keep Them</Text>
+                </Pressable>
+              </View>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Saved</Text>
+                <Text style={styles.sectionCount}>
+                  {localList.length} {localList.length === 1 ? 'show' : 'shows'}
+                </Text>
+              </View>
+              <View style={styles.posterGrid}>
+                {localList.map(entry => {
+                  const show = showMap[entry.showId];
+                  const title = show?.title || showTitleFallback(entry.showId);
+                  const posterUrl = show?.images ? (getImageUrl(show.images.poster) || getImageUrl(show.images.thumbnail)) : null;
+                  return (
+                    <View key={entry.showId} style={[styles.gridCard, gridCardStyle]}>
+                      <Pressable
+                        style={({ pressed }) => pressed && styles.pressed}
+                        onPress={() => goToShow(show, entry.showId)}
+                      >
+                        <View>
+                          {posterUrl ? (
+                            <Image source={{ uri: posterUrl }} style={styles.gridPoster} contentFit="cover" transition={200} />
+                          ) : (
+                            <View style={[styles.gridPoster, styles.cardPosterPlaceholder]}>
+                              <Text style={styles.placeholderText}>{title.charAt(0)}</Text>
+                            </View>
+                          )}
+                          <PosterStatusPill show={show} />
+                        </View>
+                        <Text style={styles.gridTitle} numberOfLines={2}>{title}</Text>
+                        <OutOfMarketChip show={show} />
+                      </Pressable>
+                    </View>
+                  );
+                })}
+              </View>
+            </View>
+          )}
+          contentContainerStyle={{ paddingBottom: insets.bottom + TAB_BAR_CLEARANCE }}
+        />
+      </View>
+    );
+  }
+
   if (!authLoading && !isAuthenticated) {
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -216,7 +284,7 @@ export default function ToWatchScreen() {
           <Text style={styles.ctaEmoji}>🎟️</Text>
           <Text style={styles.ctaTitle}>Plan your next show</Text>
           <Text style={styles.ctaDescription}>
-            Sign in to build your watchlist and track when you{"'"}re going.
+            Tap the bookmark on any show to save it here. Sign in to keep your list and track when you{"'"}re going.
           </Text>
           <Pressable
             style={({ pressed }) => [styles.ctaButton, pressed && styles.pressed]}
@@ -726,6 +794,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.xxl, paddingVertical: Spacing.md,
   },
   ctaButtonText: { color: '#0d0d1a', fontSize: FontSize.md, fontWeight: '700' },
+  localBanner: {
+    marginHorizontal: Spacing.lg, marginTop: Spacing.md, marginBottom: Spacing.lg,
+    padding: Spacing.lg, borderRadius: BorderRadius.md,
+    backgroundColor: Colors.surface.raised, borderWidth: 1, borderColor: Colors.border.subtle,
+  },
+  localBannerTitle: { color: Colors.text.primary, fontSize: FontSize.md, fontWeight: '700' },
+  localBannerText: { color: Colors.text.secondary, fontSize: FontSize.sm, marginTop: Spacing.xs, lineHeight: 20 },
+  localBannerButton: {
+    marginTop: Spacing.md, backgroundColor: Colors.brand, borderRadius: 10,
+    paddingVertical: Spacing.sm, alignItems: 'center', minHeight: 44, justifyContent: 'center',
+  },
   quickAddBar: {
     flexDirection: 'row', alignItems: 'center', gap: Spacing.sm,
     marginHorizontal: Spacing.lg, marginTop: Spacing.lg,

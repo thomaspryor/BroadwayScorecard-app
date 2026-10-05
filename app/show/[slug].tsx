@@ -33,6 +33,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { ShowDetailSkeleton } from '@/components/Skeleton';
 import { useAuth } from '@/lib/auth-context';
 import { useWatchlist } from '@/hooks/useWatchlist';
+import { useLocalWatchlist } from '@/hooks/useLocalWatchlist';
 import { useMyRatingsMap } from '@/hooks/useMyRatingsMap';
 import { featureFlags } from '@/lib/feature-flags';
 
@@ -75,8 +76,9 @@ export default function ShowDetailScreen() {
   }, [detail]);
 
   const show = useMemo(() => shows.find(s => s.slug === slug), [shows, slug]);
-  const { user, isAuthenticated, showSignIn } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const { isWatchlisted, addToWatchlist, removeFromWatchlist } = useWatchlist(user?.id || null);
+  const { isSavedLocally, toggleLocal } = useLocalWatchlist();
   const ratingsMap = useMyRatingsMap(user?.id || null);
 
   // Other Productions: same title, different ID (any status)
@@ -315,9 +317,9 @@ export default function ShowDetailScreen() {
               )}
               {featureFlags.userAccounts && (
                 <BookmarkOverlay
-                  isWatchlisted={isWatchlisted(show.id)}
+                  isWatchlisted={isAuthenticated ? isWatchlisted(show.id) : isSavedLocally(show.id)}
                   onToggle={async () => {
-                    if (!isAuthenticated) { showSignIn('watchlist'); return; }
+                    if (!isAuthenticated) { await toggleLocal(show.id, 'show_bookmark'); return; }
                     try {
                       if (isWatchlisted(show.id)) await removeFromWatchlist(show.id);
                       else await addToWatchlist(show.id);

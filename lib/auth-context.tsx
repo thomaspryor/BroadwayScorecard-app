@@ -12,7 +12,7 @@ import { Alert } from 'react-native';
 import { getSupabaseClient } from './supabase';
 import type { UserProfile } from './user-types';
 import SignInSheet from '@/components/SignInSheet';
-import { trackSignInStarted, trackSignInCompleted, trackSignOut as trackSignOutEvent, identifyUser, resetAnalyticsUser } from '@/lib/analytics';
+import { trackEvent, trackSignInStarted, trackSignInCompleted, trackSignOut as trackSignOutEvent, identifyUser, resetAnalyticsUser } from '@/lib/analytics';
 import { setSentryUser, clearSentryUser, captureException } from '@/lib/sentry';
 import { clearPendingAction } from '@/lib/deferred-auth';
 
@@ -43,7 +43,7 @@ try {
   console.warn('[Auth] @react-native-google-signin not available');
 }
 
-type SignInContext = 'rating' | 'watchlist' | 'list' | 'generic';
+type SignInContext = 'rating' | 'watchlist' | 'watchlist_local' | 'list' | 'generic';
 
 interface AuthContextValue {
   user: { id: string; email: string } | null;
@@ -56,8 +56,8 @@ interface AuthContextValue {
   signOut: () => Promise<void>;
   /** Permanently deletes the account and all associated data (App Store 5.1.1(v)) */
   deleteAccount: () => Promise<void>;
-  /** Show sign-in sheet with context */
-  showSignIn: (context?: SignInContext) => void;
+  /** Show sign-in sheet with context; source says what opened it (analytics, matches web's sign_in_prompt_shown) */
+  showSignIn: (context?: SignInContext, source?: string) => void;
   /** Dev-only email/password sign-in for simulator testing */
   devSignIn: () => Promise<void>;
 }
@@ -386,7 +386,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // ─── Show Sign-In Sheet ──────────────────────────────────
-  const showSignIn = useCallback((context: SignInContext = 'generic') => {
+  const showSignIn = useCallback((context: SignInContext = 'generic', source?: string) => {
+    trackEvent('sign_in_prompt_shown', { context, source: source || context });
     setSheetContext(context);
     setSheetOpen(true);
   }, []);
@@ -435,6 +436,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         visible={sheetOpen}
         onClose={() => {
           setSheetOpen(false);
+          trackEvent('sign_in_prompt_dismissed', { context: sheetContext });
           // Dismissing without signing in leaves the draft action stale — clear
           // it so a LATER sign-in (different flow) can't silently resurrect and
           // auto-save it over whatever the user has open by then.

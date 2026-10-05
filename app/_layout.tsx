@@ -12,6 +12,7 @@ import { DataProvider } from '@/lib/data-context';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { Onboarding, hasSeenOnboarding } from '@/components/Onboarding';
 import { AuthProvider } from '@/lib/auth-context';
+import { LocalWatchlistMigrator } from '@/hooks/useLocalWatchlistMigration';
 import { MarketProvider } from '@/lib/market-context';
 import { ToastProvider } from '@/lib/toast-context';
 import Toast from '@/components/Toast';
@@ -263,7 +264,10 @@ function RootLayout() {
       <MarketProvider>
       <DataProvider>
         {featureFlags.userAccounts ? (
-          <AuthProvider>{appContent}</AuthProvider>
+          <AuthProvider>
+            {appContent}
+            <LocalWatchlistMigrator />
+          </AuthProvider>
         ) : (
           appContent
         )}

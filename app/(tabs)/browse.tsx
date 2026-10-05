@@ -21,6 +21,7 @@ import { getQualifiedScore } from '@/lib/score-utils';
 import { StaleBanner } from '@/components/StaleBanner';
 import { useAuth } from '@/lib/auth-context';
 import { useWatchlist } from '@/hooks/useWatchlist';
+import { useLocalWatchlist } from '@/hooks/useLocalWatchlist';
 import { useMyRatingsMap } from '@/hooks/useMyRatingsMap';
 import { Colors, Spacing, FontSize, BorderRadius, TAB_BAR_CLEARANCE } from '@/constants/theme';
 import { trackFilterChanged, trackScoreModeToggled, trackMarketChanged, trackDataRefreshed } from '@/lib/analytics';
@@ -112,19 +113,24 @@ export default function BrowseScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const searchInputRef = useRef<TextInput>(null);
   const isWestEnd = market === 'london';
-  const { user, isAuthenticated, showSignIn } = useAuth();
+  const { user, isAuthenticated } = useAuth();
+  const { localList, toggleLocal } = useLocalWatchlist();
   const { watchlist, addToWatchlist, removeFromWatchlist } = useWatchlist(user?.id || null);
-  const watchlistSet = useMemo(() => new Set(watchlist.map(w => w.show_id)), [watchlist]);
+  // Signed out, the bookmarks show what's saved on this phone (BRO-4727).
+  const watchlistSet = useMemo(
+    () => new Set(isAuthenticated ? watchlist.map(w => w.show_id) : localList.map(e => e.showId)),
+    [isAuthenticated, watchlist, localList],
+  );
   const ratingsMap = useMyRatingsMap(user?.id || null);
   const toggleWatchlist = useCallback(async (showId: string) => {
-    if (!isAuthenticated) { showSignIn('watchlist'); return; }
+    if (!isAuthenticated) { await toggleLocal(showId, 'show_bookmark'); return; }
     try {
       if (watchlistSet.has(showId)) await removeFromWatchlist(showId);
       else await addToWatchlist(showId);
     } catch {
       // Hook already sets error state; swallow re-throw to prevent unhandled rejection
     }
-  }, [isAuthenticated, showSignIn, watchlistSet, addToWatchlist, removeFromWatchlist]);
+  }, [isAuthenticated, toggleLocal, watchlistSet, addToWatchlist, removeFromWatchlist]);
 
   // Fuse search
   const fuse = useMemo(() => new Fuse(shows, FUSE_OPTIONS), [shows]);

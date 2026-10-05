@@ -15,6 +15,7 @@ import { useShows } from '@/lib/data-context';
 import { useMarket } from '@/lib/market-context';
 import { useAuth } from '@/lib/auth-context';
 import { useWatchlist } from '@/hooks/useWatchlist';
+import { useLocalWatchlist } from '@/hooks/useLocalWatchlist';
 import { useMyRatingsMap } from '@/hooks/useMyRatingsMap';
 import { ShowCard } from '@/components/ShowCard';
 import { AnimatedListItem } from '@/components/AnimatedListItem';
@@ -33,19 +34,24 @@ export default function HomeScreen() {
   const router = useRouter();
   const { market } = useMarket();
   const [refreshing, setRefreshing] = useState(false);
-  const { user, isAuthenticated, showSignIn } = useAuth();
+  const { user, isAuthenticated } = useAuth();
+  const { localList, toggleLocal } = useLocalWatchlist();
   const { watchlist, addToWatchlist, removeFromWatchlist } = useWatchlist(user?.id || null);
-  const watchlistSet = useMemo(() => new Set(watchlist.map(w => w.show_id)), [watchlist]);
+  // Signed out, the bookmarks show what's saved on this phone (BRO-4727).
+  const watchlistSet = useMemo(
+    () => new Set(isAuthenticated ? watchlist.map(w => w.show_id) : localList.map(e => e.showId)),
+    [isAuthenticated, watchlist, localList],
+  );
   const ratingsMap = useMyRatingsMap(user?.id || null);
   const toggleWatchlist = useCallback(async (showId: string) => {
-    if (!isAuthenticated) { showSignIn('watchlist'); return; }
+    if (!isAuthenticated) { await toggleLocal(showId, 'show_bookmark'); return; }
     try {
       if (watchlistSet.has(showId)) await removeFromWatchlist(showId);
       else await addToWatchlist(showId);
     } catch {
       // Hook already sets error state; swallow re-throw to prevent unhandled rejection
     }
-  }, [watchlistSet, addToWatchlist, removeFromWatchlist]);
+  }, [isAuthenticated, toggleLocal, watchlistSet, addToWatchlist, removeFromWatchlist]);
 
   // Home: Broadway-only for NYC (no off-broadway), all west-end for London
   const marketShows = useMemo(

@@ -15,6 +15,7 @@ import { useAuth } from '@/lib/auth-context';
 import { toLocalYMD } from '@/lib/date-utils';
 import { useUserReviews } from '@/hooks/useUserReviews';
 import { useWatchlist } from '@/hooks/useWatchlist';
+import { useLocalWatchlist } from '@/hooks/useLocalWatchlist';
 import { useUserLists } from '@/hooks/useUserLists';
 import { useToastSafe } from '@/lib/toast-context';
 import { savePendingAction, getPendingAction, clearPendingAction } from '@/lib/deferred-auth';
@@ -49,6 +50,7 @@ export default function ShowPageRating({
     updatePlannedDate,
     watchlist,
   } = useWatchlist(user?.id || null);
+  const { isSavedLocally, toggleLocal } = useLocalWatchlist();
   const { lists, getLists } = useUserLists(user?.id || null);
   const { showToast } = useToastSafe();
   const pathname = usePathname();
@@ -190,13 +192,9 @@ export default function ShowPageRating({
 
   const handleToggleWatchlist = useCallback(async () => {
     if (!isAuthenticated) {
-      savePendingAction({
-        type: 'watchlist',
-        showId,
-        returnRoute: pathname,
-        timestamp: Date.now(),
-      });
-      showSignIn('watchlist');
+      // Save first, ask after (BRO-4727): the show is kept on this phone and
+      // moves into the account on sign-in (hooks/useLocalWatchlistMigration.ts).
+      await toggleLocal(showId, 'show_watchlist');
       return;
     }
     setWatchlistLoading(true);
@@ -213,7 +211,7 @@ export default function ShowPageRating({
     } finally {
       setWatchlistLoading(false);
     }
-  }, [isAuthenticated, showId, pathname, showSignIn, isWatchlisted, addToWatchlist, removeFromWatchlist, showToast]);
+  }, [isAuthenticated, showId, toggleLocal, isWatchlisted, addToWatchlist, removeFromWatchlist, showToast]);
 
   const handleListPress = useCallback(() => {
     if (!isAuthenticated) {
@@ -354,12 +352,12 @@ export default function ShowPageRating({
         {/* Watchlist button + planned date */}
         <View style={styles.rightCol}>
           <WatchlistButton
-            isWatchlisted={isWatchlisted(showId)}
+            isWatchlisted={isAuthenticated ? isWatchlisted(showId) : isSavedLocally(showId)}
             onToggle={handleToggleWatchlist}
             loading={watchlistLoading}
           />
           {/* Add date right below Watchlist button */}
-          {isWatchlisted(showId) && (
+          {isAuthenticated && isWatchlisted(showId) && (
             <View style={styles.watchlistDateCol}>
               <Pressable
                 style={styles.watchlistDateButton}

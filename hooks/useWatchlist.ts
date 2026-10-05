@@ -12,6 +12,7 @@ import { getSupabaseClient } from '@/lib/supabase';
 import { enqueue, isOnline } from '@/lib/offline-queue';
 import { scheduleRateReminder, cancelRateReminder, cancelAllRemindersForShow } from '@/lib/local-notifications';
 import type { WatchlistEntry } from '@/lib/user-types';
+import { trackEvent } from '@/lib/analytics';
 
 const CACHE_KEY = (userId: string) => `@bsc:watchlist:${userId}`;
 
@@ -23,6 +24,12 @@ let sharedWatchlist: WatchlistEntry[] = [];
 function broadcastWatchlist(entries: WatchlistEntry[]) {
   sharedWatchlist = entries;
   listeners.forEach(fn => fn(entries));
+}
+
+/** Drop the cached copy so the next getWatchlist() reads the server (used after
+ *  signed-out saves move into the account, hooks/useLocalWatchlistMigration.ts). */
+export async function invalidateWatchlistCache(userId: string): Promise<void> {
+  await AsyncStorage.removeItem(CACHE_KEY(userId)).catch(() => {});
 }
 
 export function useWatchlist(userId: string | null) {
@@ -124,6 +131,7 @@ export function useWatchlist(userId: string | null) {
       try {
         const { error: err } = await client.from('watchlist').insert({ user_id: userId, show_id: showId });
         if (err) throw err;
+        trackEvent('watchlist_add', { show_id: showId, local: false });
         mutationVersion.current++;
         broadcastWatchlist([optimistic, ...sharedWatchlist]);
         await AsyncStorage.removeItem(CACHE_KEY(userId)).catch(() => {});
