@@ -246,25 +246,27 @@ export default function ToWatchScreen() {
                   const title = show?.title || showTitleFallback(entry.showId);
                   const posterUrl = show?.images ? (getImageUrl(show.images.poster) || getImageUrl(show.images.thumbnail)) : null;
                   return (
-                    <View key={entry.showId} style={[styles.gridCard, gridCardStyle]}>
-                      <Pressable
-                        style={({ pressed }) => pressed && styles.pressed}
-                        onPress={() => goToShow(show, entry.showId)}
-                      >
-                        <View>
-                          {posterUrl ? (
-                            <Image source={{ uri: posterUrl }} style={styles.gridPoster} contentFit="cover" transition={200} />
-                          ) : (
-                            <View style={[styles.gridPoster, styles.cardPosterPlaceholder]}>
-                              <Text style={styles.placeholderText}>{title.charAt(0)}</Text>
-                            </View>
-                          )}
-                          <PosterStatusPill show={show} />
-                        </View>
-                        <Text style={styles.gridTitle} numberOfLines={2}>{title}</Text>
-                        <OutOfMarketChip show={show} />
-                      </Pressable>
-                    </View>
+                    // The Pressable is the card and carries the width, as in
+                    // renderUpcomingItem: an unsized wrapper let each poster
+                    // shrink to its title's width.
+                    <Pressable
+                      key={entry.showId}
+                      style={({ pressed }) => [styles.gridCard, gridCardStyle, pressed && styles.pressed]}
+                      onPress={() => goToShow(show, entry.showId)}
+                    >
+                      <View style={styles.upcomingPosterWrap}>
+                        {posterUrl ? (
+                          <Image source={{ uri: posterUrl }} style={styles.gridPoster} contentFit="cover" transition={200} />
+                        ) : (
+                          <View style={[styles.gridPoster, styles.cardPosterPlaceholder]}>
+                            <Text style={styles.placeholderText}>{title.charAt(0)}</Text>
+                          </View>
+                        )}
+                        <PosterStatusPill show={show} />
+                      </View>
+                      <Text style={styles.gridTitle} numberOfLines={2}>{title}</Text>
+                      <OutOfMarketChip show={show} />
+                    </Pressable>
                   );
                 })}
               </View>
