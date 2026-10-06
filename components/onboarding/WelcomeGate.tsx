@@ -96,8 +96,16 @@ export default function WelcomeGate() {
       const { data, error } = await client.rpc('claim_onboarding');
       if (error) return; // e.g. the migration is not applied: show nothing
       AsyncStorage.setItem(key, '1').catch(() => {});
-      // Once claimed it is spent, so open even if this effect re-ran meanwhile.
-      if (data === true && mounted.current) setOpenFor(userId);
+      if (data !== true) return;
+      // Once claimed it is spent, so open even if this effect re-ran meanwhile,
+      // but never over a screen (rating, sign-in) opened while the claim was in flight.
+      const openWhenFree = () => {
+        if (!mounted.current) return;
+        const path = pathRef.current || '';
+        if (BUSY_ROUTES.some(r => path.startsWith(r))) { setTimeout(openWhenFree, BUSY_RETRY_MS); return; }
+        setOpenFor(userId);
+      };
+      openWhenFree();
     };
 
     (async () => {
