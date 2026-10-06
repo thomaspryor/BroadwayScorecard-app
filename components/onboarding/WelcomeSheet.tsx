@@ -35,6 +35,7 @@ import {
 } from '@/lib/welcome-onboarding';
 import { usePosterGrid } from '@/hooks/usePosterGrid';
 import { useWatchlist } from '@/hooks/useWatchlist';
+import { removeLocalShow } from '@/lib/local-watchlist-store';
 import { POSTER_GRID_GAP, POSTER_GRID_ROW_GAP } from '@/lib/poster-grid';
 import StarRating from '@/components/user/StarRating';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
@@ -170,7 +171,7 @@ export default function WelcomeSheet({ userId, onClose }: WelcomeSheetProps) {
     let failed = 0;
     for (const [showId, rating] of entries) {
       const { write, clearWatchlist } = welcomeSaveStep({ showId, rating }, { seen: seen.has(showId), watchlisted: watchlisted.has(showId) });
-      if (!write) continue;
+      if (!write) { await removeLocalShow(showId).catch(() => {}); continue; }
       let saved = false;
       try {
         const { error } = await client.from(write.table).insert({ user_id: userId, ...write.row });
@@ -186,7 +187,10 @@ export default function WelcomeSheet({ userId, onClose }: WelcomeSheetProps) {
       } catch {
         failed++;
       }
-      if (saved && clearWatchlist) {
+      if (!saved) continue;
+      // Seen now: a copy saved on this phone before sign-in must not move onto the watchlist later.
+      await removeLocalShow(showId).catch(() => {});
+      if (clearWatchlist) {
         await removeFromWatchlist(showId).catch(() => { /* pick saved; watchlist cleanup is best-effort */ });
       }
     }
