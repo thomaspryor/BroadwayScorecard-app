@@ -475,9 +475,11 @@ export default function ShowDetailScreen() {
                 {detail.audience.sources.showScore && (
                   <Pressable
                     style={styles.audienceSourceCard}
+                    disabled={!detail.audience.sources.showScore.url}
                     onPress={() => {
-                      const ssSlug = show.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-                      WebBrowser.openBrowserAsync(`https://show-score.com/show/${ssSlug}`);
+                      // The feed carries the real page; never build one from the title.
+                      const ssUrl = detail.audience?.sources?.showScore?.url;
+                      if (ssUrl) WebBrowser.openBrowserAsync(ssUrl);
                     }}
                   >
                     <View style={styles.audienceSourceHeader}>
@@ -490,7 +492,7 @@ export default function ShowDetailScreen() {
                       {detail.audience.sources.showScore.score}%
                     </Text>
                     <Text style={styles.audienceSourceMeta}>
-                      {detail.audience.sources.showScore.count} reviews →
+                      {detail.audience.sources.showScore.count} reviews{detail.audience.sources.showScore.url ? ' →' : ''}
                     </Text>
                   </Pressable>
                 )}

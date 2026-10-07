@@ -7,6 +7,7 @@
  */
 
 import { normalizeVenue } from './show-format';
+import { showScoreLinkUrl } from './show-score-link';
 
 // Expected schema versions
 export const EXPECTED_SCHEMA_VERSION = 1;
@@ -122,7 +123,7 @@ export interface MobileShowDetail {
     score: number;
     designation: string | null;
     sources?: {
-      ss?: { s: number; c: number };
+      ss?: { s: number; c: number; u?: string };       // u = Show Score page URL
       mz?: { s: number; c: number; sr?: number | null };
       rd?: { s: number; c: number; tp?: number; sent?: string | null };
       bc?: { s: number; c: number; sr?: number | null };
@@ -217,7 +218,7 @@ export interface ShowDetail {
     score: number;
     designation: string | null;
     sources: {
-      showScore: { score: number; count: number } | null;
+      showScore: { score: number; count: number; url: string | null } | null;
       mezzanine: { score: number; count: number; starRating: number | null } | null;
       reddit: { score: number; count: number; totalPosts: number; sentiment: string | null } | null;
       broadwayCom: { score: number; count: number; starRating: number | null } | null;
@@ -313,7 +314,7 @@ export function mapShowDetail(raw: MobileShowDetail): ShowDetail {
       score: raw.au.score,
       designation: raw.au.designation ?? null,
       sources: {
-        showScore: raw.au.sources?.ss ? { score: raw.au.sources.ss.s, count: raw.au.sources.ss.c } : null,
+        showScore: raw.au.sources?.ss ? { score: raw.au.sources.ss.s, count: raw.au.sources.ss.c, url: showScoreLinkUrl(raw.au.sources.ss.u) } : null,
         mezzanine: raw.au.sources?.mz ? { score: raw.au.sources.mz.s, count: raw.au.sources.mz.c, starRating: raw.au.sources.mz.sr ?? null } : null,
         reddit: raw.au.sources?.rd ? { score: raw.au.sources.rd.s, count: raw.au.sources.rd.c, totalPosts: raw.au.sources.rd.tp ?? 0, sentiment: raw.au.sources.rd.sent ?? null } : null,
         broadwayCom: raw.au.sources?.bc ? { score: raw.au.sources.bc.s, count: raw.au.sources.bc.c, starRating: raw.au.sources.bc.sr ?? null } : null,
