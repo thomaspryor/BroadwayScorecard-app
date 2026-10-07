@@ -365,7 +365,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const client = getSupabaseClient();
     if (!client) return;
 
-    await client.auth.signOut();
+    // This device only. The default ('global') revokes every session on the
+    // account, so signing out here also signed the user out of the website
+    // on their phone and computer (BRO-4822).
+    await client.auth.signOut({ scope: 'local' });
     setUser(null);
     setProfile(null);
   }, []);
@@ -380,7 +383,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error('Could not delete your account. Please try again.');
     }
 
-    await client.auth.signOut();
+    // The account is gone and its sessions with it; only this device's copy needs clearing.
+    await client.auth.signOut({ scope: 'local' }).catch(() => {});
     setUser(null);
     setProfile(null);
   }, []);
