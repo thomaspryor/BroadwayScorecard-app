@@ -13,6 +13,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { useShows } from '@/lib/data-context';
 import { fetchShowDetail, fetchSocialPulse } from '@/lib/api';
 import { getImageUrl } from '@/lib/images';
+import { getRelatedShows } from '@/lib/related-shows';
 import { nowMs } from '@/lib/date-utils';
 import { getScoreColor, getContrastTextColor, getMarketMinReviews, getQualifiedScore } from '@/lib/score-utils';
 import { Show, ShowDetail, MobileShowDetail, mapShowDetail } from '@/lib/types';
@@ -89,25 +90,11 @@ export default function ShowDetailScreen() {
       .sort((a, b) => (b.openingDate ?? '').localeCompare(a.openingDate ?? ''));
   }, [show, shows]);
 
-  // Related shows: same type + category, sorted by score proximity
-  const relatedBase = useMemo(() => {
-    if (!show) return [];
-    return shows
-      .filter(s =>
-        s.id !== show.id &&
-        s.type === show.type &&
-        s.category === show.category &&
-        getQualifiedScore(s) != null
-      )
-      .sort((a, b) => {
-        const ref = getQualifiedScore(show) ?? show.compositeScore ?? 0;
-        const aDiff = Math.abs((getQualifiedScore(a) ?? 0) - ref);
-        const bDiff = Math.abs((getQualifiedScore(b) ?? 0) - ref);
-        return aDiff - bDiff;
-      });
-  }, [show, shows]);
-  const relatedShowsOpen = useMemo(() => relatedBase.filter(s => s.status === 'open' || s.status === 'previews').slice(0, 6), [relatedBase]);
-  const relatedShowsClosed = useMemo(() => relatedBase.filter(s => s.status === 'closed').slice(0, 6), [relatedBase]);
+  // Related shows: ranked by similarity then critic score (see lib/related-shows.ts)
+  const { open: relatedShowsOpen, closed: relatedShowsClosed } = useMemo(
+    () => (show ? getRelatedShows(show, shows) : { open: [], closed: [] }),
+    [show, shows]
+  );
 
   const handleShare = async () => {
     if (!show) return;
