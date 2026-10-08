@@ -31,6 +31,9 @@ import { ceremonyToYear } from '@/lib/tony-utils';
 import { recordShowView } from '@/lib/store-review';
 import { ShareCardWithRef, ShareCardHandle } from '@/components/ShareCard';
 import { SectionCard } from '@/components/show-page/SectionCard';
+import { TierChip, TierKey } from '@/components/show-page/TierChip';
+import { asOutletTier, isLondonCategory, showsTierChips } from '@/lib/tier-display';
+import { formatPullQuote, nestQuotes } from '@/lib/nest-quotes';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ShowDetailSkeleton } from '@/components/Skeleton';
 import { useAuth } from '@/lib/auth-context';
@@ -597,8 +600,9 @@ export default function ShowDetailScreen() {
         {/* Critic Reviews List — collapsed by default */}
         {detail?.reviews && detail.reviews.length > 0 && (
           <SectionCard title="Critic Scorecard" meta={`${detail.reviews.length} reviews`}>
+            {showsTierChips(show.type) && <TierKey london={isLondonCategory(show.category)} />}
             {(showAllReviews ? detail.reviews : detail.reviews.slice(0, 3)).map((review, i) => (
-              <ReviewRow key={i} review={review} showId={show.id} category={show.category} />
+              <ReviewRow key={i} review={review} showId={show.id} category={show.category} showTiers={showsTierChips(show.type)} />
             ))}
             {!showAllReviews && detail.reviews.length > 3 && (
               <Pressable
@@ -922,7 +926,8 @@ function BreakdownBar({ reviews }: { reviews: ShowDetail['reviews'] }) {
   );
 }
 
-function ReviewRow({ review, showId, category }: { review: ShowDetail['reviews'][0]; showId: string; category?: string }) {
+function ReviewRow({ review, showId, category, showTiers }: { review: ShowDetail['reviews'][0]; showId: string; category?: string; showTiers: boolean }) {
+  const tier = showTiers ? asOutletTier(review.tier) : null;
   const formattedDate = review.publishDate ? (() => {
     try {
       return new Date(review.publishDate + 'T12:00:00').toLocaleDateString('en-US', {
@@ -961,6 +966,9 @@ function ReviewRow({ review, showId, category }: { review: ShowDetail['reviews']
             </View>
           )}
           <Text style={styles.reviewOutlet} numberOfLines={1}>{review.outlet}</Text>
+          {tier && (
+            <TierChip tier={tier} london={isLondonCategory(category)} isTopCritic={review.isTopCritic} criticName={review.criticName} />
+          )}
           {review.designation === 'Critics_Pick' && (
             <View style={styles.criticsPickBadge}>
               <Text style={styles.criticsPickText}>★ Critics Pick</Text>
@@ -969,7 +977,7 @@ function ReviewRow({ review, showId, category }: { review: ShowDetail['reviews']
         </View>
         {review.pullQuote && (
           <Text style={styles.reviewQuote}>
-            {'\u201C'}{review.pullQuote}{/[.!?'\u2019"\u201D]$/.test(review.pullQuote.trim()) ? '' : '.'}{'\u201D'}
+            {formatPullQuote(review.pullQuote)}
           </Text>
         )}
         <View style={styles.reviewMetaRow}>
@@ -1732,7 +1740,7 @@ function SocialScorecardSection({ sp }: { sp: SocialPulsePayload }) {
          quote treatment and the app's own ReviewRow quote style). */}
       {quotes.length > 0 && quotes.map((q, i) => (
         <View key={i} style={styles.socialQuote}>
-          <Text style={styles.socialQuoteText} numberOfLines={2}>{'\u201C'}{q.t.trim()}{'\u201D'}</Text>
+          <Text style={styles.socialQuoteText} numberOfLines={2}>{'\u201C'}{nestQuotes(q.t)}{'\u201D'}</Text>
           {q.a && <Text style={styles.socialQuoteAuthor}>— {q.a} on {q.p}</Text>}
         </View>
       ))}
@@ -1927,7 +1935,7 @@ function VideoReviewsSection({ reviews, category }: { reviews: ShowDetail['video
                 {v.channelName || v.handle || 'Video Review'}
               </Text>
               {v.platform && <Text style={styles.videoPlatform}>{v.platform}</Text>}
-              {v.keyQuote && <Text style={styles.videoQuote} numberOfLines={3}>{'\u201C'}{v.keyQuote}{'\u201D'}</Text>}
+              {v.keyQuote && <Text style={styles.videoQuote} numberOfLines={3}>{'\u201C'}{nestQuotes(v.keyQuote)}{'\u201D'}</Text>}
             </View>
             {/* Same score chip as the written Critic Reviews rows — no
                sentiment pill (owner decision 2026-08-03). */}

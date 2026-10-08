@@ -113,11 +113,12 @@ export interface MobileShowDetail {
     o: string;          // outlet display name
     s: number;          // score 0-100
     b: string;          // bucket (Positive/Mixed/Negative)
-    t: number;          // tier (1/2/3)
+    t: number;          // outlet tier 1-4, regional (London tiers on West End shows)
     u?: string;         // url
     d?: string;         // publishDate
     q?: string;         // pullQuote
     dg?: string;        // designation
+    tc?: 1;             // top critic, promoted to tier 1 wherever they write
   }[];
   au?: {
     score: number;
@@ -209,6 +210,7 @@ export interface ShowDetail {
     score: number;
     bucket: string;
     tier: number;
+    isTopCritic: boolean;
     url: string | null;
     publishDate: string | null;
     pullQuote: string | null;
@@ -305,6 +307,7 @@ export function mapShowDetail(raw: MobileShowDetail): ShowDetail {
       score: r.s,
       bucket: r.b,
       tier: r.t,
+      isTopCritic: r.tc === 1,
       url: r.u ?? null,
       publishDate: r.d ?? null,
       pullQuote: r.q ?? null,
