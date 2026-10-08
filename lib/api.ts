@@ -7,7 +7,7 @@
  * Show detail responses are cached to AsyncStorage for offline use.
  */
 
-import { setCachedDetail, getCachedDetail } from './cache';
+import { setCachedDetail, getCachedDetail, setCachedRelatedPicks } from './cache';
 
 // Dev override so a locally-generated data build can be previewed in the
 // simulator (e.g. EXPO_PUBLIC_DATA_BASE=http://localhost:8090). Baked at
@@ -71,6 +71,25 @@ export async function fetchSocialPulse(showId: string): Promise<object | null> {
     const response = await fetch(url, { headers: { 'Cache-Control': 'no-cache' } });
     if (!response.ok) return null;
     return response.json();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Fetch the curated "shows you might like" picks (~30 KB gzip) from the CDN.
+ * Returns the raw JSON string, or null on 404 / network failure: the show screen
+ * then uses its own ranking (lib/related-shows.ts), so this is never required.
+ */
+export async function fetchRelatedPicks(): Promise<string | null> {
+  try {
+    const response = await fetch(`${CDN_BASE}/related-shows-mobile.json`, {
+      headers: { 'Cache-Control': 'no-cache' },
+    });
+    if (!response.ok) return null;
+    const raw = await response.text();
+    setCachedRelatedPicks(raw).catch(() => {});
+    return raw;
   } catch {
     return null;
   }

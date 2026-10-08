@@ -14,6 +14,7 @@ import { useShows } from '@/lib/data-context';
 import { fetchShowDetail, fetchSocialPulse } from '@/lib/api';
 import { getImageUrl } from '@/lib/images';
 import { getRelatedShows } from '@/lib/related-shows';
+import { useRelatedPicks } from '@/hooks/useRelatedPicks';
 import { nowMs } from '@/lib/date-utils';
 import { getScoreColor, getContrastTextColor, getMarketMinReviews, getQualifiedScore } from '@/lib/score-utils';
 import { Show, ShowDetail, MobileShowDetail, mapShowDetail } from '@/lib/types';
@@ -90,10 +91,11 @@ export default function ShowDetailScreen() {
       .sort((a, b) => (b.openingDate ?? '').localeCompare(a.openingDate ?? ''));
   }, [show, shows]);
 
-  // Related shows: ranked by similarity then critic score (see lib/related-shows.ts)
+  // Related shows: the website's curated picks, topped up by a local ranking (see lib/related-shows.ts)
+  const relatedPicks = useRelatedPicks();
   const { open: relatedShowsOpen, closed: relatedShowsClosed } = useMemo(
-    () => (show ? getRelatedShows(show, shows) : { open: [], closed: [] }),
-    [show, shows]
+    () => (show ? getRelatedShows(show, shows, relatedPicks?.get(show.id)) : { open: [], closed: [] }),
+    [show, shows, relatedPicks]
   );
 
   const handleShare = async () => {

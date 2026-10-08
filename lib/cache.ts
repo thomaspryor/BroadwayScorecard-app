@@ -11,6 +11,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 const CACHE_KEY = 'mobile-shows-data';
 const TIMESTAMP_KEY = 'mobile-shows-timestamp';
 const DETAIL_PREFIX = 'show-detail-';
+const RELATED_KEY = 'related-picks-data';
 const TTL_MS = 60 * 60 * 1000; // 1 hour
 
 export async function getCachedData(): Promise<string | null> {
@@ -46,4 +47,13 @@ export async function getCachedDetail(showId: string): Promise<object | null> {
   const raw = await AsyncStorage.getItem(DETAIL_PREFIX + showId);
   if (!raw) return null;
   try { return JSON.parse(raw); } catch { return null; }
+}
+
+/** Cache the curated related-shows file (raw JSON string) for offline use */
+export async function setCachedRelatedPicks(raw: string): Promise<void> {
+  await AsyncStorage.setItem(RELATED_KEY, raw);
+}
+
+export async function getCachedRelatedPicks(): Promise<string | null> {
+  return AsyncStorage.getItem(RELATED_KEY);
 }
