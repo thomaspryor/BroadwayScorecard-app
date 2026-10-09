@@ -81,3 +81,13 @@ export function tierExplanation(
       : (opts.london ? info.examplesLondon : info.examplesNyc),
   };
 }
+
+/** Signal bars lit on the tier chip: 4 for Tier 1 down to 1 for Tier 4 (BRO-4905). */
+export function tierBarsLit(tier: OutletTier): number {
+  return 5 - tier;
+}
+
+/** A tier's weight as a whole percent of a Tier 1 review, for the "Counts" key. */
+export function tierPercent(tier: OutletTier): number {
+  return Math.round(TIER_DISPLAY[tier].weight * 100);
+}

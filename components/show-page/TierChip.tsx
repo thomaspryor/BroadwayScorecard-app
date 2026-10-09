@@ -5,7 +5,7 @@
  * how much the review counts. The chip sits inside the review row's own
  * Pressable, so tapping it explains the tier instead of opening the review.
  *
- * TierKey is the "Weighted by outlet tier T1-T4" line at the top of the list;
+ * TierKey is the "Weighted by outlet tier · Counts" scale at the top of the list;
  * it opens the same sheet listing all four tiers.
  */
 import { useState } from 'react';
@@ -13,7 +13,7 @@ import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as WebBrowser from 'expo-web-browser';
 import { Colors, FontSize, Spacing } from '@/constants/theme';
-import { TIERS, tierExplanation, type OutletTier } from '@/lib/tier-display';
+import { TIERS, tierBarsLit, tierExplanation, tierPercent, type OutletTier } from '@/lib/tier-display';
 
 const METHODOLOGY_URL = 'https://broadwayscorecard.com/methodology#critic-score';
 
@@ -36,7 +36,7 @@ export function TierChip({ tier, london, isTopCritic, criticName }: {
         accessibilityHint="Explains how much this review counts"
         testID="tier-chip"
       >
-        <Text style={[styles.chipText, tier === 1 && styles.chipTextT1]}>T{tier}</Text>
+        <ChipFace tier={tier} />
       </Pressable>
       <TierSheet visible={open} onClose={() => setOpen(false)}>
         <TierBlock tier={tier} title={info.title} weight={info.weight} relative={info.relative} detail={info.detail} />
@@ -53,12 +53,18 @@ export function TierKey({ london }: { london: boolean }) {
         onPress={() => setOpen(true)}
         style={({ pressed }) => [styles.keyRow, pressed && styles.chipPressed]}
         accessibilityRole="button"
-        accessibilityLabel="Weighted by outlet tier, T1 to T4. How we weight critics"
+        accessibilityLabel={`Weighted by outlet tier. ${TIERS.map((t) => `Tier ${t} counts ${tierPercent(t)}%`).join(', ')}. How we weight critics`}
         testID="tier-key"
       >
-        <Text style={styles.keyText}>Weighted by outlet tier</Text>
-        <View style={styles.chip}>
-          <Text style={styles.chipText}>T1–T4</Text>
+        <Text style={styles.keyText}>Weighted by outlet tier · Counts</Text>
+        {/* The whole scale at once, so the bars are learned from one line (BRO-4905). */}
+        <View style={styles.scale} testID="tier-scale">
+          {TIERS.map((t) => (
+            <View key={t} style={styles.scaleStep}>
+              <View style={styles.chip}><ChipFace tier={t} /></View>
+              <Text style={styles.scalePct}>{tierPercent(t)}%</Text>
+            </View>
+          ))}
         </View>
       </Pressable>
       <TierSheet visible={open} onClose={() => setOpen(false)}>
@@ -70,6 +76,25 @@ export function TierKey({ london }: { london: boolean }) {
     </>
   );
 }
+
+// "T1" plus four ascending bars, lit one per step of weight (T1 all four, T4
+// one), so the chip shows how much a review counts and not only its tier.
+function ChipFace({ tier }: { tier: OutletTier }) {
+  const lit = tierBarsLit(tier);
+  const color = tier === 1 ? Colors.text.secondary : Colors.text.muted;
+  return (
+    <View style={styles.face}>
+      <Text style={[styles.chipText, { color }]}>T{tier}</Text>
+      <View style={styles.bars} testID="tier-bars">
+        {BAR_HEIGHTS.map((h, i) => (
+          <View key={h} style={[styles.bar, { height: h, backgroundColor: i < lit ? color : 'rgba(255, 255, 255, 0.14)' }]} />
+        ))}
+      </View>
+    </View>
+  );
+}
+
+const BAR_HEIGHTS = [3, 5, 7, 9];
 
 function TierSheet({ visible, onClose, children }: { visible: boolean; onClose: () => void; children: React.ReactNode }) {
   const insets = useSafeAreaInsets();
@@ -133,13 +158,23 @@ const styles = StyleSheet.create({
     fontVariant: ['tabular-nums'],
     letterSpacing: 0.2,
   },
-  chipTextT1: {
-    color: Colors.text.secondary,
-  },
-  keyRow: {
+  face: {
     flexDirection: 'row',
     alignItems: 'center',
-    alignSelf: 'flex-start',
+    gap: 3,
+  },
+  bars: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 1.5,
+    height: 9,
+  },
+  bar: {
+    width: 2,
+    borderRadius: 1,
+  },
+  keyRow: {
+    alignSelf: 'stretch',
     gap: 6,
     paddingVertical: Spacing.xs,
     marginBottom: Spacing.sm,
@@ -147,6 +182,25 @@ const styles = StyleSheet.create({
   keyText: {
     color: Colors.text.muted,
     fontSize: FontSize.xs,
+  },
+  scale: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    rowGap: 6,
+  },
+  scaleStep: {
+    // Two per line: a phone fits three, which strands T4 on its own line.
+    width: '50%',
+    maxWidth: 124,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  scalePct: {
+    color: Colors.text.secondary,
+    fontSize: FontSize.xs,
+    fontVariant: ['tabular-nums'],
   },
   overlay: {
     flex: 1,

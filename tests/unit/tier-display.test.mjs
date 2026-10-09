@@ -2,7 +2,8 @@
 // src/config/tier-display.ts; weights mirror TIER_WEIGHTS in scoring.ts there.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { TIER_DISPLAY, TIERS, asOutletTier, isLondonCategory, showsTierChips, tierExplanation } from '../../lib/tier-display.ts';
+import { TIER_DISPLAY, TIERS, asOutletTier, isLondonCategory, showsTierChips, tierBarsLit, tierExplanation, tierPercent } from '../../lib/tier-display.ts';
+import { readFileSync } from 'node:fs';
 import { mapShowDetail } from '../../lib/types.ts';
 
 test('weights match the website (T1 1.0, T2 0.75, T3 0.40, T4 0.20)', () => {
@@ -44,4 +45,14 @@ test('mapShowDetail carries the top-critic flag from rv[].tc', () => {
     { cn: 'A Critic', o: 'TheaterMania', s: 70, b: 'Mixed', t: 2 },
   ] });
   assert.deepEqual(d.reviews.map(r => [r.tier, r.isTopCritic]), [[1, true], [2, false]]);
+});
+
+test('chip bars and the Counts key follow the weights (BRO-4905)', () => {
+  assert.deepEqual(TIERS.map(tierPercent), [100, 75, 40, 20]);
+  assert.deepEqual(TIERS.map(tierBarsLit), [4, 3, 2, 1]);
+  // Both the chip and the key draw from the helpers, not hardcoded counts.
+  const src = readFileSync(new URL('../../components/show-page/TierChip.tsx', import.meta.url), 'utf8');
+  assert.match(src, /i < lit \?/, 'ChipFace must light bars from tierBarsLit');
+  assert.match(src, /const lit = tierBarsLit\(tier\)/);
+  assert.match(src, /\{tierPercent\(t\)\}%/, 'Counts key must use tierPercent');
 });
