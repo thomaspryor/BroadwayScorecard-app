@@ -76,8 +76,8 @@ blended score rule, navigation structure and image URLs: `memory/architecture.md
 
 ## Deployment — EAS builds cost ~$1.85 each, so DO NOT reach for one by reflex
 - **Dev:** `npx expo start` → Expo Go on iPhone
-- **Shipping:** `gh workflow run eas-build.yml --ref main`, then verify with
-  `npx eas-cli build:list`. The workflow runs `scripts/ship.js`, which picks a
+- **Shipping:** `gh workflow run eas-build.yml --ref main`, then verify with `npx eas-cli build:list`
+  (cloud has no EXPO_TOKEN: read the run's job log via `gh api`). It runs `scripts/ship.js`, which picks a
   native build ONLY when the native fingerprint moved and otherwise ships a free
   OTA update. Check locally first with `node scripts/ship.js --dry-run`.
 - **ONE ship per session, at the end.** Builds 69-72 were four dispatches in one
