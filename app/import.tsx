@@ -42,6 +42,7 @@ import {
   acquireFromTheatrScreenshots,
   type ImportAcquireResult,
   type RawImportEntry,
+  type TheatrReaction,
 } from '@/lib/show-import';
 import {
   ShowMatcher,
@@ -50,7 +51,14 @@ import {
   MATCH_THRESHOLD,
   type MatchCandidate,
 } from '@/lib/show-match';
-import { THEATR_MAX_SCREENSHOTS } from '@/lib/theatr-import';
+import {
+  THEATR_MAX_SCREENSHOTS,
+  DEFAULT_REACTION_RATINGS,
+  REACTION_LABELS,
+  effectiveRating,
+  reactionCounts,
+} from '@/lib/theatr-import';
+
 import {
   searchMezzanineCatalog,
   resolveMezzanineShow,
@@ -70,6 +78,9 @@ import * as haptics from '@/lib/haptics';
 
 type ImportSourceId = 'mezzanine' | 'show-score' | 'theatr';
 
+/** Steps for a reaction's rating, null = "Don't rate" at the bottom. */
+const REACTION_STEPS: (number | null)[] = [null, 0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5];
+
 /** A seen-but-unrated show the user already had on their watchlist (saved
  *  before they went) hits the watchlist unique key on insert. Give that row
  *  the date seen so it moves to To Be Rated, instead of leaving it undated in
@@ -88,7 +99,13 @@ type ImportStep = 'source' | 'matching' | 'preview' | 'importing' | 'done';
 
 export interface MatchedEntry {
   sourceTitle: string;
+  /** The rating this row imports with: the source's own rating, or for a
+   *  Theatr reaction, what the user set that reaction to (effectiveRating). */
   sourceRating: number | null;
+  /** The source's own rating before any reaction setting (Theatr: a score
+   *  the user wrote); recomputing sourceRating starts from this. */
+  scoreRating?: number | null;
+  reaction?: TheatrReaction;
   sourceScore: number | null;
   sourceDate: string | null;
   /** The venue the SOURCE logged, not the matched production's. Shown on
@@ -197,6 +214,8 @@ export default function ImportScreen() {
   const [source, setSource] = useState<ImportSourceId>('mezzanine');
   const [entries, setEntries] = useState<MatchedEntry[]>([]);
   const [notices, setNotices] = useState<string[]>([]);
+  // Theatr has no stars: the user decides what each reaction rates as.
+  const [reactionRatings, setReactionRatings] = useState(DEFAULT_REACTION_RATINGS);
   const [profileInput, setProfileInput] = useState('');
   const [theatrProgress, setTheatrProgress] = useState<{ done: number; total: number } | null>(null);
   const [importStats, setImportStats] = useState({ imported: 0, skipped: 0, errors: 0 });
@@ -287,7 +306,9 @@ export default function ImportScreen() {
       const alreadyReviewed = showId ? existingReviewShowIds.has(showId) : false;
       matched.push({
         sourceTitle: raw.title,
-        sourceRating: raw.rating,
+        sourceRating: effectiveRating(raw.rating, raw.reaction, reactionRatings),
+        scoreRating: raw.rating,
+        ...(raw.reaction ? { reaction: raw.reaction } : {}),
         sourceScore: raw.sourceScore,
         sourceDate: raw.date,
         sourceVenue: raw.venue,
@@ -352,7 +373,7 @@ export default function ImportScreen() {
         mezz_show_id: raw.mezzShowId || null,
       }).catch(() => {});
     }
-  }, [buildMatcher, user]);
+  }, [buildMatcher, user, reactionRatings]);
 
   const handlePickFile = useCallback(async () => {
     const result = await DocumentPicker.getDocumentAsync({ type: 'application/json', copyToCacheDirectory: true });
@@ -413,6 +434,20 @@ export default function ImportScreen() {
       setStep('source');
     }
   }, [matchAndPreview, profileInput]);
+
+  // Seen shows rated only by a Theatr reaction, per reaction: one control
+  // each in the preview. Changing one re-rates every row with that reaction.
+  const reactionCountsInPreview = useMemo(
+    () => reactionCounts(entries.filter(e => e.kind === 'diary').map(e => ({ reaction: e.reaction, scoreRating: e.scoreRating ?? null }))),
+    [entries],
+  );
+  const stepReactionRating = useCallback((reaction: TheatrReaction, dir: 1 | -1) => {
+    haptics.tap();
+    const i = REACTION_STEPS.indexOf(reactionRatings[reaction]);
+    const next = { ...reactionRatings, [reaction]: REACTION_STEPS[Math.max(0, Math.min(REACTION_STEPS.length - 1, i + dir))] };
+    setReactionRatings(next);
+    setEntries(es => es.map(e => e.reaction ? { ...e, sourceRating: effectiveRating(e.scoreRating ?? null, e.reaction, next) } : e));
+  }, [reactionRatings]);
 
   const toggleEntry = useCallback((index: number) => {
     haptics.tap();
@@ -755,7 +790,7 @@ export default function ImportScreen() {
               <Text style={styles.sourceHint}>
                 Theatr has no export, so pick screenshots instead. In the app: Profile → Activity, then screenshot the
                 feed from the top as you scroll down, and pick them in that order. Up to {THEATR_MAX_SCREENSHOTS}
-                screenshots. We read the shows, dates, and your reviews and scores (like 84/100); the images
+                screenshots. We read the shows, dates, your reactions and any reviews you wrote; the images
                 aren&apos;t saved.
               </Text>
               <Pressable style={styles.smallBtnGhost} onPress={handlePickTheatrScreenshots}>
@@ -787,6 +822,43 @@ export default function ImportScreen() {
               {skippedOwnedCount > 0 && <Text style={styles.summaryMuted}>{skippedOwnedCount} skipped — already in your shows</Text>}
               {unmatchedRows.length > 0 && <Text style={styles.summaryWarn}>{unmatchedRows.length} not on Broadway Scorecard</Text>}
             </View>
+            {(Object.keys(reactionCountsInPreview) as TheatrReaction[]).length > 0 && (
+              <View style={styles.reactionBox}>
+                <Text style={styles.reactionTitle}>Your Theatr reactions</Text>
+                <Text style={styles.sectionHint}>
+                  Theatr has no star ratings, so choose what each reaction means. You can change any rating later.
+                </Text>
+                {(['recommend', 'mixed', 'dislike'] as TheatrReaction[]).filter(r => reactionCountsInPreview[r]).map(r => {
+                  const value = reactionRatings[r];
+                  return (
+                    <View key={r} style={styles.reactionRow}>
+                      <Text style={styles.reactionLabel}>
+                        {REACTION_LABELS[r]} <Text style={styles.rowMuted}>({reactionCountsInPreview[r]})</Text>
+                      </Text>
+                      <Pressable
+                        style={[styles.stepBtn, value === null && styles.disabled]}
+                        disabled={value === null}
+                        onPress={() => stepReactionRating(r, -1)}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Lower the rating for ${REACTION_LABELS[r]}`}
+                      >
+                        <Text style={styles.stepText}>−</Text>
+                      </Pressable>
+                      <Text style={styles.reactionValue}>{value === null ? 'Don\u2019t rate' : `★ ${value}`}</Text>
+                      <Pressable
+                        style={[styles.stepBtn, value === 5 && styles.disabled]}
+                        disabled={value === 5}
+                        onPress={() => stepReactionRating(r, 1)}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Raise the rating for ${REACTION_LABELS[r]}`}
+                      >
+                        <Text style={styles.stepText}>+</Text>
+                      </Pressable>
+                    </View>
+                  );
+                })}
+              </View>
+            )}
             {notices.map((n, i) => <Text key={i} style={styles.noticeText}>{n}</Text>)}
             <Text style={styles.captionText}>
               Imported ratings are private until you choose to share them.
@@ -1070,7 +1142,7 @@ export function EntryRow({ entry, onToggle, disabled, resolve, onFind, onPick, o
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
           <Text style={styles.rowTitle} numberOfLines={1}>{entry.sourceTitle}</Text>
           {entry.sourceRating ? (
-            <Text style={styles.rowRating}>{entry.sourceScore !== null ? `${entry.sourceScore} → ` : ''}★ {entry.sourceRating}</Text>
+            <Text style={styles.rowRating}>{entry.sourceScore !== null ? `${entry.sourceScore} → ` : entry.reaction && entry.scoreRating == null ? `${REACTION_LABELS[entry.reaction]} → ` : ''}★ {entry.sourceRating}</Text>
           ) : entry.kind === 'diary' ? (
             <Text style={styles.rowMuted}>no rating → watchlist</Text>
           ) : null}
@@ -1151,6 +1223,19 @@ const styles = StyleSheet.create({
   summaryMuted: { color: Colors.text.muted, fontSize: FontSize.sm },
   summaryWarn: { color: Colors.score.amber, fontSize: FontSize.sm },
   noticeText: { color: Colors.score.amber, fontSize: FontSize.xs, marginTop: 2 },
+  reactionBox: {
+    borderWidth: 1, borderColor: Colors.border.default, borderRadius: BorderRadius.md,
+    backgroundColor: Colors.surface.overlay, padding: Spacing.md, marginBottom: Spacing.sm,
+  },
+  reactionTitle: { color: Colors.text.primary, fontSize: FontSize.sm, fontWeight: '700', marginBottom: 2 },
+  reactionRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, minHeight: 44 },
+  reactionLabel: { color: Colors.text.primary, fontSize: FontSize.sm, flex: 1 },
+  reactionValue: { color: Colors.score.amber, fontSize: FontSize.sm, fontWeight: '600', minWidth: 84, textAlign: 'center' },
+  stepBtn: {
+    width: 44, height: 44, borderRadius: BorderRadius.md, borderWidth: 1, borderColor: Colors.border.default,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  stepText: { color: Colors.text.primary, fontSize: FontSize.md, fontWeight: '700' },
   captionText: { color: Colors.text.muted, fontSize: FontSize.xs, marginBottom: Spacing.md, lineHeight: 16 },
   sectionTitle: { color: Colors.text.muted, fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: Spacing.xs },
   sectionHint: { color: Colors.text.muted, fontSize: FontSize.xs, marginBottom: Spacing.sm, lineHeight: 16 },

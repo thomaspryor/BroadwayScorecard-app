@@ -41,7 +41,12 @@ export interface RawImportEntry {
   fromDiary?: boolean;
   /** Mezzanine Show class objectId (entry.show.id in the export). */
   mezzShowId?: string;
+  /** Theatr reaction on a seen show. Rated by the user's own choice in the
+   *  preview (reactionRatings), never by the source; a written score wins. */
+  reaction?: TheatrReaction;
 }
+
+export type TheatrReaction = 'recommend' | 'mixed' | 'dislike';
 
 export interface ImportAcquireResult {
   entries: RawImportEntry[];
