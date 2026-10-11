@@ -438,15 +438,28 @@ export default function ImportScreen() {
   // Seen shows rated only by a Theatr reaction, per reaction: one control
   // each in the preview. Changing one re-rates every row with that reaction.
   const reactionCountsInPreview = useMemo(
-    () => reactionCounts(entries.filter(e => e.kind === 'diary').map(e => ({ reaction: e.reaction, scoreRating: e.scoreRating ?? null }))),
+    // Rows that will import (ticked and matched), so the box never shows for
+    // reactions whose shows are all skipped.
+    () => reactionCounts(entries.filter(e => e.kind === 'diary' && e.selected && e.match).map(e => ({ reaction: e.reaction, scoreRating: e.scoreRating ?? null }))),
     [entries],
   );
+  // Functional update: two quick taps must both count.
   const stepReactionRating = useCallback((reaction: TheatrReaction, dir: 1 | -1) => {
     haptics.tap();
-    const i = REACTION_STEPS.indexOf(reactionRatings[reaction]);
-    const next = { ...reactionRatings, [reaction]: REACTION_STEPS[Math.max(0, Math.min(REACTION_STEPS.length - 1, i + dir))] };
-    setReactionRatings(next);
-    setEntries(es => es.map(e => e.reaction ? { ...e, sourceRating: effectiveRating(e.scoreRating ?? null, e.reaction, next) } : e));
+    setReactionRatings(prev => {
+      const current = prev[reaction];
+      // "+" from Don't rate goes back to the default, not up from half a star.
+      const value = current === null && dir === 1
+        ? DEFAULT_REACTION_RATINGS[reaction] ?? 0.5
+        : REACTION_STEPS[Math.max(0, Math.min(REACTION_STEPS.length - 1, REACTION_STEPS.indexOf(current) + dir))];
+      return { ...prev, [reaction]: value };
+    });
+  }, []);
+  // Re-rate every reaction row whenever a reaction setting changes.
+  useEffect(() => {
+    setEntries(es => es.some(e => e.reaction)
+      ? es.map(e => e.reaction ? { ...e, sourceRating: effectiveRating(e.scoreRating ?? null, e.reaction, reactionRatings) } : e)
+      : es);
   }, [reactionRatings]);
 
   const toggleEntry = useCallback((index: number) => {
@@ -589,6 +602,12 @@ export default function ImportScreen() {
   const fixedReadyCount = useMemo(() => unresolvedRows.filter(({ entry }) => entry.selected && entry.match).length, [unresolvedRows]);
 
   const selectedCount = useMemo(() => entries.filter(e => e.selected && e.match).length, [entries]);
+  // Rated diary rows with no date import as reviews in the Diary's "No date"
+  // section (web parity: ImportShows' preview caption).
+  const undatedRatedCount = useMemo(
+    () => entries.filter(e => e.kind === 'diary' && e.selected && e.match && !e.sourceDate && e.sourceRating).length,
+    [entries],
+  );
   const skippedOwnedCount = useMemo(() => entries.filter(e => e.alreadyOwned && !e.selected && e.match && (e.matchScore > MATCH_THRESHOLD || e.dateSuspect)).length, [entries]);
 
   /** Build the ordered insert plan: rated diary entries → reviews table;
@@ -831,7 +850,18 @@ export default function ImportScreen() {
                 {(['recommend', 'mixed', 'dislike'] as TheatrReaction[]).filter(r => reactionCountsInPreview[r]).map(r => {
                   const value = reactionRatings[r];
                   return (
-                    <View key={r} style={styles.reactionRow}>
+                    <View
+                      key={r}
+                      style={styles.reactionRow}
+                      // One adjustable control for VoiceOver: swipe up/down
+                      // changes the rating and the value is read out.
+                      accessible
+                      accessibilityRole="adjustable"
+                      accessibilityLabel={`Rating for shows marked ${REACTION_LABELS[r]}`}
+                      accessibilityValue={{ text: value === null ? 'Don\u2019t rate' : `${value} stars` }}
+                      accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
+                      onAccessibilityAction={(ev) => stepReactionRating(r, ev.nativeEvent.actionName === 'increment' ? 1 : -1)}
+                    >
                       <Text style={styles.reactionLabel}>
                         {REACTION_LABELS[r]} <Text style={styles.rowMuted}>({reactionCountsInPreview[r]})</Text>
                       </Text>
@@ -863,6 +893,9 @@ export default function ImportScreen() {
             <Text style={styles.captionText}>
               Imported ratings are private until you choose to share them.
               {source === 'show-score' ? ' Show Score scores convert to the nearest half-star.' : ''}
+              {undatedRatedCount > 0
+                ? ` ${undatedRatedCount} of your reviews have no date. They\u2019ll land in a "No date" section where you can add one.`
+                : ''}
             </Text>
 
             {dateSuspectRows.length > 0 && (
@@ -1142,7 +1175,7 @@ export function EntryRow({ entry, onToggle, disabled, resolve, onFind, onPick, o
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
           <Text style={styles.rowTitle} numberOfLines={1}>{entry.sourceTitle}</Text>
           {entry.sourceRating ? (
-            <Text style={styles.rowRating}>{entry.sourceScore !== null ? `${entry.sourceScore} → ` : entry.reaction && entry.scoreRating == null ? `${REACTION_LABELS[entry.reaction]} → ` : ''}★ {entry.sourceRating}</Text>
+            <Text style={styles.rowRating}>{entry.sourceScore !== null && entry.scoreRating != null ? `${entry.sourceScore} → ` : entry.reaction && entry.scoreRating == null ? `${REACTION_LABELS[entry.reaction]} → ` : ''}★ {entry.sourceRating}</Text>
           ) : entry.kind === 'diary' ? (
             <Text style={styles.rowMuted}>no rating → watchlist</Text>
           ) : null}
