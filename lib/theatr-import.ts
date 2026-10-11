@@ -2,8 +2,9 @@
  * Pure helpers for the Theatr screenshot import (BRO-4618, BRO-5082). Kept free of
  * React Native imports so tests/unit/theatr-import.test.mjs can load them
  * under plain node. Web twin: Broadwayscore src/lib/show-import.ts
- * (resolveFeedDates / dropBackfillDates / mergeTheatrRows / theatrRowsToEntries /
- * theatrRowsPipeline / theatrNotices); keep the two in step.
+ * (overlapBatches / stitchBatchRows / resolveFeedDates / dropBackfillDates /
+ * mergeTheatrRows / theatrRowsToEntries / theatrRowsPipeline / theatrNotices);
+ * keep the two in step.
  *
  * Theatr has no data export and its profile pages and API need a Theatr
  * login, so the user picks screenshots of Profile → Activity (or Collection →
@@ -61,6 +62,58 @@ export interface TheatrRow {
   reaction: 'recommend' | 'mixed' | 'dislike' | null;
   /** Set by resolveFeedDates when `date` came from the feed header. */
   dateFromFeed?: boolean;
+  /** Set by dropBackfillDates: a real viewing whose logged date was dropped,
+   *  not a copy with its date cropped off, so it never folds into another. */
+  dateDropped?: boolean;
+}
+
+/**
+ * Batches of at most `size` screenshots where each batch after the first
+ * starts with the previous batch's last screenshot as context, so the model
+ * sees the date header or year divider that scrolled off above. Rows read
+ * from that context screenshot repeat the previous batch's tail and are
+ * removed again by stitchBatchRows.
+ */
+export function overlapBatches<T>(items: T[], size: number): T[][] {
+  if (items.length === 0) return [];
+  const out: T[][] = [items.slice(0, size)];
+  let next = out[0].length;
+  while (next < items.length) {
+    const start = next - 1;
+    const batch = items.slice(start, start + size);
+    out.push(batch);
+    next = start + batch.length;
+  }
+  return out;
+}
+
+/**
+ * Join per-batch rows into one feed-ordered list, dropping the rows each
+ * batch repeats from its context screenshot: the longest run at the start of
+ * a batch that matches the end of what came before (same list and title).
+ */
+export function stitchBatchRows(batches: TheatrRow[][]): TheatrRow[] {
+  const same = (a: TheatrRow, b: TheatrRow) => a.list === b.list && a.title.toLowerCase() === b.title.toLowerCase();
+  const out: TheatrRow[] = [];
+  for (const rows of batches) {
+    let overlap = 0;
+    for (let k = Math.min(rows.length, out.length); k > 0; k--) {
+      const tail = out.slice(out.length - k);
+      if (tail.every((r, i) => same(r, rows[i]))) { overlap = k; break; }
+    }
+    // The context copy may show what the first copy lacked (a header that
+    // was cropped there, a review that ran onto the next screenshot).
+    for (let i = 0; i < overlap; i++) {
+      const kept = out[out.length - overlap + i];
+      const again = rows[i];
+      if (!kept.monthDay && again.monthDay) kept.monthDay = again.monthDay;
+      if (!kept.yearHint && again.yearHint) kept.yearHint = again.yearHint;
+      if (!kept.review && again.review) kept.review = again.review;
+      if (kept.score === null && again.score !== null) { kept.score = again.score; kept.rating = again.rating; }
+    }
+    out.push(...rows.slice(overlap).map((r) => ({ ...r })));
+  }
+  return out;
 }
 
 /**
@@ -101,17 +154,24 @@ export const THEATR_BACKFILL_MIN = 3;
 
 /** Drop feed dates on backfill days; returns how many were dropped. */
 export function dropBackfillDates(rows: TheatrRow[]): { rows: TheatrRow[]; dropped: number } {
-  const perDay = new Map<string, number>();
-  for (const r of rows) if (r.dateFromFeed && r.date) perDay.set(r.date, (perDay.get(r.date) || 0) + 1);
-  let dropped = 0;
+  // Distinct shows per day: a repeat of one row must not make a real
+  // two-show day look like a backfill.
+  const perDay = new Map<string, Set<string>>();
+  for (const r of rows) {
+    if (!r.dateFromFeed || !r.date) continue;
+    if (!perDay.has(r.date)) perDay.set(r.date, new Set());
+    perDay.get(r.date)!.add(r.title.toLowerCase());
+  }
+  const backfillDays = new Set(Array.from(perDay).filter(([, titles]) => titles.size >= THEATR_BACKFILL_MIN).map(([day]) => day));
+  const droppedTitles = new Set<string>();
   const out = rows.map((r) => {
-    if (r.dateFromFeed && r.date && (perDay.get(r.date) || 0) >= THEATR_BACKFILL_MIN) {
-      dropped++;
-      return { ...r, date: null, dateFromFeed: false };
+    if (r.dateFromFeed && r.date && backfillDays.has(r.date)) {
+      droppedTitles.add(`${r.date}|${r.title.toLowerCase()}`);
+      return { ...r, date: null, dateFromFeed: false, dateDropped: true };
     }
     return r;
   });
-  return { rows: out, dropped };
+  return { rows: out, dropped: droppedTitles.size };
 }
 
 /**
@@ -133,14 +193,14 @@ export function mergeTheatrRows(rows: TheatrRow[]): TheatrRow[] {
   };
   const pending: TheatrRow[] = [];
   for (const r of rows) {
-    const undatedDup = r.list === 'attended' && !r.date && datedTitles.has(titleKey(r));
+    const undatedDup = r.list === 'attended' && !r.date && !r.dateDropped && datedTitles.has(titleKey(r));
     if (undatedDup) {
       const prev = out.find((o) => titleKey(o) === titleKey(r) && o.date);
       if (prev) fill(prev, r);
       else pending.push(r); // its dated copy comes later
       continue;
     }
-    const key = `${titleKey(r)}|${r.date || ''}`;
+    const key = `${titleKey(r)}|${r.date || (r.dateDropped ? 'dropped' : '')}`;
     const prev = byKey.get(key);
     if (prev) { fill(prev, r); continue; }
     const copy = { ...r };
@@ -179,10 +239,11 @@ export function theatrRowsToEntries(rows: TheatrRow[]): RawImportEntry[] {
     : { title: r.title, venue: r.venue, rating: null, sourceScore: null, date: null, reviewText: null, kind: 'watchlist' as const, listName: 'Interested' });
 }
 
-/** The whole client-side pipeline after the edge function: feed dates,
- *  backfill days, repeats, then import entries. */
-export function theatrRowsPipeline(rows: TheatrRow[], today: string): { entries: RawImportEntry[]; feedDates: number; backfillDropped: number } {
-  const dated = resolveFeedDates(rows, today);
+/** The whole client-side pipeline after the edge function, given each
+ *  batch's rows in screenshot order: stitch batches, feed dates, backfill
+ *  days, repeats, then import entries. */
+export function theatrRowsPipeline(batches: TheatrRow[][], today: string): { entries: RawImportEntry[]; feedDates: number; backfillDropped: number } {
+  const dated = resolveFeedDates(stitchBatchRows(batches), today);
   const { rows: cleaned, dropped } = dropBackfillDates(dated);
   const merged = mergeTheatrRows(cleaned);
   return {

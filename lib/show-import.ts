@@ -16,8 +16,8 @@ import {
   THEATR_ERROR_COPY,
   THEATR_MAX_EDGE,
   THEATR_MAX_SCREENSHOTS,
-  chunk,
   invokeErrorCode,
+  overlapBatches,
   theatrNotices,
   theatrRowsPipeline,
   type TheatrRow,
@@ -232,15 +232,17 @@ export async function acquireFromTheatrScreenshots(
   const supabase = getSupabaseClient();
   if (!supabase) throw new Error(THEATR_ERROR_COPY.unauthorized);
 
+  // Selection order (orderedSelection): the feed walk needs screenshots top
+  // to bottom, which is the order users pick them in.
   const picked = shots.slice(0, THEATR_MAX_SCREENSHOTS);
-  const batches = chunk(picked, THEATR_BATCH_SIZE);
-  // Indexed by batch so the merge sees rows in screenshot order, whichever
+  const batches = overlapBatches(picked.map((_, i) => i), THEATR_BATCH_SIZE);
+  // Indexed by batch so the stitch sees rows in screenshot order, whichever
   // batch finishes first.
   const rowsByBatch: TheatrRow[][] = batches.map(() => []);
+  const read = new Set<number>(); // screenshots a successful call covered
+  const seen = new Set<number>(); // for progress: each screenshot once
   let unreadable = 0;
-  let failedScreenshots = 0;
   let firstError: string | null = null;
-  let done = 0;
   onProgress?.(0, picked.length);
 
   const runBatch = async (batchIndex: number) => {
@@ -248,12 +250,13 @@ export async function acquireFromTheatrScreenshots(
     // One at a time (a 48MP photo decodes to ~200MB; twelve in parallel can
     // get the app killed), and one unreadable image must not sink the rest.
     const images: { mediaType: string; data: string }[] = [];
-    for (const shot of batch) {
+    const ok: number[] = [];
+    for (const i of batch) {
       try {
-        images.push(await screenshotToJpegBase64(shot));
-      } catch { /* counted below */ }
+        images.push(await screenshotToJpegBase64(picked[i]));
+        ok.push(i);
+      } catch { /* not in `read`, so counted as failed */ }
     }
-    failedScreenshots += batch.length - images.length;
     if (images.length < batch.length && !firstError) firstError = 'invalid_images';
     try {
       if (images.length === 0) return;
@@ -263,14 +266,14 @@ export async function acquireFromTheatrScreenshots(
       if (error || !data) throw new Error(invokeErrorCode(error));
       if (!data.ok) throw new Error(data.error || 'internal');
       rowsByBatch[batchIndex] = data.entries || [];
+      ok.forEach((i) => read.add(i));
       unreadable += data.unreadableImages || 0;
     } catch (err) {
-      failedScreenshots += images.length;
       const code = err instanceof Error ? err.message : 'internal';
       if (!firstError || firstError === 'invalid_images') firstError = code;
     } finally {
-      done += batch.length;
-      onProgress?.(done, picked.length);
+      batch.forEach((i) => seen.add(i));
+      onProgress?.(seen.size, picked.length);
     }
   };
 
@@ -279,13 +282,19 @@ export async function acquireFromTheatrScreenshots(
     while (next < batches.length) await runBatch(next++);
   }));
 
-  const { entries, feedDates, backfillDropped } = theatrRowsPipeline(rowsByBatch.flat(), localToday());
+  const { entries, feedDates, backfillDropped } = theatrRowsPipeline(rowsByBatch, localToday());
   if (entries.length === 0) {
     const code = firstError || 'no_shows';
     throw new Error(THEATR_ERROR_COPY[code] || THEATR_ERROR_COPY.internal);
   }
   return {
     entries,
-    notices: theatrNotices(entries, { picked: shots.length, failedScreenshots, unreadable, feedDates, backfillDropped }),
+    notices: theatrNotices(entries, {
+      picked: shots.length,
+      failedScreenshots: picked.length - read.size,
+      unreadable,
+      feedDates,
+      backfillDropped,
+    }),
   };
 }
