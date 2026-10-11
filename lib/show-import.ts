@@ -8,6 +8,7 @@
  */
 import { File } from 'expo-file-system';
 import { downscaleToJpeg } from './photo-image-pipeline';
+import { localToday } from './stats-scope';
 import { getSupabaseClient } from './supabase';
 import { sanitizeRating } from './rating';
 import {
@@ -17,9 +18,8 @@ import {
   THEATR_MAX_SCREENSHOTS,
   chunk,
   invokeErrorCode,
-  mergeTheatrRows,
   theatrNotices,
-  theatrRowsToEntries,
+  theatrRowsPipeline,
   type TheatrRow,
   type TheatrScreenshotResponse,
 } from './theatr-import';
@@ -279,11 +279,13 @@ export async function acquireFromTheatrScreenshots(
     while (next < batches.length) await runBatch(next++);
   }));
 
-  const merged = mergeTheatrRows(rowsByBatch.flat());
-  if (merged.length === 0) {
+  const { entries, feedDates, backfillDropped } = theatrRowsPipeline(rowsByBatch.flat(), localToday());
+  if (entries.length === 0) {
     const code = firstError || 'no_shows';
     throw new Error(THEATR_ERROR_COPY[code] || THEATR_ERROR_COPY.internal);
   }
-  const entries = theatrRowsToEntries(merged);
-  return { entries, notices: theatrNotices(entries, { picked: shots.length, failedScreenshots, unreadable }) };
+  return {
+    entries,
+    notices: theatrNotices(entries, { picked: shots.length, failedScreenshots, unreadable, feedDates, backfillDropped }),
+  };
 }

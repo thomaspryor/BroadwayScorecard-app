@@ -753,9 +753,10 @@ export default function ImportScreen() {
             <View>
               <Text style={styles.sourceLabel}>📸 Theatr</Text>
               <Text style={styles.sourceHint}>
-                Theatr has no export, so pick screenshots instead. In the app: Profile → Collection → Attended (and
-                Interested), then screenshot the list as you scroll. Up to {THEATR_MAX_SCREENSHOTS} screenshots. We only
-                read the show names and dates; the images aren&apos;t saved.
+                Theatr has no export, so pick screenshots instead. In the app: Profile → Activity, then screenshot the
+                feed from the top as you scroll down, and pick them in that order. Up to {THEATR_MAX_SCREENSHOTS}
+                screenshots. We read the shows, dates, and your reviews and scores (like 84/100); the images
+                aren&apos;t saved.
               </Text>
               <Pressable style={styles.smallBtnGhost} onPress={handlePickTheatrScreenshots}>
                 <Text style={styles.smallBtnGhostText}>Choose Screenshots</Text>
