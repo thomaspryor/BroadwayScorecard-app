@@ -120,6 +120,46 @@ function run(cmd, cmdArgs, opts = {}) {
   });
 }
 
+/**
+ * BRO-4896: after a failed `eas build --auto-submit`, find out whether the
+ * build itself finished (then the submit failed) and, if so, retry the submit
+ * for that same build (no new build cost) with its output captured and logged,
+ * so the CI log names Apple's actual reason. Never throws: diagnostics must not
+ * mask the original failure.
+ * @param {Function} runFn run(cmd, args, opts) -> stdout string
+ * @param {Error} [buildErr] the original failure
+ * @returns {{buildId: string|null, submitted: boolean, detail: string}}
+ */
+function surfaceSubmitFailure(runFn, buildErr) {
+  const result = { buildId: null, submitted: false, detail: '' };
+  try {
+    const out = runFn('npx', [
+      'eas-cli', 'build:list', '--platform', 'ios', '--build-profile', 'production',
+      '--limit', '1', '--json', '--non-interactive',
+    ]);
+    const start = out.indexOf('[');
+    const latest = start === -1 ? null : JSON.parse(out.slice(start))[0];
+    if (!latest || latest.status !== 'FINISHED') {
+      result.detail = `latest build is ${latest ? latest.status : 'missing'}, not a submit failure`;
+      console.error(`ship: ${result.detail}`);
+      return result;
+    }
+    result.buildId = latest.id;
+    console.error(`\nship: build ${latest.id} finished but auto-submit failed; retrying submit to capture Apple's error`);
+    const submitOut = runFn('npx', [
+      'eas-cli', 'submit', '--platform', 'ios', '--id', latest.id, '--non-interactive',
+    ]);
+    result.submitted = true;
+    result.detail = submitOut;
+    console.error(submitOut);
+    console.error('ship: retry submit SUCCEEDED, the build is on its way to TestFlight');
+  } catch (e) {
+    result.detail = [e.stdout, e.stderr, e.message].filter(Boolean).join('\n');
+    console.error(`ship: submit diagnostics:\n${result.detail}`);
+  }
+  return result;
+}
+
 /** Native fingerprint of the working tree, as EAS computes it. */
 function localFingerprint() {
   const out = run('npx', ['expo-updates', 'fingerprint:generate', '--platform', 'ios']);
@@ -513,13 +553,20 @@ function main() {
 
   if (mode === 'build') {
     console.log('\n$ eas build --platform ios --profile production --non-interactive --auto-submit');
-    run('npx', [
-      'eas-cli', 'build',
-      '--platform', 'ios',
-      '--profile', 'production',
-      '--non-interactive',
-      '--auto-submit',
-    ], { stdio: 'inherit' });
+    try {
+      run('npx', [
+        'eas-cli', 'build',
+        '--platform', 'ios',
+        '--profile', 'production',
+        '--non-interactive',
+        '--auto-submit',
+      ], { stdio: 'inherit' });
+    } catch (err) {
+      // BRO-4896: auto-submit failures print only "Something went wrong when
+      // submitting your app", hiding Apple's reason from the CI log.
+      surfaceSubmitFailure(run, err);
+      throw err;
+    }
   } else {
     const message = commitSubject().slice(0, 100);
     console.log(`\n$ eas update --branch production --environment production --message "${message}"`);
@@ -616,4 +663,5 @@ module.exports = {
   parseLoadedVars,
   parseRuntimeVersion,
   publicVarsUsedInSource,
+  surfaceSubmitFailure,
 };
