@@ -558,7 +558,7 @@ export default function ImportScreen() {
     if (choice.source === 'mezzanine' && user) {
       // Give the production a row of its own so it stops being unmatchable
       // for everyone else too (self-heal loop, web parity).
-      supabaseRestInsert('user_show_stubs', stubRowFromCandidate(choice.candidate, user.id)).catch(() => {});
+      supabaseRestInsert('user_show_stubs', stubRowFromCandidate(choice.candidate, user.id), { returning: 'minimal' }).catch(() => {});
     }
     // Without this the picked production renders as a raw slug in Watched /
     // To Watch / Lists — it has no entry in the scored catalog.

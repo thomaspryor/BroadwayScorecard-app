@@ -295,7 +295,7 @@ export function ShowSearchModal({
       // for everyone else too (self-heal loop, web parity). Best-effort —
       // the diary-title cache alone keeps the row readable locally.
       if (user) {
-        supabaseRestInsert('user_show_stubs', stubRowFromCandidate(candidate, user.id)).catch(() => {});
+        supabaseRestInsert('user_show_stubs', stubRowFromCandidate(candidate, user.id), { returning: 'minimal' }).catch(() => {});
       }
       recordDiaryTitles({
         [candidate.id]: {
