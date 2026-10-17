@@ -47,14 +47,9 @@ import * as Crypto from 'expo-crypto';
 import { enqueuePhotoUpload, flushPhotoQueue } from '@/lib/photo-upload-queue';
 import type { ProcessedPhoto } from '@/lib/photo-image-pipeline';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
+import { getProductionMarketLabel } from '@/lib/production-labels';
 
 const MAX_CHARS = 2000;
-
-const MARKET_LABELS: Record<string, string> = {
-  'broadway': 'Broadway',
-  'off-broadway': 'Off-Broadway',
-  'west-end': 'West End',
-};
 
 /** Mode eyebrow above the header title — web parity (RatingEditor HEADER_COPY). */
 const MODE_EYEBROW = {
@@ -89,7 +84,7 @@ export default function RateModal() {
 
   // Production context — which run of this title is being rated
   const category = show?.category ?? diaryMeta?.category;
-  const marketLabel = category ? MARKET_LABELS[category] || null : null;
+  const marketLabel = getProductionMarketLabel(category);
   const openingDate = show?.openingDate ?? diaryMeta?.openingDate;
   const openingYear = openingDate ? openingDate.slice(0, 4) : null;
   const closingYear = show?.closingDate ? show.closingDate.slice(0, 4) : null;

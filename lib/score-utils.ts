@@ -85,13 +85,14 @@ export function isCriticalGold(score: number | null | undefined, category?: stri
 
 /**
  * Minimum reviews before a composite score is shown — mirrors web
- * getMarketMinReviews (Broadway/West End = 5, Off-Broadway/Off-WE/Regional = 3).
+ * getMarketMinReviews (Broadway/West End = 5, Off-Broadway/Off-WE/Regional/Tour = 3).
  */
 export function getMarketMinReviews(category?: string): number {
   switch (category) {
     case 'off-broadway':
     case 'off-west-end':
     case 'regional':
+    case 'tour': // web parity: src/config/markets.json tour.minReviews = 3
       return 3;
     default:
       return 5;

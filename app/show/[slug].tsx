@@ -13,6 +13,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { useShows } from '@/lib/data-context';
 import { fetchShowDetail, fetchSocialPulse } from '@/lib/api';
 import { getImageUrl } from '@/lib/images';
+import { getProductionMarketLabel } from '@/lib/production-labels';
 import { getRelatedShows } from '@/lib/related-shows';
 import { useRelatedPicks } from '@/hooks/useRelatedPicks';
 import { nowMs } from '@/lib/date-utils';
@@ -730,9 +731,7 @@ export default function ShowDetailScreen() {
           <SectionCard title="Other Productions" meta={show.title}>
             {otherProductions.map(prod => {
               const prodPoster = getImageUrl(prod.images.poster) || getImageUrl(prod.images.thumbnail);
-              const marketLabel = prod.category === 'west-end' ? 'West End'
-                : prod.category === 'off-broadway' ? 'Off-Broadway'
-                : 'Broadway';
+              const marketLabel = getProductionMarketLabel(prod.category);
               const openYear = prod.openingDate ? new Date(prod.openingDate + 'T12:00:00').getFullYear() : null;
               const closeYear = prod.closingDate ? new Date(prod.closingDate + 'T12:00:00').getFullYear() : null;
               const yearRange = openYear
