@@ -5,7 +5,8 @@
 
 import React, { useMemo, useState, useCallback, useRef } from 'react';
 import { View, Text, TextInput, FlatList, StyleSheet, ScrollView, Pressable, RefreshControl, Platform, useWindowDimensions } from 'react-native';
-import Fuse, { IFuseOptions } from 'fuse.js';
+import Fuse from 'fuse.js';
+import { SHOW_SEARCH_FUSE_OPTIONS } from '@/lib/show-search';
 import { ShowListSkeleton } from '@/components/Skeleton';
 import { BottomScrim } from '@/components/BottomScrim';
 import * as Haptics from 'expo-haptics';
@@ -82,16 +83,6 @@ function FilterPill({ label, active, onPress, color }: { label: string; active: 
   );
 }
 
-const FUSE_OPTIONS: IFuseOptions<Show> = {
-  keys: [
-    { name: 'title', weight: 2 },
-    { name: 'venue', weight: 1 },
-    { name: 'creativeTeam.name', weight: 0.7 },
-  ],
-  threshold: 0.35,
-  includeScore: true,
-  minMatchCharLength: 2,
-};
 
 export default function BrowseScreen() {
   const { shows, isLoading, refresh, error } = useShows();
@@ -133,7 +124,7 @@ export default function BrowseScreen() {
   }, [isAuthenticated, toggleLocal, watchlistSet, addToWatchlist, removeFromWatchlist]);
 
   // Fuse search
-  const fuse = useMemo(() => new Fuse(shows, FUSE_OPTIONS), [shows]);
+  const fuse = useMemo(() => new Fuse(shows, SHOW_SEARCH_FUSE_OPTIONS), [shows]);
   const searchResults = useMemo(() => {
     const q = searchQuery.trim();
     if (q.length < 2) return null;
@@ -261,6 +252,16 @@ export default function BrowseScreen() {
       <View style={[styles.center, { paddingTop: insets.top }]}>
         <Text style={styles.errorText}>{error}</Text>
         <Text style={styles.hintText}>Check your internet connection and try again.</Text>
+        <Pressable
+          style={({ pressed }) => [styles.retryButton, pressed && { opacity: 0.7 }]}
+          onPress={onRefresh}
+          disabled={refreshing}
+          accessibilityRole="button"
+          accessibilityLabel="Try again"
+          accessibilityState={{ busy: refreshing }}
+        >
+          <Text style={styles.retryText}>{refreshing ? 'Loading…' : 'Try Again'}</Text>
+        </Pressable>
       </View>
     );
   }
@@ -312,6 +313,7 @@ export default function BrowseScreen() {
               <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
                 style={[styles.filterGroup, { maxWidth: filterGroupMaxWidth(windowWidth, scoreToggleWidth) }]}
               >
                 {STATUS_OPTIONS.map(opt => (
@@ -331,7 +333,7 @@ export default function BrowseScreen() {
             }
             {/* Type + Sort + OB toggle + Advanced filters */}
             {!searchResults && <View style={styles.filterRowInline}>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterGroup}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" style={styles.filterGroup}>
                 {/* Advanced filters entry point — desktop parity
                     (beta feedback 2026-07-26). */}
                 <FilterPill
@@ -376,6 +378,11 @@ export default function BrowseScreen() {
         }
         contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + TAB_BAR_CLEARANCE }]}
         showsVerticalScrollIndicator={false}
+        // The search field lives in the list header: the first tap on a result
+        // opens it (not just dismisses the keyboard), and scrolling hides the
+        // keyboard like other iOS search lists.
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
         windowSize={5}
         maxToRenderPerBatch={8}
         initialNumToRender={10}
@@ -532,5 +539,17 @@ const styles = StyleSheet.create({
     color: Colors.text.muted,
     fontSize: FontSize.md,
     textAlign: 'center',
+  },
+  retryButton: {
+    marginTop: Spacing.lg,
+    backgroundColor: Colors.brand,
+    borderRadius: BorderRadius.md,
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.xl,
+  },
+  retryText: {
+    color: Colors.text.inverse,
+    fontSize: FontSize.md,
+    fontWeight: '800',
   },
 });

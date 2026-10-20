@@ -59,6 +59,8 @@ const FUSE_OPTIONS: IFuseOptions<Show> = {
   ],
   threshold: 0.35,
   minMatchCharLength: 2,
+  // Match anywhere in the title, not only near its start (web parity).
+  ignoreLocation: true,
 };
 
 const DIARY_FUSE_OPTIONS: IFuseOptions<MatchCandidate> = {

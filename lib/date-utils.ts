@@ -37,3 +37,18 @@ export function toLocalYMD(d: Date): string {
   const offsetMs = d.getTimezoneOffset() * 60 * 1000;
   return new Date(d.getTime() - offsetMs).toISOString().split('T')[0];
 }
+
+/**
+ * Parse a stored calendar date ("YYYY-MM-DD", or a longer ISO string whose
+ * first 10 characters are one) as LOCAL NOON. Bare `new Date('2026-03-05')` is
+ * UTC midnight, which every US timezone renders as the previous day (and the
+ * previous month or year on the 1st). Noon stays on the stored date in every
+ * timezone from UTC-12 to UTC+11. Returns null for missing or malformed input.
+ */
+export function parseLocalDate(dateStr: string | null | undefined): Date | null {
+  if (!dateStr) return null;
+  const ymd = dateStr.slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return null;
+  const d = new Date(`${ymd}T12:00:00`);
+  return Number.isNaN(d.getTime()) ? null : d;
+}

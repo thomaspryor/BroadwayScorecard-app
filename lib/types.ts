@@ -22,7 +22,7 @@ export interface MobileShow {
   s: string;      // slug
   v: string;      // venue
   st: string;     // status: open | closed | previews | upcoming
-  ty: string;     // type: musical | play
+  ty?: string;    // type: musical | play | opera | special (may be missing)
   cat?: string;   // category: broadway (default) | off-broadway | west-end
   od?: string;    // openingDate (ISO date)
   cd?: string;    // closingDate (ISO date)
@@ -37,7 +37,10 @@ export interface MobileShow {
     rc: number;   // reviewCount
     l: string;    // label (Critical Gold, Recommended, etc.)
     t1: number;   // tier1Count
+    t2?: number;  // tier2Count (absent in the bundled seed)
+    q?: number;   // 1/0: the website's hasEnoughReviews verdict (absent on older feeds)
   };
+  ps?: string;    // previewsStartDate (YYYY-MM-DD), absent on older feeds
   ag?: {
     g: string;    // grade (A+, B-, etc.)
     l: string;    // label (Loving It, Shrugging, etc.)
@@ -71,6 +74,8 @@ export interface Show {
   category: string;
   openingDate: string | null;
   closingDate: string | null;
+  /** First preview (YYYY-MM-DD) from the feed's `ps`; null on older feeds. */
+  previewsStartDate: string | null;
   /** Tickets on sale for a not-yet-open show (watchlist bookability label) */
   ticketsOnSale: boolean;
   images: {
@@ -83,6 +88,11 @@ export interface Show {
     reviewCount: number;
     label: string;
     tier1Count: number;
+    /** Undefined when the feed predates `cr.t2` (seed data). */
+    tier2Count?: number;
+    /** The website's display verdict (`cr.q`); undefined on older feeds, which
+     *  fall back to the local rule in lib/score-gate.ts. */
+    qualified?: boolean;
   } | null;
   audienceGrade: {
     grade: string;
@@ -414,10 +424,13 @@ export function mapMobileShow(raw: MobileShow): Show {
     slug: raw.s ?? '',
     venue: normalizeVenue(raw.v ?? ''),
     status: raw.st ?? 'closed',
-    type: raw.ty ?? 'play',
+    // No 'play' default: a missing type renders as a neutral EVENT pill (web
+    // resolveShowFormat), not as a mislabelled PLAY.
+    type: raw.ty ?? '',
     category: raw.cat ?? 'broadway',
     openingDate: raw.od ?? null,
     closingDate: raw.cd ?? null,
+    previewsStartDate: raw.ps ?? null,
     ticketsOnSale: raw.tx === 1,
     images: {
       thumbnail: raw.img?.th ?? null,
@@ -430,6 +443,8 @@ export function mapMobileShow(raw: MobileShow): Show {
           reviewCount: raw.cr.rc,
           label: raw.cr.l,
           tier1Count: raw.cr.t1,
+          ...(typeof raw.cr.t2 === 'number' ? { tier2Count: raw.cr.t2 } : {}),
+          ...(raw.cr.q === 1 || raw.cr.q === 0 ? { qualified: raw.cr.q === 1 } : {}),
         }
       : null,
     audienceGrade: raw.ag

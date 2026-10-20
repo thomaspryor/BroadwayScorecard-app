@@ -44,6 +44,11 @@ const SIZES = {
   large: { box: 64, font: FontSize.xxl, showsLabel: true, labelMaxWidth: 84, radius: BorderRadius.md },
 } as const;
 
+/** "TBD" is three glyphs where a score is two, so it runs a size smaller to keep its padding. */
+const TBD_FONT_SCALE = 0.8;
+/** The app-wide 12pt text floor; matches the web MiniShowCard TBD chip (text-xs). */
+const TBD_MIN_FONT = 12;
+
 const GOLD_GRADIENT: [string, string, string, string, string] = [
   '#DAA520', '#FFD700', '#FFF0A0', '#FFD700', '#DAA520',
 ];
@@ -95,8 +100,12 @@ export function ScoreBadge({ score, category, size = 'medium', showLabel = false
   const dim = SIZES[size];
 
   if (!tier || score == null) {
+    const tbdFont = Math.max(TBD_MIN_FONT, Math.round(dim.font * TBD_FONT_SCALE));
+    // Web parity: a show without a displayable score reads "TBD" in muted
+    // gray, the same box as a scored badge (score badges are sacred). "—"
+    // looked like missing data rather than "score coming".
     return (
-      <View style={styles.wrapper} accessible accessibilityLabel="No score available" accessibilityRole="text">
+      <View style={styles.wrapper} accessible accessibilityLabel="Score to be determined" accessibilityRole="text">
         <View
           style={[
             styles.badge,
@@ -108,7 +117,15 @@ export function ScoreBadge({ score, category, size = 'medium', showLabel = false
             },
           ]}
         >
-          <Text style={[styles.score, { fontSize: dim.font }]}>—</Text>
+          <Text
+            style={[styles.score, styles.tbd, { fontSize: tbdFont }]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            // Shrinks for large Dynamic Type, never below the 12pt floor.
+            minimumFontScale={TBD_MIN_FONT / tbdFont}
+          >
+            TBD
+          </Text>
         </View>
       </View>
     );
@@ -213,6 +230,10 @@ const styles = StyleSheet.create({
   score: {
     fontWeight: '700',
     fontVariant: ['tabular-nums'],
+  },
+  tbd: {
+    color: Colors.text.secondary,
+    letterSpacing: 0.3,
   },
   // Sizes live here (not in SIZES) so scripts/check-font-floor.js can see them
   // and account for them as documented exemptions rather than being blind to a

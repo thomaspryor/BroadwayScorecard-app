@@ -17,7 +17,18 @@ import { getProductionMarketLabel } from '@/lib/production-labels';
 import { getRelatedShows } from '@/lib/related-shows';
 import { useRelatedPicks } from '@/hooks/useRelatedPicks';
 import { nowMs } from '@/lib/date-utils';
-import { getScoreColor, getContrastTextColor, getMarketMinReviews, getQualifiedScore } from '@/lib/score-utils';
+import {
+  getScoreColor,
+  getContrastTextColor,
+  getQualifiedScore,
+  getScoreTierLabel,
+  getStatusFactLabel,
+  isScoreTBD,
+  reviewsRemainingForShow,
+} from '@/lib/score-utils';
+import { countBreakdown } from '@/lib/breakdown';
+import { getOpeningVerb } from '@/lib/run-info';
+import { resolveShowSlug } from '@/lib/slug-fallback';
 import { Show, ShowDetail, MobileShowDetail, mapShowDetail } from '@/lib/types';
 import { ScoreBadge, StatusBadge, FormatPill, ProductionPill, CategoryBadge } from '@/components/show-cards';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
@@ -43,6 +54,9 @@ import { useLocalWatchlist } from '@/hooks/useLocalWatchlist';
 import { useMyRatingsMap } from '@/hooks/useMyRatingsMap';
 import { featureFlags } from '@/lib/feature-flags';
 
+/** Critic reviews shown before "Show all" (website CollapsibleReviews initialCount). */
+const INITIAL_REVIEW_COUNT = 5;
+
 interface SocialPulsePayload {
   _v: number;
   t: 'Buzzing' | 'Rising' | 'Steady' | 'Troubled' | 'BuildingBaseline' | 'Hidden';
@@ -58,10 +72,12 @@ interface SocialPulsePayload {
 
 export default function ShowDetailScreen() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
-  const { shows } = useShows();
+  const { shows, isLoading: showsLoading, refresh } = useShows();
+  const [retrying, setRetrying] = useState(false);
   const router = useRouter();
-  const [detail, setDetail] = useState<ShowDetail | null>(null);
-  const [detailLoading, setDetailLoading] = useState(true);
+  // Detail JSON, tagged with the show it belongs to so a different show id
+  // never renders the previous show's reviews while its own detail loads.
+  const [detailState, setDetailState] = useState<{ id: string; detail: ShowDetail | null } | null>(null);
   const [showAllReviews, setShowAllReviews] = useState(false);
   const [showAllCast, setShowAllCast] = useState(false);
   const [socialPulse, setSocialPulse] = useState<SocialPulsePayload | null>(null);
@@ -79,9 +95,14 @@ export default function ShowDetailScreen() {
       if (y > 40000) clearInterval(id);
     }, 1400);
     return () => clearInterval(id);
-  }, [detail]);
+  }, [detailState]);
 
-  const show = useMemo(() => shows.find(s => s.slug === slug), [shows, slug]);
+  // Exact slug, or an old/renamed link resolved the way the website's
+  // redirects resolve it (lib/slug-fallback.ts). Anything else gets the
+  // not-found view below, with suggestions when the slug is ambiguous.
+  const resolution = useMemo(() => resolveShowSlug(slug, shows), [slug, shows]);
+  const show = resolution.kind === 'found' || resolution.kind === 'redirect' ? resolution.show : undefined;
+  const showId = show?.id;
   const { user, isAuthenticated } = useAuth();
   const { isWatchlisted, addToWatchlist, removeFromWatchlist } = useWatchlist(user?.id || null);
   const { isSavedLocally, toggleLocal } = useLocalWatchlist();
@@ -212,36 +233,41 @@ export default function ShowDetailScreen() {
     });
   }, [show]);
 
+  // Keyed on the show id, not the object: a background feed refresh hands
+  // back new Show objects for the same show, which used to refetch the
+  // detail JSON on every refresh. A real id change (a redirect resolving
+  // once the feed loads) clears the previous show's detail first.
   useEffect(() => {
-    if (!show) return;
+    if (!showId) return;
     let cancelled = false;
     (async () => {
+      let next: ShowDetail | null = null;
       try {
-        const raw = await fetchShowDetail(show.id);
-        if (!cancelled && raw) {
-          setDetail(mapShowDetail(raw as MobileShowDetail));
-        }
+        const raw = await fetchShowDetail(showId);
+        if (raw) next = mapShowDetail(raw as MobileShowDetail);
       } catch {
         // Detail fetch failed — show page still works with browse data
-      } finally {
-        if (!cancelled) setDetailLoading(false);
       }
+      if (!cancelled) setDetailState({ id: showId, detail: next });
     })();
     return () => { cancelled = true; };
-  }, [show]);
+  }, [showId]);
+  const detailReady = detailState != null && detailState.id === showId;
+  const detail = detailReady ? detailState.detail : null;
+  const detailLoading = !detailReady;
 
   // Fetch social pulse data
   useEffect(() => {
-    if (!show) return;
+    if (!showId) return;
     let cancelled = false;
-    fetchSocialPulse(show.id).then(raw => {
+    fetchSocialPulse(showId).then(raw => {
       if (!cancelled && raw) {
         const sp = raw as SocialPulsePayload;
         if (sp.t !== 'Hidden') setSocialPulse(sp);
       }
     }).catch(() => {});
     return () => { cancelled = true; };
-  }, [show?.id]);
+  }, [showId]);
 
   // Track show detail view (once per show load — keyed on id, not object ref)
   useEffect(() => {
@@ -253,18 +279,93 @@ export default function ShowDetailScreen() {
   }, [show?.id]);
 
   if (!show) {
+    // The feed is still loading (cold launch from a deep link or a shared
+    // link): a skeleton, not a "Show not found" flash.
+    if ((showsLoading && shows.length === 0) || retrying) {
+      return (
+        <>
+          <Stack.Screen options={{ title: '' }} />
+          <ShowDetailSkeleton />
+        </>
+      );
+    }
+    const handleRetry = async () => {
+      setRetrying(true);
+      try {
+        await refresh();
+      } finally {
+        setRetrying(false);
+      }
+    };
+    const searchQuery = resolution.kind === 'suggest' || resolution.kind === 'search' ? resolution.query : '';
     return (
-      <View style={styles.center}>
-        <Text style={styles.notFoundText}>Show not found</Text>
-      </View>
+      <>
+        <Stack.Screen options={{ title: '' }} />
+        <ScrollView style={styles.notFoundScroll} contentContainerStyle={styles.notFoundContent}>
+          <Text style={styles.notFoundTitle} accessibilityRole="header">
+            {resolution.kind === 'suggest' ? 'Which show did you mean?' : 'Show not found'}
+          </Text>
+          <Text style={styles.notFoundText}>
+            {resolution.kind === 'suggest'
+              ? 'This link matches more than one production.'
+              : 'This link may be out of date, or the show list has not finished updating.'}
+          </Text>
+          {resolution.kind === 'suggest' && (
+            <View style={styles.notFoundList}>
+              {resolution.shows.map(s => (
+                <Pressable
+                  key={s.id}
+                  style={({ pressed }) => [styles.notFoundRow, pressed && styles.pressed]}
+                  onPress={() => router.replace(`/show/${s.slug}`)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${s.title}${s.openingDate ? `, ${s.openingDate.slice(0, 4)}` : ''}`}
+                >
+                  <Text style={styles.notFoundRowTitle} numberOfLines={1}>{s.title}</Text>
+                  <Text style={styles.notFoundRowMeta} numberOfLines={1}>
+                    {[s.venue, s.openingDate?.slice(0, 4)].filter(Boolean).join(' · ')}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          )}
+          <View style={styles.notFoundActions}>
+            {resolution.kind !== 'suggest' && (
+              <Pressable
+                style={({ pressed }) => [styles.notFoundPrimary, pressed && styles.pressed]}
+                onPress={handleRetry}
+                accessibilityRole="button"
+                accessibilityLabel="Try again"
+              >
+                <Text style={styles.notFoundPrimaryText}>Try Again</Text>
+              </Pressable>
+            )}
+            <Pressable
+              style={({ pressed }) => [styles.notFoundSecondary, pressed && styles.pressed]}
+              onPress={() => router.push(searchQuery ? { pathname: '/search', params: { q: searchQuery } } : '/search')}
+              accessibilityRole="button"
+              accessibilityLabel="Search shows"
+            >
+              <Text style={styles.notFoundSecondaryText}>Search Shows</Text>
+            </Pressable>
+          </View>
+        </ScrollView>
+      </>
     );
   }
 
   const posterUrl = getImageUrl(show.images.poster) || getImageUrl(show.images.thumbnail);
 
-  // Market-aware minimum reviews before showing a composite (mirrors the website's gate)
-  const hasEnoughReviews = (show.criticScore?.reviewCount ?? 0) >= getMarketMinReviews(show.category);
-  const displayScore = getQualifiedScore(show);
+  // Website gate (lib/score-gate.ts): no number until the show has enough
+  // reviews for its market and is past previews. TBD hides the score, the
+  // tier word, the audience chip and the breakdown bar, as the website does.
+  const scoreTBD = isScoreTBD(show);
+  const displayScore = scoreTBD ? null : getQualifiedScore(show);
+  const sentimentLabel = getScoreTierLabel(displayScore, show.category);
+  const criticReviewCount = show.criticScore?.reviewCount ?? 0;
+  const reviewsStillNeeded =
+    scoreTBD && show.status !== 'previews' && show.status !== 'upcoming' ? reviewsRemainingForShow(show) : 0;
+  const openingVerb = getOpeningVerb(show.openingDate, show.status);
+  const shareShow = displayScore === show.compositeScore ? null : { ...show, compositeScore: displayScore };
 
   return (
     <>
@@ -335,7 +436,7 @@ export default function ShowDetailScreen() {
               {show.runtime && <Text style={styles.meta} numberOfLines={1}>{show.runtime}</Text>}
               {show.openingDate && (
                 <Text style={styles.meta} numberOfLines={1}>
-                  {show.status === 'previews' ? 'Opens' : 'Opened'} {formatDateShort(show.openingDate)}
+                  {openingVerb} {formatDateShort(show.openingDate)}
                 </Text>
               )}
               {show.closingDate && (
@@ -355,24 +456,26 @@ export default function ShowDetailScreen() {
           <View style={styles.scoreRow}>
             <ScoreBadge score={displayScore} category={show.category} size="large" animated />
             <View style={styles.scoreMeta}>
-              {hasEnoughReviews && show.criticScore ? (
-                <>
-                  <Text style={[styles.sentimentLabel, { color: getScoreColor(displayScore, show.category) }]}>
-                    {show.criticScore.label}
-                  </Text>
-                  <Text style={styles.reviewCountText}>
-                    Based on {show.criticScore.reviewCount} critic reviews
-                  </Text>
-                </>
-              ) : show.criticScore ? (
-                <Text style={styles.reviewCountText}>
-                  {show.criticScore.reviewCount} review{show.criticScore.reviewCount !== 1 ? 's' : ''} — awaiting more reviews
-                </Text>
+              {/* Website hero: tier word from the displayed score (never the
+                  feed's stored label), or "Awaiting Reviews" while TBD. */}
+              {scoreTBD || !sentimentLabel ? (
+                <Text style={[styles.sentimentLabel, styles.sentimentTBD]}>Awaiting Reviews</Text>
               ) : (
-                <Text style={styles.reviewCountText}>Awaiting reviews</Text>
+                <Text style={[styles.sentimentLabel, { color: getScoreColor(displayScore, show.category) }]}>
+                  {sentimentLabel}
+                </Text>
               )}
-              {/* Audience grade chip — matching website */}
-              {show.audienceGrade && (
+              {reviewsStillNeeded > 0 ? (
+                <Text style={styles.reviewCountText}>
+                  {criticReviewCount} {criticReviewCount === 1 ? 'review' : 'reviews'} · {reviewsStillNeeded} more for a score
+                </Text>
+              ) : criticReviewCount > 0 ? (
+                <Text style={styles.reviewCountText}>
+                  Based on {criticReviewCount} critic {criticReviewCount === 1 ? 'review' : 'reviews'}
+                </Text>
+              ) : null}
+              {/* Audience grade chip — website hides it while the score is TBD */}
+              {!scoreTBD && show.audienceGrade && (
                 <View style={[styles.audienceChip, { backgroundColor: show.audienceGrade.color + '26' }]}>
                   <Text style={[styles.audienceChipText, { color: show.audienceGrade.color }]}>
                     Audience: {show.audienceGrade.grade} · {show.audienceGrade.label}
@@ -383,9 +486,9 @@ export default function ShowDetailScreen() {
           </View>
 
           {/* Score Breakdown Bar — right under score row */}
-          {detail?.reviews && detail.reviews.length > 0 && hasEnoughReviews && (
+          {detail?.reviews && detail.reviews.length > 0 && !scoreTBD && (
             <View style={styles.breakdownSection}>
-              <BreakdownBar reviews={detail.reviews} />
+              <BreakdownBar reviews={detail.reviews} category={show.category} />
             </View>
           )}
 
@@ -602,10 +705,10 @@ export default function ShowDetailScreen() {
         {detail?.reviews && detail.reviews.length > 0 && (
           <SectionCard title="Critic Scorecard" meta={`${detail.reviews.length} reviews`}>
             {showsTierChips(show.type) && <TierKey london={isLondonCategory(show.category)} />}
-            {(showAllReviews ? detail.reviews : detail.reviews.slice(0, 3)).map((review, i) => (
+            {(showAllReviews ? detail.reviews : detail.reviews.slice(0, INITIAL_REVIEW_COUNT)).map((review, i) => (
               <ReviewRow key={i} review={review} showId={show.id} category={show.category} showTiers={showsTierChips(show.type)} />
             ))}
-            {!showAllReviews && detail.reviews.length > 3 && (
+            {!showAllReviews && detail.reviews.length > INITIAL_REVIEW_COUNT && (
               <Pressable
                 style={({ pressed }) => [styles.showAllButton, pressed && styles.pressed]}
                 onPress={() => setShowAllReviews(true)}
@@ -782,7 +885,9 @@ export default function ShowDetailScreen() {
         )}
 
         {/* Hidden share card for image capture */}
-        <ShareCardWithRef ref={shareCardRef} show={show} />
+        {/* The share image shows the same gated score as the hero (TBD stays TBD;
+            ShareCard on its own only checks the review count). */}
+        <ShareCardWithRef ref={shareCardRef} show={shareShow ?? show} />
 
         {/* Quick Facts — structured basics + Official Site (relocated from the hero ticket row) */}
         <SectionCard title="Quick Facts">
@@ -790,12 +895,12 @@ export default function ShowDetailScreen() {
             <View style={styles.qfRow}>
               <Text style={styles.qfLabel}>Status</Text>
               <Text style={styles.qfValue}>
-                {show.status === 'open' ? 'Now Playing' : show.status === 'previews' ? 'In Previews' : show.status === 'upcoming' ? 'Upcoming' : 'Closed'}
+                {getStatusFactLabel(show.status)}
               </Text>
             </View>
             {show.openingDate && (
               <View style={styles.qfRow}>
-                <Text style={styles.qfLabel}>{show.status === 'previews' || show.status === 'upcoming' ? 'Opens' : 'Opened'}</Text>
+                <Text style={styles.qfLabel}>{openingVerb}</Text>
                 <Text style={styles.qfValue}>{formatQuickFactDate(show.openingDate)}</Text>
               </View>
             )}
@@ -867,15 +972,14 @@ export default function ShowDetailScreen() {
 // SUB-COMPONENTS
 // ===========================================
 
-function BreakdownBar({ reviews }: { reviews: ShowDetail['reviews'] }) {
-  const counts = { Rave: 0, Positive: 0, Mixed: 0, Negative: 0 };
-  for (const r of reviews) {
-    if (r.bucket === 'Rave') counts.Rave++;
-    else if (r.bucket === 'Positive') counts.Positive++;
-    else if (r.bucket === 'Mixed') counts.Mixed++;
-    else if (r.bucket === 'Negative') counts.Negative++;
-  }
-  const total = counts.Rave + counts.Positive + counts.Mixed + counts.Negative;
+/**
+ * Rave / Positive / Mixed / Negative bar. Each review is classified from its
+ * score with the website's thresholds (lib/breakdown.ts), not from the feed's
+ * bucket word: "Pan" reviews used to fall out of the bar entirely.
+ */
+function BreakdownBar({ reviews, category }: { reviews: ShowDetail['reviews']; category: string }) {
+  const { rave, positive, mixed, negative, total } = countBreakdown(reviews, category);
+  const counts = { Rave: rave, Positive: positive, Mixed: mixed, Negative: negative };
   if (total === 0) return null;
 
   const raveColor = '#FFD700';  // gold
@@ -1961,15 +2065,75 @@ const styles = StyleSheet.create({
   content: {
     paddingBottom: Spacing.xxl,
   },
-  center: {
+  notFoundScroll: {
     flex: 1,
     backgroundColor: Colors.surface.default,
-    alignItems: 'center',
+  },
+  notFoundContent: {
+    flexGrow: 1,
     justifyContent: 'center',
+    padding: Spacing.xl,
+    gap: Spacing.md,
+  },
+  notFoundTitle: {
+    color: Colors.text.primary,
+    fontSize: FontSize.xl,
+    fontWeight: '800',
+    textAlign: 'center',
   },
   notFoundText: {
     color: Colors.text.muted,
-    fontSize: FontSize.lg,
+    fontSize: FontSize.md,
+    textAlign: 'center',
+  },
+  notFoundList: {
+    gap: Spacing.sm,
+    marginTop: Spacing.sm,
+  },
+  notFoundRow: {
+    backgroundColor: Colors.surface.raised,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: Colors.border.subtle,
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+  },
+  notFoundRowTitle: {
+    color: Colors.text.primary,
+    fontSize: FontSize.md,
+    fontWeight: '700',
+  },
+  notFoundRowMeta: {
+    color: Colors.text.muted,
+    fontSize: FontSize.sm,
+    marginTop: 2,
+  },
+  notFoundActions: {
+    gap: Spacing.sm,
+    marginTop: Spacing.md,
+  },
+  notFoundPrimary: {
+    backgroundColor: Colors.brand,
+    borderRadius: BorderRadius.md,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  notFoundPrimaryText: {
+    color: Colors.text.inverse,
+    fontSize: FontSize.md,
+    fontWeight: '800',
+  },
+  notFoundSecondary: {
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: Colors.border.subtle,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  notFoundSecondaryText: {
+    color: Colors.text.primary,
+    fontSize: FontSize.md,
+    fontWeight: '700',
   },
   headerCard: {
     backgroundColor: Colors.surface.raised,
@@ -2019,6 +2183,9 @@ const styles = StyleSheet.create({
   sentimentLabel: {
     fontSize: FontSize.lg,
     fontWeight: '700',
+  },
+  sentimentTBD: {
+    color: Colors.text.secondary,
   },
   reviewCountText: {
     color: Colors.text.muted,
