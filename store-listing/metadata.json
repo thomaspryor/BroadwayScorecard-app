@@ -13,19 +13,26 @@
   "price": "Free",
   "privacy_nutrition_labels": {
     "data_not_collected": false,
+    "tracking": false,
     "data_collected": [
-      "User ID (for account functionality, linked to user)",
-      "Email address (for account sign-in, linked to user)",
-      "Product interaction (analytics for app improvement, not linked to user)"
+      "Email Address (account sign-in, linked to user)",
+      "Name (display name from Apple/Google sign-in, linked to user)",
+      "Photos (diary photos, linked to user)",
+      "Other User Content (ratings, reviews, diary, watchlist, lists; linked to user)",
+      "User ID (account, analytics and crash reports; linked to user)",
+      "Product Interaction (PostHog analytics, linked to user after sign-in)",
+      "Crash Data (Sentry, linked to user id)",
+      "Performance Data (Sentry tracing, linked to user id)"
     ],
-    "note": "Broadway Scorecard offers optional user accounts (Google/Apple sign-in) for saving reviews, watchlists, and lists. Anonymous analytics (PostHog) track feature usage for app improvement. Users who do not sign in have no data collected."
+    "note": "Full questionnaire answers with code sources: store-listing/privacy-details.md. Guests also send anonymous analytics and crash reports."
   },
-  "app_review_notes": "This app displays aggregated public theater critic review scores and audience ratings for Broadway, Off-Broadway, and West End shows. Optional user accounts (Google or Apple sign-in via Supabase) allow users to save personal reviews, watchlists, and custom lists. Anonymous analytics (PostHog) are used for app improvement. Users can use all browsing features without an account.",
+  "app_review_notes": "This app displays aggregated public theater critic review scores and audience ratings for Broadway, Off-Broadway, and West End shows. Optional user accounts (Google or Apple sign-in via Supabase) allow users to save personal reviews, watchlists, and custom lists. Analytics (PostHog) and crash reporting (Sentry) are used for app improvement. A demo account is provided in the App Review sign-in fields. Users can use all browsing features without an account.",
   "app_review_contact": {
     "firstName": "Thomas",
     "lastName": "Pryor",
     "email": "tom@broadwayscorecard.com",
-    "phone": "+1 212 555 0199",
-    "demoAccountRequired": false
+    "phone": "",
+    "demoAccountRequired": true,
+    "phone_note": "Placeholder number removed. Enter a real contact phone in App Store Connect."
   }
 }
