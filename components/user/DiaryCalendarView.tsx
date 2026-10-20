@@ -8,16 +8,17 @@
  * instead of mounting the whole diary's grids at once.
  *
  * The month walk starts at the NEWEST thing on the calendar — the latest dated
- * review OR the furthest-out booking — and stops at the oldest review. Starting
- * at today would let the MAX_MONTHS cap swallow the whole diary for a user
- * whose last entry is years old; stopping at today would hide the months their
+ * review OR the furthest-out booking — and stops at the oldest review; past
+ * the newest 36 months only months with an entry are drawn, so nothing is cut
+ * off (lib/diary-calendar.ts). Stopping at today would hide the months their
  * Upcoming shelf is already pointing at (beta feedback 2026-08-09, ADd7L27s:
  * "should also show future months up to whenever there are shows on the
- * Upcoming section").
+ * Upcoming section"). A day with several shows draws the first poster with a
+ * "+N" badge and asks which one to open.
  */
 
 import React, { useMemo } from 'react';
-import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { View, Text, Pressable, StyleSheet, Alert } from 'react-native';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { Colors, FontSize, BorderRadius, Spacing } from '@/constants/theme';
@@ -26,90 +27,39 @@ import { showTitleFallback } from '@/lib/show-format';
 import * as haptics from '@/lib/haptics';
 import type { UserReview } from '@/lib/user-types';
 import type { Show } from '@/lib/types';
+import {
+  buildReviewsByDate,
+  buildUpcomingByDate,
+  buildDiaryCalendarMonths,
+  buildMonthCells,
+  type CalendarMonth,
+} from '@/lib/diary-calendar';
 
 const WEEKDAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
-// Bound so a decades-deep import can't schedule hundreds of month grids.
-const MAX_MONTHS = 36;
 
-export interface CalendarMonth { year: number; month: number }
-
-/** Reviews keyed by exact date (YYYY-MM-DD) — same-day repeat viewings just
- *  show the first one; a rare edge case, not worth a stacked-poster cell. */
-export function buildReviewsByDate(reviews: UserReview[]): Record<string, UserReview> {
-  const map: Record<string, UserReview> = {};
-  for (const r of reviews) {
-    if (r.date_seen && !map[r.date_seen]) map[r.date_seen] = r;
-  }
-  return map;
-}
-
-/** Booked-but-unseen nights keyed by date — planned watchlist dates and the
- *  rare future-dated review. First entry per date wins, same as the diary map. */
-export function buildUpcomingByDate(
-  items: { show_id: string; date: string | null }[],
-): Record<string, { show_id: string }> {
-  const map: Record<string, { show_id: string }> = {};
-  for (const item of items) {
-    if (item.date && !map[item.date]) map[item.date] = { show_id: item.show_id };
-  }
-  return map;
-}
-
-/** Newest→oldest month span of the dated diary, capped at MAX_MONTHS. Booked
- *  future dates extend the newest end so those months are reachable. */
-export function buildDiaryCalendarMonths(
-  reviewsByDate: Record<string, UserReview>,
-  upcomingByDate: Record<string, { show_id: string }> = {},
-): CalendarMonth[] {
-  const dates = Object.keys(reviewsByDate).sort();
-  const upcomingDates = Object.keys(upcomingByDate).sort();
-  const today = new Date();
-  const newestDate = [dates[dates.length - 1], upcomingDates[upcomingDates.length - 1]]
-    .filter(Boolean)
-    .sort()
-    .pop();
-  const newest = newestDate ? new Date(`${newestDate}T00:00:00`) : today;
-  const oldest = dates.length > 0 ? new Date(`${dates[0]}T00:00:00`) : today;
-  let y = newest.getFullYear();
-  let m = newest.getMonth();
-  const out: CalendarMonth[] = [];
-  while (out.length < MAX_MONTHS) {
-    out.push({ year: y, month: m });
-    if (y === oldest.getFullYear() && m === oldest.getMonth()) break;
-    m -= 1;
-    if (m < 0) { m = 11; y -= 1; }
-  }
-  return out;
-}
+// Pure month/day logic lives in lib/diary-calendar.ts (unit tested); the
+// Watched tab imports it from here.
+export { buildReviewsByDate, buildUpcomingByDate, buildDiaryCalendarMonths };
+export type { CalendarMonth };
 
 interface DiaryCalendarMonthProps {
   year: number;
   month: number;
-  reviewsByDate: Record<string, UserReview>;
+  reviewsByDate: Record<string, UserReview[]>;
   /** Booked nights not yet seen — drawn dimmed so they don't read as attended. */
-  upcomingByDate?: Record<string, { show_id: string }>;
+  upcomingByDate?: Record<string, { show_id: string }[]>;
   showMap: Record<string, Show>;
 }
 
+function openShow(showId: string, show: Show | undefined) {
+  router.push(show ? `/show/${show.slug}` : `/diary-show/${showId}` as any);
+}
+
 export function DiaryCalendarMonth({ year, month, reviewsByDate, upcomingByDate, showMap }: DiaryCalendarMonthProps) {
-  const cells = useMemo(() => {
-    const startWeekday = new Date(year, month, 1).getDay();
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
-    const out: ({ day: number; dateStr: string; showId: string | null; upcoming: boolean } | null)[] = [];
-    for (let i = 0; i < startWeekday; i++) out.push(null);
-    for (let day = 1; day <= daysInMonth; day++) {
-      const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-      const review = reviewsByDate[dateStr];
-      const booked = review ? null : upcomingByDate?.[dateStr];
-      out.push({
-        day,
-        dateStr,
-        showId: review?.show_id ?? booked?.show_id ?? null,
-        upcoming: !review && !!booked,
-      });
-    }
-    return out;
-  }, [year, month, reviewsByDate, upcomingByDate]);
+  const cells = useMemo(
+    () => buildMonthCells(year, month, reviewsByDate, upcomingByDate),
+    [year, month, reviewsByDate, upcomingByDate],
+  );
 
   const monthLabel = new Date(year, month, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
@@ -124,27 +74,45 @@ export function DiaryCalendarMonth({ year, month, reviewsByDate, upcomingByDate,
       <View style={styles.grid}>
         {cells.map((cell, i) => {
           if (!cell) return <View key={i} style={styles.cell} />;
-          if (!cell.showId) {
+          if (cell.showIds.length === 0) {
             return (
               <View key={i} style={styles.cell}>
                 <Text style={styles.dayNumber}>{cell.day}</Text>
               </View>
             );
           }
-          const cellShowId = cell.showId;
+          const cellShowId = cell.showIds[0];
           const show = showMap[cellShowId];
           const posterUrl = show?.images ? (getImageUrl(show.images.poster) || getImageUrl(show.images.thumbnail)) : null;
-          const title = show?.title || showTitleFallback(cellShowId);
+          const titleOf = (id: string) => showMap[id]?.title || showTitleFallback(id);
+          const title = titleOf(cellShowId);
+          const extra = cell.showIds.length - 1;
+          const onPress = () => {
+            haptics.tap();
+            if (extra === 0) {
+              openShow(cellShowId, show);
+              return;
+            }
+            // Two or more shows that day (a matinee + evening double): ask which.
+            Alert.alert(
+              cell.upcoming ? 'Booked that day' : 'Seen that day',
+              undefined,
+              [
+                ...cell.showIds.map((id) => ({ text: titleOf(id), onPress: () => openShow(id, showMap[id]) })),
+                { text: 'Cancel', style: 'cancel' as const },
+              ],
+            );
+          };
+          const spoken = extra > 0
+            ? cell.showIds.map(titleOf).join(' and ')
+            : title;
           return (
             <Pressable
               key={i}
               style={styles.cell}
-              onPress={() => {
-                haptics.tap();
-                router.push(show ? `/show/${show.slug}` : `/diary-show/${cellShowId}` as any);
-              }}
+              onPress={onPress}
               accessibilityRole="button"
-              accessibilityLabel={`${title}, ${cell.dateStr}${cell.upcoming ? ', booked' : ''}`}
+              accessibilityLabel={`${spoken}, ${cell.dateStr}${cell.upcoming ? ', booked' : ''}`}
             >
               {posterUrl ? (
                 <Image
@@ -161,6 +129,11 @@ export function DiaryCalendarMonth({ year, month, reviewsByDate, upcomingByDate,
                   a future date must not read as "I saw this". */}
               {cell.upcoming && <View style={styles.cellUpcomingRing} pointerEvents="none" />}
               <Text style={styles.dayNumberOverlay}>{cell.day}</Text>
+              {extra > 0 && (
+                <View style={styles.moreBadge} pointerEvents="none">
+                  <Text style={styles.moreBadgeText}>+{extra}</Text>
+                </View>
+              )}
             </Pressable>
           );
         })}
@@ -199,6 +172,12 @@ const styles = StyleSheet.create({
   },
   cellPosterPlaceholder: { alignItems: 'center', justifyContent: 'center' },
   cellPosterPlaceholderText: { color: Colors.text.muted, fontSize: 12, fontWeight: '600' },
+  moreBadge: {
+    position: 'absolute', right: 3, bottom: 3,
+    minWidth: 18, paddingHorizontal: 3, borderRadius: BorderRadius.sm,
+    backgroundColor: Colors.brand, alignItems: 'center',
+  },
+  moreBadgeText: { color: Colors.text.inverse, fontSize: 12, fontWeight: '800' },
   dayNumberOverlay: {
     position: 'absolute', top: 2, left: 4,
     color: '#fff', fontSize: 12, fontWeight: '700',

@@ -9,7 +9,7 @@
  * it opens the same sheet listing all four tiers.
  */
 import { useState } from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as WebBrowser from 'expo-web-browser';
 import { Colors, FontSize, Spacing } from '@/constants/theme';
@@ -99,11 +99,19 @@ const BAR_HEIGHTS = [3, 5, 7, 9];
 function TierSheet({ visible, onClose, children }: { visible: boolean; onClose: () => void; children: React.ReactNode }) {
   const insets = useSafeAreaInsets();
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={styles.overlay} onPress={onClose} accessibilityLabel="Close">
-        <Pressable style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, Spacing.lg) }]} onPress={() => {}}>
-          <View style={styles.handle} />
-          <View style={styles.sheetBody}>{children}</View>
+    // Native page sheet: swipe down or Done closes it (onRequestClose). The old
+    // transparent modal slid a dark overlay up with the sheet and only closed
+    // on a tap outside, which VoiceOver users could not find.
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+      <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, Spacing.lg) }]}>
+        <View style={styles.handle} />
+        <View style={styles.sheetHeader}>
+          <Pressable onPress={onClose} hitSlop={12} accessibilityRole="button" accessibilityLabel="Done">
+            <Text style={styles.done}>Done</Text>
+          </Pressable>
+        </View>
+        <ScrollView style={styles.sheetScroll} contentContainerStyle={styles.sheetBody}>
+          {children}
           <Pressable
             onPress={() => { onClose(); WebBrowser.openBrowserAsync(METHODOLOGY_URL); }}
             style={({ pressed }) => [styles.link, pressed && styles.chipPressed]}
@@ -111,8 +119,8 @@ function TierSheet({ visible, onClose, children }: { visible: boolean; onClose: 
           >
             <Text style={styles.linkText}>How we weight critics →</Text>
           </Pressable>
-        </Pressable>
-      </Pressable>
+        </ScrollView>
+      </View>
     </Modal>
   );
 }
@@ -202,19 +210,20 @@ const styles = StyleSheet.create({
     fontSize: FontSize.xs,
     fontVariant: ['tabular-nums'],
   },
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
-  },
   sheet: {
+    flex: 1,
     backgroundColor: Colors.surface.raised,
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
     paddingHorizontal: Spacing.lg,
     paddingTop: Spacing.sm,
-    maxHeight: '80%',
   },
+  sheetHeader: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    minHeight: 44,
+    alignItems: 'center',
+  },
+  done: { color: Colors.brand, fontSize: FontSize.md, fontWeight: '600' },
+  sheetScroll: { flex: 1 },
   handle: {
     alignSelf: 'center',
     width: 36,
