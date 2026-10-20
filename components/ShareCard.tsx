@@ -14,6 +14,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Path } from 'react-native-svg';
 import { getScoreTier, getMarketMinReviews } from '@/lib/score-utils';
 import { getImageUrl } from '@/lib/images';
+import { buildShowSharePayload } from '@/lib/share-payload';
 import { Colors, FontSize, BorderRadius, Spacing } from '@/constants/theme';
 import { trackShowShared } from '@/lib/analytics';
 let ViewShot: any;
@@ -58,18 +59,7 @@ export const ShareCardWithRef = React.forwardRef<ShareCardHandle, ShareCardProps
 
       try {
         const uri = await viewShotRef.current?.capture?.();
-        if (!uri) {
-          await Share.share({
-            message: `Check out ${props.show.title} on Broadway Scorecard!\nhttps://broadwayscorecard.com/show/${props.show.slug}`,
-          });
-          return;
-        }
-
-        await Share.share(
-          Platform.OS === 'ios'
-            ? { url: uri }
-            : { message: `Check out ${props.show.title} on Broadway Scorecard!\nhttps://broadwayscorecard.com/show/${props.show.slug}` },
-        );
+        await Share.share(buildShowSharePayload(props.show, uri, Platform.OS));
         props.onShared?.();
       } catch {
         // User cancelled
