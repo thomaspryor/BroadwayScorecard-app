@@ -11,6 +11,7 @@ import DateTimePicker, { type DateTimePickerEvent } from '@react-native-communit
 import Svg, { Path } from 'react-native-svg';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
 import * as haptics from '@/lib/haptics';
+import { toLocalYMD } from '@/lib/date-utils';
 
 interface ReviewPanelProps {
   rating: number;
@@ -55,8 +56,9 @@ export default function ReviewPanel({
   const handleDateChange = useCallback((_event: DateTimePickerEvent, selectedDate?: Date) => {
     setShowDatePicker(Platform.OS === 'ios'); // iOS keeps picker open
     if (selectedDate) {
-      const iso = selectedDate.toISOString().split('T')[0];
-      setDateSeen(iso);
+      // Local calendar day: toISOString() is UTC, so after ~8pm ET the
+      // picked date saved as the next day.
+      setDateSeen(toLocalYMD(selectedDate));
     }
   }, []);
 

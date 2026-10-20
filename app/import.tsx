@@ -27,15 +27,19 @@ import {
   StyleSheet,
   ScrollView,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useNavigation } from 'expo-router';
+import { usePreventRemove } from 'expo-router/react-navigation';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '@/lib/auth-context';
 import { useShows } from '@/lib/data-context';
-import { supabaseRestInsert, supabaseRestUpdate } from '@/lib/supabase-rest';
+import { supabaseRestInsert, supabaseRestSelect, supabaseRestUpdate } from '@/lib/supabase-rest';
+import { MEZZANINE_FILE_ERROR } from '@/lib/mezzanine-parse';
+import { buildReviewKeySet, claimReviewKey, fetchAllPages, reviewDedupeKey, type ReviewKeyRow } from '@/lib/import-dedupe';
 import {
   acquireFromMezzanine,
   acquireFromShowScore,
@@ -95,6 +99,32 @@ async function dateExistingWatchlistRow(userId: string, showId: string, dateSeen
   );
   return !error && !!data;
 }
+
+/** Every (show_id, date_seen) already in the account, read from the database
+ *  rather than the on-device cache, which is empty on a fresh install and
+ *  stale after edits elsewhere. Null when the read fails. */
+async function fetchExistingReviewRows(userId: string): Promise<ReviewKeyRow[] | null> {
+  return fetchAllPages<ReviewKeyRow>(async (offset, limit) => {
+    const { data, error } = await supabaseRestSelect<ReviewKeyRow>(
+      'reviews',
+      `user_id=eq.${encodeURIComponent(userId)}&select=show_id,date_seen&order=id.asc&limit=${limit}&offset=${offset}`,
+    );
+    return error || !Array.isArray(data) ? null : data;
+  });
+}
+
+/** Database first, then the diary cache, then nothing (the in-batch check
+ *  still runs). */
+async function loadExistingReviewKeys(userId: string): Promise<Set<string>> {
+  const rows = await fetchExistingReviewRows(userId).catch(() => null);
+  if (rows) return buildReviewKeySet(rows);
+  try {
+    const cached = await AsyncStorage.getItem(`@bsc:reviews:${userId}`);
+    if (cached) return buildReviewKeySet(JSON.parse(cached));
+  } catch { /* fall through */ }
+  return new Set();
+}
+
 type ImportStep = 'source' | 'matching' | 'preview' | 'importing' | 'done';
 
 export interface MatchedEntry {
@@ -207,6 +237,7 @@ function isUnmatched(e: MatchedEntry): boolean {
 export default function ImportScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const navigation = useNavigation();
   const { user } = useAuth();
   const { shows } = useShows();
 
@@ -229,6 +260,11 @@ export default function ImportScreen() {
   const matcherRef = useRef<ShowMatcher | null>(null);
   const ownedRef = useRef<{ reviews: Set<string>; watchlist: Set<string> }>({ reviews: new Set(), watchlist: new Set() });
   const [resolve, setResolve] = useState<Record<number, ResolveState>>({});
+
+  // Leaving the screen stops the insert loop. Before this the loop kept
+  // writing rows after the sheet closed. The checkpoint is saved after every
+  // row, so the next visit offers to resume.
+  useEffect(() => () => { cancelledRef.current = true; }, []);
 
   // Check for an unfinished import from a previous session (checkpointing —
   // a killed/backgrounded app mid-bulk-import shouldn't force a full redo).
@@ -264,16 +300,21 @@ export default function ImportScreen() {
   }, [shows]);
 
   const matchAndPreview = useCallback(async (acquired: ImportAcquireResult, sourceId: ImportSourceId) => {
-    const existingReviewShowIds = new Set<string>(); // populated below from cache; import happens against live DB state
+    const existingReviewShowIds = new Set<string>();
     const existingWatchlistShowIds = new Set<string>();
+    // Reviews from the database when reachable (the cache is empty on a fresh
+    // install, which pre-ticked every show the user already had); runImport
+    // re-checks show + date right before inserting.
+    const dbReviewRows = await fetchExistingReviewRows(user!.id).catch(() => null);
+    dbReviewRows?.forEach(r => existingReviewShowIds.add(r.show_id));
     try {
       const [reviewsCache, watchlistCache] = await Promise.all([
-        AsyncStorage.getItem(`@bsc:reviews:${user!.id}`),
+        dbReviewRows ? Promise.resolve(null) : AsyncStorage.getItem(`@bsc:reviews:${user!.id}`),
         AsyncStorage.getItem(`@bsc:watchlist:${user!.id}`),
       ]);
       if (reviewsCache) (JSON.parse(reviewsCache) as { show_id: string }[]).forEach(r => existingReviewShowIds.add(r.show_id));
       if (watchlistCache) (JSON.parse(watchlistCache) as { show_id: string }[]).forEach(w => existingWatchlistShowIds.add(w.show_id));
-    } catch { /* best-effort de-dupe hint only — unique constraints are the real guard */ }
+    } catch { /* best-effort hint only; watchlist's unique key and runImport's show+date check are the real guards */ }
     ownedRef.current = { reviews: existingReviewShowIds, watchlist: existingWatchlistShowIds };
 
     const { matcher, notice: catalogNotice } = await buildMatcher();
@@ -384,7 +425,7 @@ export default function ImportScreen() {
     try {
       await matchAndPreview(await acquireFromMezzanine(result.assets[0].uri), 'mezzanine');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to parse file');
+      setError(err instanceof Error ? err.message : MEZZANINE_FILE_ERROR);
       setStep('source');
     }
   }, [matchAndPreview]);
@@ -630,16 +671,34 @@ export default function ImportScreen() {
     setStep('importing');
     setImportProgress({ done: checkpoint.processedCount, total: checkpoint.plans.length });
     const stats = { ...checkpoint.stats };
+    // reviews has no unique key (repeat viewings are allowed), so the
+    // database never rejects a duplicate. Skip a review whose show + date
+    // seen is already in the account: that is what a resume after a kill, or
+    // a second import of the same file, would otherwise double.
+    const reviewKeys = checkpoint.plans.slice(checkpoint.processedCount).some(p => p.type === 'review')
+      ? await loadExistingReviewKeys(user!.id)
+      : new Set<string>();
 
     for (let i = checkpoint.processedCount; i < checkpoint.plans.length; i++) {
       if (cancelledRef.current) break;
       const plan = checkpoint.plans[i];
+      if (plan.type === 'review' && claimReviewKey(reviewKeys, plan.showId, plan.dateSeen)) {
+        stats.skipped++;
+        checkpoint.processedCount = i + 1;
+        checkpoint.stats = stats;
+        setImportProgress({ done: checkpoint.processedCount, total: checkpoint.plans.length });
+        await AsyncStorage.setItem(CHECKPOINT_KEY(user!.id), JSON.stringify(checkpoint)).catch(() => {});
+        continue;
+      }
       try {
         const table = plan.type === 'review' ? 'reviews' : 'watchlist';
         const row = plan.type === 'review'
           ? { user_id: user!.id, show_id: plan.showId, rating: plan.rating, review_text: plan.reviewText || null, date_seen: plan.dateSeen || null }
           : { user_id: user!.id, show_id: plan.showId, ...(plan.plannedDate ? { planned_date: plan.plannedDate } : {}) };
         const { error: insertErr } = await supabaseRestInsert(table, row);
+        // A failed review insert gives its key back so an identical row later
+        // in the file can still land.
+        if (insertErr && plan.type === 'review') reviewKeys.delete(reviewDedupeKey(plan.showId, plan.dateSeen));
         if (insertErr) {
           if (insertErr.code !== '23505') stats.errors++;
           else if (plan.type === 'watchlist' && await dateExistingWatchlistRow(user!.id, plan.showId, plan.plannedDate)) stats.imported++;
@@ -648,6 +707,7 @@ export default function ImportScreen() {
           stats.imported++;
         }
       } catch {
+        if (plan.type === 'review') reviewKeys.delete(reviewDedupeKey(plan.showId, plan.dateSeen));
         stats.errors++;
       }
 
@@ -715,8 +775,28 @@ export default function ImportScreen() {
     setResumeSummary(null);
   }, [user]);
 
+  // Swipe-down, Android back and Cancel all pass through here while rows are
+  // being written. Stopping is safe (progress is checkpointed), but it must be
+  // a choice, not a stray swipe.
+  usePreventRemove(step === 'importing', ({ data }) => {
+    Alert.alert(
+      'Stop importing?',
+      'Shows imported so far stay in your account. Open Import again to finish the rest.',
+      [
+        { text: 'Keep Importing', style: 'cancel' },
+        {
+          text: 'Stop',
+          style: 'destructive',
+          onPress: () => {
+            cancelledRef.current = true;
+            navigation.dispatch(data.action);
+          },
+        },
+      ],
+    );
+  });
+
   const handleClose = useCallback(() => {
-    cancelledRef.current = true;
     router.back();
   }, [router]);
 
@@ -725,7 +805,7 @@ export default function ImportScreen() {
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
-        <Pressable onPress={handleClose} hitSlop={12}>
+        <Pressable onPress={handleClose} hitSlop={12} accessibilityRole="button">
           <Text style={styles.cancelText}>{step === 'done' ? 'Done' : 'Cancel'}</Text>
         </Pressable>
         <Text style={styles.headerTitle}>
