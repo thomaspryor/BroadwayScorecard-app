@@ -368,6 +368,12 @@ export default function ShowPageRating({
                   setShowWatchlistDatePicker(true);
                 }}
                 hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel={
+                  watchlistEntry?.planned_date
+                    ? `Planned for ${new Date(watchlistEntry.planned_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}. Change date`
+                    : 'Add the date you plan to go'
+                }
               >
                 <Svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke={Colors.text.muted} strokeWidth={2}>
                   <Path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />

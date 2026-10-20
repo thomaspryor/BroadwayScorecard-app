@@ -258,16 +258,16 @@ export default function ShowDetailScreen() {
 
   // Fetch social pulse data
   useEffect(() => {
-    if (!show) return;
+    if (!showId) return;
     let cancelled = false;
-    fetchSocialPulse(show.id).then(raw => {
+    fetchSocialPulse(showId).then(raw => {
       if (!cancelled && raw) {
         const sp = raw as SocialPulsePayload;
         if (sp.t !== 'Hidden') setSocialPulse(sp);
       }
     }).catch(() => {});
     return () => { cancelled = true; };
-  }, [show?.id]);
+  }, [showId]);
 
   // Track show detail view (once per show load — keyed on id, not object ref)
   useEffect(() => {

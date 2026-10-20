@@ -24,8 +24,19 @@ import { ClosingSoon } from '@/components/ClosingSoon';
 import { filterByMarketCategory } from '@/components/MarketPicker';
 import { Show } from '@/lib/types';
 import { getQualifiedScore } from '@/lib/score-utils';
+import { toLocalYMD } from '@/lib/date-utils';
+import {
+  hasTagCI,
+  isDateNightShow,
+  isRankedShelfEligible,
+  isTopRecentCandidate,
+  selectClosingSoon,
+  selectStartingSoon,
+  shortMonthDay,
+  startingSoonSubtitle,
+} from '@/lib/home-shelves';
 import { StaleBanner } from '@/components/StaleBanner';
-import { Colors, Spacing, FontSize, TAB_BAR_CLEARANCE } from '@/constants/theme';
+import { Colors, Spacing, FontSize, BorderRadius, TAB_BAR_CLEARANCE } from '@/constants/theme';
 import { trackDataRefreshed } from '@/lib/analytics';
 
 export default function HomeScreen() {
@@ -66,33 +77,29 @@ export default function HomeScreen() {
       .sort((a, b) => (b.openingDate ?? '').localeCompare(a.openingDate ?? ''));
   }, [marketShows]);
 
-  // Themed featured rows
+  // Themed featured rows. Each rule is a port of the website home page
+  // (src/app/page.tsx) kept in lib/home-shelves.ts with unit tests.
   const featuredRows = useMemo((): { title: string; shows: Show[]; getSubtitle?: (show: Show) => string | undefined }[] => {
     const rows: { title: string; shows: Show[]; getSubtitle?: (show: Show) => string | undefined }[] = [];
     const now = new Date();
-    const shortDate = (d: string) => {
-      // new Date('T12:00:00') doesn't throw — it yields Invalid Date, whose
-      // toLocaleDateString is the literal string "Invalid Date" (beta feedback
-      // 2026-07-25: "Opens Invalid Date" on the Starting Soon shelf).
-      const parsed = new Date(d + 'T12:00:00');
-      if (isNaN(parsed.getTime())) return null;
-      return parsed.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    };
     const isOpen = (s: Show) => s.status === 'open' || s.status === 'previews';
+    // Score-ranked shelves leave opera out (the website gives it its own
+    // shelf). Kept local so non-ranked shelves (Just Opened, Starting Soon)
+    // still list a Met production.
+    const ranked = marketShows.filter(isRankedShelfEligible);
     // Ranked shelves only admit shows whose score clears the market min-review
     // gate — a 1-review 98 must not top the shelf (Gruffalo, beta 2026-08-01).
     const byScore = (a: Show, b: Show) => (getQualifiedScore(b) ?? 0) - (getQualifiedScore(a) ?? 0);
 
     // Top Shows (overall)
-    const top = marketShows.filter(s => isOpen(s) && getQualifiedScore(s) != null).sort(byScore).slice(0, 10);
+    const top = ranked.filter(s => isOpen(s) && getQualifiedScore(s) != null).sort(byScore).slice(0, 10);
     if (top.length > 0) rows.push({ title: 'Top Shows', shows: top });
 
     // Just Opened — second shelf, most recently opened first (owner ask 2026-08-01)
     // Local-date strings, not toISOString (UTC): in the ET evening UTC is
     // already tomorrow, which would show "Opened <tomorrow>".
-    const toLocalDateStr = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    const todayLocal = toLocalDateStr(now);
-    const sixtyDaysAgo = toLocalDateStr(new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000));
+    const todayLocal = toLocalYMD(now);
+    const sixtyDaysAgo = toLocalYMD(new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000));
     const justOpened = marketShows
       .filter(s => s.status === 'open' && s.openingDate && s.openingDate >= sixtyDaysAgo && s.openingDate <= todayLocal)
       .sort((a, b) => (b.openingDate ?? '').localeCompare(a.openingDate ?? ''))
@@ -101,7 +108,7 @@ export default function HomeScreen() {
       title: 'Just Opened',
       shows: justOpened,
       getSubtitle: (s) => {
-        const d = shortDate(s.openingDate ?? '');
+        const d = shortMonthDay(s.openingDate);
         return d ? `Opened ${d}` : undefined;
       },
     });
@@ -114,107 +121,76 @@ export default function HomeScreen() {
     // Best Off-Broadway (NYC market only, separate from main Broadway filter)
     if (market === 'nyc') {
       const offBway = shows
-        .filter(s => s.category === 'off-broadway' && isOpen(s) && getQualifiedScore(s) != null)
+        .filter(s => s.category === 'off-broadway' && isRankedShelfEligible(s) && isOpen(s) && getQualifiedScore(s) != null)
         .sort(byScore).slice(0, 10);
       if (offBway.length >= 3) rows.push({ title: 'Best Off-Broadway', shows: offBway });
     }
 
-    // Shows Starting Soon (upcoming, not yet in previews)
-    const startingSoon = marketShows
-      .filter(s => s.status === 'upcoming')
-      .sort((a, b) => (a.openingDate ?? '').localeCompare(b.openingDate ?? ''))
-      .slice(0, 10);
+    // Starting Soon: in previews, or upcoming with a first-preview/opening
+    // date, by next milestone. Previews read "Opens <opening>", upcoming
+    // "Starts <first preview>". This replaces the separate "Coming Up"
+    // (previews) shelf, which repeated the same shows.
+    const startingSoon = selectStartingSoon(marketShows).slice(0, 10);
     if (startingSoon.length >= 2) rows.push({
       title: 'Starting Soon',
       shows: startingSoon,
-      getSubtitle: (s) => {
-        const d = shortDate(s.openingDate ?? '');
-        return d ? `Opens ${d}` : undefined;
-      },
+      getSubtitle: startingSoonSubtitle,
     });
 
-    // Top Recent Shows (opened in last 12 months)
-    const twelveMonthsAgo = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-    const recent = marketShows.filter(s =>
-      isOpen(s) && getQualifiedScore(s) != null && s.openingDate && s.openingDate >= twelveMonthsAgo
-    ).sort(byScore).slice(0, 10);
+    // Top Recent Shows: open musicals and plays that opened in the last 12 months
+    const recent = ranked
+      .filter(s => isTopRecentCandidate(s, now) && getQualifiedScore(s) != null)
+      .sort(byScore).slice(0, 10);
     if (recent.length >= 3) rows.push({ title: 'Top Recent Shows', shows: recent });
 
     // NYT Critic's Picks
-    const nytPicks = marketShows.filter(s => isOpen(s) && s.tags.includes('nyt-pick')).sort(byScore).slice(0, 10);
+    const nytPicks = ranked.filter(s => isOpen(s) && hasTagCI(s, 'nyt-pick')).sort(byScore).slice(0, 10);
     if (nytPicks.length >= 2) rows.push({ title: "New York Times Critic's Picks", shows: nytPicks });
 
     // Tony Award Winners (open shows with tony-winner tag)
-    const tonyWinners = marketShows.filter(s => isOpen(s) && s.tags.includes('tony-winner')).sort(byScore).slice(0, 10);
+    const tonyWinners = ranked.filter(s => isOpen(s) && hasTagCI(s, 'tony-winner')).sort(byScore).slice(0, 10);
     if (tonyWinners.length >= 2) rows.push({ title: 'Tony Award Winners', shows: tonyWinners });
 
     // Best Plays — above Best Musicals (beta feedback 2026-08-04, AIYmmSht)
-    const plays = marketShows.filter(s => isOpen(s) && s.type === 'play' && getQualifiedScore(s) != null).sort(byScore).slice(0, 10);
+    const plays = ranked.filter(s => isOpen(s) && s.type === 'play' && getQualifiedScore(s) != null).sort(byScore).slice(0, 10);
     if (plays.length >= 3) rows.push({ title: 'Best Plays', shows: plays });
 
     // Best Musicals
-    const musicals = marketShows.filter(s => isOpen(s) && s.type === 'musical' && getQualifiedScore(s) != null).sort(byScore).slice(0, 10);
+    const musicals = ranked.filter(s => isOpen(s) && s.type === 'musical' && getQualifiedScore(s) != null).sort(byScore).slice(0, 10);
     if (musicals.length >= 3) rows.push({ title: 'Best Musicals', shows: musicals });
 
     // Jukebox Musicals
-    const jukebox = marketShows.filter(s => isOpen(s) && s.tags.includes('jukebox')).sort(byScore).slice(0, 10);
+    const jukebox = ranked.filter(s => isOpen(s) && hasTagCI(s, 'jukebox')).sort(byScore).slice(0, 10);
     if (jukebox.length >= 2) rows.push({ title: 'Jukebox Musicals', shows: jukebox });
 
-    // Perfect for Date Night (romantic tag, no kids-only age recommendations)
-    const dateNight = marketShows.filter(s => {
-      if (!isOpen(s)) return false;
-      const age = s.ageRecommendation?.toLowerCase() ?? '';
-      const isKidsOnly = age.includes('ages 5') || age.includes('ages 6') || age.includes('ages 7') || age.includes('ages 8');
-      return !isKidsOnly && s.tags.includes('romantic');
-    }).sort(byScore).slice(0, 10);
+    // Perfect for Date Night: romantic or drama, no kids-only age recommendation
+    const dateNight = ranked.filter(s => isOpen(s) && isDateNightShow(s)).sort(byScore).slice(0, 10);
     if (dateNight.length >= 2) rows.push({ title: 'Perfect for Date Night', shows: dateNight });
 
     // Great for Kids
-    const kids = marketShows.filter(s => {
+    const kids = ranked.filter(s => {
       if (!isOpen(s)) return false;
       const age = s.ageRecommendation?.toLowerCase() ?? '';
-      return age.includes('kids') || age.includes('ages 5') || age.includes('ages 6') || age.includes('ages 7') || age.includes('ages 8') || age.includes('all ages') || s.tags.includes('family');
+      return age.includes('kids') || age.includes('ages 5') || age.includes('ages 6') || age.includes('ages 7') || age.includes('ages 8') || age.includes('all ages') || hasTagCI(s, 'family');
     }).sort(byScore).slice(0, 10);
     if (kids.length >= 2) rows.push({ title: 'Great for Kids', shows: kids });
-
-    // Upcoming / In Previews
-    const previews = marketShows.filter(s => s.status === 'previews').sort((a, b) => (a.openingDate ?? '').localeCompare(b.openingDate ?? '')).slice(0, 10);
-    if (previews.length >= 2) rows.push({
-      title: 'Coming Up',
-      shows: previews,
-      getSubtitle: (s) => {
-        const d = shortDate(s.openingDate ?? '');
-        return d ? `Opens ${d}` : undefined;
-      },
-    });
 
     return rows;
   }, [market, marketShows, shows]);
 
-  // Closing Soon — dedicated section with 30-day window and countdown badges
-  const closingSoon = useMemo(() => {
-    const now = new Date();
-    now.setHours(0, 0, 0, 0);
-    const cutoff = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
-    return marketShows
-      .filter(s => {
-        if (!s.closingDate || s.status === 'closed') return false;
-        // Bare `new Date(s.closingDate)` parses YYYY-MM-DD as UTC midnight —
-        // in ET that's always earlier than local midnight `now`, so a show
-        // closing today silently drops off the shelf.
-        const d = new Date(s.closingDate + 'T00:00:00');
-        return d >= now && d <= cutoff;
-      })
-      .sort((a, b) => (a.closingDate ?? '').localeCompare(b.closingDate ?? ''));
-  }, [marketShows]);
+  // Closing Soon — dedicated section with countdown badges: open shows
+  // closing within 120 days (website rule; lib/home-shelves.ts).
+  const closingSoon = useMemo(() => selectClosingSoon(marketShows), [marketShows]);
 
   // Closing Soon renders as the 5th shelf — after featuredRows[3] (owner ask
   // 2026-08-03, ADnQ3mUB). Clamped so a short row list still renders it once.
   const showClosingSoon = closingSoon.length >= 2;
   const closingSoonAfterIndex = Math.min(3, featuredRows.length - 1);
 
+  // Counts shows with a displayable score (the same gate as every badge), so
+  // a 1-review show the app shows as TBD is not counted as "scored".
   const scoredCount = useMemo(() =>
-    marketShows.filter(s => s.compositeScore != null).length,
+    marketShows.filter(s => getQualifiedScore(s) != null).length,
     [marketShows]
   );
 
@@ -256,6 +232,16 @@ export default function HomeScreen() {
       <View style={[styles.center, { paddingTop: insets.top }]}>
         <Text style={styles.errorText}>{error}</Text>
         <Text style={styles.hintText}>Check your internet connection and try again.</Text>
+        <Pressable
+          style={({ pressed }) => [styles.retryButton, pressed && { opacity: 0.7 }]}
+          onPress={onRefresh}
+          disabled={refreshing}
+          accessibilityRole="button"
+          accessibilityLabel="Try again"
+          accessibilityState={{ busy: refreshing }}
+        >
+          <Text style={styles.retryText}>{refreshing ? 'Loading…' : 'Try Again'}</Text>
+        </Pressable>
       </View>
     );
   }
@@ -365,6 +351,18 @@ const styles = StyleSheet.create({
     fontSize: FontSize.md,
     marginTop: Spacing.sm,
     textAlign: 'center',
+  },
+  retryButton: {
+    marginTop: Spacing.lg,
+    backgroundColor: Colors.brand,
+    borderRadius: BorderRadius.md,
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.xl,
+  },
+  retryText: {
+    color: Colors.text.inverse,
+    fontSize: FontSize.md,
+    fontWeight: '800',
   },
   header: {
     paddingHorizontal: Spacing.lg,

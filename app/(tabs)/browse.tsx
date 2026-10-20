@@ -252,6 +252,16 @@ export default function BrowseScreen() {
       <View style={[styles.center, { paddingTop: insets.top }]}>
         <Text style={styles.errorText}>{error}</Text>
         <Text style={styles.hintText}>Check your internet connection and try again.</Text>
+        <Pressable
+          style={({ pressed }) => [styles.retryButton, pressed && { opacity: 0.7 }]}
+          onPress={onRefresh}
+          disabled={refreshing}
+          accessibilityRole="button"
+          accessibilityLabel="Try again"
+          accessibilityState={{ busy: refreshing }}
+        >
+          <Text style={styles.retryText}>{refreshing ? 'Loading…' : 'Try Again'}</Text>
+        </Pressable>
       </View>
     );
   }
@@ -303,6 +313,7 @@ export default function BrowseScreen() {
               <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
                 style={[styles.filterGroup, { maxWidth: filterGroupMaxWidth(windowWidth, scoreToggleWidth) }]}
               >
                 {STATUS_OPTIONS.map(opt => (
@@ -322,7 +333,7 @@ export default function BrowseScreen() {
             }
             {/* Type + Sort + OB toggle + Advanced filters */}
             {!searchResults && <View style={styles.filterRowInline}>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterGroup}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" style={styles.filterGroup}>
                 {/* Advanced filters entry point — desktop parity
                     (beta feedback 2026-07-26). */}
                 <FilterPill
@@ -367,6 +378,11 @@ export default function BrowseScreen() {
         }
         contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + TAB_BAR_CLEARANCE }]}
         showsVerticalScrollIndicator={false}
+        // The search field lives in the list header: the first tap on a result
+        // opens it (not just dismisses the keyboard), and scrolling hides the
+        // keyboard like other iOS search lists.
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
         windowSize={5}
         maxToRenderPerBatch={8}
         initialNumToRender={10}
@@ -523,5 +539,17 @@ const styles = StyleSheet.create({
     color: Colors.text.muted,
     fontSize: FontSize.md,
     textAlign: 'center',
+  },
+  retryButton: {
+    marginTop: Spacing.lg,
+    backgroundColor: Colors.brand,
+    borderRadius: BorderRadius.md,
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.xl,
+  },
+  retryText: {
+    color: Colors.text.inverse,
+    fontSize: FontSize.md,
+    fontWeight: '800',
   },
 });

@@ -87,6 +87,7 @@ export default function SearchScreen() {
           )}
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
           windowSize={5}
           maxToRenderPerBatch={8}
