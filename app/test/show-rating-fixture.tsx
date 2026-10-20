@@ -1,7 +1,7 @@
 /**
  * Test fixture for ShowPageRating — renders with local state (no auth, no Supabase).
  *
- * DEV ONLY — returns null in production builds.
+ * DEV and CI E2E builds only (lib/fixture-gate.ts); elsewhere it redirects home.
  *
  * Usage (deep link or Expo Go URL bar):
  *   /test/show-rating-fixture?state=empty
@@ -13,7 +13,8 @@
 
 import React, { useState, useCallback } from 'react';
 import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { Redirect, useLocalSearchParams } from 'expo-router';
+import { fixtureRoutesAllowed } from '@/lib/fixture-gate';
 import { Colors, Spacing, FontSize } from '@/constants/theme';
 import StarRating from '@/components/user/StarRating';
 import ReviewPanel from '@/components/user/ReviewPanel';
@@ -187,7 +188,7 @@ export default function ShowRatingFixtureScreen() {
   // Production guard — after all hooks (React rules)
   // __DEV__ is false in CI's Release xcodebuild, so also allow the same
   // CI-only opt-in flag auth-context.tsx already uses for dev-auto-signin.
-  if (!__DEV__ && process.env.EXPO_PUBLIC_DEV_AUTO_SIGNIN !== '1') return null;
+  if (!fixtureRoutesAllowed(__DEV__, process.env.EXPO_PUBLIC_DEV_AUTO_SIGNIN)) return <Redirect href="/" />;
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>

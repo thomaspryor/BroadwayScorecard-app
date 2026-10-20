@@ -482,6 +482,7 @@ export default function ToWatchScreen() {
           onPress={() => setShowSearchModal(true)}
           hitSlop={8}
           testID="add-to-watchlist-button"
+          accessibilityRole="button"
           accessibilityLabel="Add to watchlist"
         >
           <Svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={Colors.text.inverse} strokeWidth={2.5}>
@@ -495,7 +496,13 @@ export default function ToWatchScreen() {
           <Text style={styles.statsNumber}>{totalCount}</Text> shows
         </Text>
         <View style={styles.controlsRight}>
-          <Pressable style={styles.sortButton} onPress={cycleSort}>
+          <Pressable
+            style={styles.sortButton}
+            onPress={cycleSort}
+            accessibilityRole="button"
+            accessibilityLabel={`Sort: ${sortLabel}`}
+            accessibilityHint="Changes the sort order"
+          >
             <Text style={styles.sortText}>{sortLabel}</Text>
             <Svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke={Colors.text.muted} strokeWidth={2}>
               <Path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
@@ -507,6 +514,9 @@ export default function ToWatchScreen() {
               style={[styles.viewToggleButton, viewMode === 'grid' && styles.viewToggleActive]}
               onPress={() => { haptics.tap(); setViewMode('grid'); }}
               hitSlop={4}
+              accessibilityRole="button"
+              accessibilityLabel="Grid view"
+              accessibilityState={{ selected: viewMode === 'grid' }}
             >
               <Svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={viewMode === 'grid' ? Colors.text.primary : Colors.text.muted} strokeWidth={2}>
                 <Path strokeLinecap="round" strokeLinejoin="round" d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z" />
@@ -517,6 +527,9 @@ export default function ToWatchScreen() {
               style={[styles.viewToggleButton, viewMode === 'list' && styles.viewToggleActive]}
               onPress={() => { haptics.tap(); setViewMode('list'); }}
               hitSlop={4}
+              accessibilityRole="button"
+              accessibilityLabel="List view"
+              accessibilityState={{ selected: viewMode === 'list' }}
             >
               <Svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={viewMode === 'list' ? Colors.text.primary : Colors.text.muted} strokeWidth={2}>
                 <Path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
@@ -590,6 +603,8 @@ export default function ToWatchScreen() {
                         <Pressable
                           style={({ pressed }) => [styles.addShowCard, pressed && styles.pressed]}
                           onPress={() => setShowSearchModal(true)}
+                          accessibilityRole="button"
+                          accessibilityLabel="Add show"
                         >
                           <Svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke={Colors.text.muted} strokeWidth={2}>
                             <Path strokeLinecap="round" d="M12 5v14M5 12h14" />
@@ -609,6 +624,8 @@ export default function ToWatchScreen() {
               <Pressable
                 style={({ pressed }) => [styles.quickAddBar, pressed && styles.pressed]}
                 onPress={() => setShowSearchModal(true)}
+                accessibilityRole="search"
+                accessibilityLabel="Search shows to add"
               >
                 <Svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={Colors.text.muted} strokeWidth={2}>
                   <Path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />

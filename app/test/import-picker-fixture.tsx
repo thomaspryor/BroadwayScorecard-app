@@ -3,7 +3,7 @@
  * the SHIPPING EntryRow/ProductionPicker with local state (no auth, no
  * Supabase, no 7.5MB catalog fetch).
  *
- * DEV ONLY — returns null in production builds.
+ * DEV and CI E2E builds only (lib/fixture-gate.ts); elsewhere it redirects home.
  *
  * Usage (deep link or Expo Go URL bar):
  *   /test/import-picker-fixture?state=closed    — flagged rows, picker shut
@@ -19,7 +19,8 @@
  */
 import React, { useState, useCallback } from 'react';
 import { View, Text, ScrollView, StyleSheet } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { Redirect, useLocalSearchParams } from 'expo-router';
+import { fixtureRoutesAllowed } from '@/lib/fixture-gate';
 import { Colors, Spacing, FontSize } from '@/constants/theme';
 import { EntryRow, type MatchedEntry, type PickerCandidate, type ResolveState } from '../import';
 
@@ -161,7 +162,7 @@ export default function ImportPickerFixture() {
     setResolve(prev => { const next = { ...prev }; delete next[idx]; return next; });
   }, []);
 
-  if (!__DEV__) return null;
+  if (!fixtureRoutesAllowed(__DEV__, process.env.EXPO_PUBLIC_DEV_AUTO_SIGNIN)) return <Redirect href="/" />;
 
   const fixup = mode === 'fixup';
   const readyCount = entries.filter(e => e.selected && e.match).length;

@@ -7,14 +7,19 @@
  */
 
 import React, { useRef, useCallback } from 'react';
-import { View, Text, StyleSheet, Share, Platform } from 'react-native';
+import { View, Text, StyleSheet, Share, Platform, Alert } from 'react-native';
 import { Image } from 'expo-image';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Path } from 'react-native-svg';
 import { getScoreTier, getMarketMinReviews } from '@/lib/score-utils';
 import { getImageUrl } from '@/lib/images';
-import { buildShowSharePayload } from '@/lib/share-payload';
+import {
+  shareShowCard,
+  SHARE_IMAGE_FAILED_TITLE,
+  SHARE_IMAGE_FAILED_BODY,
+  SHARE_FAILED_TITLE,
+} from '@/lib/share-card-flow';
 import { Colors, FontSize, BorderRadius, Spacing } from '@/constants/theme';
 import { trackShowShared } from '@/lib/analytics';
 let ViewShot: any;
@@ -57,13 +62,23 @@ export const ShareCardWithRef = React.forwardRef<ShareCardHandle, ShareCardProps
       if (Platform.OS === 'ios') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       trackShowShared(props.show.id, props.show.title);
 
-      try {
-        const uri = await viewShotRef.current?.capture?.();
-        await Share.share(buildShowSharePayload(props.show, uri, Platform.OS));
-        props.onShared?.();
-      } catch {
-        // User cancelled
-      }
+      const shot = viewShotRef.current;
+      const outcome = await shareShowCard({
+        show: props.show,
+        platform: Platform.OS,
+        capture: typeof shot?.capture === 'function' ? () => shot.capture() : undefined,
+        share: (payload) => Share.share(payload),
+        dismissedAction: Share.dismissedAction,
+        notifyImageFailed: () =>
+          new Promise<void>((resolve) => {
+            Alert.alert(SHARE_IMAGE_FAILED_TITLE, SHARE_IMAGE_FAILED_BODY, [{ text: 'OK', onPress: () => resolve() }], {
+              cancelable: true,
+              onDismiss: () => resolve(),
+            });
+          }),
+        notifyShareFailed: (message) => Alert.alert(SHARE_FAILED_TITLE, message),
+      });
+      if (outcome === 'shared') props.onShared?.();
     }, [props]);
 
     React.useImperativeHandle(ref, () => ({ share }), [share]);

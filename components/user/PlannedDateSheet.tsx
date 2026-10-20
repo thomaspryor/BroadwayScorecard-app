@@ -1,6 +1,6 @@
 /**
- * PlannedDateSheet — "when are you going?" date picker, presented as a modal
- * bottom sheet.
+ * PlannedDateSheet — "when are you going?" date picker, presented as a native
+ * page sheet.
  *
  * Why a sheet and not an inline picker: the show page rendered
  * DateTimePicker (display="inline", ~320pt wide, non-shrinkable) INSIDE the
@@ -16,7 +16,7 @@ import React, { useCallback, useState } from 'react';
 import { View, Text, Pressable, Modal, StyleSheet, Platform } from 'react-native';
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
+import { Colors, Spacing, FontSize } from '@/constants/theme';
 
 interface PlannedDateSheetProps {
   visible: boolean;
@@ -72,14 +72,14 @@ export function PlannedDateSheet({
   );
 
   return (
+    // Native page sheet: swipe down cancels (onRequestClose). The old
+    // transparent modal slid its dark backdrop up with the sheet.
     <Modal
       visible={visible}
-      transparent
       animationType="slide"
+      presentationStyle="pageSheet"
       onRequestClose={onCancel}
-      statusBarTranslucent
     >
-      <Pressable style={styles.backdrop} onPress={onCancel} accessibilityLabel="Dismiss date picker" />
       <View style={[styles.sheet, { paddingBottom: insets.bottom + Spacing.lg }]}>
         <View style={styles.header}>
           <Pressable onPress={onCancel} hitSlop={10} accessibilityRole="button">
@@ -111,26 +111,11 @@ export function PlannedDateSheet({
 }
 
 const styles = StyleSheet.create({
-  backdrop: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-  },
   sheet: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
+    flex: 1,
     backgroundColor: Colors.surface.raised,
-    borderTopLeftRadius: BorderRadius.lg,
-    borderTopRightRadius: BorderRadius.lg,
     paddingHorizontal: Spacing.lg,
     paddingTop: Spacing.md,
-    borderTopWidth: 1,
-    borderColor: Colors.border.subtle,
   },
   header: {
     flexDirection: 'row',

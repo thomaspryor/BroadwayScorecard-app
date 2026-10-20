@@ -44,66 +44,63 @@ export function AdvancedFiltersSheet({ visible, selections, matchCount, onToggle
   };
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <View style={styles.backdrop}>
-        <Pressable style={styles.backdropTouch} onPress={onClose} accessibilityLabel="Close filters" />
-        <View style={[styles.sheet, { paddingBottom: insets.bottom + Spacing.lg }]}>
-          <View style={styles.grabber} />
-          <View style={styles.headerRow}>
-            <Text style={styles.title}>Filters</Text>
-            {activeCount > 0 && (
-              <Pressable onPress={clearAll} hitSlop={8} accessibilityRole="button" accessibilityLabel="Clear all filters">
-                <Text style={styles.clearAll}>Clear all</Text>
-              </Pressable>
-            )}
-          </View>
-          <ScrollView style={styles.groups} showsVerticalScrollIndicator={false}>
-            {ADVANCED_FILTER_GROUPS.map((group) => (
-              <View key={group.key} style={styles.group}>
-                <Text style={styles.groupLabel}>{group.label.toUpperCase()}</Text>
-                <View style={styles.pillRow}>
-                  {group.options.map((opt) => {
-                    const active = selections[group.key]?.includes(opt.id) ?? false;
-                    return (
-                      <Pressable
-                        key={opt.id}
-                        style={[styles.pill, active && styles.pillActive]}
-                        onPress={() => toggle(group.key, opt.id)}
-                        accessibilityRole="button"
-                        accessibilityState={{ selected: active }}
-                        accessibilityLabel={opt.label}
-                      >
-                        <Text style={[styles.pillText, active && styles.pillTextActive]}>{opt.label}</Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-              </View>
-            ))}
-          </ScrollView>
-          <Pressable
-            style={({ pressed }) => [styles.doneButton, pressed && styles.pressed]}
-            onPress={onClose}
-            accessibilityRole="button"
-          >
-            <Text style={styles.doneText}>
-              {activeCount > 0 ? `Show ${matchCount} ${matchCount === 1 ? 'show' : 'shows'}` : 'Done'}
-            </Text>
-          </Pressable>
+    // Native page sheet: swipe down closes it (onRequestClose), the screen
+    // behind recedes, and nothing dims-then-slides. The old transparent modal
+    // slid its own dark backdrop up from the bottom along with the sheet.
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+      <View style={[styles.sheet, { paddingBottom: insets.bottom + Spacing.lg }]}>
+        <View style={styles.grabber} />
+        <View style={styles.headerRow}>
+          <Text style={styles.title}>Filters</Text>
+          {activeCount > 0 && (
+            <Pressable onPress={clearAll} hitSlop={8} accessibilityRole="button" accessibilityLabel="Clear all filters">
+              <Text style={styles.clearAll}>Clear all</Text>
+            </Pressable>
+          )}
         </View>
+        <ScrollView style={styles.groups} showsVerticalScrollIndicator={false}>
+          {ADVANCED_FILTER_GROUPS.map((group) => (
+            <View key={group.key} style={styles.group}>
+              <Text style={styles.groupLabel}>{group.label.toUpperCase()}</Text>
+              <View style={styles.pillRow}>
+                {group.options.map((opt) => {
+                  const active = selections[group.key]?.includes(opt.id) ?? false;
+                  return (
+                    <Pressable
+                      key={opt.id}
+                      style={[styles.pill, active && styles.pillActive]}
+                      onPress={() => toggle(group.key, opt.id)}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: active }}
+                      accessibilityLabel={opt.label}
+                    >
+                      <Text style={[styles.pillText, active && styles.pillTextActive]}>{opt.label}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+          ))}
+        </ScrollView>
+        <Pressable
+          style={({ pressed }) => [styles.doneButton, pressed && styles.pressed]}
+          onPress={onClose}
+          accessibilityRole="button"
+        >
+          <Text style={styles.doneText}>
+            {activeCount > 0 ? `Show ${matchCount} ${matchCount === 1 ? 'show' : 'shows'}` : 'Done'}
+          </Text>
+        </Pressable>
       </View>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  backdropTouch: { flex: 1 },
   sheet: {
+    flex: 1,
     backgroundColor: Colors.surface.raised,
-    borderTopLeftRadius: BorderRadius.lg, borderTopRightRadius: BorderRadius.lg,
     paddingHorizontal: Spacing.lg, paddingTop: Spacing.sm,
-    maxHeight: '85%',
   },
   grabber: {
     alignSelf: 'center', width: 36, height: 4, borderRadius: 2,
@@ -115,9 +112,9 @@ const styles = StyleSheet.create({
   },
   title: { color: Colors.text.primary, fontSize: FontSize.lg, fontWeight: '700' },
   clearAll: { color: Colors.brand, fontSize: FontSize.sm, fontWeight: '600' },
-  // flexShrink 1: RN defaults flexShrink to 0, so without this the ScrollView
-  // sizes to content and pushes the Done button past the sheet's maxHeight.
-  groups: { flexGrow: 0, flexShrink: 1 },
+  // Fills the sheet between the header and the Done button, scrolling when
+  // the groups are taller than the screen.
+  groups: { flex: 1 },
   group: { marginBottom: Spacing.lg },
   groupLabel: {
     color: Colors.text.muted, fontSize: FontSize.xs, fontWeight: '600',

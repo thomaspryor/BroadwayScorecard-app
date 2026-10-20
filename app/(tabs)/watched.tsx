@@ -31,7 +31,8 @@ import { useUserReviews } from '@/hooks/useUserReviews';
 import { useWatchlist } from '@/hooks/useWatchlist';
 import { useShows } from '@/lib/data-context';
 import { getImageUrl } from '@/lib/images';
-import { toLocalYMD } from '@/lib/date-utils';
+import { toLocalYMD, nowMs } from '@/lib/date-utils';
+import { shouldRefreshPhotoFeed, PHOTO_URL_REFRESH_MS } from '@/lib/photo-feed-refresh';
 import { buildReviewIndex, classifyWatchlistEntry } from '@/lib/watchlist-slot';
 import { showTitleFallback } from '@/lib/show-format';
 import { featureFlags } from '@/lib/feature-flags';
@@ -167,6 +168,8 @@ function AddShowCard({ label, onPress, cardWidth }: { label: string; onPress: ()
         pressed && styles.pressed,
       ]}
       onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
     >
       <Svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke={Colors.text.muted} strokeWidth={2}>
         <Path strokeLinecap="round" d="M12 5v14M5 12h14" />
@@ -287,24 +290,53 @@ export default function WatchedScreen() {
     return map;
   }, [shows]);
 
-  useEffect(() => {
-    if (isAuthenticated && user) {
-      getAllReviews();
-      getWatchlist();
-    }
-  }, [isAuthenticated, user, getAllReviews, getWatchlist]);
+  // The user whose first diary + watchlist load has finished. After that a
+  // refetch (every tab focus) refreshes in place; it used to swap the whole
+  // screen for the skeleton, which flashed and lost the scroll position.
+  const [loadedFor, setLoadedFor] = useState<string | null>(null);
 
+  // useFocusEffect also runs on mount and whenever the signed-in user
+  // changes while focused, so a separate mount effect only fetched twice.
   useFocusEffect(
     useCallback(() => {
       if (isAuthenticated && user) {
-        getAllReviews();
-        getWatchlist();
+        const uid = user.id;
+        Promise.allSettled([getAllReviews(), getWatchlist()]).then(() => setLoadedFor(uid));
         refreshSeenUnrated();
       }
     }, [isAuthenticated, user, getAllReviews, getWatchlist, refreshSeenUnrated]),
   );
 
-  const loading = authLoading || reviewsLoading || watchlistLoading;
+  // Skeleton only until there is something to show: the first load for this
+  // user, unless cached rows are already on screen.
+  const hasDiaryData = reviews.length > 0 || watchlist.length > 0;
+  const loading = authLoading || (
+    !!user && loadedFor !== user.id && (reviewsLoading || watchlistLoading || !hasDiaryData)
+  );
+
+  // Photo Feed freshness. usePhotoFeed loads once per mount and its signed
+  // URLs expire after 5 minutes, so a long-lived tab showed broken photos and
+  // never picked up a photo added from the rating sheet. While the Feed is on
+  // screen: refetch on arrival if the last load is stale, then re-sign before
+  // expiry. The hook's own mount load counts as a refresh (effect order).
+  const photoFeedRefreshedAt = useRef<number | null>(null);
+  const userId = user?.id ?? null;
+  useEffect(() => {
+    if (userId) photoFeedRefreshedAt.current = nowMs();
+  }, [userId]);
+  const feedVisible = viewMode === 'list';
+  useFocusEffect(
+    useCallback(() => {
+      if (!feedVisible || !userId) return;
+      const run = () => {
+        photoFeedRefreshedAt.current = nowMs();
+        refreshPhotoFeed().catch(() => {});
+      };
+      if (shouldRefreshPhotoFeed(photoFeedRefreshedAt.current, nowMs())) run();
+      const timer = setInterval(run, PHOTO_URL_REFRESH_MS);
+      return () => clearInterval(timer);
+    }, [feedVisible, userId, refreshPhotoFeed]),
+  );
 
   // Sorted diary
   const sortedReviews = useMemo(() => {
@@ -860,6 +892,7 @@ export default function WatchedScreen() {
             style={({ pressed }) => [styles.addButton, pressed && styles.pressed]}
             onPress={() => router.push('/import' as any)}
             hitSlop={8}
+            accessibilityRole="button"
             accessibilityLabel="Import shows from Show Score, Mezzanine or Theatr"
             testID="import-shows-button"
           >
@@ -876,6 +909,7 @@ export default function WatchedScreen() {
             style={({ pressed }) => [styles.addButton, styles.addButtonPrimary, pressed && styles.pressed]}
             onPress={() => setShowSearchModal(true)}
             hitSlop={8}
+            accessibilityRole="button"
             accessibilityLabel="Rate a show"
           >
             <Svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={Colors.text.inverse} strokeWidth={2.5}>
@@ -919,7 +953,14 @@ export default function WatchedScreen() {
         <View style={styles.controlsRow}>
           <Text style={styles.showsSeenLabel}>{showsSeen} {showsSeen === 1 ? 'show' : 'shows'} seen</Text>
           <View style={styles.controlsRight}>
-            <Pressable style={styles.sortButton} hitSlop={{ top: 6, bottom: 6 }} onPress={cycleDiarySort}>
+            <Pressable
+              style={styles.sortButton}
+              hitSlop={{ top: 6, bottom: 6 }}
+              onPress={cycleDiarySort}
+              accessibilityRole="button"
+              accessibilityLabel={`Sort: ${sortLabel}`}
+              accessibilityHint="Changes the sort order"
+            >
               <Text style={styles.sortText}>{sortLabel}</Text>
               <Svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke={Colors.text.muted} strokeWidth={2}>
                 <Path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
@@ -1001,7 +1042,7 @@ export default function WatchedScreen() {
                 <PhotoWallGrid photos={allPhotosFlat} signedUrls={photoSignedUrls} />
               )
             )}
-            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { onRefresh(); refreshPhotoFeed(); }} tintColor={Colors.text.secondary} />}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { onRefresh(); photoFeedRefreshedAt.current = nowMs(); refreshPhotoFeed(); }} tintColor={Colors.text.secondary} />}
             showsVerticalScrollIndicator={false}
             contentContainerStyle={[styles.gridContainer, { paddingBottom: listBottomPad }]}
           />

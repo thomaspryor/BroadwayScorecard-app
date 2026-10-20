@@ -80,4 +80,6 @@ appId: com.broadwayscorecard.app
     visible: "Import Complete"
     timeout: 20000
 - assertVisible: "1 shows imported"
-- assertVisible: "Not imported — 1 show we couldn't find"
+# Copy changed in d3b8df3 (flagged rows get a fix-up list); the old
+# "Not imported — 1 show we couldn't find" line no longer exists.
+- assertVisible: "Still to fix — 1 show"

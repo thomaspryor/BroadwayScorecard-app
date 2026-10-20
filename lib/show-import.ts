@@ -11,6 +11,7 @@ import { downscaleToJpeg } from './photo-image-pipeline';
 import { localToday } from './stats-scope';
 import { getSupabaseClient } from './supabase';
 import { sanitizeRating } from './rating';
+import { parseMezzanineExport, MEZZANINE_FILE_ERROR } from './mezzanine-parse';
 import {
   THEATR_BATCH_SIZE,
   THEATR_ERROR_COPY,
@@ -137,70 +138,20 @@ export async function acquireFromShowScore(profileInput: string): Promise<Import
 // Mezzanine
 // ---------------------------------------------------------------------------
 
-interface MezzEntry {
-  show: { name: string; id: string };
-  rating: number | null;
-  date: string | null;
-  review: string | null;
-  production?: { theater?: { name: string; location?: string } };
-}
-
-interface MezzExport {
-  appVersion?: string;
-  data: {
-    diaryEntries: MezzEntry[];
-    lists: { name: string; shows: { name: string; id?: string }[] }[];
-  };
-}
-
 /** Parse a Mezzanine JSON export (Settings → Export Data → JSON) given a
- *  document-picker file URI. */
+ *  document-picker file URI. Parsing lives in ./mezzanine-parse (pure, unit
+ *  tested); a file that can't be read gets the same plain-English error as
+ *  one that isn't an export. */
 export async function acquireFromMezzanine(fileUri: string): Promise<ImportAcquireResult> {
-  const text = await new File(fileUri).text();
-  const parsed: MezzExport = JSON.parse(text);
-  if (!parsed.data?.diaryEntries) {
-    throw new Error('Invalid Mezzanine export — missing data.diaryEntries');
+  let text: string;
+  try {
+    text = await new File(fileUri).text();
+  } catch {
+    throw new Error(MEZZANINE_FILE_ERROR);
   }
-
-  const entries: RawImportEntry[] = [];
-  const today = new Date().toISOString().split('T')[0];
-
-  for (const entry of parsed.data.diaryEntries) {
-    const date = entry.date ? entry.date.split('T')[0] : null;
-    const hasRating = !!(entry.rating && entry.rating > 0);
-    // Unrated future entries are plans, not viewings → watchlist.
-    const isFuture = date !== null && date > today;
-    entries.push({
-      title: entry.show.name,
-      venue: entry.production?.theater?.name || null,
-      // Mezzanine ratings are already 1–5 half-star; sanitize defensively.
-      rating: hasRating ? sanitizeRating(entry.rating as number) || null : null,
-      sourceScore: null,
-      date,
-      reviewText: entry.review || null,
-      kind: !hasRating && isFuture ? 'watchlist' : 'diary',
-      ...(!hasRating && isFuture ? { listName: 'Upcoming', fromDiary: true } : {}),
-      ...(entry.show.id ? { mezzShowId: entry.show.id } : {}),
-    });
-  }
-
-  for (const list of parsed.data.lists || []) {
-    for (const show of list.shows) {
-      entries.push({
-        title: show.name,
-        venue: null,
-        rating: null,
-        sourceScore: null,
-        date: null,
-        reviewText: null,
-        kind: 'watchlist',
-        listName: list.name,
-        ...(show.id ? { mezzShowId: show.id } : {}),
-      });
-    }
-  }
-
-  return { entries, notices: [] };
+  // localToday, not a UTC split: from ~8pm ET a show planned for tomorrow
+  // compared equal to "today" and imported as already seen.
+  return parseMezzanineExport(text, localToday());
 }
 
 // ---------------------------------------------------------------------------

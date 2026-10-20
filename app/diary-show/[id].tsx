@@ -12,7 +12,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getDiaryShowMeta, showTitleFallback } from '@/lib/show-format';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
 
@@ -27,7 +26,6 @@ const MARKET_LABELS: Record<string, string> = {
 
 export default function DiaryShowScreen() {
   const params = useLocalSearchParams<{ id: string }>();
-  const insets = useSafeAreaInsets();
   const showId = params.id ?? '';
 
   const meta = showId ? getDiaryShowMeta(showId) : null;
@@ -41,7 +39,9 @@ export default function DiaryShowScreen() {
     : null;
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top + Spacing.lg }]}>
+    // The native header (app/_layout.tsx, headerShown: true) already sits
+    // below the status bar; adding insets.top here doubled the gap.
+    <View style={[styles.container, { paddingTop: Spacing.lg }]}>
       <View style={styles.headerRow}>
         <View style={styles.poster}>
           <Text style={styles.posterEmoji}>🎭</Text>

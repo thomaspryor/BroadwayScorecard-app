@@ -14,6 +14,8 @@
  */
 
 import React from 'react';
+import { Redirect } from 'expo-router';
+import { fixtureRoutesAllowed } from '@/lib/fixture-gate';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { PosterStatusPill } from '@/components/show-cards/PosterStatusPill';
 import { OutOfMarketChip } from '@/components/show-cards/OutOfMarketChip';
@@ -76,7 +78,7 @@ function MarketBlock({ market }: { market: Market }) {
 }
 
 export default function WatchlistTagFixtureScreen() {
-  if (!__DEV__ && process.env.EXPO_PUBLIC_DEV_AUTO_SIGNIN !== '1') return null;
+  if (!fixtureRoutesAllowed(__DEV__, process.env.EXPO_PUBLIC_DEV_AUTO_SIGNIN)) return <Redirect href="/" />;
   return (
     <ScrollView style={styles.root} contentContainerStyle={styles.content}>
       <MarketBlock market="nyc" />

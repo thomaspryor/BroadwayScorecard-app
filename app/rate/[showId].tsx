@@ -24,7 +24,8 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
-import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
+import { useLocalSearchParams, useRouter, useNavigation, Stack } from 'expo-router';
+import { usePreventRemove } from 'expo-router/react-navigation';
 import { Image } from 'expo-image';
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import Svg, { Path } from 'react-native-svg';
@@ -39,6 +40,9 @@ import { recordRatingGiven } from '@/lib/store-review';
 import { getImageUrl } from '@/lib/images';
 import { getDiaryShowMeta } from '@/lib/show-format';
 import { toLocalYMD } from '@/lib/date-utils';
+import { sanitizeRating } from '@/lib/rating';
+import { isOnline } from '@/lib/offline-queue';
+import { isRateFormDirty, friendlySaveError, RATING_GONE_MESSAGE, type RateFormValues } from '@/lib/rate-form';
 import { savePendingAction, getPendingAction, clearPendingAction } from '@/lib/deferred-auth';
 import * as haptics from '@/lib/haptics';
 import StarRating from '@/components/user/StarRating';
@@ -60,6 +64,7 @@ const MODE_EYEBROW = {
 export default function RateModal() {
   const params = useLocalSearchParams<{ showId: string; showTitle: string; reviewId?: string; initialRating?: string; suggestedDate?: string }>();
   const router = useRouter();
+  const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const { user, showSignIn } = useAuth();
   const { getReviewsForShow, deleteReview, saveReview, invalidateCache } = useUserReviews(user?.id || null);
@@ -106,11 +111,10 @@ export default function RateModal() {
   // the stored date async and start blank.
   const [currentRating, setCurrentRating] = useState<number | null>(initialRating);
   const [reviewText, setReviewText] = useState('');
-  const [dateSeen, setDateSeen] = useState(() => {
-    if (reviewId) return '';
-    if (suggestedDate) return suggestedDate > todayYMD ? todayYMD : suggestedDate;
-    return todayYMD;
-  });
+  const initialDate = reviewId
+    ? ''
+    : suggestedDate ? (suggestedDate > todayYMD ? todayYMD : suggestedDate) : todayYMD;
+  const [dateSeen, setDateSeen] = useState(initialDate);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -121,46 +125,58 @@ export default function RateModal() {
   const stagedPhotosRef = useRef<ProcessedPhoto[]>([]);
   useEffect(() => { stagedPhotosRef.current = stagedPhotos; }, [stagedPhotos]);
   const [loadingReview, setLoadingReview] = useState(!!reviewId);
-  const isDirty = useRef(false);
-  const populatingRef = useRef(!!reviewId); // true while loading edit data
-  const mountedRef = useRef(false); // effect fires once on mount before any user input
-
-  // Track dirty state — skip the mount run and changes from initial data population
-  useEffect(() => {
-    if (!mountedRef.current) {
-      mountedRef.current = true;
-      return;
-    }
-    if (!populatingRef.current) {
-      isDirty.current = true;
-    }
-  }, [currentRating, reviewText, dateSeen]);
+  // What the form held when it opened (or when the stored rating finished
+  // loading). Dirty = differs from this. State, not a ref, so the swipe-down
+  // guard below re-renders when it flips. Null while an edit is loading.
+  const [baseline, setBaseline] = useState<RateFormValues | null>(() => (reviewId ? null : {
+    rating: initialRating,
+    text: '',
+    date: initialDate,
+    stagedCount: 0,
+  }));
+  const isDirty = isRateFormDirty(baseline, {
+    rating: currentRating,
+    text: reviewText,
+    date: dateSeen,
+    stagedCount: stagedPhotos.length,
+  });
+  // Set right before a deliberate close (Save, Delete, resumed save) so the
+  // guard lets it through without asking "Discard changes?".
+  const bypassGuardRef = useRef(false);
+  // A second Save tap while the first is in flight would insert twice.
+  const savingRef = useRef(false);
 
   // Fetch existing review data when editing
   useEffect(() => {
     (async () => {
-      if (!reviewId || !user) {
-        populatingRef.current = false;
+      if (!reviewId) return;
+      if (!user) {
+        setBaseline(prev => prev ?? { rating: initialRating, text: '', date: '', stagedCount: 0 });
         setLoadingReview(false);
         return;
       }
-      populatingRef.current = true;
+      // Not found or fetch failed: the form keeps its opening values, so
+      // those are the baseline.
+      let loaded: RateFormValues = { rating: initialRating, text: '', date: '', stagedCount: 0 };
       try {
         const showReviews = await getReviewsForShow(showId);
         const existing = showReviews.find(r => r.id === reviewId);
         if (existing) {
-          setCurrentRating(existing.rating);
-          setReviewText(existing.review_text || '');
-          setDateSeen(existing.date_seen || '');
+          loaded = {
+            rating: existing.rating,
+            text: existing.review_text || '',
+            date: existing.date_seen || '',
+            stagedCount: 0,
+          };
+          setCurrentRating(loaded.rating);
+          setReviewText(loaded.text);
+          setDateSeen(loaded.date);
         }
       } catch {
         // If fetch fails, user can still enter new data
       } finally {
+        setBaseline(loaded);
         setLoadingReview(false);
-        // React batches the state updates above, so the dirty-tracking effect
-        // fires on the NEXT render. We clear populatingRef in a microtask to
-        // ensure it's still true when the batched render fires the effect.
-        queueMicrotask(() => { populatingRef.current = false; });
       }
     })();
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -201,39 +217,56 @@ export default function RateModal() {
     }
   }, []);
 
-  const handleCancel = useCallback(() => {
-    if (isDirty.current) {
-      Alert.alert(
-        'Discard changes?',
-        'You have unsaved changes that will be lost.',
-        [
-          { text: 'Keep Editing', style: 'cancel' },
-          { text: 'Discard', style: 'destructive', onPress: () => router.back() },
-        ],
-      );
-    } else {
-      router.back();
+  // One guard for every way out: Cancel, the iOS swipe-down, and the
+  // Android back button. Before this, only Cancel asked; a swipe dropped the
+  // stars, notes and staged photos silently.
+  usePreventRemove(isDirty, ({ data }) => {
+    if (bypassGuardRef.current) {
+      navigation.dispatch(data.action);
+      return;
     }
+    Alert.alert(
+      'Discard changes?',
+      'You have unsaved changes that will be lost.',
+      [
+        { text: 'Keep Editing', style: 'cancel' },
+        { text: 'Discard', style: 'destructive', onPress: () => navigation.dispatch(data.action) },
+      ],
+    );
+  });
+
+  const closeWithoutPrompt = useCallback(() => {
+    bypassGuardRef.current = true;
+    router.back();
+  }, [router]);
+
+  const handleCancel = useCallback(() => {
+    router.back();
   }, [router]);
 
   // Persists a rating for the CURRENTLY signed-in user. Shared by the normal
   // Save path and the post-sign-in resume path below.
   const performSave = useCallback(async (ratingVal: number, textVal: string, dateVal: string) => {
     if (!user) return;
+    const rating = sanitizeRating(ratingVal);
     if (reviewId) {
       const filters = `id=eq.${reviewId}&user_id=eq.${user.id}`;
-      const { error } = await supabaseRestUpdate('reviews', filters, {
-        rating: ratingVal,
+      const { data: updated, error } = await supabaseRestUpdate<{ id: string }>('reviews', filters, {
+        rating,
         review_text: textVal.trim() || null,
         date_seen: dateVal || null,
         updated_at: new Date().toISOString(),
       });
       if (error) throw new Error(error.message);
+      // PATCH matching zero rows is a 200 with an empty body. Without this
+      // the sheet said "Rating updated" for a rating deleted on another
+      // device (web parity: ShowHeroRedesign throws the same way).
+      if (!updated) throw new Error(RATING_GONE_MESSAGE);
     } else {
       const { data: inserted, error } = await supabaseRestInsert<{ id: string }>('reviews', {
         user_id: user.id,
         show_id: showId,
-        rating: ratingVal,
+        rating,
         review_text: textVal.trim() || null,
         date_seen: dateVal || null,
       });
@@ -268,12 +301,11 @@ export default function RateModal() {
     }
     await invalidateCache();
     haptics.success();
-    isDirty.current = false; // prevent discard alert
     recordRatingGiven();
   }, [user, reviewId, showId, invalidateCache, removeFromWatchlist, watchlist, showToast]);
 
   const handleSave = useCallback(async () => {
-    if (!canSave || currentRating === null) return;
+    if (!canSave || currentRating === null || savingRef.current) return;
 
     // Gate at Save, not at entry — the sheet is reachable pre-auth so a
     // signed-out user can fill out the full rating (stars + notes + date)
@@ -282,6 +314,7 @@ export default function RateModal() {
     // top of this screen (AuthProvider mounts it globally), so this screen
     // stays alive underneath and resumes the save once auth resolves below.
     if (!user) {
+      savingRef.current = true;
       setSaving(true);
       await savePendingAction({
         type: 'rating',
@@ -292,25 +325,28 @@ export default function RateModal() {
         returnRoute: `/rate/${showId}`,
         timestamp: Date.now(),
       });
+      savingRef.current = false;
       setSaving(false);
       showSignIn('rating');
       return;
     }
 
+    savingRef.current = true;
     setSaving(true);
     setSaveError(null);
     try {
       await performSave(currentRating, reviewText, dateSeen);
-      router.back();
+      closeWithoutPrompt();
       showToast(reviewId ? 'Rating updated' : 'Rating saved', 'success', '/(tabs)/watched');
     } catch (e) {
       const detail = e instanceof Error ? e.message : 'Unknown error';
       haptics.error();
-      setSaveError(`Save failed: ${detail}`);
+      setSaveError(friendlySaveError(detail, await isOnline()));
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
-  }, [canSave, currentRating, user, reviewId, reviewText, dateSeen, showId, performSave, router, showToast, showSignIn]);
+  }, [canSave, currentRating, user, reviewId, reviewText, dateSeen, showId, performSave, closeWithoutPrompt, showToast, showSignIn]);
 
   // Resume a gated save once sign-in succeeds — this screen is still mounted
   // underneath the sign-in sheet, so it picks its own pending action back up.
@@ -322,15 +358,18 @@ export default function RateModal() {
       if (!pending || pending.type !== 'rating' || pending.showId !== showId) return;
       hasExecutedPendingRef.current = true;
       await clearPendingAction();
+      if (savingRef.current) return;
+      savingRef.current = true;
       setSaving(true);
       try {
         await performSave(pending.rating ?? currentRating ?? 0, pending.reviewText ?? reviewText, pending.dateSeen ?? dateSeen);
-        router.back();
+        closeWithoutPrompt();
         showToast(reviewId ? 'Rating updated' : 'Rating saved', 'success', '/(tabs)/watched');
       } catch (e) {
         const detail = e instanceof Error ? e.message : 'Unknown error';
-        setSaveError(`Save failed: ${detail}`);
+        setSaveError(friendlySaveError(detail, await isOnline()));
       } finally {
+        savingRef.current = false;
         setSaving(false);
       }
     })();
@@ -355,8 +394,7 @@ export default function RateModal() {
               await deleteReview(reviewId);
               await invalidateCache();
               haptics.action();
-              isDirty.current = false;
-              router.back();
+              closeWithoutPrompt();
               showToast('Rating deleted.', 'info', {
                 actionLabel: 'Undo',
                 onAction: () => {
@@ -377,14 +415,14 @@ export default function RateModal() {
         },
       ],
     );
-  }, [reviewId, currentRating, reviewText, dateSeen, showId, deleteReview, saveReview, invalidateCache, router, showToast]);
+  }, [reviewId, currentRating, reviewText, dateSeen, showId, deleteReview, saveReview, invalidateCache, closeWithoutPrompt, showToast]);
 
   // If showId is missing, bail
   if (!showId) {
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
         <Text style={styles.errorText}>Something went wrong. Please try again.</Text>
-        <Pressable onPress={() => router.back()} style={styles.errorDismiss}>
+        <Pressable onPress={() => router.back()} style={styles.errorDismiss} accessibilityRole="button">
           <Text style={styles.errorDismissText}>Dismiss</Text>
         </Pressable>
       </View>
@@ -401,7 +439,7 @@ export default function RateModal() {
       >
         {/* Header */}
         <View style={[styles.header, { paddingTop: Math.max(insets.top, Spacing.md) }]}>
-          <Pressable onPress={handleCancel} hitSlop={12} style={styles.headerButton}>
+          <Pressable onPress={handleCancel} hitSlop={12} style={styles.headerButton} accessibilityRole="button" accessibilityLabel="Cancel">
             <Text style={styles.cancelText}>Cancel</Text>
           </Pressable>
           <View style={styles.headerTitleCol}>
@@ -415,6 +453,9 @@ export default function RateModal() {
             disabled={!canSave}
             hitSlop={12}
             style={styles.headerButton}
+            accessibilityRole="button"
+            accessibilityLabel={saving ? 'Saving' : 'Save rating'}
+            accessibilityState={{ disabled: !canSave, busy: saving }}
           >
             {saving ? (
               <ActivityIndicator size="small" color={Colors.score.gold} />
@@ -559,7 +600,7 @@ export default function RateModal() {
                 userId={user?.id ?? null}
                 dateSeen={dateSeen || null}
                 stagedPhotos={stagedPhotos}
-                onStagePhotos={(items) => { setStagedPhotos(prev => [...prev, ...items]); isDirty.current = true; }}
+                onStagePhotos={(items) => setStagedPhotos(prev => [...prev, ...items])}
                 onRemoveStaged={(index) => setStagedPhotos(prev => prev.filter((_, i) => i !== index))}
               />
 

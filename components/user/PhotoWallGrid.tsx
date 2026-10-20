@@ -9,6 +9,7 @@ import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { Colors, Spacing, FontSize } from '@/constants/theme';
 import * as haptics from '@/lib/haptics';
+import { showTitleFallback } from '@/lib/show-format';
 import type { WallPhoto } from '@/hooks/usePhotoFeed';
 
 interface PhotoWallGridProps {
@@ -41,6 +42,9 @@ export function PhotoWallGrid({ photos, signedUrls }: PhotoWallGridProps) {
               params: { showId: photo.show_id, reviewId: photo.review_id },
             });
           }}
+          accessibilityRole="imagebutton"
+          accessibilityLabel={photo.show_id ? `Photo from ${showTitleFallback(photo.show_id)}` : 'Photo'}
+          accessibilityHint={photo.show_id ? 'Opens this diary entry' : undefined}
         >
           {signedUrls[photo.storage_path] && (
             <Image source={{ uri: signedUrls[photo.storage_path] }} style={styles.img} contentFit="cover" />
