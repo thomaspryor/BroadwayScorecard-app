@@ -4,32 +4,21 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { View, Text, TextInput, FlatList, StyleSheet } from 'react-native';
-import Fuse, { IFuseOptions } from 'fuse.js';
+import Fuse from 'fuse.js';
+import { SHOW_SEARCH_FUSE_OPTIONS } from '@/lib/show-search';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useShows } from '@/lib/data-context';
 import { ShowCard } from '@/components/ShowCard';
 import { AnimatedListItem } from '@/components/AnimatedListItem';
-import { Show } from '@/lib/types';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
 import { trackSearchPerformed, trackSearchNoResults } from '@/lib/analytics';
-
-const FUSE_OPTIONS: IFuseOptions<Show> = {
-  keys: [
-    { name: 'title', weight: 2 },
-    { name: 'venue', weight: 1 },
-    { name: 'creativeTeam.name', weight: 0.7 },
-  ],
-  threshold: 0.35,
-  includeScore: true,
-  minMatchCharLength: 2,
-};
 
 export default function SearchScreen() {
   const { shows } = useShows();
   const insets = useSafeAreaInsets();
   const [query, setQuery] = useState('');
 
-  const fuse = useMemo(() => new Fuse(shows, FUSE_OPTIONS), [shows]);
+  const fuse = useMemo(() => new Fuse(shows, SHOW_SEARCH_FUSE_OPTIONS), [shows]);
 
   const results = useMemo(() => {
     const q = query.trim();

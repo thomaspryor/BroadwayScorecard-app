@@ -5,7 +5,8 @@
 
 import React, { useMemo, useState, useCallback, useRef } from 'react';
 import { View, Text, TextInput, FlatList, StyleSheet, ScrollView, Pressable, RefreshControl, Platform, useWindowDimensions } from 'react-native';
-import Fuse, { IFuseOptions } from 'fuse.js';
+import Fuse from 'fuse.js';
+import { SHOW_SEARCH_FUSE_OPTIONS } from '@/lib/show-search';
 import { ShowListSkeleton } from '@/components/Skeleton';
 import { BottomScrim } from '@/components/BottomScrim';
 import * as Haptics from 'expo-haptics';
@@ -82,16 +83,6 @@ function FilterPill({ label, active, onPress, color }: { label: string; active: 
   );
 }
 
-const FUSE_OPTIONS: IFuseOptions<Show> = {
-  keys: [
-    { name: 'title', weight: 2 },
-    { name: 'venue', weight: 1 },
-    { name: 'creativeTeam.name', weight: 0.7 },
-  ],
-  threshold: 0.35,
-  includeScore: true,
-  minMatchCharLength: 2,
-};
 
 export default function BrowseScreen() {
   const { shows, isLoading, refresh, error } = useShows();
@@ -133,7 +124,7 @@ export default function BrowseScreen() {
   }, [isAuthenticated, toggleLocal, watchlistSet, addToWatchlist, removeFromWatchlist]);
 
   // Fuse search
-  const fuse = useMemo(() => new Fuse(shows, FUSE_OPTIONS), [shows]);
+  const fuse = useMemo(() => new Fuse(shows, SHOW_SEARCH_FUSE_OPTIONS), [shows]);
   const searchResults = useMemo(() => {
     const q = searchQuery.trim();
     if (q.length < 2) return null;

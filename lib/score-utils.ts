@@ -83,39 +83,18 @@ export function isCriticalGold(score: number | null | undefined, category?: stri
   return Math.round(score) >= getGoldThreshold(category);
 }
 
-/**
- * Minimum reviews before a composite score is shown — mirrors web
- * getMarketMinReviews (Broadway/West End = 5, Off-Broadway/Off-WE/Regional/Tour = 3).
- */
-export function getMarketMinReviews(category?: string): number {
-  switch (category) {
-    case 'off-broadway':
-    case 'off-west-end':
-    case 'regional':
-    case 'tour': // web parity: src/config/markets.json tour.minReviews = 3
-      return 3;
-    default:
-      return 5;
-  }
-}
-
-/**
- * Composite score gated by the market min-review threshold — the single
- * predicate for "does this show have a displayable Critic Score?".
- * Returns null when under threshold so badges render "—" and ranked
- * shelves/sorts exclude the show (beta feedback 2026-08-01: The Gruffalo,
- * 1 review, ranked #1 on the WE Home with a 98 badge while its own show
- * page suppressed the score).
- */
-export function getQualifiedScore(show: {
-  compositeScore: number | null;
-  category: string;
-  criticScore: { reviewCount: number } | null;
-}): number | null {
-  if (show.compositeScore == null) return null;
-  if ((show.criticScore?.reviewCount ?? 0) < getMarketMinReviews(show.category)) return null;
-  return show.compositeScore;
-}
+// The display gate (market minimums, T3-only extra, the feed's `cr.q` verdict)
+// lives in the pure lib/score-gate.ts; re-exported so existing imports keep
+// working. getQualifiedScore is the single "does this show have a displayable
+// Critic Score?" predicate (beta feedback 2026-08-01: The Gruffalo, 1 review,
+// ranked #1 on the WE Home with a 98 badge while its own page hid the score).
+export {
+  getMarketMinReviews,
+  getQualifiedScore,
+  hasEnoughReviewsForShow,
+  isScoreTBD,
+  reviewsRemainingForShow,
+} from './score-gate';
 
 export function getScoreTier(score: number | null | undefined, category?: string): ScoreTier | null {
   if (score == null) return null;
@@ -125,6 +104,12 @@ export function getScoreTier(score: number | null | undefined, category?: string
   if (rounded >= 65) return SCORE_TIERS.worthSeeing;
   if (rounded >= 55) return SCORE_TIERS.skippable;
   return SCORE_TIERS.stayAway;
+}
+
+/** Sentiment word under a score (web getSentimentLabel): derived from the
+ *  score and market, never from the feed's precomputed `cr.l`. */
+export function getScoreTierLabel(score: number | null | undefined, category?: string): string | null {
+  return getScoreTier(score, category)?.label ?? null;
 }
 
 export function getScoreColor(score: number | null | undefined, category?: string): string {
@@ -167,8 +152,30 @@ export function getStatusInfo(status: string): StatusInfo {
       return { label: 'IN PREVIEWS', color: Colors.status.previews };
     case 'upcoming':
       return { label: 'UPCOMING', color: Colors.status.upcoming };
+    case 'announced':
+      // Web ShowPills styles announced exactly like upcoming (blue): it is a
+      // future show, not a closed one.
+      return { label: 'ANNOUNCED', color: Colors.status.upcoming };
     default:
-      return { label: status.toUpperCase(), color: Colors.status.closed };
+      return { label: (status || '').toUpperCase(), color: Colors.status.closed };
+  }
+}
+
+/** Quick Facts status word: one mapping shared with the status pill, so an
+ *  announced show never reads "Closed". */
+export function getStatusFactLabel(status: string): string {
+  switch (status) {
+    case 'open':
+      return 'Now Playing';
+    case 'previews':
+      return 'In Previews';
+    case 'upcoming':
+    case 'announced':
+      return 'Upcoming';
+    case 'closed':
+      return 'Closed';
+    default:
+      return getStatusInfo(status).label;
   }
 }
 
@@ -176,13 +183,24 @@ export function getStatusInfo(status: string): StatusInfo {
 // FORMAT DISPLAY
 // ===========================================
 
-export function getFormatInfo(type: string): { label: string; color: string } {
+// Web src/lib/show-format.ts: opera is indigo, special ("EVENT") amber, and
+// unknown or missing types are a neutral EVENT, never PLAY (a concert badged
+// PLAY is a factual error; EVENT is merely unspecific). The -500 shades match
+// the app's musical/play pill colours.
+const FORMAT_OPERA_COLOR = '#6366f1'; // indigo-500
+const FORMAT_EVENT_COLOR = '#f59e0b'; // amber-500
+
+export function getFormatInfo(type: string | null | undefined): { label: string; color: string } {
   switch (type) {
     case 'musical':
       return { label: 'MUSICAL', color: Colors.format.musical };
     case 'play':
       return { label: 'PLAY', color: Colors.format.play };
+    case 'opera':
+      return { label: 'OPERA', color: FORMAT_OPERA_COLOR };
+    case 'special':
+      return { label: 'EVENT', color: FORMAT_EVENT_COLOR };
     default:
-      return { label: type.toUpperCase(), color: Colors.text.muted };
+      return { label: 'EVENT', color: Colors.text.secondary };
   }
 }
