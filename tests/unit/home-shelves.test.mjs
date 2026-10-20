@@ -93,3 +93,19 @@ test('contract: closing-soon window and shelf predicates match the website home 
   assert.match(src, /tags\.includes\('romantic'\) \|\| tags\.includes\('drama'\)/);
   assert.match(src, /s\.status === 'previews' \|\| \(s\.status === 'upcoming' && \(s\.previewsStartDate \|\| s\.openingDate\)\)/);
 });
+
+test('top recent cutoff is a local date, not UTC, on a US evening', () => {
+  // Node re-reads TZ at runtime. 10pm in New York is already tomorrow in UTC,
+  // where the old toISOString() cutoff read one day late.
+  const saved = process.env.TZ;
+  process.env.TZ = 'America/New_York';
+  try {
+    const evening = new Date(2026, 9, 20, 22, 0, 0);
+    assert.equal(evening.toISOString().slice(0, 10), '2026-10-21', 'fixture must cross midnight UTC');
+    assert.equal(twelveMonthsAgoYMD(evening), '2025-10-20');
+    assert.equal(isTopRecentCandidate(s({ openingDate: '2025-10-20' }), evening), true);
+  } finally {
+    if (saved === undefined) delete process.env.TZ;
+    else process.env.TZ = saved;
+  }
+});
