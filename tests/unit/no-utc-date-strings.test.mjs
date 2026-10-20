@@ -24,8 +24,6 @@ const ALLOWED = new Map([
   ['lib/stats/season-windows.ts', 'Date.UTC calendar math'],
   ['lib/welcome-onboarding.ts', 'Date.UTC calendar math'],
   ['lib/theatr-import.ts', 'adds days to a T00:00:00Z date'],
-  // Owned by another change set; a 12-month cutoff off by one day at most.
-  ['app/(tabs)/index.tsx', 'known: twelveMonthsAgo cutoff, fix pending'],
 ]);
 
 const PATTERN = /toISOString\(\)\s*\.\s*(split\(\s*['"]T['"]\s*\)\s*\[\s*0\s*\]|slice\(\s*0\s*,\s*10\s*\)|substring\(\s*0\s*,\s*10\s*\))/;
