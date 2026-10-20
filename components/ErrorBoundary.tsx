@@ -5,7 +5,9 @@
 
 import React, { Component, ErrorInfo } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
+import * as SplashScreen from 'expo-splash-screen';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
+import { captureRenderError } from '@/lib/sentry';
 
 interface Props {
   children: React.ReactNode;
@@ -31,6 +33,11 @@ export class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, info: ErrorInfo) {
     console.error('ErrorBoundary caught:', error, info.componentStack);
+    // The boundary swallows the error, so Sentry's global handler never sees it.
+    captureRenderError(error, info.componentStack);
+    // A crash before the root layout was ready would otherwise leave the
+    // splash covering this fallback until its backstop timer.
+    SplashScreen.hide();
   }
 
   handleRetry = () => {

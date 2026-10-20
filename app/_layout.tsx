@@ -5,6 +5,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { DarkTheme, ThemeProvider , Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import * as SplashScreen from 'expo-splash-screen';
 import 'react-native-reanimated';
 
 import PostHog, { PostHogProvider } from 'posthog-react-native';
@@ -27,6 +28,19 @@ import { startAutoFlush, flushQueue } from '@/lib/offline-queue';
 import { rescheduleAllReminders } from '@/lib/local-notifications';
 import { getUserWatchlistCache } from '@/lib/user-cache';
 import { makeShowTitleLookup, parseCachedWatchlist } from '@/lib/rate-reminders';
+
+// Crash reporting starts before anything else on the JS side, so errors while
+// the providers below mount are reported. It used to start in RootLayout's
+// first effect, after the first render (and after Sentry.wrap() below ran on
+// an uninitialized client).
+initSentry();
+
+// Keep the native splash up until RootLayout knows what to render. Otherwise
+// expo-router hides it as soon as navigation is ready, while this layout still
+// returns null (onboarding check + PostHog), and the user sees an empty screen.
+SplashScreen.preventAutoHideAsync().catch(() => {});
+/** Never leave the splash up longer than this, whatever is still loading. */
+const SPLASH_MAX_MS = 6000;
 
 // Custom dark theme matching our design tokens
 const BroadwayDark = {
@@ -105,9 +119,15 @@ function RootLayout() {
   const [phClient, setPhClient] = useState<PostHog | null>(null);
   const [phReady, setPhReady] = useState(!POSTHOG_API_KEY); // skip wait if no key
 
+  const ready = showOnboarding !== null && phReady;
   useEffect(() => {
-    // Init crash reporting first — catches errors during startup
-    initSentry();
+    if (ready) SplashScreen.hide();
+  }, [ready]);
+
+  useEffect(() => {
+    // Backstop for the splash: a hung flag/onboarding read must not trap the
+    // user on it. hide() is a no-op once the splash is gone.
+    const splashBackstop = setTimeout(() => SplashScreen.hide(), SPLASH_MAX_MS);
 
     // Start offline queue auto-flush + flush any pending operations
     startAutoFlush();
@@ -132,7 +152,10 @@ function RootLayout() {
       .then(([, seen]) => setShowOnboarding(!seen))
       .catch(() => setShowOnboarding(false));
 
-    // Check for OTA updates in background (non-blocking)
+    // Download any OTA update in the background. It applies on the next cold
+    // start. Never reloadAsync() here: reloading mid-session threw away
+    // whatever the user was doing (a half-written rating, a scrolled list)
+    // seconds after launch.
     if (!__DEV__) {
       try {
         // Deliberately lazy: expo-updates is absent in Expo Go, and a static import would
@@ -143,12 +166,11 @@ function RootLayout() {
           .then(({ isAvailable }: { isAvailable: boolean }) => {
             if (isAvailable) return Updates.fetchUpdateAsync();
           })
-          .then((result: { isNew?: boolean } | undefined) => {
-            if (result?.isNew) Updates.reloadAsync();
-          })
           .catch(() => {}); // Silent fail — network errors are fine
       } catch {} // Native module not available in dev client
     }
+
+    return () => clearTimeout(splashBackstop);
   }, []);
 
   // Register push notifications + set up tap handler

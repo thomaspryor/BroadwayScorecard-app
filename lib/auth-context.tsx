@@ -141,7 +141,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setSignInLoading(false);
         setSignInProvider(null);
         identifyUser(session.user.id);
-        setSentryUser(session.user.id, session.user.email);
+        setSentryUser(session.user.id);
         trackSignInCompleted(session.user.app_metadata?.provider || 'unknown');
         // Re-link this device's push token to the new account. Never prompts.
         // Deferred: supabase-js holds its auth lock while this callback runs,
