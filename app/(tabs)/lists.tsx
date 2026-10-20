@@ -4,12 +4,11 @@
  * Reuses the existing ListsTab component from the old My Shows tab.
  */
 
-import React, { useEffect, useMemo, useCallback } from 'react';
+import React, { useMemo, useCallback, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import { useAuth } from '@/lib/auth-context';
-import { useUserLists } from '@/hooks/useUserLists';
 import { useShows } from '@/lib/data-context';
 import { featureFlags } from '@/lib/feature-flags';
 import ListsTab from '@/components/user/ListsTab';
@@ -20,7 +19,6 @@ import { Skeleton } from '@/components/Skeleton';
 export default function ListsScreen() {
   const insets = useSafeAreaInsets();
   const { user, isAuthenticated, loading: authLoading, showSignIn } = useAuth();
-  const { getLists, loading: listsLoading } = useUserLists(user?.id || null);
   const { shows } = useShows();
 
   const showMap = useMemo(() => {
@@ -29,17 +27,24 @@ export default function ListsScreen() {
     return map;
   }, [shows]);
 
-  useEffect(() => {
-    if (isAuthenticated && user) getLists();
-  }, [isAuthenticated, user, getLists]);
-
+  // ListsTab owns the lists (its own useUserLists) and loads them on mount.
+  // This screen used to hold a second instance whose `loading` swapped
+  // ListsTab out for a skeleton on every tab focus, which unmounted it and
+  // threw away the open list. Now a focus only bumps refreshSignal, and
+  // ListsTab refetches in place. The first focus is the mount; skip it.
+  const [refreshSignal, setRefreshSignal] = useState(0);
+  const firstFocusRef = useRef(true);
   useFocusEffect(
     useCallback(() => {
-      if (isAuthenticated && user) getLists();
-    }, [isAuthenticated, user, getLists]),
+      if (firstFocusRef.current) {
+        firstFocusRef.current = false;
+        return;
+      }
+      setRefreshSignal(n => n + 1);
+    }, []),
   );
 
-  const loading = authLoading || listsLoading;
+  const loading = authLoading;
 
   if (!featureFlags.userAccounts) return null;
 
@@ -56,6 +61,7 @@ export default function ListsScreen() {
           <Pressable
             style={({ pressed }) => [styles.ctaButton, pressed && styles.pressed]}
             onPress={() => showSignIn('rating')}
+            accessibilityRole="button"
           >
             <Text style={styles.ctaButtonText}>Sign In to Get Started</Text>
           </Pressable>
@@ -82,7 +88,7 @@ export default function ListsScreen() {
       <View style={styles.headerRow}>
         <Text style={styles.pageTitle}>My Lists</Text>
       </View>
-      {user && <ListsTab userId={user.id} showMap={showMap} />}
+      {user && <ListsTab userId={user.id} showMap={showMap} refreshSignal={refreshSignal} />}
     </View>
   );
 }

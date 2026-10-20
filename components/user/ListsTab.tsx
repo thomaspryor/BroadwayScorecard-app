@@ -48,9 +48,14 @@ interface ListsTabProps {
   userId: string;
   showMap: Record<string, Show>;
   createTrigger?: number;
+  /** Bumped by the parent when its tab regains focus. Refetches lists and
+   *  the open list's items in place, so an open list stays open (the Lists
+   *  tab used to unmount this component behind a skeleton on every focus,
+   *  dropping back to the index). */
+  refreshSignal?: number;
 }
 
-export default function ListsTab({ userId, showMap, createTrigger }: ListsTabProps) {
+export default function ListsTab({ userId, showMap, createTrigger, refreshSignal = 0 }: ListsTabProps) {
   const router = useRouter();
   const {
     lists, loading,
@@ -66,10 +71,10 @@ export default function ListsTab({ userId, showMap, createTrigger }: ListsTabPro
     router.push(show ? `/show/${show.slug}` : `/diary-show/${showId}` as any);
   }, [router]);
 
-  // Load lists on mount
+  // Load lists on mount and on each parent refresh signal
   useEffect(() => {
     getLists();
-  }, [getLists]);
+  }, [getLists, refreshSignal]);
 
   const [refreshing, setRefreshing] = useState(false);
   const onRefresh = useCallback(async () => {
@@ -96,18 +101,20 @@ export default function ListsTab({ userId, showMap, createTrigger }: ListsTabPro
     }
   }, [createTrigger]);
 
-  // Load items when viewing a list detail
+  // Load items when viewing a list detail, and again on a refresh signal
+  // (the spinner only covers an empty list, so a refresh doesn't flash).
   useEffect(() => {
     if (activeListId) {
       setListItemsLoading(true);
       getListItems(activeListId)
         .then(setListItems)
+        .catch(() => { /* keep what's shown; pull-to-refresh retries */ })
         .finally(() => setListItemsLoading(false));
     } else {
       setListItems([]);
       setShowSearch(false);
     }
-  }, [activeListId, getListItems]);
+  }, [activeListId, getListItems, refreshSignal]);
 
   const activeList = useMemo(
     () => lists.find(l => l.id === activeListId) || null,
@@ -121,7 +128,13 @@ export default function ListsTab({ userId, showMap, createTrigger }: ListsTabPro
   // ─── Handlers ───────────────────────────────────────────
   const handleCreateList = async (name: string, description: string | null, isRanked: boolean) => {
     haptics.action();
-    const newList = await createList(name, description, isRanked);
+    let newList: UserList | null = null;
+    try {
+      newList = await createList(name, description, isRanked);
+    } catch (e) {
+      Alert.alert('Couldn\u2019t create the list', e instanceof Error ? e.message : 'Please try again.');
+      return;
+    }
     if (newList) {
       trackListCreated(newList.id, name, isRanked);
       setShowModal(null);
@@ -161,11 +174,18 @@ export default function ListsTab({ userId, showMap, createTrigger }: ListsTabPro
   const handleAddShow = async (showId: string) => {
     if (!activeListId) return;
     haptics.action();
-    await addToList(activeListId, showId);
+    try {
+      // Throws at the per-list cap and on server failure (useUserLists).
+      await addToList(activeListId, showId);
+    } catch (e) {
+      Alert.alert('Couldn\u2019t add the show', e instanceof Error ? e.message : 'Please try again.');
+      return;
+    }
     trackShowAddedToList(activeListId, showId, 'list_detail');
     // Refresh items
-    const items = await getListItems(activeListId);
-    setListItems(items);
+    try {
+      setListItems(await getListItems(activeListId));
+    } catch { /* the add landed; the list refreshes on next focus */ }
   };
 
   const handleRemoveShow = async (showId: string) => {
@@ -222,6 +242,7 @@ export default function ListsTab({ userId, showMap, createTrigger }: ListsTabPro
           <Pressable
             style={({ pressed }) => [styles.ctaButton, pressed && styles.pressed]}
             onPress={() => setShowModal('create')}
+            accessibilityRole="button"
           >
             <Text style={styles.ctaButtonText}>Create a List</Text>
           </Pressable>
@@ -246,6 +267,7 @@ export default function ListsTab({ userId, showMap, createTrigger }: ListsTabPro
             <Pressable
               style={styles.listCard}
               onPress={() => { haptics.tap(); setActiveListId(list.id); }}
+              accessibilityRole="button"
             >
               <View style={styles.listCardInfo}>
                 <View style={styles.listCardHeader}>
@@ -285,6 +307,8 @@ export default function ListsTab({ userId, showMap, createTrigger }: ListsTabPro
             <Pressable
               style={styles.createButton}
               onPress={() => { haptics.tap(); setShowModal('create'); }}
+              accessibilityRole="button"
+              accessibilityLabel="Create a list"
             >
               <Text style={styles.createButtonText}>+ Create a list</Text>
             </Pressable>
@@ -305,10 +329,20 @@ export default function ListsTab({ userId, showMap, createTrigger }: ListsTabPro
     <View style={{ flex: 1 }}>
       {/* Back + Header */}
       <View style={styles.detailHeader}>
-        <Pressable onPress={() => { haptics.tap(); setActiveListId(null); }} hitSlop={12}>
+        <Pressable
+          onPress={() => { haptics.tap(); setActiveListId(null); }}
+          hitSlop={12}
+          accessibilityRole="button"
+          accessibilityLabel="Back to lists"
+        >
           <Text style={styles.backText}>← Lists</Text>
         </Pressable>
-        <Pressable onPress={() => { haptics.action(); setShowListMenu(true); }} hitSlop={12}>
+        <Pressable
+          onPress={() => { haptics.action(); setShowListMenu(true); }}
+          hitSlop={12}
+          accessibilityRole="button"
+          accessibilityLabel="List options"
+        >
           <Text style={styles.moreButton}>•••</Text>
         </Pressable>
       </View>
@@ -337,7 +371,7 @@ export default function ListsTab({ userId, showMap, createTrigger }: ListsTabPro
         <Text style={styles.detailDescription}>{activeList.description}</Text>
       )}
 
-      {listItemsLoading ? (
+      {listItemsLoading && listItems.length === 0 ? (
         <View style={styles.centerContainer}>
           <ActivityIndicator color={Colors.brand} />
         </View>
@@ -361,7 +395,13 @@ export default function ListsTab({ userId, showMap, createTrigger }: ListsTabPro
                   {/* Rank number */}
                   <Text style={styles.rankNumber}>{idx + 1}</Text>
                   {/* Drag handle */}
-                  <Pressable onLongPress={drag} hitSlop={8}>
+                  <Pressable
+                    onLongPress={drag}
+                    hitSlop={8}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Reorder ${show?.title || showTitleFallback(item.show_id)}`}
+                    accessibilityHint="Long-press, then drag to move"
+                  >
                     <Svg width={16} height={16} viewBox="0 0 24 24" fill={Colors.text.muted}>
                       <Path d="M8 6h2v2H8zm6 0h2v2h-2zM8 11h2v2H8zm6 0h2v2h-2zM8 16h2v2H8zm6 0h2v2h-2z" />
                     </Svg>
@@ -392,6 +432,8 @@ export default function ListsTab({ userId, showMap, createTrigger }: ListsTabPro
                     onPress={() => handleRemoveShow(item.show_id)}
                     hitSlop={12}
                     style={styles.removeButton}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Remove ${show?.title || showTitleFallback(item.show_id)} from list`}
                   >
                     <Svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke={Colors.text.muted} strokeWidth={2}>
                       <Path strokeLinecap="round" strokeLinejoin="round" d="M18 6L6 18M6 6l12 12" />
@@ -444,6 +486,8 @@ export default function ListsTab({ userId, showMap, createTrigger }: ListsTabPro
                   onPress={() => handleRemoveShow(item.show_id)}
                   hitSlop={12}
                   style={styles.removeButton}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Remove ${show?.title || showTitleFallback(item.show_id)} from list`}
                 >
                   <Svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke={Colors.text.muted} strokeWidth={2}>
                     <Path strokeLinecap="round" strokeLinejoin="round" d="M18 6L6 18M6 6l12 12" />
