@@ -30,6 +30,11 @@ jobs:
     name: Maestro E2E (${{ inputs.suite || 'all' }})
     runs-on: macos-26
     timeout-minutes: 120
+    # Each run sets a new dev-test password (see "Rotate dev-test password"),
+    # so two overlapping runs would sign each other out. Run one at a time.
+    concurrency:
+      group: maestro-e2e
+      cancel-in-progress: false
     env:
       # Schedule triggers carry no inputs, so `inputs.suite` is '' there.
       # Resolve the suite once here; without this every suite conditional
@@ -101,6 +106,34 @@ jobs:
 
       - name: Install CocoaPods
         run: cd ios && pod install --repo-update
+
+      # The dev-test password used to be committed in lib/auth-context.tsx, so
+      # it is public. Every run sets a fresh random one through the admin API
+      # and bakes it only into this run's local simulator build (dev auto
+      # sign-in reads EXPO_PUBLIC_DEV_TEST_PASSWORD; lib/dev-auto-signin.ts).
+      - name: Rotate dev-test password
+        run: |
+          set -euo pipefail
+          node <<'EOF'
+          const crypto = require('crypto');
+          const fs = require('fs');
+          const base = process.env.EXPO_PUBLIC_SUPABASE_URL;
+          const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+          const email = 'dev-test@broadwayscorecard.com';
+          const headers = { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' };
+          (async () => {
+            const list = await fetch(`${base}/auth/v1/admin/users?filter=${encodeURIComponent(email)}&per_page=50`, { headers });
+            if (!list.ok) throw new Error(`user lookup failed: HTTP ${list.status}`);
+            const users = ((await list.json()).users || []).filter((u) => u.email === email);
+            if (users.length !== 1) throw new Error(`expected 1 ${email} user, found ${users.length}`);
+            const password = `${crypto.randomBytes(24).toString('base64url')}Aa1!`;
+            console.log(`::add-mask::${password}`);
+            const res = await fetch(`${base}/auth/v1/admin/users/${users[0].id}`, { method: 'PUT', headers, body: JSON.stringify({ password }) });
+            if (!res.ok) throw new Error(`password update failed: HTTP ${res.status}`);
+            fs.appendFileSync(process.env.GITHUB_ENV, `EXPO_PUBLIC_DEV_TEST_PASSWORD=${password}\n`);
+            console.log('dev-test password rotated for this run');
+          })().catch((e) => { console.error(`::error::${e.message}`); process.exit(1); });
+          EOF
 
       - name: Build app for Simulator (Release — JS bundled)
         run: |

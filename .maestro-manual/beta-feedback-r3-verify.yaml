@@ -1,3 +1,5 @@
+# Password: pass -e DEV_TEST_PASSWORD=<current dev-test password>. maestro-e2e.yml sets a
+# fresh random one every run, so set your own via the Supabase admin API first.
 # Verification screenshots for the 2026-08-03 beta-feedback round-3 batch.
 # LOCAL-ONLY TOOL — outside .maestro/ so CI's glob never runs it.
 # Pre-req: Release sim build installed (scripts/build-sim.sh).
@@ -46,7 +48,7 @@ appId: com.broadwayscorecard.app
       - inputText: "dev-test@broadwayscorecard.com"
       - tapOn:
           text: "Password"
-      - inputText: "dev-test-local-only-2024"
+      - inputText: ${DEV_TEST_PASSWORD}
       - hideKeyboard
       - tapOn:
           text: "^Sign In$"

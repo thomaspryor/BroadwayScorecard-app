@@ -46,6 +46,28 @@ test('no password string literal anywhere in the app bundle sources', () => {
   assert.deepEqual(hits, [], 'credentials must come from build-time env, never source');
 });
 
+test('Maestro flows type passwords from a variable, never a literal', () => {
+  // The same dev-test password was also typed as a literal in .maestro-manual
+  // flows. maestro-e2e.yml now rotates it every run; flows take it via -e.
+  const hits = [];
+  const walk = dir => {
+    for (const name of readdirSync(join(root, dir))) {
+      const rel = join(dir, name);
+      if (statSync(join(root, rel)).isDirectory()) walk(rel);
+      else if (/\.ya?ml$/.test(name)) {
+        const lines = readFileSync(join(root, rel), 'utf8').split('\n');
+        lines.forEach((line, i) => {
+          if (!/text:\s*["']?Password/i.test(line)) return;
+          const next = lines.slice(i + 1).find(l => /-\s*inputText:/.test(l));
+          if (next && !/inputText:\s*["']?\$\{/.test(next)) hits.push(`${rel}:${i + 1}`);
+        });
+      }
+    }
+  };
+  for (const dir of ['.maestro', '.maestro-manual']) walk(dir);
+  assert.deepEqual(hits, [], 'type passwords as ${VAR} passed with maestro -e');
+});
+
 test('auth-context reads the password from the env var', () => {
   const src = readFileSync(join(root, 'lib/auth-context.tsx'), 'utf8');
   assert.match(src, /process\.env\.EXPO_PUBLIC_DEV_TEST_PASSWORD/);

@@ -1,3 +1,5 @@
+# Password: pass -e DEV_TEST_PASSWORD=<current dev-test password>. maestro-e2e.yml sets a
+# fresh random one every run, so set your own via the Supabase admin API first.
 # Take after-screenshots of redesigned Watched / To Watch / Lists tabs
 # Pre-req: app already installed, EXPO_PUBLIC_DEV_AUTO_SIGNIN=1 in .env.local
 # Skips onboarding (handled by dev flag), does dev sign-in, screenshots each tab.
@@ -56,7 +58,7 @@ appId: com.broadwayscorecard.app
       - inputText: "dev-test@broadwayscorecard.com"
       - tapOn:
           text: "Password"
-      - inputText: "dev-test-local-only-2024"
+      - inputText: ${DEV_TEST_PASSWORD}
       - hideKeyboard
       - tapOn:
           text: "^Sign In$"
