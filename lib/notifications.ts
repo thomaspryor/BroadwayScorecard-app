@@ -15,6 +15,13 @@ import { captureException } from './sentry';
 
 const PUSH_TOKEN_KEY = '@bsc:pushToken';
 const PERMISSION_ASKED_KEY = '@bsc:notificationPermissionAsked';
+const EAS_PROJECT_ID = '8948052e-aa32-4767-9eeb-9f33288f8e6d';
+/** Sign-out waits at most this long for the push-token unlink. */
+const UNLINK_TIMEOUT_MS = 4000;
+/** `${token}|${userId}` of the last successful server write this process made.
+ *  Launch runs both registerForPushNotifications() and the sign-in sync, which
+ *  would otherwise write the identical row twice. */
+let lastSavedLink: string | null = null;
 
 type NotificationsModule = typeof import('expo-notifications');
 type DeviceModule = typeof import('expo-device');
@@ -68,7 +75,7 @@ export async function registerForPushNotifications(): Promise<string | null> {
   // Get Expo push token
   try {
     const tokenData = await Notifications.getExpoPushTokenAsync({
-      projectId: '8948052e-aa32-4767-9eeb-9f33288f8e6d',
+      projectId: EAS_PROJECT_ID,
     });
     const token = tokenData.data;
 
@@ -83,6 +90,67 @@ export async function registerForPushNotifications(): Promise<string | null> {
   } catch (e) {
     if (__DEV__) console.warn('[Notifications] Token registration failed:', e);
     return null;
+  }
+}
+
+/**
+ * Link this device's push token to whoever is signed in NOW, without ever
+ * showing the permission prompt (does nothing unless permission is already
+ * granted). Called on sign-in: registerForPushNotifications() runs once per
+ * launch, so a mid-session sign-in left the device anonymous (or still
+ * unlinked by a sign-out) until the next cold start.
+ */
+export async function syncPushTokenIfPermitted(): Promise<void> {
+  if (!Notifications || !Device?.isDevice) return;
+  try {
+    const { status } = await Notifications.getPermissionsAsync();
+    if (status !== 'granted') return;
+    let token = await AsyncStorage.getItem(PUSH_TOKEN_KEY);
+    if (!token) {
+      token = (await Notifications.getExpoPushTokenAsync({ projectId: EAS_PROJECT_ID })).data;
+      await AsyncStorage.setItem(PUSH_TOKEN_KEY, token);
+    }
+    await savePushTokenToServer(token);
+  } catch (e) {
+    if (__DEV__) console.warn('[Notifications] Push token sync failed:', e);
+  }
+}
+
+/**
+ * Detach this device's push token from the account that is signing out.
+ * Personal notifications (send-notifications.ts targets tokens by user_id)
+ * otherwise kept arriving for the old account, on a phone that may now be
+ * someone else's. The row stays, with user_id NULL: the same anonymous
+ * registration a device has before sign-in, which push_tokens_claim_update
+ * permits (using (true), with check user_id is null). No DELETE policy exists.
+ *
+ * Call BEFORE auth.signOut(). Best effort and bounded: a hung request must
+ * never block signing out.
+ */
+export async function unlinkPushTokenFromUser(): Promise<void> {
+  try {
+    const token = await AsyncStorage.getItem(PUSH_TOKEN_KEY);
+    if (!token) return;
+    const { getSupabaseClient } = require('./supabase');
+    const client = getSupabaseClient();
+    if (!client) return;
+    // The next sign-in must write the row again, even for the same account.
+    lastSavedLink = null;
+    const write: PromiseLike<{ error: { message: string; code?: string } | null }> = client
+      .from('push_tokens')
+      .update({ user_id: null, updated_at: new Date().toISOString() })
+      .eq('token', token);
+    const result = await Promise.race([
+      write,
+      new Promise<{ error: null }>(resolve => setTimeout(() => resolve({ error: null }), UNLINK_TIMEOUT_MS)),
+    ]);
+    if (result.error) {
+      captureException(new Error(`push_tokens unlink failed: ${result.error.message}`), {
+        code: String(result.error.code ?? 'unknown'),
+      });
+    }
+  } catch (e) {
+    captureException(e instanceof Error ? e : new Error(String(e)), { stage: 'unlinkPushTokenFromUser' });
   }
 }
 
@@ -167,6 +235,8 @@ async function savePushTokenToServer(token: string): Promise<void> {
     // Get current user (optional — tokens can be anonymous)
     const { data: { session } } = await client.auth.getSession();
     const userId = session?.user?.id ?? null;
+    const link = `${token}|${userId ?? ''}`;
+    if (link === lastSavedLink) return;
 
     const row = {
       token,
@@ -223,6 +293,8 @@ async function savePushTokenToServer(token: string): Promise<void> {
         signedIn: String(userId != null),
       });
       if (__DEV__) console.warn('[Notifications] Failed to save token to server:', error);
+    } else {
+      lastSavedLink = link;
     }
   } catch (e) {
     // Non-critical — token is cached locally, will retry next launch

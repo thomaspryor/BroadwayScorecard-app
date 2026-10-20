@@ -89,6 +89,21 @@ export async function cancelAllRemindersForShow(showId: string): Promise<void> {
 }
 
 /**
+ * Cancel every rate reminder on the device (sign-out / account deletion).
+ * They belong to the account that set the planned dates; left in place, the
+ * next person on the phone got "How was <show>?" for someone else's plans.
+ */
+export async function cancelAllRateReminders(): Promise<void> {
+  if (!Notifications) return;
+  const all = await Notifications.getAllScheduledNotificationsAsync();
+  for (const n of all) {
+    if (n.identifier.startsWith(NOTIFICATION_PREFIX)) {
+      await Notifications.cancelScheduledNotificationAsync(n.identifier).catch(() => {});
+    }
+  }
+}
+
+/**
  * Re-schedule all rate reminders from watchlist data.
  * Called on app launch to recover from app kill / iOS clearing notifications.
  *
@@ -102,12 +117,7 @@ export async function rescheduleAllReminders(
   if (!Notifications || Platform.OS !== 'ios') return;
 
   // Step 1: Cancel all existing rate reminders
-  const all = await Notifications.getAllScheduledNotificationsAsync();
-  for (const n of all) {
-    if (n.identifier.startsWith(NOTIFICATION_PREFIX)) {
-      await Notifications.cancelScheduledNotificationAsync(n.identifier).catch(() => {});
-    }
-  }
+  await cancelAllRateReminders();
 
   // Step 2: Filter to future dates and schedule (capped at MAX_SCHEDULED)
   const now = Date.now();
