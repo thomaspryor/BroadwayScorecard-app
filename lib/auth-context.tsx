@@ -19,6 +19,28 @@ import { cancelAllRateReminders } from '@/lib/local-notifications';
 import { syncPushTokenIfPermitted, unlinkPushTokenFromUser } from '@/lib/notifications';
 import { resetWatchlistState } from '@/hooks/useWatchlist';
 import { appleDisplayName, shouldFillDisplayName } from '@/lib/apple-name';
+import { devAutoSignInBlock } from '@/lib/dev-auto-signin';
+
+// The dev-test account's password, inlined at bundle time only where the build
+// environment sets it (a developer's gitignored .env, the E2E workflow). It
+// used to be a string literal here: readable in the repo, and inside any bundle
+// built with EXPO_PUBLIC_DEV_AUTO_SIGNIN set (only dead-code removal kept it
+// out of production bundles).
+const DEV_TEST_PASSWORD = process.env.EXPO_PUBLIC_DEV_TEST_PASSWORD || undefined;
+// Module-local on purpose: only dead code in production builds reads it, so the
+// minifier drops it (an export from another module would ship).
+const DEV_TEST_EMAIL = 'dev-test@broadwayscorecard.com';
+
+/** expo-updates channel of this build ("production" for EAS production builds). */
+function readUpdatesChannel(): string | null {
+  try {
+    // Lazy: expo-updates is absent in Expo Go.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    return (require('expo-updates') as { channel?: string | null }).channel ?? null;
+  } catch {
+    return null;
+  }
+}
 
 // Lazy-load native auth modules — they crash at import time if native modules
 // aren't registered (e.g. dev client built without the plugin, or Expo Go).
@@ -108,16 +130,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         loadProfile(session.user.id);
         setLoading(false);
       } else if (process.env.EXPO_PUBLIC_DEV_AUTO_SIGNIN === '1') {
-        // Auto-sign-in with dev test account for simulator testing
-        console.log('[Auth] Dev auto-sign-in triggered');
-        try {
-          const { error } = await client.auth.signInWithPassword({
-            email: 'dev-test@broadwayscorecard.com',
-            password: 'dev-test-local-only-2024',
-          });
-          if (error) console.error('[Auth] Dev auto-sign-in failed:', error.message);
-        } catch (e) {
-          console.error('[Auth] Dev auto-sign-in error:', e);
+        // Dev / E2E auto sign-in to the shared dev-test account. Not gated on
+        // __DEV__ (the E2E Release build needs it); see lib/dev-auto-signin.ts.
+        const blocked = devAutoSignInBlock({
+          flag: process.env.EXPO_PUBLIC_DEV_AUTO_SIGNIN,
+          password: DEV_TEST_PASSWORD,
+          channel: readUpdatesChannel(),
+        });
+        if (blocked || !DEV_TEST_PASSWORD) {
+          console.warn(`[Auth] Dev auto-sign-in skipped: ${blocked ?? 'no-password'}`);
+        } else {
+          console.log('[Auth] Dev auto-sign-in triggered');
+          try {
+            const { error } = await client.auth.signInWithPassword({
+              email: DEV_TEST_EMAIL,
+              password: DEV_TEST_PASSWORD,
+            });
+            if (error) console.error('[Auth] Dev auto-sign-in failed:', error.message);
+          } catch (e) {
+            console.error('[Auth] Dev auto-sign-in error:', e);
+          }
         }
         setLoading(false);
       } else {
@@ -378,8 +410,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    const email = 'dev-test@broadwayscorecard.com';
-    const password = 'dev-test-local-only-2024';
+    const email = DEV_TEST_EMAIL;
+    const password = DEV_TEST_PASSWORD;
+    if (!password) {
+      Alert.alert('Dev Sign-In', 'Set EXPO_PUBLIC_DEV_TEST_PASSWORD (the dev-test account password) in .env, then restart Metro.');
+      return;
+    }
 
     try {
       setSignInLoading(true);

@@ -31,6 +31,14 @@ test('settings links are well-formed and avoid known-dead routes', () => {
   }
 });
 
+test('the sign-in sheet links its Terms and Privacy Policy', () => {
+  const src = readFileSync(new URL('../../components/SignInSheet.tsx', import.meta.url), 'utf8');
+  assert.match(src, /'https:\/\/broadwayscorecard\.com\/terms'/);
+  assert.match(src, /'https:\/\/broadwayscorecard\.com\/privacy'/);
+  assert.match(src, /openBrowserAsync\(TERMS_URL\)/);
+  assert.match(src, /openBrowserAsync\(PRIVACY_URL\)/);
+});
+
 test('every linked page returns 200 (live, opt-in)', { skip: process.env.CHECK_WEB_LINKS !== '1' }, async () => {
   const failures = [];
   for (const p of collectPaths()) {
