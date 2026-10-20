@@ -12,6 +12,7 @@ import {
   reviewsRemainingForShow,
   getQualifiedScore,
   isScoreTBD,
+  isShowPageScoreTBD,
   tier1And2CountOf,
   T3_ONLY_EXTRA,
 } from '../../lib/score-gate.ts';
@@ -77,14 +78,33 @@ test('previews and upcoming are always TBD, like the website show page', () => {
   assert.equal(isScoreTBD(show({ criticScore: { reviewCount: 1, tier1Count: 1 } })), true);
 });
 
+test('show page uses cr.pq, which can disagree with the card verdict cr.q', () => {
+  // Coverage floor: a score public for 24h+ stays on the page after a review
+  // drops it under the count (q=0, pq=1).
+  const floor = show({ criticScore: { reviewCount: 4, tier1Count: 1, tier2Count: 1, qualified: false, pageQualified: true } });
+  assert.equal(isScoreTBD(floor), true, 'cards follow q');
+  assert.equal(isShowPageScoreTBD(floor), false, 'the page follows pq');
+  // Never public, coverage incomplete: cards show it, the page waits (q=1, pq=0).
+  const held = show({ criticScore: { reviewCount: 9, tier1Count: 2, tier2Count: 1, qualified: true, pageQualified: false } });
+  assert.equal(isScoreTBD(held), false);
+  assert.equal(isShowPageScoreTBD(held), true);
+  // A null score is TBD whatever pq says.
+  assert.equal(isShowPageScoreTBD(show({ compositeScore: null, criticScore: { reviewCount: 9, qualified: true, pageQualified: true } })), true);
+  // No pq (older feed, seed): falls back to the card rule, previews included.
+  assert.equal(isShowPageScoreTBD(show()), false);
+  assert.equal(isShowPageScoreTBD(show({ status: 'previews' })), true);
+});
+
 test('mapMobileShow carries cr.q, cr.t2 and ps through, and never invents a type', () => {
-  const mapped = mapMobileShow({ id: 'x', t: 'X', s: 'x', v: 'V', st: 'previews', cs: 70, cr: { s: 70, rc: 2, l: 'Worth Seeing', t1: 1, t2: 0, q: 1 }, ps: '2026-11-02' });
+  const mapped = mapMobileShow({ id: 'x', t: 'X', s: 'x', v: 'V', st: 'previews', cs: 70, cr: { s: 70, rc: 2, l: 'Worth Seeing', t1: 1, t2: 0, q: 1, pq: 0 }, ps: '2026-11-02' });
   assert.equal(mapped.criticScore.qualified, true);
+  assert.equal(mapped.criticScore.pageQualified, false);
   assert.equal(mapped.criticScore.tier2Count, 0);
   assert.equal(mapped.previewsStartDate, '2026-11-02');
   assert.equal(mapped.type, '');
   const old = mapMobileShow({ id: 'y', t: 'Y', s: 'y', v: 'V', st: 'open', ty: 'play', cr: { s: 70, rc: 2, l: 'x', t1: 0 } });
   assert.equal('qualified' in old.criticScore, false, 'older feeds leave the verdict undefined');
+  assert.equal('pageQualified' in old.criticScore, false);
   assert.equal('tier2Count' in old.criticScore, false);
   assert.equal(old.previewsStartDate, null);
   assert.equal(mapMobileShow({ id: 'z', t: 'Z', s: 'z', v: '', st: 'open', cr: { s: 1, rc: 1, l: '', t1: 0, q: 0 } }).criticScore.qualified, false);

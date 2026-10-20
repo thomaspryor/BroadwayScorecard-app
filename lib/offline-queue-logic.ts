@@ -220,7 +220,7 @@ export type PhotoFailureDecision =
   | { action: 'done' }
   | { action: 'orphaned' }
   | { action: 'drop'; reason: string }
-  | { action: 'keep'; attempts: number; lastError: string; abandoned: boolean };
+  | { action: 'keep'; attempts: number; lastError: string; abandoned: boolean; deferred?: boolean };
 
 export function decidePhotoFailure(
   item: { attempts: number },
@@ -233,7 +233,7 @@ export function decidePhotoFailure(
   if (info.code === '23503') return { action: 'orphaned' };
   if (cls === 'permanent') return { action: 'drop', reason: `permanent:${info.code || 'rls'}` };
   const lastError = (info.message || 'Upload failed').slice(0, 300);
-  if (cls === 'deferred') return { action: 'keep', attempts: item.attempts, lastError, abandoned: false };
+  if (cls === 'deferred') return { action: 'keep', attempts: item.attempts, lastError, abandoned: false, deferred: true };
   const attempts = item.attempts + 1;
   return { action: 'keep', attempts, lastError, abandoned: attempts === maxAttempts };
 }

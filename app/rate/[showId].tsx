@@ -42,7 +42,7 @@ import { getDiaryShowMeta } from '@/lib/show-format';
 import { toLocalYMD } from '@/lib/date-utils';
 import { sanitizeRating } from '@/lib/rating';
 import { isOnline } from '@/lib/offline-queue';
-import { isRateFormDirty, friendlySaveError, RATING_GONE_MESSAGE, type RateFormValues } from '@/lib/rate-form';
+import { isRateFormDirty, isOwnInsertDuplicate, friendlySaveError, RATING_GONE_MESSAGE, type RateFormValues } from '@/lib/rate-form';
 import { savePendingAction, getPendingAction, clearPendingAction } from '@/lib/deferred-auth';
 import * as haptics from '@/lib/haptics';
 import StarRating from '@/components/user/StarRating';
@@ -145,6 +145,16 @@ export default function RateModal() {
   const bypassGuardRef = useRef(false);
   // A second Save tap while the first is in flight would insert twice.
   const savingRef = useRef(false);
+  // The new review's id, fixed for this sheet: a save whose response was lost
+  // (timeout, dropped connection) is retried with the same id, so the row it
+  // already created comes back as a duplicate key instead of a second entry.
+  const newReviewIdRef = useRef<string | null>(null);
+  // router.back() after the sheet is already gone would pop the screen below.
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
 
   // Fetch existing review data when editing
   useEffect(() => {
@@ -220,11 +230,15 @@ export default function RateModal() {
   // One guard for every way out: Cancel, the iOS swipe-down, and the
   // Android back button. Before this, only Cancel asked; a swipe dropped the
   // stars, notes and staged photos silently.
-  usePreventRemove(isDirty, ({ data }) => {
+  // While a save is in flight the sheet cannot be dismissed at all: "Discard"
+  // there would still land the rating, and the save's own close would then
+  // pop the screen underneath.
+  usePreventRemove(isDirty || saving, ({ data }) => {
     if (bypassGuardRef.current) {
       navigation.dispatch(data.action);
       return;
     }
+    if (savingRef.current) return;
     Alert.alert(
       'Discard changes?',
       'You have unsaved changes that will be lost.',
@@ -236,6 +250,7 @@ export default function RateModal() {
   });
 
   const closeWithoutPrompt = useCallback(() => {
+    if (!mountedRef.current) return;
     bypassGuardRef.current = true;
     router.back();
   }, [router]);
@@ -263,14 +278,19 @@ export default function RateModal() {
       // device (web parity: ShowHeroRedesign throws the same way).
       if (!updated) throw new Error(RATING_GONE_MESSAGE);
     } else {
-      const { data: inserted, error } = await supabaseRestInsert<{ id: string }>('reviews', {
+      newReviewIdRef.current ??= Crypto.randomUUID();
+      const newId = newReviewIdRef.current;
+      const { data: insertedRow, error } = await supabaseRestInsert<{ id: string }>('reviews', {
+        id: newId,
         user_id: user.id,
         show_id: showId,
         rating,
         review_text: textVal.trim() || null,
         date_seen: dateVal || null,
       });
-      if (error) throw new Error(error.message);
+      // reviews_pkey duplicate: an earlier attempt from this sheet landed.
+      if (error && !isOwnInsertDuplicate(error)) throw new Error(error.message);
+      const inserted = insertedRow ?? { id: newId };
       // Photos picked BEFORE the first save (beta feedback 2026-08-02) —
       // now that the review row exists, queue them for upload. Best-effort:
       // the upload queue retries on next foreground if this flush fails.

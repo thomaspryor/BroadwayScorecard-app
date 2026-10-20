@@ -10,6 +10,7 @@
  */
 
 import { getSupabaseClient, SUPABASE_URL, SUPABASE_ANON_KEY } from './supabase';
+import { fetchWithTimeout } from './fetch-utils';
 
 interface RestResult<T = Record<string, unknown>> {
   data: T | null;
@@ -43,6 +44,33 @@ async function getAccessToken(): Promise<string | null> {
   return session?.access_token ?? null;
 }
 
+interface RawResponse {
+  ok: boolean;
+  status: number;
+  /** Parsed JSON body; null when empty or not JSON. */
+  body: unknown;
+}
+
+/**
+ * One request under the shared timeout (lib/fetch-utils), body included. A
+ * stalled save otherwise spun the Save button forever on a bad connection.
+ */
+function request(url: string, init: RequestInit): Promise<RawResponse> {
+  return fetchWithTimeout(url, init, async r => {
+    const text = await r.text();
+    let body: unknown = null;
+    if (text) {
+      try { body = JSON.parse(text); } catch { body = null; }
+    }
+    return { ok: r.ok, status: r.status, body };
+  });
+}
+
+function restError(res: RawResponse): { message: string; code?: string } {
+  const body = (res.body && typeof res.body === 'object' ? res.body : {}) as { message?: string; code?: string };
+  return { message: body.message || `HTTP ${res.status}`, code: body.code };
+}
+
 function headers(accessToken: string, prefer?: string): Record<string, string> {
   const h: Record<string, string> = {
     apikey: SUPABASE_ANON_KEY,
@@ -64,21 +92,18 @@ export async function supabaseRestInsert<T = Record<string, unknown>>(
     return { data: null, error: { message: 'No valid session. Please sign in again.' } };
   }
 
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
+  const res = await request(`${SUPABASE_URL}/rest/v1/${table}`, {
     method: 'POST',
     headers: headers(accessToken, `return=${opts.returning ?? 'representation'}`),
     body: JSON.stringify(row),
   });
 
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    return { data: null, error: { message: body.message || `HTTP ${res.status}`, code: body.code } };
-  }
+  if (!res.ok) return { data: null, error: restError(res) };
 
   // return=minimal sends an empty 201: nothing to parse (and a column-grant
   // table like user_show_stubs would refuse the RETURNING read anyway).
   if (opts.returning === 'minimal') return { data: null, error: null };
-  const data = await res.json();
+  const data = res.body as T | T[] | null;
   return { data: Array.isArray(data) ? data[0] : data, error: null };
 }
 
@@ -93,18 +118,15 @@ export async function supabaseRestUpsert(
     return { data: null, error: { message: 'No valid session. Please sign in again.' } };
   }
 
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
+  const res = await request(`${SUPABASE_URL}/rest/v1/${table}`, {
     method: 'POST',
     headers: headers(accessToken, 'return=representation,resolution=merge-duplicates'),
     body: JSON.stringify(row),
   });
 
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    return { data: null, error: { message: body.message || `HTTP ${res.status}`, code: body.code } };
-  }
+  if (!res.ok) return { data: null, error: restError(res) };
 
-  const data = await res.json();
+  const data = res.body as Record<string, unknown> | Record<string, unknown>[] | null;
   return { data: Array.isArray(data) ? data[0] : data, error: null };
 }
 
@@ -119,18 +141,15 @@ export async function supabaseRestUpdate<T = Record<string, unknown>>(
     return { data: null, error: { message: 'No valid session. Please sign in again.' } };
   }
 
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${filters}`, {
+  const res = await request(`${SUPABASE_URL}/rest/v1/${table}?${filters}`, {
     method: 'PATCH',
     headers: headers(accessToken, 'return=representation'),
     body: JSON.stringify(updates),
   });
 
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    return { data: null, error: { message: body.message || `HTTP ${res.status}`, code: body.code } };
-  }
+  if (!res.ok) return { data: null, error: restError(res) };
 
-  const data = await res.json();
+  const data = res.body as T | T[] | null;
   return { data: Array.isArray(data) ? data[0] : data, error: null };
 }
 
@@ -144,16 +163,13 @@ export async function supabaseRestSelect<T = Record<string, unknown>>(
     return { data: null, error: { message: 'No valid session. Please sign in again.' } };
   }
 
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${params}`, {
+  const res = await request(`${SUPABASE_URL}/rest/v1/${table}?${params}`, {
     method: 'GET',
     headers: headers(accessToken),
   });
 
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    return { data: null, error: { message: body.message || `HTTP ${res.status}`, code: body.code } };
-  }
+  if (!res.ok) return { data: null, error: restError(res) };
 
-  const data = await res.json();
-  return { data: data as T[], error: null };
+  const data = res.body as T | T[] | null;
+  return { data: (data as T[] | null) ?? [], error: null };
 }

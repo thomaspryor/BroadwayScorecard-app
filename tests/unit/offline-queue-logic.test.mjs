@@ -202,8 +202,12 @@ test('photo failure: abandoned exactly once, at the ceiling', () => {
   assert.equal(at.abandoned, true);
   // A manual retry past the ceiling is not reported again
   assert.equal(decidePhotoFailure({ attempts: MAX_PHOTO_ATTEMPTS }, { message: 'server' }).abandoned, false);
-  // Offline does not use up an attempt
-  assert.equal(decidePhotoFailure({ attempts: 2 }, { message: 'Network request failed' }).attempts, 2);
+  // Offline does not use up an attempt, and is marked deferred so the photo
+  // keeps its status (no retry badge for being offline)
+  const offline = decidePhotoFailure({ attempts: 2 }, { message: 'Network request failed' });
+  assert.equal(offline.attempts, 2);
+  assert.equal(offline.deferred, true);
+  assert.equal(at.deferred, undefined);
 });
 
 test('photo file paths: durable copy only for cache files, delete only own files', () => {

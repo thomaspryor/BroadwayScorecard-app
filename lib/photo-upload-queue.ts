@@ -174,6 +174,13 @@ interface AttemptResult {
   abandoned: boolean;
 }
 
+const KEEP_AS_IS: AttemptResult = { remove: false, next: null, uploaded: false, abandoned: false };
+
+/** True while `userId` is still the signed-in account. */
+async function stillSignedInAs(userId: string): Promise<boolean> {
+  return (await getSessionUserId()) === userId;
+}
+
 /** One upload attempt (file, then row). Never throws. */
 async function attemptUpload(item: QueuedPhotoUpload): Promise<AttemptResult> {
   const path = buildPhotoStoragePath(item.userId, item.reviewId, item.id);
@@ -203,6 +210,9 @@ async function attemptUpload(item: QueuedPhotoUpload): Promise<AttemptResult> {
       takenAt: item.takenAt,
     });
   } catch (e) {
+    // Signed out or switched accounts mid-upload: the failure is the session's,
+    // not the photo's. Dropping it here would delete the only local copy.
+    if (!(await stillSignedInAs(item.userId))) return KEEP_AS_IS;
     const decision = decidePhotoFailure(item, e, MAX_ATTEMPTS);
     switch (decision.action) {
       case 'done':
@@ -219,7 +229,8 @@ async function attemptUpload(item: QueuedPhotoUpload): Promise<AttemptResult> {
       case 'keep': {
         const next: QueuedPhotoUpload = {
           ...item,
-          status: 'failed',
+          // Offline or an expired token is not the photo failing: no retry badge.
+          status: decision.deferred ? item.status : 'failed',
           attempts: decision.attempts,
           lastError: decision.lastError,
         };
@@ -275,6 +286,7 @@ async function runPhotoFlush(): Promise<{ uploaded: string[]; abandoned: string[
     if (item.userId !== userId) continue; // another account's photo: wait for it to sign in
     if (item.attempts >= MAX_ATTEMPTS) continue; // abandoned: waits for a manual retry
     if (waitingOnReview.has(item.reviewId)) continue; // its review row is still queued
+    if (!(await stillSignedInAs(userId))) break; // signed out mid-run: the rest waits
 
     const result = await attemptUpload(item);
     if (result.remove) removed.add(item.id);

@@ -83,7 +83,7 @@ export function isCriticalGold(score: number | null | undefined, category?: stri
   return Math.round(score) >= getGoldThreshold(category);
 }
 
-// The display gate (market minimums, T3-only extra, the feed's `cr.q` verdict)
+// The display gate (market minimums, T3-only extra, the feed's `cr.q`/`cr.pq` verdicts)
 // lives in the pure lib/score-gate.ts; re-exported so existing imports keep
 // working. getQualifiedScore is the single "does this show have a displayable
 // Critic Score?" predicate (beta feedback 2026-08-01: The Gruffalo, 1 review,
@@ -93,6 +93,7 @@ export {
   getQualifiedScore,
   hasEnoughReviewsForShow,
   isScoreTBD,
+  isShowPageScoreTBD,
   reviewsRemainingForShow,
 } from './score-gate';
 

@@ -74,3 +74,22 @@ test('other server errors keep their detail', () => {
   assert.equal(friendlySaveError('No valid session. Please sign in again.', true),
     'Save failed: No valid session. Please sign in again.');
 });
+
+test('a retried insert that hits its own primary key counts as saved', async () => {
+  const { isOwnInsertDuplicate } = await import('../../lib/rate-form.ts');
+  const pk = { code: '23505', message: 'duplicate key value violates unique constraint "reviews_pkey"' };
+  assert.equal(isOwnInsertDuplicate(pk), true);
+  assert.equal(isOwnInsertDuplicate({ code: '23505', message: 'duplicate key value violates unique constraint "reviews_user_show_key"' }), false);
+  assert.equal(isOwnInsertDuplicate({ code: '42501', message: 'row-level security "reviews_pkey"' }), false);
+  assert.equal(isOwnInsertDuplicate(null), false);
+});
+
+test('rate sheet: fixed insert id per sheet, and no dismissal while saving', async () => {
+  const { readFileSync } = await import('node:fs');
+  const src = readFileSync(new URL('../../app/rate/[showId].tsx', import.meta.url), 'utf8');
+  assert.match(src, /newReviewIdRef\.current \?\?= Crypto\.randomUUID\(\)/);
+  assert.match(src, /supabaseRestInsert<\{ id: string \}>\('reviews', \{\n\s+id: newId,/);
+  assert.match(src, /usePreventRemove\(isDirty \|\| saving,/);
+  assert.match(src, /if \(savingRef\.current\) return;\n/);
+  assert.match(src, /if \(!mountedRef\.current\) return;\n\s+bypassGuardRef\.current = true;/);
+});

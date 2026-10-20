@@ -20,9 +20,12 @@ test('tier word comes from the displayed score, never the feed label', () => {
   assert.match(SHOW_PAGE, /getScoreTierLabel\(displayScore, show\.category\)/);
 });
 
-test('score, audience chip and breakdown are gated on isScoreTBD', () => {
-  assert.match(SHOW_PAGE, /const scoreTBD = isScoreTBD\(show\)/);
-  assert.match(SHOW_PAGE, /scoreTBD \? null : getQualifiedScore\(show\)/);
+// The show page gates on the feed's cr.pq (the website show page's rule:
+// card gate plus the coverage floor), falling back to isScoreTBD for feeds
+// without pq. Cards keep isScoreTBD (cr.q).
+test('score, audience chip and breakdown are gated on isShowPageScoreTBD', () => {
+  assert.match(SHOW_PAGE, /const scoreTBD = isShowPageScoreTBD\(show\)/);
+  assert.match(SHOW_PAGE, /scoreTBD \? null : show\.compositeScore/);
   assert.match(SHOW_PAGE, /!scoreTBD && show\.audienceGrade/);
   assert.match(SHOW_PAGE, /!scoreTBD && \(\s*<View style=\{styles\.breakdownSection\}>/);
   assert.doesNotMatch(SHOW_PAGE, /getMarketMinReviews/, 'the review-count-only gate missed q and previews');

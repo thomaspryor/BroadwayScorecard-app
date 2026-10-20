@@ -23,7 +23,7 @@ import {
   getQualifiedScore,
   getScoreTierLabel,
   getStatusFactLabel,
-  isScoreTBD,
+  isShowPageScoreTBD,
   reviewsRemainingForShow,
 } from '@/lib/score-utils';
 import { countBreakdown } from '@/lib/breakdown';
@@ -355,11 +355,12 @@ export default function ShowDetailScreen() {
 
   const posterUrl = getImageUrl(show.images.poster) || getImageUrl(show.images.thumbnail);
 
-  // Website gate (lib/score-gate.ts): no number until the show has enough
-  // reviews for its market and is past previews. TBD hides the score, the
-  // tier word, the audience chip and the breakdown bar, as the website does.
-  const scoreTBD = isScoreTBD(show);
-  const displayScore = scoreTBD ? null : getQualifiedScore(show);
+  // Website show-page gate (lib/score-gate.ts): no number until the show has
+  // enough reviews for its market and is past previews, plus the coverage
+  // floor. TBD hides the score, the tier word, the audience chip and the
+  // breakdown bar, as the website does.
+  const scoreTBD = isShowPageScoreTBD(show);
+  const displayScore = scoreTBD ? null : show.compositeScore;
   const sentimentLabel = getScoreTierLabel(displayScore, show.category);
   const criticReviewCount = show.criticScore?.reviewCount ?? 0;
   const reviewsStillNeeded =

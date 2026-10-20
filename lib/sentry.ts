@@ -33,9 +33,10 @@ export function initSentry() {
     sendDefaultPii: false,
     // Filter out common noise
     beforeSend(event) {
-      // Skip network errors (flaky connections are expected on mobile)
+      // Skip network errors (flaky connections are expected on mobile),
+      // including lib/fetch-utils' FetchTimeoutError ("Request timed out ...")
       const message = event.exception?.values?.[0]?.value || '';
-      if (/network request failed|fetch failed|load failed|aborterror/i.test(message)) {
+      if (/network request failed|fetch failed|load failed|aborterror|request timed out/i.test(message)) {
         return null;
       }
       return event;

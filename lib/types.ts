@@ -38,7 +38,8 @@ export interface MobileShow {
     l: string;    // label (Critical Gold, Recommended, etc.)
     t1: number;   // tier1Count
     t2?: number;  // tier2Count (absent in the bundled seed)
-    q?: number;   // 1/0: the website's hasEnoughReviews verdict (absent on older feeds)
+    q?: number;   // 1/0: the website card verdict, hasEnoughReviews (absent on older feeds)
+    pq?: number;  // 1/0: the website show-page verdict, with the coverage floor (absent on older feeds)
   };
   ps?: string;    // previewsStartDate (YYYY-MM-DD), absent on older feeds
   ag?: {
@@ -90,9 +91,11 @@ export interface Show {
     tier1Count: number;
     /** Undefined when the feed predates `cr.t2` (seed data). */
     tier2Count?: number;
-    /** The website's display verdict (`cr.q`); undefined on older feeds, which
+    /** The website card verdict (`cr.q`); undefined on older feeds, which
      *  fall back to the local rule in lib/score-gate.ts. */
     qualified?: boolean;
+    /** The website show-page verdict (`cr.pq`); undefined on older feeds. */
+    pageQualified?: boolean;
   } | null;
   audienceGrade: {
     grade: string;
@@ -445,6 +448,7 @@ export function mapMobileShow(raw: MobileShow): Show {
           tier1Count: raw.cr.t1,
           ...(typeof raw.cr.t2 === 'number' ? { tier2Count: raw.cr.t2 } : {}),
           ...(raw.cr.q === 1 || raw.cr.q === 0 ? { qualified: raw.cr.q === 1 } : {}),
+          ...(raw.cr.pq === 1 || raw.cr.pq === 0 ? { pageQualified: raw.cr.pq === 1 } : {}),
         }
       : null,
     audienceGrade: raw.ag

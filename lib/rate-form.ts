@@ -53,3 +53,15 @@ export function friendlySaveError(message: string, online: boolean): string {
   if (message === RATING_GONE_MESSAGE) return message;
   return `Save failed: ${message}`;
 }
+
+/**
+ * The insert hit the row's own primary key: an earlier attempt with this
+ * client-made id already landed (its response was lost), so the save is done.
+ * Any other unique violation is a real error.
+ */
+export function isOwnInsertDuplicate(
+  error: { message: string; code?: string } | null,
+  constraint = 'reviews_pkey',
+): boolean {
+  return !!error && error.code === '23505' && error.message.includes(`"${constraint}"`);
+}

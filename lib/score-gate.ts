@@ -2,11 +2,13 @@
  * The Critic Score display gate, a port of the website's
  * scripts/lib/min-reviews.js (getMarketMinReviews / reviewsRemainingForScore).
  *
- * The feed now carries the website's own verdict as `cr.q` (1 = the site shows
- * the score, 0 = it shows TBD). When `q` is present it wins: it already folds
- * in rules the app cannot recompute (the curated-historical carve-out, the
- * coverage floor). The local rule below is the fallback for older feeds and the
- * bundled seed, which have no `q`.
+ * The feed carries two website verdicts. `cr.q` is the website card's rule
+ * (1 = cards and badges show the score): hasEnoughReviews, including the
+ * curated-historical carve-out the app cannot recompute. `cr.pq` is the
+ * website show page's rule, which also applies the coverage floor (a score
+ * public for 24h stays shown; a never-public score waits for missing reviews)
+ * and previews/upcoming. When a flag is present it wins. The local rule below
+ * is the fallback for older feeds and the bundled seed, which have neither.
  *
  * Pure: no React Native imports, so tests/unit/score-gate.test.mjs can load it.
  */
@@ -57,8 +59,10 @@ export interface GateInput {
     reviewCount: number;
     tier1Count?: number | null;
     tier2Count?: number | null;
-    /** The website's verdict from the feed (`cr.q`); undefined on older feeds. */
+    /** The website card verdict from the feed (`cr.q`); undefined on older feeds. */
     qualified?: boolean | null;
+    /** The website show-page verdict (`cr.pq`); undefined on older feeds. */
+    pageQualified?: boolean | null;
   } | null;
 }
 
@@ -105,9 +109,20 @@ export function getQualifiedScore(show: GateInput): number | null {
 }
 
 /**
- * The web show page's `showTBD`: no displayable score yet, or the show has not
+ * The web card badge's TBD: no displayable score yet, or the show has not
  * opened (previews and upcoming always read TBD, even with early reviews).
  */
 export function isScoreTBD(show: GateInput & { status: string }): boolean {
   return getQualifiedScore(show) == null || show.status === 'previews' || show.status === 'upcoming';
+}
+
+/**
+ * The web show page's `showTBD`, which differs from the cards: it adds the
+ * coverage floor (src/config/score-buckets.ts applyCoverageFloor). Uses the
+ * feed's `cr.pq` when present, else the card rule above.
+ */
+export function isShowPageScoreTBD(show: GateInput & { status: string }): boolean {
+  const pq = show.criticScore?.pageQualified;
+  if (pq != null) return !pq || show.compositeScore == null;
+  return isScoreTBD(show);
 }

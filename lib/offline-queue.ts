@@ -131,13 +131,23 @@ async function runFlush(): Promise<number> {
   const removed = new Set<string>();
   const updated = new Map<string, QueuedOperation>();
 
+  // The account can change while the run is in flight (sign-out, switch). A
+  // request sent then goes out under another session or none: RLS rejects
+  // it, or an update matches 0 rows and still "succeeds". Neither says
+  // anything about the op, so the run stops and the op stays queued (replays
+  // are safe: inserts carry ids, so a landed one comes back as a duplicate).
+  const sameAccount = async () => (await getSessionUserId(client)) === userId;
+
   for (const op of queue) {
     if (!isFlushableBy(op, userId)) continue;
+    if (!(await sameAccount())) break;
     try {
       await executeOperation(client, op);
+      if (!(await sameAccount())) break;
       removed.add(op.id);
       continue;
     } catch (e) {
+      if (!(await sameAccount())) break;
       const decision = decideOnFailure(op, e);
       if (decision.action === 'done') {
         removed.add(op.id);

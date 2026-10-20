@@ -57,6 +57,11 @@ export function useWatchlist(userId: string | null) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const mutationVersion = useRef(0);
+  // The list is shared across hook instances: a fetch that finishes after a
+  // sign-out or account switch must not broadcast (or cache) the old
+  // account's list over the new one. Same guard as useUserReviews.
+  const userIdRef = useRef(userId);
+  useEffect(() => { userIdRef.current = userId; }, [userId]);
 
   // Subscribe to shared state changes from other hook instances
   useEffect(() => {
@@ -76,6 +81,7 @@ export function useWatchlist(userId: string | null) {
       const cached = await AsyncStorage.getItem(CACHE_KEY(userId));
       if (cached) {
         const parsed = JSON.parse(cached) as WatchlistEntry[];
+        if (userIdRef.current !== userId) return parsed;
         broadcastWatchlist(parsed);
         // Background refresh — skip state update if mutations happen during fetch
         refreshWatchlist(client, userId, mutationVersion.current).catch(() => {});
@@ -105,6 +111,7 @@ export function useWatchlist(userId: string | null) {
 
     if (err) throw err;
     const result = (data || []) as WatchlistEntry[];
+    if (userIdRef.current !== uid) return result;
     // Skip state update if a mutation happened while we were fetching
     if (versionAtStart === undefined || versionAtStart === mutationVersion.current) {
       broadcastWatchlist(result);
