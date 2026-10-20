@@ -8,6 +8,7 @@ import { View, Text, StyleSheet, Pressable, ScrollView, Alert } from 'react-nati
 import * as WebBrowser from 'expo-web-browser';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
+import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useShows } from '@/lib/data-context';
 import { useMarket } from '@/lib/market-context';
@@ -20,8 +21,33 @@ import { Colors, Spacing, FontSize } from '@/constants/theme';
 import { trackDataRefreshed, trackCacheCleared, trackMarketChanged } from '@/lib/analytics';
 import * as haptics from '@/lib/haptics';
 import { exportAndDeleteAllPhotos } from '@/lib/photo-export';
+import { cacheKeysToClear } from '@/lib/cache-keys';
+import { formatVersionLabel } from '@/lib/app-version';
 
 const WEB = 'https://broadwayscorecard.com';
+
+/** "1.1.0 (73) · update 1a2b3c4d": native version + build, plus the OTA update
+ *  the phone is running. Both modules are lazy so a dev client without them
+ *  still renders Settings. */
+function readVersionLabel(): string {
+  let version: string | null | undefined = Constants.expoConfig?.version;
+  let build: string | null = null;
+  let updateId: string | null = null;
+  let isEmbeddedLaunch = true;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const Application = require('expo-application') as typeof import('expo-application');
+    version = Application.nativeApplicationVersion || version;
+    build = Application.nativeBuildVersion;
+  } catch {}
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const Updates = require('expo-updates') as typeof import('expo-updates');
+    updateId = Updates.updateId;
+    isEmbeddedLaunch = Updates.isEmbeddedLaunch;
+  } catch {}
+  return formatVersionLabel({ version, build, updateId, isEmbeddedLaunch });
+}
 
 function SettingsRow({ label, value, onPress, destructive }: { label: string; value?: string; onPress?: () => void; destructive?: boolean }) {
   return (
@@ -65,31 +91,22 @@ export default function SettingsScreen() {
 
   const handleClearCache = () => {
     haptics.action();
-    Alert.alert('Clear Cache', 'This will remove all cached data. The app will re-download show data on next launch.', [
+    Alert.alert('Clear Cache', 'This removes downloaded show data and images. Your saved shows, ratings and settings are kept. Show data downloads again on next launch.', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Clear',
         style: 'destructive',
         onPress: async () => {
           trackCacheCleared();
-          // Preserve onboarding flag, push token, and notification state when clearing cache
-          const keysToPreserve = [
-            '@broadwayScorecard:onboardingSeen',
-            '@bsc:pushToken',
-            '@bsc:notificationPermissionAsked',
-          ];
-          const preserved: [string, string][] = [];
-          for (const key of keysToPreserve) {
-            const val = await AsyncStorage.getItem(key);
-            if (val !== null) preserved.push([key, val]);
+          // Only re-downloadable data (lib/cache-keys.ts). AsyncStorage.clear()
+          // here used to wipe guest saved shows, unsynced edits and settings.
+          try {
+            const doomed = cacheKeysToClear(await AsyncStorage.getAllKeys());
+            if (doomed.length > 0) await AsyncStorage.multiRemove(doomed);
+          } catch {
+            // Best effort — a failed sweep leaves stale-but-valid cache
           }
-          // Clear user cache if signed in
-          if (user?.id) await clearUserCache(user.id);
-          // Clear AsyncStorage (show data cache) but restore preserved keys
-          await AsyncStorage.clear();
-          for (const [key, val] of preserved) {
-            await AsyncStorage.setItem(key, val);
-          }
+          await Promise.all([Image.clearDiskCache(), Image.clearMemoryCache()]).catch(() => {});
           Alert.alert('Done', 'Cache cleared. Pull down to refresh.');
         },
       },
@@ -201,7 +218,7 @@ export default function SettingsScreen() {
     );
   };
 
-  const appVersion = Constants.expoConfig?.version ?? '1.0.0';
+  const appVersion = readVersionLabel();
 
   const lastUpdatedText = lastUpdated
     ? lastUpdated.toLocaleDateString('en-US', {
@@ -235,16 +252,18 @@ export default function SettingsScreen() {
       {featureFlags.userAccounts && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>ACCOUNT</Text>
-          {isAuthenticated && profile ? (
+          {/* Gated on the session alone: a profile row that failed to load
+              used to hide Sign Out and Delete Account entirely. */}
+          {isAuthenticated ? (
             <>
               <View style={styles.profileCard}>
                 <View style={styles.profileAvatar}>
                   <Text style={styles.profileAvatarText}>
-                    {(profile.display_name || user?.email || '?').charAt(0).toUpperCase()}
+                    {(profile?.display_name || user?.email || '?').charAt(0).toUpperCase()}
                   </Text>
                 </View>
                 <View style={styles.profileInfo}>
-                  {profile.display_name && (
+                  {!!profile?.display_name && (
                     <Text style={styles.profileName}>{profile.display_name}</Text>
                   )}
                   {user?.email && (
@@ -282,7 +301,7 @@ export default function SettingsScreen() {
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>EXPLORE</Text>
-        <SettingsRow label="Best-Of Lists" onPress={() => open('/best/best-musicals')} />
+        <SettingsRow label="Best-Of Lists" onPress={() => open('/best/musicals')} />
         <SettingsRow label="Tony Predictions" onPress={() => open('/tony-awards/predictions')} />
         <SettingsRow label="Box Office" onPress={() => open('/box-office')} />
         <SettingsRow label="Lottery & Rush Tickets" onPress={() => open('/lotteries')} />
