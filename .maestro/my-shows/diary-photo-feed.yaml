@@ -21,7 +21,9 @@ appId: com.broadwayscorecard.app
 - tapOn:
     id: "diary-list-view-toggle"
 
-- assertVisible: "Only you"
+# The pill renders as "🔒 Only you" and assertVisible needs a full regex match
+# (README gotcha), so the bare text never matched: this flow failed every night.
+- assertVisible: ".*Only you"
 - assertVisible: "Timeline"
 - assertVisible: "Photo wall"
 

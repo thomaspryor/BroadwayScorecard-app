@@ -8,10 +8,10 @@ appId: com.broadwayscorecard.app
 - extendedWaitUntil:
     visible: "Broadway Scorecard"
     timeout: 45000
-- openLink: broadwayscorecard:///watched
-- tapOn:
-    text: "Open"
-    optional: true
+# Tab tap, not openLink: a deep link sent to the already-running app was
+# intermittently dropped here (nightly 2026-10-19 sat on Home for the full 30s
+# while stats-tab.yaml's identical openLink passed minutes later).
+- tapOn: "Watched"
 - extendedWaitUntil:
     visible: "My Watched Shows"
     timeout: 30000

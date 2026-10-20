@@ -16,6 +16,20 @@
 
 appId: com.broadwayscorecard.app
 ---
+# Put the fixture into On My iPhone > Downloads with a real Safari download.
+# maestro-e2e.yml serves it, but until 2026-10-20 no step ever fetched it, so
+# the picker showed "On My iPhone is Empty" and this flow failed every night.
+# localhost is not a claimed universal link, so openLink lands in Safari.
+- openLink: http://localhost:8931/mezzanine-import.json
+- tapOn:
+    text: "Continue"
+    optional: true
+- extendedWaitUntil:
+    visible: "Download"
+    timeout: 15000
+- tapOn: "Download"
+- waitForAnimationToEnd:
+    timeout: 5000
 - launchApp
 - openLink: broadwayscorecard:///import
 - tapOn:
