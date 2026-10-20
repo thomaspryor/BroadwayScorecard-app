@@ -68,3 +68,19 @@ export function getClosingInfo(
   if ((closingDate as string).slice(0, 10) >= toLocalYMD(now)) return `Closes ${fmt}`;
   return null;
 }
+
+/**
+ * "Opens" or "Opened" before an opening date. A show reads "Opens" until its
+ * opening night has passed: any status other than open/closed (previews,
+ * upcoming, announced), or an opening date later than today. The old rule
+ * keyed on status alone, so an upcoming or announced show read "Opened".
+ */
+export function getOpeningVerb(
+  openingDate: string | null | undefined,
+  status: string,
+  now: Date = new Date(),
+): 'Opens' | 'Opened' {
+  if (status !== 'open' && status !== 'closed') return 'Opens';
+  if (openingDate && openingDate.slice(0, 10) > toLocalYMD(now)) return 'Opens';
+  return 'Opened';
+}

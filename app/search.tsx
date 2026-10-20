@@ -7,6 +7,7 @@ import { View, Text, TextInput, FlatList, StyleSheet } from 'react-native';
 import Fuse from 'fuse.js';
 import { SHOW_SEARCH_FUSE_OPTIONS } from '@/lib/show-search';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useLocalSearchParams } from 'expo-router';
 import { useShows } from '@/lib/data-context';
 import { ShowCard } from '@/components/ShowCard';
 import { AnimatedListItem } from '@/components/AnimatedListItem';
@@ -16,7 +17,10 @@ import { trackSearchPerformed, trackSearchNoResults } from '@/lib/analytics';
 export default function SearchScreen() {
   const { shows } = useShows();
   const insets = useSafeAreaInsets();
-  const [query, setQuery] = useState('');
+  // ?q= prefills the box (the show page's "Search Shows" button passes the
+  // words from a link that no longer matches a show).
+  const { q: initialQuery } = useLocalSearchParams<{ q?: string }>();
+  const [query, setQuery] = useState(() => (typeof initialQuery === 'string' ? initialQuery : ''));
 
   const fuse = useMemo(() => new Fuse(shows, SHOW_SEARCH_FUSE_OPTIONS), [shows]);
 

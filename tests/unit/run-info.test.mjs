@@ -4,7 +4,7 @@
 // as local noon, so "Closes Mar 2027" never reads "Feb 2027" in US timezones.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { getDurationSuffix, getRunDuration, getClosingInfo } from '../../lib/run-info.ts';
+import { getDurationSuffix, getRunDuration, getClosingInfo, getOpeningVerb } from '../../lib/run-info.ts';
 import { parseLocalDate, toLocalYMD } from '../../lib/date-utils.ts';
 import { UK_REGIONAL_VENUES, getUkRegionalVenueCity } from '../../lib/uk-regional-venues.ts';
 import { SKIP_NO_WEB, readWeb } from './web-repo.mjs';
@@ -73,4 +73,19 @@ test('contract: suffix strings match the website getDurationSuffix', { skip: SKI
   }
   const returns = (body.match(/return /g) ?? []).length;
   assert.equal(returns, 5, 'website added or removed a branch: port it to lib/run-info.ts');
+});
+
+test('getOpeningVerb: "Opens" until opening night has passed', () => {
+  const now = new Date(2026, 9, 20, 9, 0); // Oct 20 2026, local morning
+  // Status other than open/closed reads "Opens" whatever the date says.
+  assert.equal(getOpeningVerb('2026-11-12', 'previews', now), 'Opens');
+  assert.equal(getOpeningVerb('2026-03-01', 'upcoming', now), 'Opens');
+  assert.equal(getOpeningVerb('2027-04-01', 'announced', now), 'Opens');
+  assert.equal(getOpeningVerb(null, 'announced', now), 'Opens');
+  // An "open" show with a future opening date (feed flips status early) still "Opens".
+  assert.equal(getOpeningVerb('2026-10-21', 'open', now), 'Opens');
+  // Opening tonight or earlier reads "Opened".
+  assert.equal(getOpeningVerb('2026-10-20', 'open', now), 'Opened');
+  assert.equal(getOpeningVerb('2024-04-25', 'open', now), 'Opened');
+  assert.equal(getOpeningVerb('2019-01-10', 'closed', now), 'Opened');
 });

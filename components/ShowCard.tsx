@@ -16,7 +16,8 @@ import { useRouter } from 'expo-router';
 import { Show } from '@/lib/types';
 import { getImageUrl } from '@/lib/images';
 import { ScoreBadge, StatusBadge, FormatPill, ProductionPill, CategoryBadge, AudienceChip } from '@/components/show-cards';
-import { getContrastTextColor, getQualifiedScore } from '@/lib/score-utils';
+import { getContrastTextColor, getFormatInfo, getQualifiedScore, isScoreTBD } from '@/lib/score-utils';
+import { getClosingInfo, getRunDuration } from '@/lib/run-info';
 import { BookmarkOverlay } from '@/components/BookmarkOverlay';
 import { Colors, Spacing, BorderRadius, FontSize } from '@/constants/theme';
 import type { ScoreMode } from '@/components/ScoreToggle';
@@ -33,58 +34,19 @@ interface ShowCardProps {
   testID?: string;
 }
 
-const MARKET_LABELS: Record<string, string> = {
-  'broadway': 'on Broadway',
-  'off-broadway': 'Off-Broadway',
-  'west-end': 'in the West End',
-};
-
-function getRunDuration(openingDate: string | null, status: string, category: string): string | null {
-  if (!openingDate || status !== 'open') return null;
-  const open = new Date(openingDate);
-  if (isNaN(open.getTime())) return null;
-
-  const suffix = MARKET_LABELS[category] ?? 'on Broadway';
-  const now = new Date();
-  const totalMonths = Math.max(1, Math.round((now.getTime() - open.getTime()) / (30.44 * 24 * 60 * 60 * 1000)));
-  if (totalMonths >= 24) {
-    const years = Math.floor(totalMonths / 12);
-    return `${years} years ${suffix}`;
-  }
-  if (totalMonths >= 12) {
-    const years = Math.floor(totalMonths / 12);
-    const rem = totalMonths % 12;
-    return rem > 0 ? `${years} year${years > 1 ? 's' : ''}, ${rem} mo ${suffix}` : `${years} year ${suffix}`;
-  }
-  return `${totalMonths} mo ${suffix}`;
-}
-
-function getClosingInfo(closingDate: string | null, status: string): string | null {
-  if (!closingDate) return null;
-  const close = new Date(closingDate);
-  if (isNaN(close.getTime())) return null;
-  const fmt = close.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-
-  if (status === 'closed') {
-    return `Closed ${fmt}`;
-  }
-  // Open or previews with a closing date = closing soon
-  const now = new Date();
-  if (close > now) {
-    return `Closes ${fmt}`;
-  }
-  return null;
-}
-
 export const ShowCard = memo(function ShowCard({ show, scoreMode = 'critics', hideStatus = false, isWatchlisted, onToggleWatchlist, myRating, testID }: ShowCardProps) {
   const router = useRouter();
   const imageUrl = getImageUrl(show.images.poster ?? show.images.thumbnail);
-  const displayScore = getQualifiedScore(show);
-  const scoreText = displayScore ? `Score ${Math.round(displayScore)}` : 'No score';
-  const accessLabel = `${show.title}, ${show.venue ?? 'Unknown venue'}, ${show.type}, ${scoreText}`;
+  // Web ScoreBadge: previews/upcoming and below-the-gate shows read TBD.
+  const displayScore = isScoreTBD(show) ? null : getQualifiedScore(show);
+  const scoreText = displayScore != null ? `Score ${Math.round(displayScore)}` : 'Score to be determined';
+  const formatWord = getFormatInfo(show.type).label.toLowerCase();
+  const accessLabel = `${show.title}, ${show.venue || 'Unknown venue'}, ${formatWord}, ${scoreText}`;
+  // Run length and closing month: shared rules in lib/run-info.ts (market
+  // suffix from the web's getDurationSuffix; dates parsed at local noon).
   const runInfo = useMemo(
-    () => getRunDuration(show.openingDate, show.status, show.category),
-    [show.openingDate, show.status, show.category]
+    () => getRunDuration(show.openingDate, show.status, show.category, show.venue),
+    [show.openingDate, show.status, show.category, show.venue]
   );
   const closingInfo = useMemo(
     () => getClosingInfo(show.closingDate, show.status),
