@@ -12,6 +12,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Crypto from 'expo-crypto';
 import { getSupabaseClient } from '@/lib/supabase';
 import { enqueue, isOnline } from '@/lib/offline-queue';
+import { errorInfo, nextListPosition } from '@/lib/offline-queue-logic';
 import { getUserListsCache, setUserListsCache } from '@/lib/user-cache';
 import type { UserList, ListItem } from '@/lib/user-types';
 
@@ -24,8 +25,20 @@ export function useUserLists(userId: string | null) {
   const [lists, setLists] = useState<UserList[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Sign-out / account switch: drop the previous account's lists.
+  const [listsOwner, setListsOwner] = useState(userId);
+  if (listsOwner !== userId) {
+    setListsOwner(userId);
+    setLists([]);
+    setError(null);
+  }
+  const userIdRef = useRef(userId);
+  useEffect(() => { userIdRef.current = userId; }, [userId]);
   const mutationVersion = useRef(0);
   const pendingMutations = useRef(0);
+  // Highest item position seen per list (server refresh or local add), so an
+  // offline add lands after the existing items instead of at a fixed slot.
+  const maxPositions = useRef<Record<string, number>>({});
 
   // ─── Foreground refresh ──────────────────────────────────
   useEffect(() => {
@@ -50,6 +63,7 @@ export function useUserLists(userId: string | null) {
       const cached = await getUserListsCache(userId);
       if (cached) {
         const parsed = JSON.parse(cached) as UserList[];
+        if (userIdRef.current !== userId) return parsed;
         setLists(parsed);
         // Background refresh — skip if mutations are pending
         refreshLists(client, userId, mutationVersion.current).catch(() => {});
@@ -80,7 +94,7 @@ export function useUserLists(userId: string | null) {
 
     if (listsErr) throw listsErr;
     if (!listsData || listsData.length === 0) {
-      if (canApplyRefresh(versionAtStart)) {
+      if (canApplyRefresh(uid, versionAtStart)) {
         setLists([]);
         await setUserListsCache(uid, '[]').catch(() => {});
       }
@@ -99,10 +113,14 @@ export function useUserLists(userId: string | null) {
 
     // Group items by list_id
     const itemsByList = new Map<string, string[]>();
+    const sameUser = userIdRef.current === uid;
     for (const item of (itemsData || [])) {
       const existing = itemsByList.get(item.list_id) || [];
       existing.push(item.show_id);
       itemsByList.set(item.list_id, existing);
+      if (sameUser) {
+        maxPositions.current[item.list_id] = Math.max(maxPositions.current[item.list_id] ?? 0, Number(item.position) || 0);
+      }
     }
 
     const result: UserList[] = listsData.map((l: UserList) => {
@@ -117,15 +135,16 @@ export function useUserLists(userId: string | null) {
 
     // Skip state update if a mutation happened while we were fetching,
     // or if mutations are still pending (prevents stomping optimistic state)
-    if (canApplyRefresh(versionAtStart)) {
+    if (canApplyRefresh(uid, versionAtStart)) {
       setLists(result);
       await setUserListsCache(uid, JSON.stringify(result)).catch(() => {});
     }
     return result;
   };
 
-  /** Safe to apply refresh data only when no mutations occurred/pending */
-  const canApplyRefresh = (versionAtStart?: number): boolean => {
+  /** Safe to apply refresh data only when no mutations occurred/pending and the account is unchanged */
+  const canApplyRefresh = (uid: string, versionAtStart?: number): boolean => {
+    if (userIdRef.current !== uid) return false;
     if (pendingMutations.current > 0) return false;
     return versionAtStart === undefined || versionAtStart === mutationVersion.current;
   };
@@ -167,10 +186,15 @@ export function useUserLists(userId: string | null) {
 
     setError(null);
     pendingMutations.current++;
+    // Client-generated so shows added to the list while offline (keyed by
+    // this id) reference the row the queued insert creates, and a replay
+    // after a lost response is a harmless duplicate (23505).
+    const listId = Crypto.randomUUID();
     try {
       const { data, error: err } = await client
         .from('lists')
         .insert({
+          id: listId,
           user_id: userId,
           name: name.trim(),
           description: description?.trim() || null,
@@ -188,7 +212,7 @@ export function useUserLists(userId: string | null) {
     } catch (e) {
       if (await isNetworkError(e)) {
         const optimistic: UserList = {
-          id: Crypto.randomUUID(),
+          id: listId,
           user_id: userId,
           name: name.trim(),
           description: description?.trim() || null,
@@ -202,8 +226,9 @@ export function useUserLists(userId: string | null) {
         await enqueue({
           table: 'lists',
           action: 'insert',
-          data: { user_id: userId, name: name.trim(), description: description?.trim() || null, is_ranked: isRanked ?? false },
+          data: { id: listId, user_id: userId, name: name.trim(), description: description?.trim() || null, is_ranked: isRanked ?? false },
           filters: {},
+          userId,
         });
         mutationVersion.current++;
         setLists(prev => [optimistic, ...prev]);
@@ -271,7 +296,7 @@ export function useUserLists(userId: string | null) {
       await invalidateCache();
     } catch (e) {
       if (await isNetworkError(e)) {
-        await enqueue({ table: 'lists', action: 'delete', filters: { id: listId } });
+        await enqueue({ table: 'lists', action: 'delete', filters: { id: listId, user_id: userId }, userId });
         mutationVersion.current++;
         setLists(prev => prev.filter(l => l.id !== listId));
         return;
@@ -284,14 +309,17 @@ export function useUserLists(userId: string | null) {
   }, [userId]);
 
   // ─── Add show to list ────────────────────────────────────
+  // Throws on failure (cap reached, server refused) so callers never report
+  // success for a show that was not added. Offline adds queue and resolve.
   const addToList = useCallback(async (listId: string, showId: string): Promise<void> => {
     const client = getSupabaseClient();
     if (!client || !userId) return;
 
     const list = lists.find(l => l.id === listId);
     if (list && (list.item_count || 0) >= MAX_ITEMS_PER_LIST) {
-      setError(`Maximum of ${MAX_ITEMS_PER_LIST} shows per list reached`);
-      return;
+      const msg = `This list is full (${MAX_ITEMS_PER_LIST} shows max)`;
+      setError(msg);
+      throw new Error(msg);
     }
 
     setError(null);
@@ -316,6 +344,7 @@ export function useUserLists(userId: string | null) {
 
       if (err) throw err;
 
+      maxPositions.current[listId] = Math.max(maxPositions.current[listId] ?? 0, maxPos + POSITION_GAP);
       mutationVersion.current++;
       setLists(prev => prev.map(l => {
         if (l.id !== listId) return l;
@@ -334,11 +363,18 @@ export function useUserLists(userId: string | null) {
       await invalidateCache();
     } catch (e) {
       if (await isNetworkError(e)) {
+        const position = nextListPosition(
+          maxPositions.current[listId] !== undefined ? [maxPositions.current[listId]] : [],
+          list?.item_count || 0,
+          POSITION_GAP,
+        );
+        maxPositions.current[listId] = position;
         await enqueue({
           table: 'list_items',
           action: 'insert',
-          data: { list_id: listId, show_id: showId, position: POSITION_GAP },
+          data: { list_id: listId, show_id: showId, position },
           filters: {},
+          userId,
         });
         mutationVersion.current++;
         setLists(prev => prev.map(l => {
@@ -358,6 +394,7 @@ export function useUserLists(userId: string | null) {
       }
       const msg = e instanceof Error ? e.message : 'Failed to add to list';
       setError(msg);
+      throw new Error(msg);
     } finally {
       pendingMutations.current--;
     }
@@ -396,6 +433,7 @@ export function useUserLists(userId: string | null) {
           table: 'list_items',
           action: 'delete',
           filters: { list_id: listId, show_id: showId },
+          userId,
         });
         mutationVersion.current++;
         setLists(prev => prev.map(l => {
@@ -491,7 +529,8 @@ export function useUserLists(userId: string | null) {
 }
 
 async function isNetworkError(e: unknown): Promise<boolean> {
-  const msg = e instanceof Error ? e.message : String(e);
+  // supabase-js errors are plain objects, not Error instances.
+  const msg = errorInfo(e).text;
   if (/network|fetch|load failed|timeout|aborterror/i.test(msg)) return true;
   return !(await isOnline());
 }

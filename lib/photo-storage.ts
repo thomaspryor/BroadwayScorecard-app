@@ -117,6 +117,34 @@ export async function getSignedUrls(paths: string[]): Promise<Record<string, str
   return map;
 }
 
+/** Removes one storage object (e.g. an upload whose review was deleted before its row landed). */
+export async function removePhotoFile(storagePath: string): Promise<void> {
+  const client = getSupabaseClient();
+  if (!client) return;
+  const { error } = await client.storage.from(BUCKET).remove([storagePath]);
+  if (error) throw error;
+}
+
+/**
+ * Deleting a review cascades its user_review_photos rows but leaves the
+ * storage objects behind. Lists the review's folder (same
+ * `{userId}/{reviewId}/` prefix as buildPhotoStoragePath) rather than the
+ * rows, so it also catches files whose row never landed and still works after
+ * the cascade removed the rows. Best effort: callers ignore its failures.
+ */
+export async function removeReviewPhotoFiles(userId: string, reviewId: string): Promise<void> {
+  const client = getSupabaseClient();
+  if (!client || !userId || !reviewId) return;
+  const folder = `${userId}/${reviewId}`;
+  const { data, error } = await client.storage.from(BUCKET).list(folder, { limit: 100 });
+  if (error) throw error;
+  // Folder entries come back with a null id; only real objects are removed.
+  const paths = (data || []).filter(f => f.id && f.name).map(f => `${folder}/${f.name}`);
+  if (paths.length === 0) return;
+  const { error: removeError } = await client.storage.from(BUCKET).remove(paths);
+  if (removeError) throw removeError;
+}
+
 export async function deletePhoto(photoId: string, storagePath: string): Promise<void> {
   const client = getSupabaseClient();
   if (!client) throw new Error('Not signed in.');

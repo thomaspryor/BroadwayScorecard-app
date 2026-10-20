@@ -10,6 +10,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Crypto from 'expo-crypto';
 import { getSupabaseClient } from '@/lib/supabase';
 import { enqueue, isOnline } from '@/lib/offline-queue';
+import { errorInfo } from '@/lib/offline-queue-logic';
+import { removeReviewPhotoFiles } from '@/lib/photo-storage';
+import { removeQueuedForReview } from '@/lib/photo-upload-queue';
 import type { UserReview } from '@/lib/user-types';
 
 const CACHE_KEY = (userId: string) => `@bsc:reviews:${userId}`;
@@ -18,6 +21,17 @@ export function useUserReviews(userId: string | null) {
   const [reviews, setReviews] = useState<UserReview[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Sign-out / account switch: drop the previous account's reviews so they
+  // never render (or feed useMyRatingsMap's ★ chips) under the next one.
+  const [reviewsOwner, setReviewsOwner] = useState(userId);
+  if (reviewsOwner !== userId) {
+    setReviewsOwner(userId);
+    setReviews([]);
+    setError(null);
+  }
+  // A fetch started for the previous account must not land after the switch.
+  const userIdRef = useRef(userId);
+  useEffect(() => { userIdRef.current = userId; }, [userId]);
   const mutationVersion = useRef(0);
   // Lets deleteReview find the show for a review id without re-creating itself.
   const reviewsRef = useRef(reviews);
@@ -40,6 +54,7 @@ export function useUserReviews(userId: string | null) {
 
         if (err) throw err;
         const result = (data || []) as UserReview[];
+        if (userIdRef.current !== userId) return result;
         // Merge into existing reviews — replace matching show's reviews, keep the rest
         setReviews(prev => {
           const otherReviews = prev.filter(r => r.show_id !== showId);
@@ -68,6 +83,7 @@ export function useUserReviews(userId: string | null) {
       const cached = await AsyncStorage.getItem(CACHE_KEY(userId));
       if (cached) {
         const parsed = JSON.parse(cached) as UserReview[];
+        if (userIdRef.current !== userId) return parsed;
         setReviews(parsed);
         // Background refresh — skip state update if mutations happen during fetch
         refreshAllReviews(client, userId, mutationVersion.current).catch(() => {});
@@ -97,8 +113,10 @@ export function useUserReviews(userId: string | null) {
 
     if (err) throw err;
     const result = (data || []) as UserReview[];
-    // Skip state update if a mutation happened while we were fetching
-    if (versionAtStart === undefined || versionAtStart === mutationVersion.current) {
+    // Skip state update if a mutation happened while we were fetching, or the
+    // signed-in account changed
+    const sameUser = userIdRef.current === uid;
+    if (sameUser && (versionAtStart === undefined || versionAtStart === mutationVersion.current)) {
       setReviews(result);
     }
 
@@ -121,6 +139,10 @@ export function useUserReviews(userId: string | null) {
       }
 
       setError(null);
+      // Client-generated so the optimistic row, any queued edits/deletes and
+      // photos keyed by it all point at the row the queued insert creates. It
+      // also makes a replay after a lost response a harmless duplicate (23505).
+      const newReviewId = Crypto.randomUUID();
       try {
         if (data.reviewId) {
           const updateData = {
@@ -143,6 +165,7 @@ export function useUserReviews(userId: string | null) {
           return updated as UserReview;
         } else {
           const insertData = {
+            id: newReviewId,
             user_id: userId,
             show_id: data.showId,
             rating: data.rating,
@@ -175,6 +198,7 @@ export function useUserReviews(userId: string | null) {
                 updated_at: now,
               },
               filters: { id: data.reviewId, user_id: userId },
+              userId,
             });
             // Optimistic local update
             const optimistic: UserReview = {
@@ -188,11 +212,11 @@ export function useUserReviews(userId: string | null) {
             setReviews(prev => prev.map(r => r.id === data.reviewId ? optimistic : r));
             return optimistic;
           } else {
-            const tempId = Crypto.randomUUID();
             await enqueue({
               table: 'reviews',
               action: 'insert',
               data: {
+                id: newReviewId,
                 user_id: userId,
                 show_id: data.showId,
                 rating: data.rating,
@@ -200,10 +224,11 @@ export function useUserReviews(userId: string | null) {
                 date_seen: data.dateSeen || null,
               },
               filters: {},
+              userId,
             });
             // Optimistic local insert
             const optimistic: UserReview = {
-              id: tempId,
+              id: newReviewId,
               user_id: userId,
               show_id: data.showId,
               rating: data.rating,
@@ -247,16 +272,24 @@ export function useUserReviews(userId: string | null) {
           client.from('seen_unrated').delete().eq('user_id', userId).eq('show_id', showId)
             .then(() => {}, () => {});
         }
+        // The photo rows cascade with the review; their storage files do not.
+        // Best effort, after the delete landed, so a failed delete never
+        // leaves a surviving review with missing photos.
+        removeReviewPhotoFiles(userId, reviewId).catch(() => {});
+        removeQueuedForReview(reviewId).catch(() => {});
         mutationVersion.current++;
         setReviews(prev => prev.filter(r => r.id !== reviewId));
         await AsyncStorage.removeItem(CACHE_KEY(userId)).catch(() => {});
       } catch (e) {
         if (await isNetworkError(e)) {
+          // The queued delete removes the storage files when it replays.
           await enqueue({
             table: 'reviews',
             action: 'delete',
             filters: { id: reviewId, user_id: userId },
+            userId,
           });
+          removeQueuedForReview(reviewId).catch(() => {});
           mutationVersion.current++;
           setReviews(prev => prev.filter(r => r.id !== reviewId));
           return;
@@ -290,7 +323,8 @@ export function useUserReviews(userId: string | null) {
 
 /** Check if an error is a network/connectivity issue (vs a server/auth error) */
 async function isNetworkError(e: unknown): Promise<boolean> {
-  const msg = e instanceof Error ? e.message : String(e);
+  // supabase-js errors are plain objects, not Error instances.
+  const msg = errorInfo(e).text;
   if (/network|fetch|load failed|timeout|aborterror/i.test(msg)) return true;
   // Also check actual connectivity
   return !(await isOnline());
