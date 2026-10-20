@@ -94,6 +94,7 @@ const SOURCE_EXTS = new Set(['.ts', '.tsx', '.js', '.jsx']);
 // direction that stays safe when someone adds one and forgets this list.
 const OPTIONAL_PUBLIC_VARS = new Set([
   'EXPO_PUBLIC_DEV_AUTO_SIGNIN', // simulator-only auth bypass
+  'EXPO_PUBLIC_DEV_TEST_PASSWORD', // dev/E2E-only (lib/dev-auto-signin.ts); must stay UNSET for production
   'EXPO_PUBLIC_STATS_LAYOUT',    // layout experiment flag
   'EXPO_PUBLIC_SENTRY_DSN',      // crash reporting; app runs without it
   'EXPO_PUBLIC_POSTHOG_API_KEY', // analytics; app runs without it

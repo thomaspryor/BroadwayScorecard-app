@@ -24,6 +24,7 @@ import {
   ScrollView,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
+import * as WebBrowser from 'expo-web-browser';
 import Svg, { Path } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
@@ -40,6 +41,10 @@ interface SignInSheetProps {
   loading?: boolean;
   loadingProvider?: 'google' | 'apple' | 'email' | null;
 }
+
+// Opened in the in-app browser from the legal line under the sign-in buttons.
+const TERMS_URL = 'https://broadwayscorecard.com/terms';
+const PRIVACY_URL = 'https://broadwayscorecard.com/privacy';
 
 const HEADLINES: Record<SignInContext, string> = {
   rating: 'Sign in to save your rating',
@@ -251,7 +256,23 @@ export default function SignInSheet({
 
           {/* Footer */}
           <Text style={styles.footer}>
-            By signing in, you agree to our Terms of Service and Privacy Policy.
+            By signing in, you agree to our{' '}
+            <Text
+              style={styles.footerLink}
+              accessibilityRole="link"
+              onPress={() => { WebBrowser.openBrowserAsync(TERMS_URL).catch(() => {}); }}
+            >
+              Terms of Service
+            </Text>
+            {' '}and{' '}
+            <Text
+              style={styles.footerLink}
+              accessibilityRole="link"
+              onPress={() => { WebBrowser.openBrowserAsync(PRIVACY_URL).catch(() => {}); }}
+            >
+              Privacy Policy
+            </Text>
+            .
           </Text>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -450,5 +471,9 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: Spacing.xl,
     lineHeight: 16,
+  },
+  footerLink: {
+    color: Colors.brand,
+    textDecorationLine: 'underline',
   },
 });

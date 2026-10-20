@@ -5,6 +5,7 @@
  */
 
 import type PostHog from 'posthog-react-native';
+import { textLengthProps } from './analytics-redact';
 
 type AnalyticsEvent = {
   event: string;
@@ -158,15 +159,16 @@ export function trackFullReviewTapped(showId: string, outlet: string, criticName
 
 // ─── Search events (P0) ────────────────────────────────
 
+// The query text itself is never sent, only its length (lib/analytics-redact.ts).
 export function trackSearchPerformed(query: string, resultCount: number) {
   trackEvent('search_performed', {
-    query,
+    ...textLengthProps('query', query),
     result_count: resultCount,
   });
 }
 
 export function trackSearchNoResults(query: string) {
-  trackEvent('search_no_results', { query });
+  trackEvent('search_no_results', textLengthProps('query', query));
 }
 
 // ─── Browse / Home events (P1) ─────────────────────────
@@ -224,7 +226,8 @@ export function trackSignOut() {
 // ─── Lists events (P1) ────────────────────────────────
 
 export function trackListCreated(listId: string, name: string, isRanked: boolean) {
-  trackEvent('list_created', { list_id: listId, name, is_ranked: isRanked });
+  // The list's name is the user's own text: send its length only.
+  trackEvent('list_created', { list_id: listId, ...textLengthProps('name', name), is_ranked: isRanked });
 }
 
 export function trackListDeleted(listId: string) {

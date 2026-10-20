@@ -2,16 +2,17 @@
  * Root layout — forces dark theme, onboarding gate, PostHog analytics, and wraps app in DataProvider.
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { DarkTheme, ThemeProvider , Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import * as SplashScreen from 'expo-splash-screen';
 import 'react-native-reanimated';
 
 import PostHog, { PostHogProvider } from 'posthog-react-native';
-import { DataProvider } from '@/lib/data-context';
+import { DataProvider, useShows } from '@/lib/data-context';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { Onboarding, hasSeenOnboarding } from '@/components/Onboarding';
-import { AuthProvider } from '@/lib/auth-context';
+import { AuthProvider, useAuth } from '@/lib/auth-context';
 import { LocalWatchlistMigrator } from '@/hooks/useLocalWatchlistMigration';
 import WelcomeGate from '@/components/onboarding/WelcomeGate';
 import { MarketProvider } from '@/lib/market-context';
@@ -25,6 +26,21 @@ import { initSentry, wrapWithSentry } from '@/lib/sentry';
 import { hydrateDiaryTitles } from '@/lib/diary-titles';
 import { startAutoFlush, flushQueue } from '@/lib/offline-queue';
 import { rescheduleAllReminders } from '@/lib/local-notifications';
+import { getUserWatchlistCache } from '@/lib/user-cache';
+import { makeShowTitleLookup, parseCachedWatchlist } from '@/lib/rate-reminders';
+
+// Crash reporting starts before anything else on the JS side, so errors while
+// the providers below mount are reported. It used to start in RootLayout's
+// first effect, after the first render (and after Sentry.wrap() below ran on
+// an uninitialized client).
+initSentry();
+
+// Keep the native splash up until RootLayout knows what to render. Otherwise
+// expo-router hides it as soon as navigation is ready, while this layout still
+// returns null (onboarding check + PostHog), and the user sees an empty screen.
+SplashScreen.preventAutoHideAsync().catch(() => {});
+/** Never leave the splash up longer than this, whatever is still loading. */
+const SPLASH_MAX_MS = 6000;
 
 // Custom dark theme matching our design tokens
 const BroadwayDark = {
@@ -64,14 +80,54 @@ function initPostHog(): PostHog | null {
   }
 }
 
+/**
+ * Re-schedules the signed-in user's planned-date reminders once per account
+ * per launch (recovers from an app kill / iOS dropping them). Rendered inside
+ * AuthProvider + DataProvider, after onboarding, so it reads the CURRENT
+ * user's watchlist cache and the show list DataProvider already parsed. The
+ * old version took whichever @bsc:watchlist:* key getAllKeys() listed first
+ * (possibly another account's) and re-parsed the 2.1MB show feed.
+ */
+function ReminderRescheduler() {
+  const { user } = useAuth();
+  const { shows } = useShows();
+  const userId = user?.id ?? null;
+  const doneFor = useRef<string | null>(null);
+
+  useEffect(() => {
+    // Sign-out cancels every reminder, so the same account signing back in
+    // has to be rescheduled again.
+    if (!userId) { doneFor.current = null; return; }
+    if (shows.length === 0 || doneFor.current === userId) return;
+    doneFor.current = userId;
+    (async () => {
+      try {
+        const entries = parseCachedWatchlist(await getUserWatchlistCache(userId));
+        if (entries.length === 0) return;
+        await rescheduleAllReminders(entries, makeShowTitleLookup(shows));
+      } catch {
+        // Non-critical — reminders just won't be rescheduled this launch
+      }
+    })();
+  }, [userId, shows]);
+
+  return null;
+}
+
 function RootLayout() {
   const [showOnboarding, setShowOnboarding] = useState<boolean | null>(null);
   const [phClient, setPhClient] = useState<PostHog | null>(null);
   const [phReady, setPhReady] = useState(!POSTHOG_API_KEY); // skip wait if no key
 
+  const ready = showOnboarding !== null && phReady;
   useEffect(() => {
-    // Init crash reporting first — catches errors during startup
-    initSentry();
+    if (ready) SplashScreen.hide();
+  }, [ready]);
+
+  useEffect(() => {
+    // Backstop for the splash: a hung flag/onboarding read must not trap the
+    // user on it. hide() is a no-op once the splash is gone.
+    const splashBackstop = setTimeout(() => SplashScreen.hide(), SPLASH_MAX_MS);
 
     // Start offline queue auto-flush + flush any pending operations
     startAutoFlush();
@@ -96,7 +152,10 @@ function RootLayout() {
       .then(([, seen]) => setShowOnboarding(!seen))
       .catch(() => setShowOnboarding(false));
 
-    // Check for OTA updates in background (non-blocking)
+    // Download any OTA update in the background. It applies on the next cold
+    // start. Never reloadAsync() here: reloading mid-session threw away
+    // whatever the user was doing (a half-written rating, a scrolled list)
+    // seconds after launch.
     if (!__DEV__) {
       try {
         // Deliberately lazy: expo-updates is absent in Expo Go, and a static import would
@@ -107,12 +166,11 @@ function RootLayout() {
           .then(({ isAvailable }: { isAvailable: boolean }) => {
             if (isAvailable) return Updates.fetchUpdateAsync();
           })
-          .then((result: { isNew?: boolean } | undefined) => {
-            if (result?.isNew) Updates.reloadAsync();
-          })
           .catch(() => {}); // Silent fail — network errors are fine
       } catch {} // Native module not available in dev client
     }
+
+    return () => clearTimeout(splashBackstop);
   }, []);
 
   // Register push notifications + set up tap handler
@@ -123,35 +181,8 @@ function RootLayout() {
     registerForPushNotifications();
     const cleanup = setupNotificationHandler();
 
-    // Re-schedule local rate reminders from cached watchlist data
-    // (Recovers from app kill / iOS clearing notifications)
-    (async () => {
-      try {
-        // Loaded inside the try/catch so a storage failure degrades to a no-op rather than a
-        // launch crash.
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
-        const AsyncStorage = require('@react-native-async-storage/async-storage').default;
-        // Find the watchlist cache key (pattern: @bsc:watchlist:{userId})
-        const keys = await AsyncStorage.getAllKeys();
-        const watchlistKey = keys.find((k: string) => k.startsWith('@bsc:watchlist:'));
-        const showsRaw = await AsyncStorage.getItem('mobile-shows-data');
-        if (!watchlistKey || !showsRaw) return;
-
-        const watchlist = JSON.parse(await AsyncStorage.getItem(watchlistKey) || '[]');
-        const showsData = JSON.parse(showsRaw);
-        const showMap = new Map<string, string>();
-        for (const s of showsData.shows || []) {
-          showMap.set(s.id || s.sl, s.t || s.title || s.id || 'Show');
-        }
-
-        await rescheduleAllReminders(
-          watchlist,
-          (showId: string) => showMap.get(showId) || 'Your show',
-        );
-      } catch {
-        // Non-critical — reminders just won't be rescheduled this launch
-      }
-    })();
+    // Planned-date reminders are rescheduled by <ReminderRescheduler />, which
+    // needs the auth + show data contexts this component sits above.
 
     return () => { cleanup?.(); };
   }, [showOnboarding]);
@@ -268,6 +299,7 @@ function RootLayout() {
           <AuthProvider>
             {appContent}
             <LocalWatchlistMigrator />
+            <ReminderRescheduler />
             <WelcomeGate />
           </AuthProvider>
         ) : (

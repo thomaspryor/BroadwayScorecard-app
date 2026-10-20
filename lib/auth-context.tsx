@@ -7,7 +7,7 @@
  * Ported from web's src/contexts/AuthContext.tsx with native auth flows.
  */
 
-import React, { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useRef, type ReactNode } from 'react';
 import { Alert } from 'react-native';
 import { getSupabaseClient } from './supabase';
 import type { UserProfile } from './user-types';
@@ -15,6 +15,32 @@ import SignInSheet from '@/components/SignInSheet';
 import { trackEvent, trackSignInStarted, trackSignInCompleted, trackSignOut as trackSignOutEvent, identifyUser, resetAnalyticsUser } from '@/lib/analytics';
 import { setSentryUser, clearSentryUser, captureException } from '@/lib/sentry';
 import { clearPendingAction } from '@/lib/deferred-auth';
+import { cancelAllRateReminders } from '@/lib/local-notifications';
+import { syncPushTokenIfPermitted, unlinkPushTokenFromUser } from '@/lib/notifications';
+import { resetWatchlistState } from '@/hooks/useWatchlist';
+import { appleDisplayName, shouldFillDisplayName } from '@/lib/apple-name';
+import { devAutoSignInBlock } from '@/lib/dev-auto-signin';
+
+// The dev-test account's password, inlined at bundle time only where the build
+// environment sets it (a developer's gitignored .env, the E2E workflow). It
+// used to be a string literal here: readable in the repo, and inside any bundle
+// built with EXPO_PUBLIC_DEV_AUTO_SIGNIN set (only dead-code removal kept it
+// out of production bundles).
+const DEV_TEST_PASSWORD = process.env.EXPO_PUBLIC_DEV_TEST_PASSWORD || undefined;
+// Module-local on purpose: only dead code in production builds reads it, so the
+// minifier drops it (an export from another module would ship).
+const DEV_TEST_EMAIL = 'dev-test@broadwayscorecard.com';
+
+/** expo-updates channel of this build ("production" for EAS production builds). */
+function readUpdatesChannel(): string | null {
+  try {
+    // Lazy: expo-updates is absent in Expo Go.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    return (require('expo-updates') as { channel?: string | null }).channel ?? null;
+  } catch {
+    return null;
+  }
+}
 
 // Lazy-load native auth modules — they crash at import time if native modules
 // aren't registered (e.g. dev client built without the plugin, or Expo Go).
@@ -64,6 +90,18 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+/**
+ * Device-local state that belongs to the account that just left: its
+ * planned-date reminders and the in-memory watchlist every screen shares.
+ * Runs on every sign-out path, including a session that expires on its own.
+ * The offline queue is deliberately not touched here (it is user-scoped in
+ * lib/offline-queue.ts).
+ */
+function clearSignedOutDeviceState(): void {
+  cancelAllRateReminders().catch(() => {});
+  resetWatchlistState();
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<{ id: string; email: string } | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -72,6 +110,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [sheetContext, setSheetContext] = useState<SignInContext>('generic');
   const [signInLoading, setSignInLoading] = useState(false);
   const [signInProvider, setSignInProvider] = useState<'google' | 'apple' | 'email' | null>(null);
+  // Name from the Apple credential, waiting for the profile to load (see
+  // lib/apple-name.ts). Set before signInWithIdToken, which fires SIGNED_IN
+  // and therefore loadProfile() before it resolves.
+  const pendingAppleName = useRef<string | null>(null);
 
   // ─── Initialize auth state ───────────────────────────────
   useEffect(() => {
@@ -88,16 +130,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         loadProfile(session.user.id);
         setLoading(false);
       } else if (process.env.EXPO_PUBLIC_DEV_AUTO_SIGNIN === '1') {
-        // Auto-sign-in with dev test account for simulator testing
-        console.log('[Auth] Dev auto-sign-in triggered');
-        try {
-          const { error } = await client.auth.signInWithPassword({
-            email: 'dev-test@broadwayscorecard.com',
-            password: 'dev-test-local-only-2024',
-          });
-          if (error) console.error('[Auth] Dev auto-sign-in failed:', error.message);
-        } catch (e) {
-          console.error('[Auth] Dev auto-sign-in error:', e);
+        // Dev / E2E auto sign-in to the shared dev-test account. Not gated on
+        // __DEV__ (the E2E Release build needs it); see lib/dev-auto-signin.ts.
+        const blocked = devAutoSignInBlock({
+          flag: process.env.EXPO_PUBLIC_DEV_AUTO_SIGNIN,
+          password: DEV_TEST_PASSWORD,
+          channel: readUpdatesChannel(),
+        });
+        if (blocked || !DEV_TEST_PASSWORD) {
+          console.warn(`[Auth] Dev auto-sign-in skipped: ${blocked ?? 'no-password'}`);
+        } else {
+          console.log('[Auth] Dev auto-sign-in triggered');
+          try {
+            const { error } = await client.auth.signInWithPassword({
+              email: DEV_TEST_EMAIL,
+              password: DEV_TEST_PASSWORD,
+            });
+            if (error) console.error('[Auth] Dev auto-sign-in failed:', error.message);
+          } catch (e) {
+            console.error('[Auth] Dev auto-sign-in error:', e);
+          }
         }
         setLoading(false);
       } else {
@@ -121,11 +173,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setSignInLoading(false);
         setSignInProvider(null);
         identifyUser(session.user.id);
-        setSentryUser(session.user.id, session.user.email);
+        setSentryUser(session.user.id);
         trackSignInCompleted(session.user.app_metadata?.provider || 'unknown');
+        // Re-link this device's push token to the new account. Never prompts.
+        // Deferred: supabase-js holds its auth lock while this callback runs,
+        // and the sync reads the session.
+        setTimeout(() => { syncPushTokenIfPermitted(); }, 0);
       } else if (event === 'SIGNED_OUT') {
         setUser(null);
         setProfile(null);
+        clearSignedOutDeviceState();
         trackSignOutEvent();
         resetAnalyticsUser();
         clearSentryUser();
@@ -146,12 +203,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { data } = await client.from('profiles').select('*').eq('id', userId).single();
 
       if (data) {
-        setProfile(data as UserProfile);
+        setProfile(await fillAppleName(userId, data as UserProfile));
       } else {
         await ensureProfile(userId);
       }
     } catch {
       await ensureProfile(userId);
+    }
+  };
+
+  /** Save the pending Apple name if the profile has no display name yet. */
+  const fillAppleName = async (userId: string, current: UserProfile): Promise<UserProfile> => {
+    const name = pendingAppleName.current;
+    pendingAppleName.current = null;
+    if (!shouldFillDisplayName(current.display_name, name)) return current;
+    const client = getSupabaseClient();
+    if (!client) return current;
+    try {
+      const { data, error } = await client
+        .from('profiles')
+        .update({ display_name: name })
+        .eq('id', userId)
+        .select()
+        .single();
+      if (error) {
+        captureException(new Error(`profiles apple name save failed: ${error.message}`), {
+          code: String((error as { code?: string }).code ?? 'unknown'),
+        });
+        return current;
+      }
+      return (data as UserProfile | null) ?? { ...current, display_name: name };
+    } catch {
+      return current;
     }
   };
 
@@ -164,6 +247,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         data: { user: authUser },
       } = await client.auth.getUser();
       const meta = authUser?.user_metadata || {};
+      const appleName = pendingAppleName.current;
+      pendingAppleName.current = null;
       // Destructuring only `data` here discards the error the same way
       // savePushTokenToServer() did, and with the same consequence: a rejected
       // upsert leaves `data` null, `if (data)` quietly skips, and the profile
@@ -175,7 +260,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .upsert(
           {
             id: userId,
-            display_name: meta.full_name || meta.name || '',
+            display_name: meta.full_name || meta.name || appleName || '',
             avatar_url: meta.avatar_url || meta.picture || null,
           },
           { onConflict: 'id' },
@@ -221,6 +306,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw new Error('No identity token from Apple');
       }
 
+      // Only present on the first authorization; never in the token itself.
+      pendingAppleName.current = appleDisplayName(credential.fullName);
+
       const { error } = await client.auth.signInWithIdToken({
         provider: 'apple',
         token: credential.identityToken,
@@ -229,6 +317,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (error) throw error;
       // onAuthStateChange handles the rest
     } catch (e: unknown) {
+      pendingAppleName.current = null;
       setSignInLoading(false);
       setSignInProvider(null);
       // User cancelled — not an error
@@ -321,8 +410,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    const email = 'dev-test@broadwayscorecard.com';
-    const password = 'dev-test-local-only-2024';
+    const email = DEV_TEST_EMAIL;
+    const password = DEV_TEST_PASSWORD;
+    if (!password) {
+      Alert.alert('Dev Sign-In', 'Set EXPO_PUBLIC_DEV_TEST_PASSWORD (the dev-test account password) in .env, then restart Metro.');
+      return;
+    }
 
     try {
       setSignInLoading(true);
@@ -365,12 +458,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const client = getSupabaseClient();
     if (!client) return;
 
+    // While the session still exists: stop this phone receiving the
+    // account's personal notifications. Bounded, never blocks sign-out.
+    await unlinkPushTokenFromUser();
+
     // This device only. The default ('global') revokes every session on the
     // account, so signing out here also signed the user out of the website
     // on their phone and computer (BRO-4822).
     await client.auth.signOut({ scope: 'local' });
     setUser(null);
     setProfile(null);
+    clearSignedOutDeviceState();
   }, []);
 
   // ─── Permanent account deletion (App Store Guideline 5.1.1(v)) ──────────
@@ -384,9 +482,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     // The account is gone and its sessions with it; only this device's copy needs clearing.
+    // The JWT is still accepted until it expires, so the token unlink works here.
+    await unlinkPushTokenFromUser();
     await client.auth.signOut({ scope: 'local' }).catch(() => {});
     setUser(null);
     setProfile(null);
+    clearSignedOutDeviceState();
   }, []);
 
   // ─── Show Sign-In Sheet ──────────────────────────────────

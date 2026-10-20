@@ -10,9 +10,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Crypto from 'expo-crypto';
 import { getSupabaseClient } from '@/lib/supabase';
 import { enqueue, isOnline } from '@/lib/offline-queue';
-import { scheduleRateReminder, cancelRateReminder, cancelAllRemindersForShow } from '@/lib/local-notifications';
+import { scheduleRateReminder, cancelAllRemindersForShow } from '@/lib/local-notifications';
 import type { WatchlistEntry } from '@/lib/user-types';
 import { trackEvent } from '@/lib/analytics';
+import { useShows } from '@/lib/data-context';
+import { resolveShowTitle } from '@/lib/rate-reminders';
 
 const CACHE_KEY = (userId: string) => `@bsc:watchlist:${userId}`;
 
@@ -26,6 +28,22 @@ function broadcastWatchlist(entries: WatchlistEntry[]) {
   listeners.forEach(fn => fn(entries));
 }
 
+/** Forget the in-memory watchlist shared by every mounted useWatchlist (sign-out,
+ *  account deletion). Without this, screens kept showing the previous account's
+ *  shows, and the next account to sign in briefly inherited them. */
+export function resetWatchlistState(): void {
+  broadcastWatchlist([]);
+}
+
+/** Make the device's "How was <show>?" reminder match the planned date. Clears
+ *  the show's reminders first: ids are per date, so changing a date used to
+ *  leave the old date's reminder scheduled as well. */
+function syncRateReminder(showId: string, plannedDate: string | null, showTitle: string): void {
+  cancelAllRemindersForShow(showId)
+    .then(() => (plannedDate ? scheduleRateReminder(showId, showTitle, plannedDate) : undefined))
+    .catch(() => {});
+}
+
 /** Drop the cached copy so the next getWatchlist() reads the server (used after
  *  signed-out saves move into the account, hooks/useLocalWatchlistMigration.ts). */
 export async function invalidateWatchlistCache(userId: string): Promise<void> {
@@ -33,6 +51,8 @@ export async function invalidateWatchlistCache(userId: string): Promise<void> {
 }
 
 export function useWatchlist(userId: string | null) {
+  // Show titles for reminders: no caller passes one, so resolve it here.
+  const { shows } = useShows();
   const [watchlist, setWatchlist] = useState<WatchlistEntry[]>(sharedWatchlist);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -170,6 +190,7 @@ export function useWatchlist(userId: string | null) {
         });
         mutationVersion.current++;
         broadcastWatchlist(sharedWatchlist.filter(w => w.show_id !== showId));
+        cancelAllRemindersForShow(showId).catch(() => {});
         return;
       }
       try {
@@ -192,6 +213,7 @@ export function useWatchlist(userId: string | null) {
           });
           mutationVersion.current++;
           broadcastWatchlist(sharedWatchlist.filter(w => w.show_id !== showId));
+          cancelAllRemindersForShow(showId).catch(() => {});
           return;
         }
         const msg = e instanceof Error ? e.message : 'Failed to remove from watchlist';
@@ -209,6 +231,7 @@ export function useWatchlist(userId: string | null) {
     async (showId: string, plannedDate: string | null, showTitle?: string): Promise<void> => {
       const client = getSupabaseClient();
       if (!client || !userId) return;
+      const title = resolveShowTitle(showId, shows, showTitle);
 
       setError(null);
       // Offline fast-path — mirror addToWatchlist
@@ -221,6 +244,8 @@ export function useWatchlist(userId: string | null) {
         });
         mutationVersion.current++;
         broadcastWatchlist(sharedWatchlist.map(w => (w.show_id === showId ? { ...w, planned_date: plannedDate } : w)));
+        // The date is saved (queued); the reminder is local and needs no network.
+        syncRateReminder(showId, plannedDate, title);
         return;
       }
       try {
@@ -244,6 +269,7 @@ export function useWatchlist(userId: string | null) {
           });
           mutationVersion.current++;
           broadcastWatchlist(sharedWatchlist.map(w => (w.show_id === showId ? { ...w, planned_date: plannedDate } : w)));
+          syncRateReminder(showId, plannedDate, title);
           return;
         }
         const msg = e instanceof Error ? e.message : 'Failed to update date';
@@ -252,13 +278,9 @@ export function useWatchlist(userId: string | null) {
       }
 
       // Schedule or cancel local notification
-      if (plannedDate && showTitle) {
-        scheduleRateReminder(showId, showTitle, plannedDate).catch(() => {});
-      } else {
-        cancelAllRemindersForShow(showId).catch(() => {});
-      }
+      syncRateReminder(showId, plannedDate, title);
     },
-    [userId],
+    [userId, shows],
   );
 
   return {

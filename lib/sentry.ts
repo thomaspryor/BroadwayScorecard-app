@@ -52,9 +52,11 @@ export function wrapWithSentry(component: React.ComponentType<any>): React.Compo
   return component;
 }
 
-/** Set user context for crash reports */
-export function setSentryUser(userId: string, email?: string) {
-  Sentry?.setUser({ id: userId, email });
+/** Set user context for crash reports. The id only: the email is personal
+ *  data the crash reports never needed (sendDefaultPii is off for the same
+ *  reason), and the privacy answers say crash data is not linked by email. */
+export function setSentryUser(userId: string) {
+  Sentry?.setUser({ id: userId });
 }
 
 /** Clear user context on sign-out */
@@ -88,6 +90,14 @@ export function captureException(error: Error, context?: Record<string, string>)
   } else {
     Sentry?.captureException(error);
   }
+}
+
+/** Report a render crash an error boundary caught. Caught errors never reach
+ *  Sentry's global handler, so without this they were invisible. */
+export function captureRenderError(error: Error, componentStack?: string | null) {
+  Sentry?.captureException(error, {
+    contexts: componentStack ? { react: { componentStack } } : undefined,
+  });
 }
 
 /** Get the Sentry navigation integration for Expo Router */
