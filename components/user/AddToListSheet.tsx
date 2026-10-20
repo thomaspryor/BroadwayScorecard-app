@@ -1,11 +1,12 @@
 /**
- * AddToListSheet — bottom sheet for adding a show to user lists.
+ * AddToListSheet — sheet for adding a show to user lists.
  *
- * Modal-based sheet shown from show pages. Displays checkboxes for
- * each user list, with inline create-new-list row.
+ * iOS pageSheet modal (drag down to dismiss, same presentation as
+ * ShowSearchModal / ListsTab's list editor) shown from show pages. Displays
+ * checkboxes for each user list, with inline create-new-list row.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -14,6 +15,8 @@ import {
   ScrollView,
   TextInput,
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
   StyleSheet,
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
@@ -46,6 +49,9 @@ export default function AddToListSheet({ showId, userId, visible, onClose }: Add
   const [mutatingLists, setMutatingLists] = useState<Set<string>>(new Set());
   const [newListName, setNewListName] = useState('');
   const [creating, setCreating] = useState(false);
+  // `creating` state lands a render late; a double tap (or tap + keyboard
+  // submit) in that window would create the list twice.
+  const creatingRef = useRef(false);
 
   // Fetch lists when sheet opens
   useEffect(() => {
@@ -70,8 +76,9 @@ export default function AddToListSheet({ showId, userId, visible, onClose }: Add
         const list = lists.find(l => l.id === listId);
         showToast(`Added to ${list?.name || 'list'}`, 'success');
       }
-    } catch {
-      showToast('Failed to update list', 'error');
+    } catch (e) {
+      const reason = e instanceof Error && e.message.startsWith('This list is full') ? e.message : null;
+      showToast(reason || (isInList ? "Couldn't remove from list" : "Couldn't add to list"), 'error');
     } finally {
       setMutatingLists(prev => {
         const next = new Set(prev);
@@ -83,21 +90,29 @@ export default function AddToListSheet({ showId, userId, visible, onClose }: Add
 
   const handleCreateAndAdd = async () => {
     const name = newListName.trim();
-    if (!name) return;
+    if (!name || creatingRef.current) return;
+    creatingRef.current = true;
     setCreating(true);
     try {
-      const newList = await createList(name);
-      if (newList) {
-        trackListCreated(newList.id, name, false);
-        await addToList(newList.id, showId);
-        trackShowAddedToList(newList.id, showId, 'show_page');
-        haptics.action();
-        showToast(`Added to ${name}`, 'success');
-        setNewListName('');
+      const newList = await createList(name).catch(() => null);
+      if (!newList) {
+        showToast("Couldn't create the list", 'error');
+        return;
       }
-    } catch {
-      showToast('Failed to create list', 'error');
+      trackListCreated(newList.id, name, false);
+      // The list exists now: clear the field so a retry can't create it twice.
+      setNewListName('');
+      try {
+        await addToList(newList.id, showId);
+      } catch {
+        showToast(`Created ${name}, but couldn't add this show`, 'error');
+        return;
+      }
+      trackShowAddedToList(newList.id, showId, 'show_page');
+      haptics.action();
+      showToast(`Added to ${name}`, 'success');
     } finally {
+      creatingRef.current = false;
       setCreating(false);
     }
   };
@@ -105,12 +120,15 @@ export default function AddToListSheet({ showId, userId, visible, onClose }: Add
   return (
     <Modal
       visible={visible}
-      transparent
       animationType="slide"
+      presentationStyle="pageSheet"
       onRequestClose={onClose}
     >
-      <Pressable style={styles.overlay} onPress={onClose}>
-        <Pressable style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 16) }]} onPress={() => {}}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.sheet}
+      >
+        <View style={[styles.sheetBody, { paddingBottom: Math.max(insets.bottom, 16) }]}>
           {/* Header */}
           <View style={styles.header}>
             <Text style={styles.title}>Add to List</Text>
@@ -187,23 +205,19 @@ export default function AddToListSheet({ showId, userId, visible, onClose }: Add
               )}
             </Pressable>
           </View>
-        </Pressable>
-      </Pressable>
+        </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
-  },
   sheet: {
-    backgroundColor: Colors.surface.raised,
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    maxHeight: '70%',
+    flex: 1,
+    backgroundColor: Colors.surface.default,
+  },
+  sheetBody: {
+    flex: 1,
   },
   header: {
     flexDirection: 'row',
@@ -220,7 +234,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   listContainer: {
-    maxHeight: 300,
+    flex: 1,
   },
   listRow: {
     flexDirection: 'row',

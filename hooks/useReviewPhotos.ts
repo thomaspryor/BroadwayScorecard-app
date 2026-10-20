@@ -39,13 +39,16 @@ export function useReviewPhotos(reviewId: string | null, userId: string | null) 
     if (!reviewId || !userId) return;
     setLoading(true);
     try {
+      // Offline, the server read fails; still show this phone's queued photos
+      // (and keep the uploaded ones already on screen).
       const [uploaded, queued] = await Promise.all([
-        getPhotosForReview(reviewId, userId),
-        getQueueForReview(reviewId),
+        getPhotosForReview(reviewId, userId).catch(() => null),
+        getQueueForReview(reviewId, userId),
       ]);
       if (!mounted.current) return;
-      setPhotos(uploaded);
       setPending(queued);
+      if (!uploaded) return;
+      setPhotos(uploaded);
 
       if (uploaded.length > 0) {
         const urls = await getSignedUrls(uploaded.map(p => p.storage_path));
