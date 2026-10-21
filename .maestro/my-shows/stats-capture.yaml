@@ -74,9 +74,8 @@ appId: com.broadwayscorecard.app
 # out. stats-tab.yaml runs the identical DOWN search and passes because it
 # starts from the top, which is what proves the element itself renders fine.
 # Caught by the first nightly run (31571886484).
-# Come back UP from the bottom to the theater ring and centre it: the house
-# grid sits right below it, so its first row is then on screen for the tap
-# below. Two earlier anchors failed on CI: the scope pill is pinned outside
+# Come back UP from the bottom to the theater ring (the house grid sits right
+# below it). Two earlier anchors failed on CI: the scope pill is pinned outside
 # the ScrollView (scrolling to it never moves), and the hero tiles end up
 # clipped under that pinned header, never counted visible (runs 39521528670,
 # 39540893537). StatsScreen stays mounted when switching views, so leaving
@@ -88,6 +87,19 @@ appId: com.broadwayscorecard.app
     visibilityPercentage: 100
     centerElement: true
     timeout: 45000
+# centerElement leaves the ring low and the grid's first row under the
+# floating tab bar, and Maestro does not count a covered element as hidden:
+# the chip tap below landed on the Home tab (run 39549966417), while the same
+# commit passed in the nightly when centering worked. A slow ~150 pt lift puts
+# the first chip row between the pinned header (~240 pt) and the tab bar
+# (~770 pt) in both cases: ~785 -> ~635 when the ring stays low, ~518 -> ~368
+# when it is centred.
+- swipe:
+    start: "50%, 65%"
+    end: "50%, 48%"
+    duration: 1000
+- waitForAnimationToEnd:
+    timeout: 3000
 - scrollUntilVisible:
     element:
       id: "stats-house-grid"
