@@ -19,6 +19,8 @@ import sys
 
 
 class Handler(http.server.SimpleHTTPRequestHandler):
+    timeout = 10  # drop connections that never send a request
+
     def end_headers(self):
         self.send_header('Content-Disposition', 'attachment; filename="mezzanine-import.json"')
         super().end_headers()

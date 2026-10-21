@@ -202,8 +202,7 @@ jobs:
         if: ${{ env.SUITE == 'all' || env.SUITE == 'import' }}
         run: |
           nohup python3 scripts/e2e-fixture-server.py 8931 .maestro/fixtures > /tmp/fixture_server.log 2>&1 &
-          sleep 1
-          curl -sf http://localhost:8931/mezzanine-import.json > /dev/null
+          curl -sf --retry 10 --retry-connrefused --retry-delay 1 http://localhost:8931/mezzanine-import.json > /dev/null
 
       - name: Run Maestro tests
         run: |

@@ -58,9 +58,13 @@ appId: com.broadwayscorecard.app
     timeout: 10000
 - tapOn: "Downloads"
 # An unfinished Safari download shows as a greyed "<name>.download" cell that
-# cannot be opened (run 39645448024 stopped here at 0%). Fail on that directly.
+# cannot be opened (run 39645448024 stopped here at 0%). Wait for the cell to
+# render first so the notVisible check below cannot pass on an empty grid.
 - extendedWaitUntil:
-    notVisible: "mezzanine-import\\.json\\.download"
+    visible: ".*mezzanine-import.*"
+    timeout: 10000
+- extendedWaitUntil:
+    notVisible: ".*mezzanine-import\\.json\\.download.*"
     timeout: 30000
 # Fresh CI install → Downloads has exactly this one fixture file. The first
 # tap on a grid cell sometimes only highlights it instead of opening it
