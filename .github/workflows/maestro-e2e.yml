@@ -29,7 +29,10 @@ jobs:
   e2e:
     name: Maestro E2E (${{ inputs.suite || 'all' }})
     runs-on: macos-26
-    timeout-minutes: 120
+    # The full suite took 119 min on 2026-10-21 (run 39521528670: 47 min Release
+    # build on a cache miss + 54 min of flows), and run 39407445793 was cancelled
+    # at the old 120-min limit before reporting. Public repo: no minute cost.
+    timeout-minutes: 165
     # Each run sets a new dev-test password (see "Rotate dev-test password"),
     # so two overlapping runs would sign each other out. Run one at a time.
     concurrency:
