@@ -13,6 +13,11 @@ appId: com.broadwayscorecard.app
 # every run — invisibly, because the E2E suite was dispatch-only until
 # 2026-08-12 and nobody dispatched it. Caught by the first nightly run
 # (31571886484). stats-capture.yaml already targets /watched correctly.
+# Wait for the tab bar before the deep link: app/_layout.tsx renders nothing
+# until its startup checks finish, and a link that arrives earlier is dropped.
+- extendedWaitUntil:
+    visible: "Watched"
+    timeout: 60000
 - openLink: broadwayscorecard:///watched
 - tapOn:
     text: "Open"

@@ -31,6 +31,11 @@ appId: com.broadwayscorecard.app
 - waitForAnimationToEnd:
     timeout: 5000
 - launchApp
+# Wait for the tab bar before the deep link: app/_layout.tsx renders nothing
+# until its startup checks finish, and a link that arrives earlier is dropped.
+- extendedWaitUntil:
+    visible: "Watched"
+    timeout: 60000
 - openLink: broadwayscorecard:///import
 - tapOn:
     text: "Open"

@@ -234,3 +234,20 @@ test('a plain text selector is not shadowed by a longer accessibilityLabel on th
   }
   assert.deepEqual(shadowed, [], 'make the label equal the visible text, or select by id');
 });
+
+// app/_layout.tsx renders nothing until its startup checks finish, and a deep
+// link that arrives before the navigator mounts is dropped: the canary in run
+// 39534082258 opened its link straight after launchApp and landed on Home.
+// Every flow waits for the app (e.g. the tab bar) between the two.
+test('no flow opens an app deep link straight after launchApp', () => {
+  const racing = [];
+  for (const flow of allFlows) {
+    const steps = read(flow).split('\n').filter(l => /^- /.test(l));
+    steps.forEach((step, i) => {
+      if (/^- launchApp\s*$/.test(step) && /^- openLink:\s*broadwayscorecard:/.test(steps[i + 1] || '')) {
+        racing.push(flow.slice(REPO_ROOT.length));
+      }
+    });
+  }
+  assert.deepEqual(racing, [], 'add an extendedWaitUntil (e.g. visible: "Watched") between launchApp and openLink');
+});
