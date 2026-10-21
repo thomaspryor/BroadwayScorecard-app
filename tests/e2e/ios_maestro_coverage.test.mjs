@@ -165,3 +165,72 @@ test('maestro-e2e.yml can dispatch the show, rate, and settings suites independe
     );
   }
 });
+
+function sourceFiles(dir, found = []) {
+  let entries;
+  try { entries = readdirSync(dir, { withFileTypes: true }); } catch { return found; }
+  for (const entry of entries) {
+    if (['node_modules', '.git', 'ios', 'android', '.expo'].includes(entry.name)) continue;
+    const full = join(dir, entry.name);
+    if (entry.isDirectory()) sourceFiles(full, found);
+    else if (/\.(tsx?|jsx?|ya?ml)$/.test(entry.name)) found.push(full);
+  }
+  return found;
+}
+const appSource = ['app', 'components'].flatMap(d => sourceFiles(join(REPO_ROOT, d)))
+  .filter(f => !/\.ya?ml$/.test(f)).map(f => readFileSync(f, 'utf8')).join('\n');
+const allFlows = sourceFiles(join(REPO_ROOT, '.maestro')).filter(f => /\.ya?ml$/.test(f));
+
+// Every flow, not only the three above: the nightly lost diary-photo-feed and
+// stats-capture to selectors that had drifted from the screen (run 39521528670).
+test('id: selectors in every flow resolve to a testID in app source', () => {
+  const missing = [];
+  for (const flow of allFlows) {
+    for (const m of read(flow).matchAll(/^\s*id:\s*"([^"]+)"/gm)) {
+      const id = m[1].replace(/\\/g, '');
+      const literal = new RegExp(`testID=(?:["']|\\{[^}]*['"\`])${id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`);
+      // testID={`stats-scope-option-${s.id}`}: the id is only known at runtime,
+      // so accept a template whose literal prefix matches up to the last '-'.
+      const prefix = id.slice(0, id.lastIndexOf('-') + 1);
+      const templated = prefix.length > 0 && appSource.includes(`testID={\`${prefix}`);
+      if (!literal.test(appSource) && !templated && !appSource.includes(`'${id}'`)) {
+        missing.push(`${flow.slice(REPO_ROOT.length)}: id "${id}"`);
+      }
+    }
+  }
+  assert.deepEqual(missing, [], 'these flow ids match no testID in app/ or components/');
+});
+
+// Maestro full-matches a text selector against the accessibility label, and a
+// Pressable's accessibilityLabel replaces its visible text. A label that only
+// extends the visible word ("Save" shown, "Save rating" announced) makes every
+// `tapOn: "Save"` fail (rate-lifecycle, nightly run 39521528670). Voice Control
+// users also say the visible word, so the label should be exactly that word.
+test('a plain text selector is not shadowed by a longer accessibilityLabel on the button showing that text', () => {
+  // Per element: the label strings set on a Pressable and the text it renders,
+  // up to its closing tag. A label elsewhere in the app that happens to equal
+  // the word does not help the button the flow taps.
+  const buttons = [];
+  for (const m of appSource.matchAll(/<(Pressable|TouchableOpacity|TouchableHighlight)\b[\s\S]*?<\/\1>/g)) {
+    const el = m[0];
+    const attr = /accessibilityLabel=(\{[^}\n]*\}|"[^"]*"|'[^']*')/.exec(el);
+    if (!attr) continue;
+    const labels = [...attr[1].matchAll(/['"]([^'"`$]+)['"]/g)].map(x => x[1]);
+    buttons.push({ el, labels });
+  }
+  assert.ok(buttons.length > 20, `parsed only ${buttons.length} labelled buttons — the scan is broken`);
+  const shadowed = [];
+  for (const flow of allFlows) {
+    for (const m of read(flow).matchAll(/^\s*-?\s*(?:tapOn|assertVisible|text):\s*"([^"]+)"\s*$/gm)) {
+      const word = m[1];
+      if (/[.*+?^${}()|[\]\\]/.test(word)) continue;
+      const shows = new RegExp(`>\\s*${word}\\s*<`);
+      for (const b of buttons) {
+        if (!shows.test(b.el) || b.labels.includes(word)) continue;
+        const longer = b.labels.filter(l => l.startsWith(`${word} `));
+        if (longer.length) shadowed.push(`${flow.slice(REPO_ROOT.length)}: "${word}" is announced as ${JSON.stringify(longer)}`);
+      }
+    }
+  }
+  assert.deepEqual(shadowed, [], 'make the label equal the visible text, or select by id');
+});

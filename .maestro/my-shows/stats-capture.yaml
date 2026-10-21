@@ -74,9 +74,13 @@ appId: com.broadwayscorecard.app
 # out. stats-tab.yaml runs the identical DOWN search and passes because it
 # starts from the top, which is what proves the element itself renders fine.
 # Caught by the first nightly run (31571886484).
+# Anchor on the first tile INSIDE the ScrollView: the scope pill is pinned
+# above it (StatsScreen.tsx) and always visible, so scrolling UP to the pill
+# finished at once without moving and the DOWN search started from the
+# bottom (nightly run 39521528670).
 - scrollUntilVisible:
     element:
-      id: "stats-scope-pill"
+      id: "stats-tile-shows"
     direction: UP
     visibilityPercentage: 20
     timeout: 30000
@@ -132,7 +136,7 @@ appId: com.broadwayscorecard.app
     timeout: 5000
 - takeScreenshot: "17-watched-grid"
 - tapOn:
-    id: "diary-feed-view-toggle"
+    id: "diary-list-view-toggle"
     optional: true
 - waitForAnimationToEnd:
     timeout: 5000

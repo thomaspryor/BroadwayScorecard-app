@@ -491,7 +491,7 @@ export default function RateModal() {
             hitSlop={12}
             style={styles.headerButton}
             accessibilityRole="button"
-            accessibilityLabel={saving ? 'Saving' : 'Save rating'}
+            accessibilityLabel={saving ? 'Saving' : 'Save'}
             accessibilityState={{ disabled: !canSave, busy: saving }}
           >
             {saving ? (

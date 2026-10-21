@@ -24,9 +24,16 @@ appId: com.broadwayscorecard.app
 # The pill renders as "🔒 Only you" and assertVisible needs a full regex match
 # (README gotcha), so the bare text never matched: this flow failed every night.
 - assertVisible: ".*Only you"
-- assertVisible: "Timeline"
-- assertVisible: "Photo wall"
-
-- tapOn: "Photo wall"
+# The toggles' accessibility labels are "Timeline view" / "Photo wall view"
+# (FeedModeToggle.tsx), so a full match on the visible word never matched.
+# Select them by id and check the selected state instead.
+- assertVisible:
+    id: "photo-feed-timeline-toggle"
+    selected: true
+- tapOn:
+    id: "photo-feed-wall-toggle"
 - assertVisible:
     id: "photo-feed-wall-toggle"
+    selected: true
+# Month headers ("OCTOBER 2026") exist only in the timeline: proves the view swapped.
+- assertNotVisible: "(JANUARY|FEBRUARY|MARCH|APRIL|MAY|JUNE|JULY|AUGUST|SEPTEMBER|OCTOBER|NOVEMBER|DECEMBER) \\d{4}"
