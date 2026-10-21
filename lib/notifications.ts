@@ -14,6 +14,7 @@ import { router } from 'expo-router';
 import { captureException } from './sentry';
 import { shouldSoftAsk, SOFT_ASK_MESSAGE, SOFT_ASK_TITLE } from './notification-ask';
 import { reviewPromptRequestedWithin } from './store-review';
+import { trackEvent } from './analytics';
 
 const PUSH_TOKEN_KEY = '@bsc:pushToken';
 const PERMISSION_ASKED_KEY = '@bsc:notificationPermissionAsked';
@@ -124,9 +125,19 @@ export async function maybeAskForNotifications(): Promise<void> {
     // Never stack the two; the flag stays unset, so the next action asks.
     if (reviewPromptRequestedWithin(60_000)) return;
     await AsyncStorage.setItem(SOFT_ASK_KEY, 'true');
+    // Opt-in rate, so the timing and copy can be judged (no personal data).
+    trackEvent('notification_soft_ask', { step: 'shown' });
     Alert.alert(SOFT_ASK_TITLE, SOFT_ASK_MESSAGE, [
-      { text: 'Not now', style: 'cancel' },
-      { text: 'Turn on', onPress: () => { registerForPushNotifications().catch(() => {}); } },
+      { text: 'Not now', style: 'cancel', onPress: () => trackEvent('notification_soft_ask', { step: 'not_now' }) },
+      {
+        text: 'Turn on',
+        onPress: () => {
+          trackEvent('notification_soft_ask', { step: 'turn_on' });
+          registerForPushNotifications()
+            .then(token => trackEvent('notification_soft_ask', { step: token ? 'ios_allowed' : 'ios_declined' }))
+            .catch(() => {});
+        },
+      },
     ]);
   } catch (e) {
     if (__DEV__) console.warn('[Notifications] Soft ask failed:', e);

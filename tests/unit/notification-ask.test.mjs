@@ -34,7 +34,8 @@ test('the soft ask shows the iOS dialog only after "Turn on"', () => {
   const lib = read('lib/notifications.ts');
   const fn = lib.slice(lib.indexOf('export async function maybeAskForNotifications'), lib.indexOf('export async function syncPushTokenIfPermitted'));
   assert.match(fn, /shouldSoftAsk\(/);
-  assert.match(fn, /text: 'Turn on', onPress: \(\) => \{ registerForPushNotifications\(\)\.catch/);
+  assert.match(fn, /text: 'Turn on',[\s\S]*?registerForPushNotifications\(\)[\s\S]*?\.catch\(/);
+  for (const step of ['shown', 'not_now', 'turn_on', 'ios_allowed', 'ios_declined']) assert.ok(fn.includes(`'${step}'`), `analytics step ${step}`);
   assert.match(fn, /if \(reviewPromptRequestedWithin\(60_000\)\) return;\s*await AsyncStorage\.setItem\(SOFT_ASK_KEY/, 'skip without spending the one ask when the App Store prompt just showed');
   assert.doesNotMatch(fn, /requestPermissionsAsync/);
 });
@@ -48,4 +49,12 @@ test('the Settings row is the way back after "Not now"', () => {
   assert.match(settings, /notificationSettingsRow\(notificationStatus\)/);
   assert.match(settings, /label="Notifications"/);
   assert.match(settings, /AppState\.addEventListener\('change'/, 're-read after returning from iOS Settings');
+});
+
+test('adding from search on To Watch leaves the question to the date prompt that follows', () => {
+  const toWatch = read('app/(tabs)/to-watch.tsx');
+  assert.match(toWatch, /addToWatchlist\(selection\.id, \{ askForNotifications: false \}\)/);
+  const watchlist = read('hooks/useWatchlist.ts');
+  const add = watchlist.slice(watchlist.indexOf('const addToWatchlist'), watchlist.indexOf('const removeFromWatchlist'));
+  assert.equal((add.match(/if \(askForNotifications\) void maybeAskForNotifications\(\);/g) || []).length, 3);
 });

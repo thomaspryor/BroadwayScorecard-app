@@ -684,7 +684,8 @@ export default function ToWatchScreen() {
           setShowSearchModal(false);
           haptics.action();
           try {
-            await addToWatchlist(selection.id);
+            // The date prompt opens next; setting a date asks about notifications.
+            await addToWatchlist(selection.id, { askForNotifications: false });
             await getWatchlist();
             // Web parity: prompt "when are you going?" right after adding
             // instead of hiding the planned date behind a long-press.

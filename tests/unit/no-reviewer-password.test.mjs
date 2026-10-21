@@ -22,18 +22,22 @@ test('the seed script has no default reviewer password', () => {
   assert.doesNotMatch(src, /REVIEWER_PASSWORD\s*(\|\||\?\?)\s*['"`]/, 'no fallback literal');
 });
 
-test('no tracked file states a password next to the reviewer account', () => {
+test('no tracked file states a password (any account)', () => {
+  // Widened from the reviewer account alone: a second test or demo account
+  // written into this public repo would be the same leak.
   const leaks = [];
   for (const f of tracked) {
-    const lines = read(f).split('\n');
-    lines.forEach((line, i) => {
-      if (!/reviewer@broadwayscorecard\.com/i.test(lines.slice(Math.max(0, i - 3), i + 4).join('\n'))) return;
-      const m = /password\W{0,3}[:=]\s*[`'"]?([^\s`'"(]{6,})/i.exec(line);
-      // Reading it from the environment is the point, not a leak.
-      if (m && !/^(process\.env\b|\$\{)/.test(m[1])) leaks.push(`${f}:${i + 1}: ${m[0]}`);
+    read(f).split('\n').forEach((line, i) => {
+      const m = /password\W{0,3}[:=]\s*([`'"]?)([^\s`'"(,;<]{6,})\1/i.exec(line); // <placeholder> is not a value
+      if (!m) return;
+      const value = m[2];
+      // Environment reads, constants and variables are the point, not a leak.
+      if (/^(process\.env\b|\$\{|[A-Z][A-Z0-9_]+$|[a-z][A-Za-z0-9_.]*$)/.test(value) && !m[1]) return;
+      if (m[1] === '' && /\.(m?[jt]sx?)$/.test(f)) return; // unquoted in code = an identifier or type
+      leaks.push(`${f}:${i + 1}: ${m[0]}`);
     });
   }
-  assert.deepEqual(leaks, [], 'keep the reviewer password in App Store Connect only');
+  assert.deepEqual(leaks, [], 'keep passwords in App Store Connect or GitHub secrets, never in the repo');
 });
 
 test('the rotated password is gone everywhere', () => {

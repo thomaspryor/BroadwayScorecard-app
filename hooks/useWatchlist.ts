@@ -129,7 +129,10 @@ export function useWatchlist(userId: string | null) {
   );
 
   const addToWatchlist = useCallback(
-    async (showId: string): Promise<void> => {
+    // askForNotifications=false when the caller opens the planned-date prompt
+    // right away: the date being set asks instead (updatePlannedDate), so the
+    // question doesn't land on top of the date sheet.
+    async (showId: string, { askForNotifications = true }: { askForNotifications?: boolean } = {}): Promise<void> => {
       const client = getSupabaseClient();
       if (!client || !userId) return;
 
@@ -154,7 +157,7 @@ export function useWatchlist(userId: string | null) {
         });
         mutationVersion.current++;
         broadcastWatchlist([optimistic, ...sharedWatchlist]);
-        void maybeAskForNotifications();
+        if (askForNotifications) void maybeAskForNotifications();
         return;
       }
       try {
@@ -164,7 +167,7 @@ export function useWatchlist(userId: string | null) {
         mutationVersion.current++;
         broadcastWatchlist([optimistic, ...sharedWatchlist]);
         await AsyncStorage.removeItem(CACHE_KEY(userId)).catch(() => {});
-        void maybeAskForNotifications();
+        if (askForNotifications) void maybeAskForNotifications();
       } catch (e) {
         if (await isNetworkError(e)) {
           await enqueue({
@@ -175,7 +178,7 @@ export function useWatchlist(userId: string | null) {
           });
           mutationVersion.current++;
           broadcastWatchlist([optimistic, ...sharedWatchlist]);
-          void maybeAskForNotifications();
+          if (askForNotifications) void maybeAskForNotifications();
           return;
         }
         const msg = e instanceof Error ? e.message : 'Failed to add to watchlist';
