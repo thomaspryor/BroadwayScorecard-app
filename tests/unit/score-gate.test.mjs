@@ -136,13 +136,23 @@ test('contract: gate matches the website min-reviews.js on a grid of inputs', { 
   assert.equal(T3_ONLY_EXTRA, web.T3_ONLY_EXTRA);
 });
 
-test('contract: Critical Gold thresholds match the website score-buckets.ts', { skip: SKIP_NO_WEB }, () => {
-  const src = readWeb('src/config/score-buckets.ts');
-  assert.ok(src, 'score-buckets.ts present');
-  const block = /MARKET_GOLD_THRESHOLD[^=]*=\s*\{([^}]*)\}/.exec(src)?.[1] ?? '';
-  const entries = [...block.matchAll(/'([^']+)':\s*(\d+)/g)].map(m => [m[1], Number(m[2])]);
-  assert.ok(entries.length >= 1, 'parsed the web thresholds');
-  for (const [cat, n] of entries) assert.equal(getGoldThreshold(cat), n, cat);
-  const def = Number(/DEFAULT_GOLD_THRESHOLD\s*=\s*(\d+)/.exec(src)?.[1]);
+test('contract: Critical Gold thresholds match the website', { skip: SKIP_NO_WEB }, () => {
+  // The website keeps its tier ladder in scripts/lib/score-tiers.js (pure
+  // CommonJS); score-buckets.ts only re-exports it. Older website checkouts
+  // still spell the map out in score-buckets.ts.
+  let thresholds, def;
+  if (readWeb('scripts/lib/score-tiers.js')) {
+    const web = createRequire(import.meta.url)(webPath('scripts/lib/score-tiers.js'));
+    thresholds = Object.entries(web.MARKET_GOLD_THRESHOLD);
+    def = web.DEFAULT_GOLD_THRESHOLD;
+  } else {
+    const src = readWeb('src/config/score-buckets.ts');
+    assert.ok(src, 'score-buckets.ts present');
+    const block = /MARKET_GOLD_THRESHOLD[^=]*=\s*\{([^}]*)\}/.exec(src)?.[1] ?? '';
+    thresholds = [...block.matchAll(/'([^']+)':\s*(\d+)/g)].map(m => [m[1], Number(m[2])]);
+    def = Number(/DEFAULT_GOLD_THRESHOLD\s*=\s*(\d+)/.exec(src)?.[1]);
+  }
+  assert.ok(thresholds.length >= 1, 'read the web thresholds');
+  for (const [cat, n] of thresholds) assert.equal(getGoldThreshold(cat), n, cat);
   assert.equal(getGoldThreshold('broadway'), def);
 });
