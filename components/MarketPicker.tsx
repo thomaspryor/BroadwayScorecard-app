@@ -10,7 +10,7 @@ import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
 import type { Market } from '@/lib/market-filter';
 
 export type { Market } from '@/lib/market-filter';
-export { filterByMarket, marketForCategory, outOfMarketCity, filterByMarketCategory } from '@/lib/market-filter';
+export { filterByMarket, marketForCategory, outOfMarketCity, filterByMarketCategory, filterBrowseShow } from '@/lib/market-filter';
 
 interface MarketPickerProps {
   market: Market;

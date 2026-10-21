@@ -34,3 +34,14 @@ test('filterByMarket still includes off-broadway for nyc', () => {
   assert.equal(filterByMarket('off-broadway', 'nyc'), true);
   assert.equal(filterByMarket('west-end', 'nyc'), false);
 });
+
+test('filterBrowseShow: NYC Off-Broadway view leaves opera out, other views keep the old rules', async () => {
+  const { filterBrowseShow } = await import('../../lib/market-filter.ts');
+  const opera = { category: 'off-broadway', type: 'opera' };
+  const play = { category: 'off-broadway', type: 'play' };
+  assert.equal(filterBrowseShow(opera, 'nyc', true), false);
+  assert.equal(filterBrowseShow(play, 'nyc', true), true);
+  assert.equal(filterBrowseShow(opera, 'nyc', false), false); // Broadway view never listed it
+  assert.equal(filterBrowseShow({ category: 'broadway', type: 'musical' }, 'nyc', false), true);
+  assert.equal(filterBrowseShow({ category: 'west-end', type: 'play' }, 'london', true), true);
+});

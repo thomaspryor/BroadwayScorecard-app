@@ -47,3 +47,12 @@ export function filterByMarketCategory(category: string, market: Market, include
   }
   return includeOB ? category === 'west-end' || category === 'off-west-end' : category === 'west-end';
 }
+
+/** Browse tab membership: the market/OB filter, minus opera in the NYC Off-Broadway
+ * view. Met productions are filed under off-broadway for routing, but the website
+ * gives opera its own section and their tiny critic pool would otherwise top the
+ * Score sort. Search still reaches them. */
+export function filterBrowseShow(show: { category: string; type?: string }, market: Market, includeOB: boolean): boolean {
+  if (!filterByMarketCategory(show.category, market, includeOB)) return false;
+  return !(market === 'nyc' && includeOB && show.type === 'opera');
+}

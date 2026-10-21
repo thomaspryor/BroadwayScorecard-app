@@ -15,7 +15,7 @@ import { useShows } from '@/lib/data-context';
 import { useMarket } from '@/lib/market-context';
 import { ShowCard } from '@/components/ShowCard';
 import { AnimatedListItem } from '@/components/AnimatedListItem';
-import { MarketPicker, Market, filterByMarketCategory } from '@/components/MarketPicker';
+import { MarketPicker, Market, filterBrowseShow } from '@/components/MarketPicker';
 import { ScoreToggle, ScoreMode } from '@/components/ScoreToggle';
 import { Show } from '@/lib/types';
 import { getQualifiedScore } from '@/lib/score-utils';
@@ -132,7 +132,7 @@ export default function BrowseScreen() {
   }, [fuse, searchQuery]);
 
   const filteredShows = useMemo(() => {
-    let result = shows.filter(s => filterByMarketCategory(s.category, market, includeOB));
+    let result = shows.filter(s => filterBrowseShow(s, market, includeOB));
 
     if (statusFilter !== 'all') {
       result = result.filter(s => s.status === statusFilter);
@@ -183,7 +183,7 @@ export default function BrowseScreen() {
   }, []);
 
   const totalForMarket = useMemo(
-    () => shows.filter(s => filterByMarketCategory(s.category, market, includeOB)).length,
+    () => shows.filter(s => filterBrowseShow(s, market, includeOB)).length,
     [shows, market, includeOB]
   );
 
