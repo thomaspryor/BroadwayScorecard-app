@@ -211,6 +211,37 @@ long-standing rather than new. It drives a real Safari download through the iOS
 document picker and the README documents how fragile that is; guessing at a fix
 without a simulator in front of me would be a coin flip.
 
+## Resolved 2026-10-21: the nightly's standing failures (BRO-2496, BRO-5802)
+
+The nightly had been red since August on mezzanine-import, diary-photo-feed and
+stats-capture. Diagnosed from each failing run's screenshots and
+screen-hierarchy dumps (the `maestro-test-results` artifact, uploaded on
+failure only). Full suite green in scheduled run 39585191221.
+
+- **diary-photo-feed:** the toggles' accessibility labels are "Timeline view" /
+  "Photo wall view" (`FeedModeToggle.tsx`), and Maestro full-matches text
+  against the label, so "Timeline" never matched. Now selected by id with
+  `selected: true`.
+- **stats-capture:** the scope pill is pinned outside the ScrollView, so
+  "scroll UP to the pill" never moved and the DOWN search for the house grid
+  started below it. Anchoring on the hero tiles failed too (they end up clipped
+  under the pinned header). It now scrolls UP to `stats-theater-ring`, then a
+  slow ~150 pt swipe lifts the grid above the floating tab bar: Maestro does
+  not treat an element covered by the tab bar as hidden, and a chip tap there
+  hit the Home tab (run 39549966417).
+- **mezzanine-import:** the out-of-process document picker took >10 s to show
+  its tab bar on the CI simulator. Wait 30 s.
+- **Launch/deep-link race (canary, run 39534082258):** `app/_layout.tsx`
+  renders nothing until its startup checks finish, and a link that arrives
+  earlier is dropped. All flows wait for the "Watched" tab between `launchApp`
+  and `openLink` (app-side fix: BRO-5813).
+- **Timeout:** the full suite took 119 min (47 min Release build on a cache
+  miss); run 39407445793 was cancelled at the old 120-min limit. Now 165.
+- Guards in `tests/e2e/ios_maestro_coverage.test.mjs` (runs in `npm test`):
+  every flow's `id:` resolves to a testID; a text tap fails if the button
+  showing that text announces a longer label (the "Save" / "Save rating"
+  regression); `openLink` straight after `launchApp` fails.
+
 ## Screen coverage map (audited 2026-08-12)
 
 Which screens an E2E flow actually opens, from `grep -rh openLink .maestro`:
