@@ -8,19 +8,26 @@
  * isn't registered in the dev client).
  */
 
-import { Platform } from 'react-native';
+import { Alert, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import { captureException } from './sentry';
+import { shouldSoftAsk, SOFT_ASK_MESSAGE, SOFT_ASK_TITLE } from './notification-ask';
+import { reviewPromptRequestedWithin } from './store-review';
 
 const PUSH_TOKEN_KEY = '@bsc:pushToken';
 const PERMISSION_ASKED_KEY = '@bsc:notificationPermissionAsked';
+/** Set once the in-context soft ask has been shown (lib/notification-ask.ts). */
+const SOFT_ASK_KEY = '@bsc:notificationSoftAsked';
+/** Let the rate sheet finish closing so the question doesn't land mid-animation. */
+const SOFT_ASK_DELAY_MS = 800;
+let softAskInFlight = false;
 const EAS_PROJECT_ID = '8948052e-aa32-4767-9eeb-9f33288f8e6d';
 /** Sign-out waits at most this long for the push-token unlink. */
 const UNLINK_TIMEOUT_MS = 4000;
 /** `${token}|${userId}` of the last successful server write this process made.
- *  Launch runs both registerForPushNotifications() and the sign-in sync, which
- *  would otherwise write the identical row twice. */
+ *  Launch (syncPushTokenIfPermitted) and the sign-in sync would otherwise
+ *  write the identical row twice. */
 let lastSavedLink: string | null = null;
 
 type NotificationsModule = typeof import('expo-notifications');
@@ -44,6 +51,8 @@ try {
 /**
  * Request notification permission and register for push notifications.
  * Returns the Expo push token, or null if permission denied or unavailable.
+ * Shows the iOS dialog when undetermined, so only maybeAskForNotifications()
+ * (after the person said yes to the soft ask) and Settings call it.
  */
 export async function registerForPushNotifications(): Promise<string | null> {
   if (!Notifications || !Device) return null;
@@ -94,11 +103,54 @@ export async function registerForPushNotifications(): Promise<string | null> {
 }
 
 /**
+ * After a first rating or watchlist add: ask once, in plain words, whether the
+ * person wants reminders, and only on "Turn on" show the iOS dialog. Does
+ * nothing on a simulator, once asked, or when iOS already has an answer.
+ */
+export async function maybeAskForNotifications(): Promise<void> {
+  // Two quick bookmark taps would both pass the check during the wait below.
+  if (!Notifications || !Device || softAskInFlight) return;
+  softAskInFlight = true;
+  try {
+    const [{ status }, asked] = await Promise.all([
+      Notifications.getPermissionsAsync(),
+      AsyncStorage.getItem(SOFT_ASK_KEY),
+    ]);
+    if (!shouldSoftAsk({ status, alreadyAsked: asked === 'true', isDevice: !!Device.isDevice })) return;
+    // After a rating save the sheet is still closing; let it finish so the
+    // question reads as a follow-up rather than part of the save.
+    await new Promise(resolve => setTimeout(resolve, SOFT_ASK_DELAY_MS));
+    // A rating can also bring up Apple's App Store prompt (lib/store-review.ts).
+    // Never stack the two; the flag stays unset, so the next action asks.
+    if (reviewPromptRequestedWithin(60_000)) return;
+    await AsyncStorage.setItem(SOFT_ASK_KEY, 'true');
+    Alert.alert(SOFT_ASK_TITLE, SOFT_ASK_MESSAGE, [
+      { text: 'Not now', style: 'cancel' },
+      { text: 'Turn on', onPress: () => { registerForPushNotifications().catch(() => {}); } },
+    ]);
+  } catch (e) {
+    if (__DEV__) console.warn('[Notifications] Soft ask failed:', e);
+  } finally {
+    softAskInFlight = false;
+  }
+}
+
+/** iOS permission status for the Settings row; 'unavailable' on a simulator or without the module. */
+export async function getNotificationPermissionStatus(): Promise<string> {
+  if (!Notifications || !Device?.isDevice) return 'unavailable';
+  try {
+    return (await Notifications.getPermissionsAsync()).status;
+  } catch {
+    return 'unavailable';
+  }
+}
+
+/**
  * Link this device's push token to whoever is signed in NOW, without ever
  * showing the permission prompt (does nothing unless permission is already
- * granted). Called on sign-in: registerForPushNotifications() runs once per
- * launch, so a mid-session sign-in left the device anonymous (or still
- * unlinked by a sign-out) until the next cold start.
+ * granted). Called at launch and on sign-in, so a mid-session sign-in does
+ * not leave the device anonymous (or still unlinked by a sign-out) until the
+ * next cold start.
  */
 export async function syncPushTokenIfPermitted(): Promise<void> {
   if (!Notifications || !Device?.isDevice) return;

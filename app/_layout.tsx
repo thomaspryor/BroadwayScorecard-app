@@ -21,7 +21,7 @@ import Toast from '@/components/Toast';
 import { featureFlags, loadFeatureFlagOverrides } from '@/lib/feature-flags';
 import { setPostHogInstance } from '@/lib/analytics';
 import { Colors } from '@/constants/theme';
-import { registerForPushNotifications, setupNotificationHandler, configureNotificationChannels } from '@/lib/notifications';
+import { syncPushTokenIfPermitted, setupNotificationHandler, configureNotificationChannels } from '@/lib/notifications';
 import { initSentry, wrapWithSentry } from '@/lib/sentry';
 import { hydrateDiaryTitles } from '@/lib/diary-titles';
 import { startAutoFlush, flushQueue } from '@/lib/offline-queue';
@@ -173,12 +173,13 @@ function RootLayout() {
     return () => clearTimeout(splashBackstop);
   }, []);
 
-  // Register push notifications + set up tap handler
-  // Runs once; actual permission prompt only fires after onboarding is dismissed
+  // Re-link the push token when permission was already granted, and set up
+  // the tap handler. Never prompts: the permission question comes after a
+  // first rating or watchlist add (maybeAskForNotifications, BRO-5852).
   useEffect(() => {
     if (showOnboarding !== false) return; // Wait until onboarding is done
     configureNotificationChannels();
-    registerForPushNotifications();
+    void syncPushTokenIfPermitted();
     const cleanup = setupNotificationHandler();
 
     // Planned-date reminders are rescheduled by <ReminderRescheduler />, which

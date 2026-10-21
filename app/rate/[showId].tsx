@@ -52,6 +52,7 @@ import { enqueuePhotoUpload, flushPhotoQueue } from '@/lib/photo-upload-queue';
 import type { ProcessedPhoto } from '@/lib/photo-image-pipeline';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
 import { getProductionMarketLabel } from '@/lib/production-labels';
+import { maybeAskForNotifications } from '@/lib/notifications';
 
 const MAX_CHARS = 2000;
 
@@ -375,6 +376,7 @@ export default function RateModal() {
       await performSave(currentRating, reviewText, dateSeen);
       closeWithoutPrompt();
       showToast(reviewId ? 'Rating updated' : 'Rating saved', 'success', '/(tabs)/watched');
+      void maybeAskForNotifications();
     } catch (e) {
       const detail = e instanceof Error ? e.message : 'Unknown error';
       haptics.error();
@@ -402,6 +404,7 @@ export default function RateModal() {
         await performSave(pending.rating ?? currentRating ?? 0, pending.reviewText ?? reviewText, pending.dateSeen ?? dateSeen);
         closeWithoutPrompt();
         showToast(reviewId ? 'Rating updated' : 'Rating saved', 'success', '/(tabs)/watched');
+        void maybeAskForNotifications();
       } catch (e) {
         const detail = e instanceof Error ? e.message : 'Unknown error';
         setSaveError(friendlySaveError(detail, await isOnline()));

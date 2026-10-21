@@ -90,6 +90,13 @@ export async function recordRatingGiven() {
   }
 }
 
+let lastReviewRequestAt = 0;
+
+/** Apple's rating prompt went up in the last `ms`: don't stack another alert on it. */
+export function reviewPromptRequestedWithin(ms: number, now: number = Date.now()): boolean {
+  return lastReviewRequestAt > 0 && now - lastReviewRequestAt < ms;
+}
+
 async function requestReview() {
   if (!StoreReview) return;
 
@@ -97,6 +104,7 @@ async function requestReview() {
   if (!isAvailable) return;
 
   await StoreReview.requestReview();
+  lastReviewRequestAt = Date.now();
   await AsyncStorage.setItem(KEYS.lastPrompt, new Date().toISOString());
 
   if (__DEV__) console.log('[StoreReview] Review prompt requested');

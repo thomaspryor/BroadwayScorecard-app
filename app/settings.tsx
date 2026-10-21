@@ -3,8 +3,8 @@
  * When signed in: profile card + sign-out (gated by feature flag).
  */
 
-import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView, Alert } from 'react-native';
+import React, { useState, useCallback, useEffect } from 'react';
+import { View, Text, StyleSheet, Pressable, ScrollView, Alert, AppState, Linking } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
@@ -23,6 +23,8 @@ import * as haptics from '@/lib/haptics';
 import { exportAndDeleteAllPhotos } from '@/lib/photo-export';
 import { cacheKeysToClear } from '@/lib/cache-keys';
 import { formatVersionLabel } from '@/lib/app-version';
+import { getNotificationPermissionStatus, registerForPushNotifications } from '@/lib/notifications';
+import { notificationSettingsRow } from '@/lib/notification-ask';
 
 const WEB = 'https://broadwayscorecard.com';
 
@@ -76,6 +78,26 @@ export default function SettingsScreen() {
   const { user, profile, isAuthenticated, signOut, deleteAccount, showSignIn } = auth;
   const [deletingAccount, setDeletingAccount] = useState(false);
   const [exportingPhotos, setExportingPhotos] = useState(false);
+  // iOS can change the answer in its own Settings app, so re-read on return.
+  const [notificationStatus, setNotificationStatus] = useState('unavailable');
+  const refreshNotificationStatus = useCallback(() => {
+    getNotificationPermissionStatus().then(setNotificationStatus).catch(() => {});
+  }, []);
+  useEffect(() => {
+    refreshNotificationStatus();
+    const sub = AppState.addEventListener('change', state => { if (state === 'active') refreshNotificationStatus(); });
+    return () => sub.remove();
+  }, [refreshNotificationStatus]);
+  const notificationRow = notificationSettingsRow(notificationStatus);
+  const handleNotifications = useCallback(async () => {
+    haptics.tap();
+    if (notificationRow.action === 'request') {
+      await registerForPushNotifications().catch(() => null);
+      refreshNotificationStatus();
+    } else if (notificationRow.action === 'open-settings') {
+      Linking.openSettings().catch(() => {});
+    }
+  }, [notificationRow.action, refreshNotificationStatus]);
   const { showToast } = useToastSafe();
 
   const handleRefresh = async () => {
@@ -283,6 +305,15 @@ export default function SettingsScreen() {
           )}
         </View>
       )}
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>NOTIFICATIONS</Text>
+        <SettingsRow
+          label="Notifications"
+          value={notificationRow.value}
+          onPress={notificationRow.action ? handleNotifications : undefined}
+        />
+      </View>
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>DATA</Text>

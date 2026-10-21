@@ -15,6 +15,7 @@ import type { WatchlistEntry } from '@/lib/user-types';
 import { trackEvent } from '@/lib/analytics';
 import { useShows } from '@/lib/data-context';
 import { resolveShowTitle } from '@/lib/rate-reminders';
+import { maybeAskForNotifications } from '@/lib/notifications';
 
 const CACHE_KEY = (userId: string) => `@bsc:watchlist:${userId}`;
 
@@ -153,6 +154,7 @@ export function useWatchlist(userId: string | null) {
         });
         mutationVersion.current++;
         broadcastWatchlist([optimistic, ...sharedWatchlist]);
+        void maybeAskForNotifications();
         return;
       }
       try {
@@ -162,6 +164,7 @@ export function useWatchlist(userId: string | null) {
         mutationVersion.current++;
         broadcastWatchlist([optimistic, ...sharedWatchlist]);
         await AsyncStorage.removeItem(CACHE_KEY(userId)).catch(() => {});
+        void maybeAskForNotifications();
       } catch (e) {
         if (await isNetworkError(e)) {
           await enqueue({
@@ -172,6 +175,7 @@ export function useWatchlist(userId: string | null) {
           });
           mutationVersion.current++;
           broadcastWatchlist([optimistic, ...sharedWatchlist]);
+          void maybeAskForNotifications();
           return;
         }
         const msg = e instanceof Error ? e.message : 'Failed to add to watchlist';
@@ -241,6 +245,9 @@ export function useWatchlist(userId: string | null) {
       const title = resolveShowTitle(showId, shows, showTitle);
 
       setError(null);
+      // A planned date is what the night-of check-in needs; imported or
+      // migrated shows never went through addToWatchlist, so ask here too.
+      if (plannedDate) void maybeAskForNotifications();
       // Offline fast-path — mirror addToWatchlist
       if (!(await isOnline())) {
         await enqueue({

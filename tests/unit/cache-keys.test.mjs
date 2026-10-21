@@ -19,6 +19,7 @@ const MUST_SURVIVE = [
   '@broadwayScorecard:onboardingSeen',
   '@bsc:pushToken',
   '@bsc:notificationPermissionAsked',
+  '@bsc:notificationSoftAsked', // the once-only notification question (BRO-5852)
   'diary-show-meta-v2', // imported diary titles (lib/diary-titles.ts)
   'diary-show-titles-v1',
   '@bsc:feature-override',

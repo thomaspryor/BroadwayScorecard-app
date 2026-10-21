@@ -35,22 +35,26 @@ test('splash is held at module scope and hidden by the layout, with a backstop',
   assert.ok((layout.match(/SplashScreen\.hide\(\)/g) || []).length >= 2, 'ready hide + backstop timer');
 });
 
-test('push permission is only requested after onboarding', () => {
+test('launch never shows the notification prompt; it only re-links a granted token after onboarding', () => {
+  // BRO-5852 (owner decision 2026-10-21): the iOS dialog comes after a first
+  // rating or watchlist add, through maybeAskForNotifications(), or from the
+  // Settings row the person taps. Nothing else may call
+  // registerForPushNotifications().
   const callers = [];
   const walk = dir => {
     for (const name of readdirSync(join(root, dir))) {
       const rel = join(dir, name);
       if (statSync(join(root, rel)).isDirectory()) walk(rel);
       else if (/\.(ts|tsx)$/.test(name) && rel !== join('lib', 'notifications.ts')) {
-        if (/registerForPushNotifications\s*\(/.test(stripComments(read(rel)))) callers.push(rel);
+        if (/registerForPushNotifications\s*\(|requestPermissionsAsync\s*\(\s*\)/.test(stripComments(read(rel)))) callers.push(rel);
       }
     }
   };
   for (const dir of ['app', 'components', 'hooks', 'lib']) walk(dir);
-  assert.deepEqual(callers, [join('app', '_layout.tsx')]);
-  const call = layout.indexOf('registerForPushNotifications()');
+  assert.deepEqual(callers, [join('app', 'settings.tsx')]);
+  const call = layout.indexOf('syncPushTokenIfPermitted()');
   const gate = layout.lastIndexOf('if (showOnboarding !== false) return;', call);
-  assert.ok(gate > 0 && call - gate < 200, 'the call must sit right behind the onboarding gate');
+  assert.ok(gate > 0 && call - gate < 200, 'the re-link sits right behind the onboarding gate');
 });
 
 test('Sentry gets render crashes and the user id only', () => {
