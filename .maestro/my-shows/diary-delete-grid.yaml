@@ -15,4 +15,6 @@ appId: com.broadwayscorecard.app
     optional: true
 
 # Diary visible
-- assertVisible: "Diary"
+- extendedWaitUntil:
+    visible: "Diary"
+    timeout: 60000

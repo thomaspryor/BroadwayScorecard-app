@@ -16,6 +16,9 @@ appId: com.broadwayscorecard.app
     optional: true
 
 # Tap 4 stars to open panel
+- extendedWaitUntil:
+    visible: "4 stars"
+    timeout: 60000
 - tapOn: "4 stars"
 - assertVisible: "Save"
 

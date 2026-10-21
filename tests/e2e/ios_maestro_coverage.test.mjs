@@ -251,3 +251,28 @@ test('no flow opens an app deep link straight after launchApp', () => {
   }
   assert.deepEqual(racing, [], 'add an extendedWaitUntil (e.g. visible: "Watched") between launchApp and openLink');
 });
+
+// The CI simulator can take ~30 s to hand a deep link to the app after the
+// "Open in Broadway Scorecard?" prompt (run 39684513791: lsd sent the open 29 s
+// after the tap, 4 s after assertVisible gave up). The first check after every
+// app deep link is an extendedWaitUntil with a long timeout, not the short
+// default wait of assertVisible or tapOn.
+test('every app deep link is followed by a long wait for its screen', () => {
+  const hasty = [];
+  for (const flow of allFlows) {
+    const blocks = [];
+    for (const line of read(flow).split('\n')) {
+      if (/^- /.test(line)) blocks.push(line);
+      else if (/^\s+\S/.test(line) && blocks.length) blocks[blocks.length - 1] += `\n${line}`;
+    }
+    blocks.forEach((block, i) => {
+      if (!/^- openLink:\s*broadwayscorecard:/.test(block)) return;
+      let j = i + 1;
+      if (/^- tapOn:/.test(blocks[j] || '') && /text:\s*"Open"/.test(blocks[j])) j++;
+      if (!/^- extendedWaitUntil:/.test(blocks[j] || '') || !/timeout:\s*([3-9]\d{4}|\d{6,})/.test(blocks[j])) {
+        hasty.push(`${flow.slice(REPO_ROOT.length)}: ${(blocks[j] || '(end)').split('\n')[0]}`);
+      }
+    });
+  }
+  assert.deepEqual(hasty, [], 'after openLink (and the optional "Open" tap), wait with extendedWaitUntil (timeout >= 30000) for the screen');
+});

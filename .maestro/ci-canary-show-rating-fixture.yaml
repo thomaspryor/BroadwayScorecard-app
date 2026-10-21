@@ -26,4 +26,6 @@ appId: com.broadwayscorecard.app
 # substring match, and the label's full text is "TEST FIXTURE — state: empty"
 # (verified via CI screen-hierarchy dump — the bare "TEST FIXTURE" selector
 # failed 100% of the time despite the text being genuinely on screen).
-- assertVisible: "TEST FIXTURE.*"
+- extendedWaitUntil:
+    visible: "TEST FIXTURE.*"
+    timeout: 60000

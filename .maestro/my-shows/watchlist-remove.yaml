@@ -15,6 +15,9 @@ appId: com.broadwayscorecard.app
     optional: true
 
 # Switch to watchlist tab
+- extendedWaitUntil:
+    visible: "Watchlist.*"
+    timeout: 60000
 - tapOn:
     text: "Watchlist.*"
 

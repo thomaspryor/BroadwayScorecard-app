@@ -16,7 +16,9 @@ appId: com.broadwayscorecard.app
     optional: true
 
 # Existing review should show edit button
-- assertVisible: "Edit rating"
+- extendedWaitUntil:
+    visible: "Edit rating"
+    timeout: 60000
 
 # Tap edit to open panel
 - tapOn: "Edit rating"

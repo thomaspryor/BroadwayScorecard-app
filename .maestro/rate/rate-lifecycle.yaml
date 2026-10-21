@@ -87,7 +87,9 @@ appId: com.broadwayscorecard.app
     text: "Open"
     optional: true
 
-- assertVisible: "Your rating for"
+- extendedWaitUntil:
+    visible: "Your rating for"
+    timeout: 60000
 
 - tapOn:
     id: "star-4"

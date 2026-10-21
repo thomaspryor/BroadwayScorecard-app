@@ -23,7 +23,9 @@ appId: com.broadwayscorecard.app
 - tapOn:
     text: "Open"
     optional: true
-- assertVisible: "Import your shows"
+- extendedWaitUntil:
+    visible: "Import your shows"
+    timeout: 60000
 - tapOn:
     text: "show-score.com/member/your-name"
 - inputText: "not-a-valid-profile-url"

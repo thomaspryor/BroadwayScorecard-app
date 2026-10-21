@@ -40,7 +40,9 @@ appId: com.broadwayscorecard.app
 - tapOn:
     text: "Open"
     optional: true
-- assertVisible: "Import your shows"
+- extendedWaitUntil:
+    visible: "Import your shows"
+    timeout: 60000
 - tapOn: "Choose JSON File"
 # The system document picker runs out of process and took >10 s to show its
 # tab bar on the CI simulator (run 39521528670: "Browse" was on screen in the

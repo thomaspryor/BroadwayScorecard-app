@@ -16,7 +16,9 @@ appId: com.broadwayscorecard.app
     optional: true
 
 # Should start as "Add to watchlist"
-- assertVisible: "Add to watchlist"
+- extendedWaitUntil:
+    visible: "Add to watchlist"
+    timeout: 60000
 
 # Tap to add
 - tapOn: "Add to watchlist"
@@ -37,7 +39,9 @@ appId: com.broadwayscorecard.app
     optional: true
 
 # Should show "Remove from watchlist" (existing state is watchlisted)
-- assertVisible: "Remove from watchlist"
+- extendedWaitUntil:
+    visible: "Remove from watchlist"
+    timeout: 60000
 
 # Toggle off
 - tapOn: "Remove from watchlist"

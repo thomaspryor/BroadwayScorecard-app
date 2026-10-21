@@ -14,7 +14,9 @@ appId: com.broadwayscorecard.app
 - tapOn:
     text: "Open"
     optional: true
-- assertVisible: "YOUR RATING"
+- extendedWaitUntil:
+    visible: "YOUR RATING"
+    timeout: 60000
 
 # Verify all 5 star buttons are visible
 - assertVisible: "1 star"

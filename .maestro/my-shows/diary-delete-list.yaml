@@ -15,7 +15,9 @@ appId: com.broadwayscorecard.app
     optional: true
 
 # Diary tab active
-- assertVisible: "Diary"
+- extendedWaitUntil:
+    visible: "Diary"
+    timeout: 60000
 
 # Sort button visible
 - assertVisible:

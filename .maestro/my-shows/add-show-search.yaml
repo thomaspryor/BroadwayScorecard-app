@@ -15,4 +15,6 @@ appId: com.broadwayscorecard.app
     optional: true
 
 # The footer card in diary mode
-- assertVisible: "Rate a show"
+- extendedWaitUntil:
+    visible: "Rate a show"
+    timeout: 60000

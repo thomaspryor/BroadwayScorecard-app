@@ -16,7 +16,9 @@ appId: com.broadwayscorecard.app
     optional: true
 
 # "Seen N times" badge should be visible
-- assertVisible: "Seen 3 times"
+- extendedWaitUntil:
+    visible: "Seen 3 times"
+    timeout: 60000
 
 # Latest review edit/delete buttons
 - assertVisible: "Edit rating"

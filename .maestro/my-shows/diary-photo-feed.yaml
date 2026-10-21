@@ -23,6 +23,10 @@ appId: com.broadwayscorecard.app
     text: "Open"
     optional: true
 
+- extendedWaitUntil:
+    visible:
+      id: "diary-list-view-toggle"
+    timeout: 60000
 - tapOn:
     id: "diary-list-view-toggle"
 

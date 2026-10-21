@@ -15,7 +15,9 @@ appId: com.broadwayscorecard.app
     optional: true
 
 # Start on diary — default sort is "Newest"
-- assertVisible: "Diary"
+- extendedWaitUntil:
+    visible: "Diary"
+    timeout: 60000
 - assertVisible:
     text: "Sort diary, Newest"
 

@@ -16,7 +16,9 @@ appId: com.broadwayscorecard.app
     optional: true
 
 # Existing review should show delete button
-- assertVisible: "Delete rating"
+- extendedWaitUntil:
+    visible: "Delete rating"
+    timeout: 60000
 
 # Tap delete
 - tapOn: "Delete rating"
