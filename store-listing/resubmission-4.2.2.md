@@ -19,7 +19,7 @@
 
 ```
 Email:    reviewer@broadwayscorecard.com
-Password: BwayReview2026!
+Password: (in App Store Connect > App Review Information; not stored in this repo)
 ```
 
 This account is pre-seeded with sample data so the reviewer immediately sees the native personal features in action — no empty states, no waiting for data to save and re-load.
@@ -46,7 +46,7 @@ This account is pre-seeded with sample data so the reviewer immediately sees the
 >
 > **🔑 DEMO ACCOUNT (pre-seeded for your convenience):**
 > - Email: reviewer@broadwayscorecard.com
-> - Password: BwayReview2026!
+> - Password: (in App Store Connect > App Review Information; not stored in this repo)
 >
 > **HOW TO EXPLORE THE PERSONAL FEATURES (4 steps):**
 > 1. Tap any show's star icon, or tap the Watched / To Watch / Lists tab
@@ -96,7 +96,7 @@ This account is pre-seeded with sample data so the reviewer immediately sees the
 >
 > **🔑 Demo account** (pre-seeded with 5 rated shows, 3 watchlist entries, 1 ranked custom list):
 > - Email: reviewer@broadwayscorecard.com
-> - Password: BwayReview2026!
+> - Password: (in App Store Connect > App Review Information; not stored in this repo)
 >
 > **4-step reviewer flow:**
 > 1. On any show, tap a star icon, OR tap the Watched / To Watch / Lists tab

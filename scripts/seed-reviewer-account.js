@@ -7,8 +7,14 @@ const https = require('https');
 const SUPABASE_URL = 'https://tcbkoevwfemkicrwpypb.supabase.co';
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const REVIEWER_EMAIL = process.env.REVIEWER_EMAIL || 'reviewer@broadwayscorecard.com';
-const REVIEWER_PASSWORD = process.env.REVIEWER_PASSWORD || 'BwayReview2026!';
+// No default: the password lives only in App Store Connect (App Review
+// Information) and the owner's records. A literal here is public (BRO-5852).
+const REVIEWER_PASSWORD = process.env.REVIEWER_PASSWORD;
 
+if (!REVIEWER_PASSWORD) {
+  console.error('Missing REVIEWER_PASSWORD env var (copy it from App Store Connect > App Review Information).');
+  process.exit(1);
+}
 if (!SERVICE_ROLE_KEY) {
   console.error('Missing SUPABASE_SERVICE_ROLE_KEY env var.');
   process.exit(1);

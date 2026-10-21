@@ -63,7 +63,7 @@
 - On the show detail page, tap a star
 - Sign In sheet appears
 - Tap "Sign in with email" (the text link below Google/Apple)
-- Enter `reviewer@broadwayscorecard.com` and `BwayReview2026!`
+- Enter `reviewer@broadwayscorecard.com` and the reviewer password from App Store Connect (App Review Information)
 - Tap Sign In
 
 **Narration:** "I'll sign in with the demo account to show the personal features."
