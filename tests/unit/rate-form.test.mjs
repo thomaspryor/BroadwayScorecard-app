@@ -93,3 +93,13 @@ test('rate sheet: fixed insert id per sheet, and no dismissal while saving', asy
   assert.match(src, /if \(savingRef\.current\) return;\n/);
   assert.match(src, /if \(!mountedRef\.current\) return;\n\s+bypassGuardRef\.current = true;/);
 });
+
+test('rate sheet: a retry that finds its own row writes the current values; a new account gets a new id', async () => {
+  const { readFileSync } = await import('node:fs');
+  const src = readFileSync(new URL('../../app/rate/[showId].tsx', import.meta.url), 'utf8');
+  // The first attempt may have landed with other stars or notes.
+  assert.match(src, /if \(!isOwnInsertDuplicate\(error\)\) throw new Error\(error\.message\);[\s\S]{0,400}supabaseRestUpdate<\{ id: string \}>\(\s*'reviews',\s*`id=eq\.\$\{newId\}&user_id=eq\.\$\{user\.id\}`,\s*\{\s*rating,/);
+  assert.match(src, /if \(!retried\) throw new Error\(RATING_GONE_MESSAGE\);/);
+  assert.doesNotMatch(src, /if \(error && !isOwnInsertDuplicate\(error\)\) throw/, 'a duplicate must not be reported as saved without writing');
+  assert.match(src, /useEffect\(\(\) => \{ newReviewIdRef\.current = null; \}, \[user\?\.id\]\);/);
+});

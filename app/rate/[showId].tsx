@@ -149,6 +149,8 @@ export default function RateModal() {
   // (timeout, dropped connection) is retried with the same id, so the row it
   // already created comes back as a duplicate key instead of a second entry.
   const newReviewIdRef = useRef<string | null>(null);
+  // Another account signing in on this sheet starts a new review, not a retry.
+  useEffect(() => { newReviewIdRef.current = null; }, [user?.id]);
   // router.back() after the sheet is already gone would pop the screen below.
   const mountedRef = useRef(true);
   useEffect(() => {
@@ -288,8 +290,23 @@ export default function RateModal() {
         review_text: textVal.trim() || null,
         date_seen: dateVal || null,
       });
-      // reviews_pkey duplicate: an earlier attempt from this sheet landed.
-      if (error && !isOwnInsertDuplicate(error)) throw new Error(error.message);
+      if (error) {
+        if (!isOwnInsertDuplicate(error)) throw new Error(error.message);
+        // reviews_pkey duplicate: an earlier attempt from this sheet landed,
+        // maybe with other stars or notes. Write what is on screen now.
+        const { data: retried, error: retryError } = await supabaseRestUpdate<{ id: string }>(
+          'reviews',
+          `id=eq.${newId}&user_id=eq.${user.id}`,
+          {
+            rating,
+            review_text: textVal.trim() || null,
+            date_seen: dateVal || null,
+            updated_at: new Date().toISOString(),
+          },
+        );
+        if (retryError) throw new Error(retryError.message);
+        if (!retried) throw new Error(RATING_GONE_MESSAGE);
+      }
       const inserted = insertedRow ?? { id: newId };
       // Photos picked BEFORE the first save (beta feedback 2026-08-02) —
       // now that the review row exists, queue them for upload. Best-effort:
