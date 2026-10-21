@@ -170,6 +170,10 @@ export async function supabaseRestSelect<T = Record<string, unknown>>(
 
   if (!res.ok) return { data: null, error: restError(res) };
 
-  const data = res.body as T | T[] | null;
-  return { data: (data as T[] | null) ?? [], error: null };
+  // PostgREST answers a select with a JSON array. Anything else (a truncated
+  // or garbled body) is an error, never "no rows": import dedupes on this.
+  if (!Array.isArray(res.body)) {
+    return { data: null, error: { message: `Unexpected response (HTTP ${res.status})` } };
+  }
+  return { data: res.body as T[], error: null };
 }
