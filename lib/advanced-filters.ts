@@ -8,7 +8,8 @@
  */
 
 import type { Show } from '@/lib/types';
-import { getQualifiedScore } from '@/lib/score-utils';
+import type { Market } from '@/lib/market-filter';
+import { getGoldThreshold, getQualifiedScore } from '@/lib/score-utils';
 
 export type FilterPredicate = (show: Show) => boolean;
 
@@ -43,6 +44,25 @@ const inScoreRange = (min: number, max: number): FilterPredicate =>
     return rounded >= min && rounded <= max;
   };
 
+// Gold starts at 85 in London (getGoldThreshold), so the Gold/Recommended
+// boundary comes from each show's own market, as its badge does. A fixed
+// 83 put a London 84 under "Critical Gold" next to a "Recommended" badge.
+const roundedQualified = (s: Show): number | null => {
+  const score = getQualifiedScore(s);
+  return score === null ? null : Math.round(score);
+};
+const isGoldTier: FilterPredicate = (s) => {
+  const r = roundedQualified(s);
+  return r !== null && r >= getGoldThreshold(s.category);
+};
+const isRecommendedTier: FilterPredicate = (s) => {
+  const r = roundedQualified(s);
+  return r !== null && r >= 75 && r < getGoldThreshold(s.category);
+};
+
+const goldLabel = (gold: number) => `Critical Gold (${gold}+)`;
+const recommendedLabel = (gold: number) => `Recommended (75–${gold - 1})`;
+
 export const ADVANCED_FILTER_GROUPS: AdvancedFilterGroup[] = [
   {
     key: 'production',
@@ -56,8 +76,8 @@ export const ADVANCED_FILTER_GROUPS: AdvancedFilterGroup[] = [
     key: 'score_tier',
     label: 'Score tier',
     options: [
-      { id: 'critical-gold', label: 'Critical Gold (83+)', predicate: inScoreRange(83, 100) },
-      { id: 'recommended', label: 'Recommended (75–82)', predicate: inScoreRange(75, 82) },
+      { id: 'critical-gold', label: goldLabel(getGoldThreshold()), predicate: isGoldTier },
+      { id: 'recommended', label: recommendedLabel(getGoldThreshold()), predicate: isRecommendedTier },
       { id: 'worth-seeing', label: 'Worth Seeing (65–74)', predicate: inScoreRange(65, 74) },
       { id: 'skippable', label: 'Mixed (55–64)', predicate: inScoreRange(55, 64) },
       { id: 'critical-miss', label: 'Critical Miss (<55)', predicate: inScoreRange(0, 54) },
@@ -114,6 +134,19 @@ export function toggleSelection(
 /** Total selected option count across all groups (badge on the Filters pill). */
 export function countActiveSelections(selections: AdvancedSelections): number {
   return Object.values(selections).reduce((n, ids) => n + (ids?.length ?? 0), 0);
+}
+
+/** The groups as the Filters sheet labels them in a market (London Gold reads 85+). */
+export function advancedFilterGroupsFor(market: Market): AdvancedFilterGroup[] {
+  if (market !== 'london') return ADVANCED_FILTER_GROUPS;
+  const gold = getGoldThreshold('west-end');
+  return ADVANCED_FILTER_GROUPS.map((group) => group.key !== 'score_tier' ? group : {
+    ...group,
+    options: group.options.map((o) =>
+      o.id === 'critical-gold' ? { ...o, label: goldLabel(gold) }
+        : o.id === 'recommended' ? { ...o, label: recommendedLabel(gold) }
+          : o),
+  });
 }
 
 /**

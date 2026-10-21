@@ -404,6 +404,7 @@ export default function BrowseScreen() {
       />
       <AdvancedFiltersSheet
         visible={filtersSheetOpen}
+        market={market}
         selections={advancedSelections}
         matchCount={filteredShows.length}
         onToggle={handleAdvancedToggle}

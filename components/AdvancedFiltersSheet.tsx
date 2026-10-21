@@ -11,15 +11,18 @@ import React from 'react';
 import { View, Text, Modal, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
-  ADVANCED_FILTER_GROUPS,
+  advancedFilterGroupsFor,
   countActiveSelections,
   type AdvancedSelections,
 } from '@/lib/advanced-filters';
+import type { Market } from '@/lib/market-filter';
 import { Colors, Spacing, FontSize, BorderRadius } from '@/constants/theme';
 import * as haptics from '@/lib/haptics';
 
 interface Props {
   visible: boolean;
+  /** Labels the score tiers for this market (London Gold is 85+) */
+  market: Market;
   selections: AdvancedSelections;
   /** Shows matching the CURRENT selections (for the Done button count) */
   matchCount: number;
@@ -29,7 +32,7 @@ interface Props {
   onClose: () => void;
 }
 
-export function AdvancedFiltersSheet({ visible, selections, matchCount, onToggle, onClearAll, onClose }: Props) {
+export function AdvancedFiltersSheet({ visible, market, selections, matchCount, onToggle, onClearAll, onClose }: Props) {
   const insets = useSafeAreaInsets();
   const activeCount = countActiveSelections(selections);
 
@@ -59,7 +62,7 @@ export function AdvancedFiltersSheet({ visible, selections, matchCount, onToggle
           )}
         </View>
         <ScrollView style={styles.groups} showsVerticalScrollIndicator={false}>
-          {ADVANCED_FILTER_GROUPS.map((group) => (
+          {advancedFilterGroupsFor(market).map((group) => (
             <View key={group.key} style={styles.group}>
               <Text style={styles.groupLabel}>{group.label.toUpperCase()}</Text>
               <View style={styles.pillRow}>

@@ -18,7 +18,6 @@ export interface ScoreTier {
   textColor: string;
   shadowColor: string;
   glow: boolean;
-  range: string;
 }
 
 const SCORE_TIERS = {
@@ -28,7 +27,6 @@ const SCORE_TIERS = {
     textColor: '#1a1a1a',
     shadowColor: '#DAA520',
     glow: true,
-    range: '83-100',
   },
   recommended: {
     label: 'Recommended',
@@ -36,7 +34,6 @@ const SCORE_TIERS = {
     textColor: '#ffffff',
     shadowColor: '#22c55e',
     glow: false,
-    range: '75-82',
   },
   worthSeeing: {
     label: 'Worth Seeing',
@@ -44,7 +41,6 @@ const SCORE_TIERS = {
     textColor: '#ffffff',
     shadowColor: '#14b8a6',
     glow: false,
-    range: '65-74',
   },
   skippable: {
     label: 'Mixed',
@@ -52,7 +48,6 @@ const SCORE_TIERS = {
     textColor: '#1a1a1a',
     shadowColor: '#d97706',
     glow: false,
-    range: '55-64',
   },
   stayAway: {
     label: 'Critical Miss',
@@ -60,7 +55,6 @@ const SCORE_TIERS = {
     textColor: '#ffffff',
     shadowColor: '#ef4444',
     glow: false,
-    range: '<55',
   },
 } as const;
 
