@@ -57,6 +57,18 @@ appId: com.broadwayscorecard.app
     visible: "Downloads"
     timeout: 10000
 - tapOn: "Downloads"
+# Grid cells in the iOS 26 picker sometimes only highlight on the first tap.
+# Run 39671117465 stayed on On My iPhone ("Downloads, 1 item" still showing);
+# the point taps below used to hide that by opening the folder themselves.
+- waitForAnimationToEnd:
+    timeout: 5000
+- runFlow:
+    when:
+      visible: "Downloads, \\d+ items?"
+    commands:
+      - tapOn:
+          text: "Downloads, \\d+ items?"
+          optional: true  # the first tap may land mid-navigation
 # An unfinished Safari download shows as a greyed "<name>.download" cell that
 # cannot be opened (run 39645448024 stopped here at 0%). Wait for the cell to
 # render first so the notVisible check below cannot pass on an empty grid.
