@@ -329,7 +329,15 @@ export default function ToWatchScreen() {
         key={item.id}
         style={({ pressed }) => [styles.gridCard, gridCardStyle, pressed && styles.pressed]}
         onPress={() => goToShow(show, item.show_id)}
-        onLongPress={() => { setPendingDate(new Date()); setDatePickingShowId(item.show_id); }}
+        // Same action sheet as the regular Watchlist rows below, not a direct
+        // date picker — a diary-only show's tap destination (diary-show/[id])
+        // deliberately has no watchlist actions of its own (see that file's
+        // header comment), so the long-press menu is the ONLY way to remove
+        // one. Upcoming used to skip straight to PlannedDateSheet, leaving no
+        // route to "Remove from Watchlist" at all (beta feedback 2026-08-30,
+        // AD-hzIliJsSfzQyUXY6CWHE). "Set reminder date" in the sheet covers
+        // the date-change case this used to shortcut to.
+        onLongPress={() => showWatchlistActionSheet(item, title)}
       >
         <View style={styles.upcomingPosterWrap}>
           {posterUrl ? (
@@ -414,7 +422,7 @@ export default function ToWatchScreen() {
         key={item.id}
         style={({ pressed }) => [styles.listRow, pressed && styles.pressed]}
         onPress={() => goToShow(show, item.show_id)}
-        onLongPress={() => { setPendingDate(new Date()); setDatePickingShowId(item.show_id); }}
+        onLongPress={() => showWatchlistActionSheet(item, title)}
       >
         {posterUrl ? (
           <Image source={{ uri: posterUrl }} style={styles.listPoster} contentFit="cover" transition={200} />
