@@ -20,6 +20,7 @@
  */
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { ymdInTimeZone } from '../lib/date-utils';
 
 const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';
 const BATCH_SIZE = 100;
@@ -185,8 +186,14 @@ function buildNewScoreMessages(tokens: PushToken[], showSlug: string, showTitle:
   }));
 }
 
+const EVENING_LOOKBACK_MS = 6 * 60 * 60 * 1000;
+
 async function buildRateShowMessages(client: SupabaseClient): Promise<ExpoPushMessage[]> {
-  const today = new Date().toISOString().split('T')[0];
+  // The cron fires at 04:00 UTC (11pm/midnight in New York), when the UTC date
+  // is already tomorrow. A UTC "today" asked about tomorrow's show and never
+  // tonight's. Planned dates are New York calendar days, and in summer (EDT)
+  // 04:00 UTC is already midnight there, so step back 6h to "this evening".
+  const today = ymdInTimeZone(new Date(Date.now() - EVENING_LOOKBACK_MS), 'America/New_York');
   const { data: watchlistEntries, error } = await client
     .from('watchlist')
     .select('user_id, show_id, show_title')

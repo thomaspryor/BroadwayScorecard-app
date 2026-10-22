@@ -39,6 +39,14 @@ export function toLocalYMD(d: Date): string {
 }
 
 /**
+ * YYYY-MM-DD in a named timezone. For server code (CI runs in UTC) that needs
+ * the calendar day a user is living in, e.g. "tonight" for a Broadway show.
+ */
+export function ymdInTimeZone(d: Date, timeZone: string): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
+}
+
+/**
  * Parse a stored calendar date ("YYYY-MM-DD", or a longer ISO string whose
  * first 10 characters are one) as LOCAL NOON. Bare `new Date('2026-03-05')` is
  * UTC midnight, which every US timezone renders as the previous day (and the

@@ -11,7 +11,8 @@
 // which is exactly what a unit test is for (/what-else sweep, 2026-08-03).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { daysUntilDate, isClosingSoonDate, toLocalYMD } from '../../lib/date-utils.ts';
+import { readFileSync } from 'node:fs';
+import { daysUntilDate, isClosingSoonDate, toLocalYMD, ymdInTimeZone } from '../../lib/date-utils.ts';
 
 const ymd = (d) => toLocalYMD(d);
 const daysFromNow = (n) => {
@@ -58,4 +59,21 @@ test('daysUntilDate counts whole days forward and backward', () => {
   assert.equal(daysUntilDate(ymd(daysFromNow(1))), 1);
   assert.equal(daysUntilDate(ymd(daysFromNow(7))), 7);
   assert.equal(daysUntilDate(ymd(daysFromNow(-3))), -3);
+});
+
+test('ymdInTimeZone gives the New York day when UTC has rolled over', () => {
+  // 04:00 UTC on Oct 22 is 00:00 EDT Oct 22; 03:59 UTC is still Oct 21 in NY.
+  assert.equal(ymdInTimeZone(new Date('2026-10-22T03:59:00Z'), 'America/New_York'), '2026-10-21');
+  // Winter (EST): the 04:00 UTC cron is 11pm the previous NY day.
+  assert.equal(ymdInTimeZone(new Date('2026-01-15T04:00:00Z'), 'America/New_York'), '2026-01-14');
+  assert.equal(ymdInTimeZone(new Date('2026-01-15T04:00:00Z'), 'UTC'), '2026-01-15');
+});
+
+test('the 04:00 UTC rate-show cron asks about the show that was on tonight', () => {
+  const src = readFileSync(new URL('../../scripts/send-notifications.ts', import.meta.url), 'utf8');
+  assert.match(src, /ymdInTimeZone\(new Date\(Date\.now\(\) - EVENING_LOOKBACK_MS\), 'America\/New_York'\)/);
+  const lookback = 6 * 60 * 60 * 1000;
+  const night = (utc) => ymdInTimeZone(new Date(Date.parse(utc) - lookback), 'America/New_York');
+  assert.equal(night('2026-10-22T04:00:00Z'), '2026-10-21'); // EDT: midnight Oct 22 → Oct 21's show
+  assert.equal(night('2026-01-15T04:00:00Z'), '2026-01-14'); // EST: 11pm Jan 14
 });

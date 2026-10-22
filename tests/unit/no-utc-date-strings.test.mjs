@@ -17,7 +17,8 @@ import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = fileURLToPath(new URL('../..', import.meta.url));
-const DIRS = ['app', 'components', 'lib', 'hooks'];
+// scripts/ too: send-notifications.ts picked the rate-show night by UTC date.
+const DIRS = ['app', 'components', 'lib', 'hooks', 'scripts'];
 
 const ALLOWED = new Map([
   ['lib/date-utils.ts', 'toLocalYMD itself: shifts by the timezone offset first'],
