@@ -31,8 +31,10 @@ jobs:
     runs-on: macos-26
     # The full suite took 119 min on 2026-10-21 (run 39521528670: 47 min Release
     # build on a cache miss + 54 min of flows), and run 39407445793 was cancelled
-    # at the old 120-min limit before reporting. Public repo: no minute cost.
-    timeout-minutes: 165
+    # at the old 120-min limit before reporting. Then run 39645448024 took 164
+    # min against 165 on a slow simulator (49 s to open one link). Full-suite
+    # runs since: 101-164 min. Public repo: no minute cost.
+    timeout-minutes: 210
     # Each run sets a new dev-test password (see "Rotate dev-test password"),
     # so two overlapping runs would sign each other out. Run one at a time.
     concurrency:
