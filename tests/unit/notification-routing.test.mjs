@@ -64,3 +64,15 @@ test('a tap that cold-launched the app is read back at setup', () => {
   // The handler must clear what it routed, or every later launch re-opens it.
   assert.match(src, /clearLastNotificationResponse\(\)/);
 });
+
+test('the server-sent "How was X?" push routes to the rate screen too', () => {
+  const src = readFileSync(join(root, 'scripts/send-notifications.ts'), 'utf8');
+  assert.match(src, /data: \{ showSlug: entry\.show_id, type: 'rate-reminder', showTitle: entry\.show_title, date: today \}/);
+  // One sent before it carried a type, still in Notification Center.
+  assert.deepEqual(
+    notificationTarget({ showSlug: 'hamilton-2015' }, 'How was Hamilton?', 'some-expo-push-id'),
+    { pathname: '/rate/[showId]', params: { showId: 'hamilton-2015', showTitle: 'Hamilton' } },
+  );
+  // Score pushes ("Reviews are in", "New score") keep opening the show page.
+  assert.equal(notificationTarget({ showSlug: 'hamilton-2015' }, 'Reviews are in for Hamilton').pathname, '/show/[slug]');
+});

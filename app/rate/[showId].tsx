@@ -75,7 +75,6 @@ export default function RateModal() {
 
   // Guard: showId is required
   const showId = params.showId;
-  const showTitle = params.showTitle || 'Rate Show';
   const reviewId = params.reviewId;
   const initialRating = params.initialRating ? parseFloat(params.initialRating) : null;
   const suggestedDate = params.suggestedDate;
@@ -86,6 +85,8 @@ export default function RateModal() {
   // says which production is being rated.
   const show = shows.find(s => s.id === showId);
   const diaryMeta = !show ? getDiaryShowMeta(showId) : null;
+  // A notification tap can arrive without a title; name the show anyway.
+  const showTitle = params.showTitle || show?.title || diaryMeta?.title || 'Rate Show';
   const posterUrl = show ? getImageUrl(show.images.poster) || getImageUrl(show.images.thumbnail) : null;
 
   // Production context — which run of this title is being rated

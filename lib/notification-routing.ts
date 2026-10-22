@@ -40,7 +40,10 @@ export function notificationTarget(
   identifier?: string | null,
 ): NotificationTarget | null {
   const showSlug = str(data?.showSlug);
-  if (showSlug && data?.type === 'rate-reminder') {
+  // The server-sent reminder had no type before it was added, and a tap on
+  // one still sitting in Notification Center should land on the rate screen.
+  const isRateReminder = data?.type === 'rate-reminder' || titleFromReminder(str(title)) !== null;
+  if (showSlug && isRateReminder) {
     const params: { showId: string; showTitle?: string; suggestedDate?: string } = { showId: showSlug };
     const showTitle = str(data?.showTitle) ?? titleFromReminder(str(title));
     const date = str(data?.date) ?? dateFromReminderId(str(identifier));

@@ -216,7 +216,8 @@ async function buildRateShowMessages(client: SupabaseClient): Promise<ExpoPushMe
         to: t.token,
         title: `How was ${entry.show_title}?`,
         body: `Tap to rate your experience tonight.`,
-        data: { showSlug: entry.show_id },
+        // type routes the tap to the rate screen (lib/notification-routing.ts).
+        data: { showSlug: entry.show_id, type: 'rate-reminder', showTitle: entry.show_title, date: today },
         sound: 'default',
         channelId: 'alerts',
       });

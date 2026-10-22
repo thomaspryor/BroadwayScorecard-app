@@ -238,18 +238,12 @@ function routeNotificationResponse(response: import('expo-notifications').Notifi
   const key = `${identifier}|${response.actionIdentifier}|${response.notification.date}`;
   if (handledResponses.has(key)) return;
   handledResponses.add(key);
-  try { Notifications?.clearLastNotificationResponse(); } catch {}
 
   const target = notificationTarget(content.data, content.title, identifier);
-  if (!target) return;
-  const go = () => router.push(target as never);
-  try {
-    go();
-  } catch {
-    // A tap that launched the app can arrive before the root navigator is
-    // ready to accept a push; try once more after it mounts.
-    setTimeout(() => { try { go(); } catch {} }, 500);
-  }
+  // router.push only queues the action; the root navigator is mounted by the
+  // time this runs (setup happens in RootLayout's effect, after <Stack>).
+  if (target) router.push(target as never);
+  try { Notifications?.clearLastNotificationResponse(); } catch {}
 }
 
 /**
