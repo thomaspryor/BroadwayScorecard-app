@@ -266,10 +266,14 @@ test('every app deep link is followed by a long wait for its screen', () => {
       else if (/^\s+\S/.test(line) && blocks.length) blocks[blocks.length - 1] += `\n${line}`;
     }
     blocks.forEach((block, i) => {
-      if (!/^- openLink:\s*broadwayscorecard:/.test(block)) return;
+      // Short form, quoted or not, and the long form (openLink:\n  link: ...).
+      if (!/^- openLink:\s*(?:\n\s+link:\s*)?["']?broadwayscorecard:/.test(block)) return;
       let j = i + 1;
       if (/^- tapOn:/.test(blocks[j] || '') && /text:\s*"Open"/.test(blocks[j])) j++;
-      if (!/^- extendedWaitUntil:/.test(blocks[j] || '') || !/timeout:\s*([3-9]\d{4}|\d{6,})/.test(blocks[j])) {
+      const wait = blocks[j] || '';
+      const timeout = Number((/^\s+timeout:\s*(\d+)\s*$/m.exec(wait) || [])[1] || 0);
+      // A notVisible wait passes before the new screen ever opens.
+      if (!/^- extendedWaitUntil:/.test(wait) || !/^\s+visible:/m.test(wait) || timeout < 30000) {
         hasty.push(`${flow.slice(REPO_ROOT.length)}: ${(blocks[j] || '(end)').split('\n')[0]}`);
       }
     });

@@ -44,7 +44,8 @@ def main():
     handler = functools.partial(Handler, directory=directory)
     try:
         httpd = DualStackServer(('::', port), handler)
-    except OSError:  # host without IPv6 (some Linux containers)
+    except OSError as e:  # host without IPv6 (some Linux containers)
+        print(f'dual-stack bind failed ({e}); serving IPv4 only', file=sys.stderr, flush=True)
         httpd = IPv4Server(('0.0.0.0', port), handler)
     with httpd:
         httpd.serve_forever()

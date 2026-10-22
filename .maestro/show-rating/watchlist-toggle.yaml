@@ -15,10 +15,14 @@ appId: com.broadwayscorecard.app
     text: "Open"
     optional: true
 
-# Should start as "Add to watchlist"
+# Wait on the fixture's own label: every Home bookmark is also announced as
+# "Add to watchlist" (components/BookmarkOverlay.tsx), so waiting on that text
+# could pass on Home before the link lands and then tap a real Home card.
 - extendedWaitUntil:
-    visible: "Add to watchlist"
+    visible: "TEST FIXTURE.*state: empty"
     timeout: 60000
+# Should start as "Add to watchlist"
+- assertVisible: "Add to watchlist"
 
 # Tap to add
 - tapOn: "Add to watchlist"
@@ -38,10 +42,11 @@ appId: com.broadwayscorecard.app
     text: "Open"
     optional: true
 
-# Should show "Remove from watchlist" (existing state is watchlisted)
 - extendedWaitUntil:
-    visible: "Remove from watchlist"
+    visible: "TEST FIXTURE.*state: existing"
     timeout: 60000
+# Should show "Remove from watchlist" (existing state is watchlisted)
+- assertVisible: "Remove from watchlist"
 
 # Toggle off
 - tapOn: "Remove from watchlist"
