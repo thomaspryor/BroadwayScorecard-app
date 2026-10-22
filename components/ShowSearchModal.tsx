@@ -431,6 +431,7 @@ export function ShowSearchModal({
             onChangeText={handleQueryChange}
             returnKeyType="search"
             autoCorrect={false}
+            clearButtonMode="while-editing"
           />
         </View>
 
