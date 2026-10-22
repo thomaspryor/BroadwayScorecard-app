@@ -111,6 +111,23 @@ function priorNightUnlandedBranch(branchNames, isAncestor) {
   return isAncestor(latest) ? null : latest;
 }
 
+const STRANDED_GRACE_DAYS = 3;
+
+/**
+ * A branch that stays unlanded for days is not "last night's work awaiting
+ * review", it is stranded (BRO-5900: one conflicting 2026-09-16 batch made
+ * every run since exit 2 and 21 more batches piled up behind it, five weeks of
+ * zero output). Inside the grace window keep aborting so tonight does not redo
+ * the same work; past it, run anyway -- tonight's branch cuts from fresh
+ * origin/main so it carries its own fixes -- and leave a STRANDED marker.
+ */
+function strandedBranchAction(branch, now = new Date(), graceDays = STRANDED_GRACE_DAYS) {
+  const m = branch.replace(OVERNIGHT_BRANCH_PREFIX, '').match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2})-(\d{2})-(\d{2})$/);
+  if (!m) return 'abort';
+  const made = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), Number(m[4]), Number(m[5]), Number(m[6]));
+  return (now - made) / 86400000 >= graceDays ? 'proceed' : 'abort';
+}
+
 // Uses sh(), not tryShell() — an unexpected git failure here must crash the
 // run (main()'s top-level catch) rather than silently read as "no prior
 // branches", which would fail the guard open exactly when it can't verify
@@ -142,6 +159,13 @@ function branchLandedOnOriginMain(branch) {
 function checkPriorNightLanded() {
   const unlanded = priorNightUnlandedBranch(listOvernightBranches(), branchLandedOnOriginMain);
   if (!unlanded) return null;
+  if (strandedBranchAction(unlanded) === 'proceed') {
+    log(`WARNING: '${unlanded}' has been unlanded for ${STRANDED_GRACE_DAYS}+ days -- stranded, not under review. Running tonight anyway.`);
+    try {
+      fs.writeFileSync(path.join(ledger.HOME, 'STRANDED'), `${unlanded}\n${new Date().toISOString()}\nResolve: git -C ${REPO} merge --no-ff ${unlanded} (or delete it if abandoned).\n`);
+    } catch { /* marker is best-effort */ }
+    return null;
+  }
   return `previous night's branch '${unlanded}' has not landed on origin/main yet `
     + `(git merge-base --is-ancestor says no) — skipping so tonight's run does not redo the same work. `
     + `Review and merge it normally (a squash or cherry-pick won't register as landed here — `
@@ -1115,6 +1139,7 @@ function copyScreenshots(visual) {
 module.exports = {
   FORBIDDEN_PATHS, forbiddenIn, crashLogExcerpt, reportBody, computeThemeSummary,
   OVERNIGHT_BRANCH_PREFIX, mostRecentOvernightBranch, priorNightUnlandedBranch,
+  strandedBranchAction, STRANDED_GRACE_DAYS,
 };
 if (require.main === module) {
   main().catch((e) => { log('FAILED:', e.stack || e.message); process.exit(1); });

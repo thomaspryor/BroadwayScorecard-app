@@ -16,7 +16,7 @@ import { createRequire } from 'node:module';
 process.env.BSC_FEEDBACK_HOME = fs.mkdtempSync(path.join(os.tmpdir(), 'overnight-test-home-'));
 
 const require = createRequire(import.meta.url);
-const { forbiddenIn, reportBody, computeThemeSummary } = require('./overnight.js');
+const { forbiddenIn, reportBody, computeThemeSummary, strandedBranchAction } = require('./overnight.js');
 const { NATIVE_PATHS } = require('../ship.js');
 const ledger = require('./ledger.js');
 
@@ -193,4 +193,12 @@ test('computeThemeSummary returns [] rather than throwing on a corrupt ledger', 
   fs.mkdirSync(ledger.HOME, { recursive: true });
   fs.writeFileSync(ledger.LEDGER, 'not valid json');
   assert.deepEqual(computeThemeSummary(), []);
+});
+
+test('strandedBranchAction: abort inside the grace window, proceed once stranded (BRO-5900)', () => {
+  const b = 'worktree-feedback-overnight-2026-09-16T06-15-05';
+  assert.equal(strandedBranchAction(b, new Date(2026, 8, 17, 2, 15)), 'abort');
+  assert.equal(strandedBranchAction(b, new Date(2026, 8, 19, 7, 0)), 'proceed');
+  assert.equal(strandedBranchAction(b, new Date(2026, 9, 20, 2, 15)), 'proceed');
+  assert.equal(strandedBranchAction('worktree-feedback-overnight-garbage', new Date(2027, 0, 1)), 'abort');
 });
