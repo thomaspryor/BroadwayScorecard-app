@@ -1204,6 +1204,7 @@ export function ProductionPicker({ state, onFind, onPick, onUpdate, isUnmatchedR
           placeholderTextColor={Colors.text.muted}
           autoCapitalize="none"
           autoCorrect={false}
+          clearButtonMode="while-editing"
           style={styles.pickerFilter}
         />
       )}
