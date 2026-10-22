@@ -1384,9 +1384,10 @@ const styles = StyleSheet.create({
   // Date lives on the poster now, not the text block below (venue dropped
   // entirely) — small low-alpha corner scrim, unobtrusive by design.
   // Horizontally centered so the tag lines up with the centered title/stars
-  // below the poster (beta feedback 2026-08-02).
+  // below the poster (beta feedback 2026-08-02). Anchored to the TOP of the
+  // poster, not the bottom (beta feedback 2026-08-10, ANIDtf6U).
   gridDateOverlayWrap: {
-    position: 'absolute', left: 0, right: 0, bottom: 6,
+    position: 'absolute', left: 0, right: 0, top: 6,
     alignItems: 'center',
   },
   gridDateOverlay: {
