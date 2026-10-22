@@ -52,7 +52,7 @@ export async function scheduleRateReminder(
     content: {
       title: `How was ${showTitle}?`,
       body: 'Tap to rate your experience tonight.',
-      data: { showSlug: showId, type: 'rate-reminder' },
+      data: { showSlug: showId, type: 'rate-reminder', showTitle, date },
       sound: 'default',
     },
     trigger: {

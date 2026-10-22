@@ -11,6 +11,7 @@
 import { Alert, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
+import { notificationTarget } from './notification-routing';
 import { captureException } from './sentry';
 import { shouldSoftAsk, SOFT_ASK_MESSAGE, SOFT_ASK_TITLE } from './notification-ask';
 import { reviewPromptRequestedWithin } from './store-review';
@@ -228,9 +229,33 @@ export async function getCachedPushToken(): Promise<string | null> {
   return AsyncStorage.getItem(PUSH_TOKEN_KEY);
 }
 
+/** Identifiers of responses already routed, so the launch-time read of the
+ *  last response and the listener never navigate twice for one tap. */
+const handledResponses = new Set<string>();
+
+function routeNotificationResponse(response: import('expo-notifications').NotificationResponse): void {
+  const { identifier, content } = response.notification.request;
+  const key = `${identifier}|${response.actionIdentifier}|${response.notification.date}`;
+  if (handledResponses.has(key)) return;
+  handledResponses.add(key);
+  try { Notifications?.clearLastNotificationResponse(); } catch {}
+
+  const target = notificationTarget(content.data, content.title, identifier);
+  if (!target) return;
+  const go = () => router.push(target as never);
+  try {
+    go();
+  } catch {
+    // A tap that launched the app can arrive before the root navigator is
+    // ready to accept a push; try once more after it mounts.
+    setTimeout(() => { try { go(); } catch {} }, 500);
+  }
+}
+
 /**
- * Set up notification response handler — navigates to show page when
- * a notification is tapped.
+ * Set up notification response handler — navigates to the screen a tapped
+ * notification points at (the rate screen for "How was <show>?", the show
+ * page for score alerts).
  *
  * Call once at app startup. Returns cleanup function.
  */
@@ -248,20 +273,17 @@ export function setupNotificationHandler(): (() => void) | null {
     }),
   });
 
-  // Handle notification taps — navigate to the relevant screen
-  const subscription = Notifications.addNotificationResponseReceivedListener(
-    (response) => {
-      const data = response.notification.request.content.data;
+  // Taps while the app is running (foreground or background).
+  const subscription = Notifications.addNotificationResponseReceivedListener(routeNotificationResponse);
 
-      if (data?.showSlug && typeof data.showSlug === 'string') {
-        // Navigate to show detail page
-        router.push(`/show/${data.showSlug}`);
-      } else if (data?.screen && typeof data.screen === 'string') {
-        // Navigate to a specific screen
-        router.push(data.screen as never);
-      }
-    },
-  );
+  // A tap that launched a closed app fires before this listener exists (it is
+  // registered only after the onboarding read), so the listener never sees
+  // it. Read it back from the native module instead. Without this, tapping
+  // last night's reminder the next morning opened the home tab.
+  try {
+    const launch = Notifications.getLastNotificationResponse();
+    if (launch) routeNotificationResponse(launch);
+  } catch {}
 
   return () => subscription.remove();
 }
