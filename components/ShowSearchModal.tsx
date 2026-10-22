@@ -324,6 +324,80 @@ export function ShowSearchModal({
   // empty state (and invite a live search) on every keystroke.
   const querySettled = debouncedQuery.trim() === query.trim();
 
+  const renderLiveResultRow = (item: MezzanineCandidate) => {
+    const alreadyListed = !!excludeIds?.has(item.id);
+    return (
+      <Pressable
+        key={item.id}
+        style={({ pressed }) => [styles.resultRow, (alreadyListed || !!addingLiveId) && styles.resultRowMuted, pressed && styles.pressed]}
+        disabled={alreadyListed || !!addingLiveId}
+        onPress={() => selectLive(item)}
+        accessibilityRole="button"
+        accessibilityState={{ disabled: alreadyListed || !!addingLiveId }}
+        accessibilityLabel={alreadyListed ? `${item.title} — ${excludedLabel}` : item.title}
+      >
+        {item.posterUrl ? (
+          <Image source={{ uri: item.posterUrl }} style={styles.resultPoster} contentFit="cover" />
+        ) : (
+          <View style={[styles.resultPoster, styles.resultPlaceholder]}>
+            <Text style={styles.placeholderText}>🎭</Text>
+          </View>
+        )}
+        <View style={styles.resultInfo}>
+          <Text style={styles.resultTitle} numberOfLines={1}>{item.title}</Text>
+          {item.venue && <Text style={styles.resultVenue} numberOfLines={1}>{item.venue}</Text>}
+          {alreadyListed && (
+            <Text style={styles.resultAlready} numberOfLines={1}>{excludedLabel}</Text>
+          )}
+          <Text style={styles.resultMeta} numberOfLines={1}>
+            {[item.city, item.openingDate?.slice(0, 4)].filter(Boolean).join(' · ')}
+            {item.city || item.openingDate ? ' · ' : ''}No critic score
+          </Text>
+        </View>
+        <Text style={styles.liveAdd}>{addingLiveId === item.id ? 'Adding…' : '+ Add'}</Text>
+      </Pressable>
+    );
+  };
+
+  // Always offered at the bottom of a non-empty results list too, not just
+  // the fully-empty state — beta feedback 2026-08-12 (AE2cV5mxGJgdIVWbvbFRLn0):
+  // a few loose fuzzy matches shouldn't hide the escape hatch to the wider
+  // catalog when none of them is the show the user meant.
+  const renderWiderCatalogFooter = () => {
+    if (!querySettled) return null;
+    return (
+      <View style={styles.liveFooterWrap}>
+        {liveState === 'idle' && (
+          <Pressable onPress={runLiveSearch} hitSlop={12} accessibilityRole="button">
+            <Text style={styles.liveLink}>Can{'’'}t find it? Search the wider theater catalog</Text>
+          </Pressable>
+        )}
+        {liveState === 'searching' && (
+          <Text style={styles.liveStatus}>Searching the wider catalog…</Text>
+        )}
+        {liveState === 'results' && (
+          <>
+            <Text style={styles.wideHeader}>From the wider theater catalog</Text>
+            {liveCandidates.map(renderLiveResultRow)}
+          </>
+        )}
+        {liveState === 'empty' && (
+          <Text style={styles.liveStatus}>
+            Not found in the wider catalog either. Try a different spelling.
+          </Text>
+        )}
+        {liveState === 'error' && (
+          <>
+            <Text style={styles.liveErrorText}>{liveError}</Text>
+            <Pressable onPress={runLiveSearch} hitSlop={12} accessibilityRole="button">
+              <Text style={styles.liveLink}>Try again</Text>
+            </Pressable>
+          </>
+        )}
+      </View>
+    );
+  };
+
   return (
     <Modal
       visible={visible}
@@ -384,7 +458,7 @@ export function ShowSearchModal({
                     accessibilityLabel={alreadyListed ? `${candidate.title} — ${excludedLabel}` : candidate.title}
                   >
                     <View style={[styles.resultPoster, styles.resultPlaceholder]}>
-                      <Text style={styles.placeholderText}>{candidate.title.charAt(0)}</Text>
+                      <Text style={styles.placeholderText}>🎭</Text>
                     </View>
                     <View style={styles.resultInfo}>
                       <Text style={styles.resultTitle} numberOfLines={1}>{candidate.title}</Text>
@@ -420,7 +494,7 @@ export function ShowSearchModal({
                     <Image source={{ uri: posterUrl }} style={styles.resultPoster} contentFit="cover" />
                   ) : (
                     <View style={[styles.resultPoster, styles.resultPlaceholder]}>
-                      <Text style={styles.placeholderText}>{show.title.charAt(0)}</Text>
+                      <Text style={styles.placeholderText}>🎭</Text>
                     </View>
                   )}
                   <View style={styles.resultInfo}>
@@ -440,6 +514,7 @@ export function ShowSearchModal({
                 </Pressable>
               );
             }}
+            ListFooterComponent={renderWiderCatalogFooter}
             contentContainerStyle={styles.list}
             showsVerticalScrollIndicator={false}
           />
@@ -451,39 +526,7 @@ export function ShowSearchModal({
             ListHeaderComponent={
               <Text style={styles.wideHeader}>From the wider theater catalog</Text>
             }
-            renderItem={({ item }) => {
-              const alreadyListed = !!excludeIds?.has(item.id);
-              return (
-                <Pressable
-                  style={({ pressed }) => [styles.resultRow, (alreadyListed || !!addingLiveId) && styles.resultRowMuted, pressed && styles.pressed]}
-                  disabled={alreadyListed || !!addingLiveId}
-                  onPress={() => selectLive(item)}
-                  accessibilityRole="button"
-                  accessibilityState={{ disabled: alreadyListed || !!addingLiveId }}
-                  accessibilityLabel={alreadyListed ? `${item.title} — ${excludedLabel}` : item.title}
-                >
-                  {item.posterUrl ? (
-                    <Image source={{ uri: item.posterUrl }} style={styles.resultPoster} contentFit="cover" />
-                  ) : (
-                    <View style={[styles.resultPoster, styles.resultPlaceholder]}>
-                      <Text style={styles.placeholderText}>{item.title.charAt(0)}</Text>
-                    </View>
-                  )}
-                  <View style={styles.resultInfo}>
-                    <Text style={styles.resultTitle} numberOfLines={1}>{item.title}</Text>
-                    {item.venue && <Text style={styles.resultVenue} numberOfLines={1}>{item.venue}</Text>}
-                    {alreadyListed && (
-                      <Text style={styles.resultAlready} numberOfLines={1}>{excludedLabel}</Text>
-                    )}
-                    <Text style={styles.resultMeta} numberOfLines={1}>
-                      {[item.city, item.openingDate?.slice(0, 4)].filter(Boolean).join(' · ')}
-                      {item.city || item.openingDate ? ' · ' : ''}No critic score
-                    </Text>
-                  </View>
-                  <Text style={styles.liveAdd}>{addingLiveId === item.id ? 'Adding…' : '+ Add'}</Text>
-                </Pressable>
-              );
-            }}
+            renderItem={({ item }) => renderLiveResultRow(item)}
             contentContainerStyle={styles.list}
             showsVerticalScrollIndicator={false}
           />
@@ -598,6 +641,12 @@ const styles = StyleSheet.create({
     color: Colors.score.red,
     fontSize: FontSize.sm,
     textAlign: 'center',
+  },
+  liveFooterWrap: {
+    borderTopWidth: 1,
+    borderTopColor: Colors.border.subtle,
+    paddingTop: Spacing.sm,
+    marginTop: Spacing.sm,
   },
   wideHeader: {
     color: Colors.text.muted,

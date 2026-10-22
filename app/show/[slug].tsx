@@ -424,7 +424,7 @@ export default function ShowDetailScreen() {
                 />
               ) : (
                 <View style={[styles.posterCard, styles.posterPlaceholder]}>
-                  <Text style={styles.posterPlaceholderText}>{show.title.charAt(0)}</Text>
+                  <Text style={styles.posterPlaceholderText}>🎭</Text>
                 </View>
               )}
               {featureFlags.userAccounts && (
@@ -553,6 +553,28 @@ export default function ShowDetailScreen() {
 
           />
         </View>
+
+        {/* Critic Reviews List — collapsed by default. Ordered above Audience
+            Scorecard and named "Critic Reviews" per beta feedback 2026-08-13
+            (AEOxuwE1ErL4VzeQLqlhcs0). */}
+        {detail?.reviews && detail.reviews.length > 0 && (
+          <SectionCard title="Critic Reviews" meta={`${detail.reviews.length} reviews`}>
+            {showsTierChips(show.type) && <TierKey london={isLondonCategory(show.category)} />}
+            {(showAllReviews ? detail.reviews : detail.reviews.slice(0, INITIAL_REVIEW_COUNT)).map((review, i) => (
+              <ReviewRow key={i} review={review} showId={show.id} category={show.category} showTiers={showsTierChips(show.type)} />
+            ))}
+            {!showAllReviews && detail.reviews.length > INITIAL_REVIEW_COUNT && (
+              <Pressable
+                style={({ pressed }) => [styles.showAllButton, pressed && styles.pressed]}
+                onPress={() => setShowAllReviews(true)}
+              >
+                <Text style={styles.showAllText}>
+                  Show all {detail.reviews.length} reviews
+                </Text>
+              </Pressable>
+            )}
+          </SectionCard>
+        )}
 
         {/* Audience Scorecard — grade badge header + horizontal source cards */}
         {detail?.audience && show.audienceGrade && (
@@ -719,26 +741,6 @@ export default function ShowDetailScreen() {
           </SectionCard>
         )}
 
-        {/* Critic Reviews List — collapsed by default */}
-        {detail?.reviews && detail.reviews.length > 0 && (
-          <SectionCard title="Critic Scorecard" meta={`${detail.reviews.length} reviews`}>
-            {showsTierChips(show.type) && <TierKey london={isLondonCategory(show.category)} />}
-            {(showAllReviews ? detail.reviews : detail.reviews.slice(0, INITIAL_REVIEW_COUNT)).map((review, i) => (
-              <ReviewRow key={i} review={review} showId={show.id} category={show.category} showTiers={showsTierChips(show.type)} />
-            ))}
-            {!showAllReviews && detail.reviews.length > INITIAL_REVIEW_COUNT && (
-              <Pressable
-                style={({ pressed }) => [styles.showAllButton, pressed && styles.pressed]}
-                onPress={() => setShowAllReviews(true)}
-              >
-                <Text style={styles.showAllText}>
-                  Show all {detail.reviews.length} reviews
-                </Text>
-              </Pressable>
-            )}
-          </SectionCard>
-        )}
-
         {/* Loading skeleton for detail */}
         {detailLoading && (
           <ShowDetailSkeleton />
@@ -870,7 +872,7 @@ export default function ShowDetailScreen() {
                     <Image source={{ uri: prodPoster }} style={styles.relatedShowImage} contentFit="cover" transition={200} />
                   ) : (
                     <View style={[styles.relatedShowImage, styles.relatedShowPlaceholder]}>
-                      <Text style={styles.relatedShowPlaceholderText}>{prod.title.charAt(0)}</Text>
+                      <Text style={styles.relatedShowPlaceholderText}>🎭</Text>
                     </View>
                   )}
                   <View style={styles.relatedShowInfo}>
@@ -1180,7 +1182,7 @@ function RelatedShowRow({ show, onPress }: { show: Show; onPress: () => void }) 
         <Image source={{ uri: poster }} style={styles.relatedShowImage} contentFit="cover" transition={200} />
       ) : (
         <View style={[styles.relatedShowImage, styles.relatedShowPlaceholder]}>
-          <Text style={styles.relatedShowPlaceholderText}>{show.title.charAt(0)}</Text>
+          <Text style={styles.relatedShowPlaceholderText}>🎭</Text>
         </View>
       )}
       <View style={styles.relatedShowInfo}>

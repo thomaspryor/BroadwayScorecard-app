@@ -73,9 +73,7 @@ export const ShowCard = memo(function ShowCard({ show, scoreMode = 'critics', hi
           />
         ) : (
           <View style={[styles.showImage, styles.placeholderThumb]}>
-            <Text style={styles.placeholderText}>
-              {show.title.charAt(0)}
-            </Text>
+            <Text style={styles.placeholderText}>🎭</Text>
           </View>
         )}
         {/* Bookmark — rendered AFTER image so it's on top (z-order) */}

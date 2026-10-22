@@ -144,7 +144,7 @@ function GridPoster({ posterUrl, title, dateLabel }: { posterUrl: string | null;
         <Image source={{ uri: posterUrl }} style={styles.gridPoster} contentFit="cover" transition={200} />
       ) : (
         <View style={[styles.gridPoster, styles.cardPosterPlaceholder]}>
-          <Text style={styles.placeholderText}>{title.charAt(0)}</Text>
+          <Text style={styles.placeholderText}>🎭</Text>
         </View>
       )}
       {!!dateLabel && (
